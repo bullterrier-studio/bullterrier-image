@@ -13,6 +13,11 @@ use tiff::tags::Tag;
 
 use crate::{Error, Image, Layer};
 
+use icc::{Model, Profile};
+
+mod icc;
+mod raw;
+
 /// The most pixels (width times height) a file may hold to be read: twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485,
 /// its decompression-bomb limit, so what the Python package read stays readable. Checked from the file's header,
 /// before any pixel is decoded or allocated.
@@ -56,14 +61,20 @@ struct Decoded {
 /// an alpha channel, a transparent palette entry or a colour key (a GIF always counts: its format may make an index
 /// transparent). Levels are `f32` in 0..1, the file's own numbers over its maximum: an 8-bit level over 255, a 16-bit
 /// one over 65535; a grey file has equal red, green and blue; a 1-bit file is 0 or 1. The format is found by content,
-/// not by the extension: PNG, JPEG (greyscale, colour and CMYK or YCCK, which are mixed to RGB without a profile),
-/// GIF, WebP, TIFF and BMP. A TIFF of 32-bit integer levels (Pillow's mode `I`) is read as 16-bit grey is, the level
-/// over 65535, and one of floating-point levels (mode `F`) as its level; both are clipped to 0..1.
+/// not by the extension: PNG, JPEG (greyscale, colour and CMYK or YCCK, which are mixed to RGB if the file has no
+/// usable profile), GIF, WebP, TIFF and BMP. A TIFF of 32-bit integer levels (Pillow's mode `I`) is read as 16-bit grey
+/// is, the level over 65535, and one of floating-point levels (mode `F`) as its level; both are clipped to 0..1.
 /// A palette TIFF (one with a `ColorMap`) is not read; palette PNG, GIF and BMP are.
 ///
 /// The picture is upright: an EXIF orientation is applied. A file of several frames (an animated GIF or PNG, a
-/// multi-page TIFF) gives its first. Levels are taken as sRGB; an embedded colour profile is not applied yet. The same
-/// file gives the same image every time.
+/// multi-page TIFF) gives its first.
+///
+/// An embedded ICC profile is converted to sRGB, from the colour model of the file itself: the grey levels of a grey
+/// file, the red, green and blue of a colour one, the inks of a CMYK TIFF or JPEG (the inks as
+/// stored, not the RGB a decoder mixes from them). Alpha is not touched. A profile that cannot be read, or
+/// that is for another colour space than the file's, is ignored and the levels are taken as sRGB, as viewers do; so are
+/// those of 16-bit grey and of floating-point TIFFs, and the inks of a 16-bit CMYK TIFF. The same file gives the same
+/// image every time.
 ///
 /// # Errors
 /// [`Error::ImageRead`], naming the path and the reason, if the file is missing, a folder, not an image, damaged or
@@ -162,21 +173,38 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
     let mut limits = image::Limits::no_limits();
     limits.max_alloc = Some(MAX_ALLOC);
     reader.limits(limits);
-    let (mut picture, orientation, wide) = if let Some((picture, orientation, wide)) = wide_tiff(path, reader.format())?
-    {
+    let format = reader.format();
+    let mut embedded = None;
+    let (mut picture, orientation, wide) = if let Some((picture, orientation, wide)) = wide_tiff(path, format)? {
         (picture, orientation, Some(wide))
     } else {
         let mut decoder = reader.into_decoder().map_err(|error| refuse(&error))?;
         let (width, height) = decoder.dimensions();
         within_limit(width, height).map_err(|reason| refuse(&reason))?;
-        // Colour management hook: `decoder.icc_profile()` is the embedded profile, to convert from before the levels are used.
+        // A profile the file cannot give is no profile: the colours are then taken as sRGB.
+        embedded = if format == Some(ImageFormat::Tiff) {
+            raw::tiff_profile(path)
+        } else {
+            decoder.icc_profile().ok().flatten()
+        };
         let orientation = decoder.orientation().map_err(|error| refuse(&error))?;
-        let picture = DynamicImage::from_decoder(decoder).map_err(|error| refuse(&error))?;
+        // The image crate mixes the inks of a CMYK file to RGB, so its profile is applied to the inks or to nothing.
+        let mut inks = None;
+        if embedded.is_some()
+            && raw::is_cmyk(path, format, decoder.original_color_type())
+            && let Some(profile) = embedded.take().and_then(|bytes| Profile::new(&bytes, Model::Cmyk))
+        {
+            inks = raw::cmyk_picture(path, format, &profile).map_err(|reason| refuse(&reason))?;
+        }
+        let picture = match inks {
+            Some(picture) => picture,
+            None => DynamicImage::from_decoder(decoder).map_err(|error| refuse(&error))?,
+        };
         (picture, orientation, None)
     };
     picture.apply_orientation(orientation);
     let (height, width) = (picture.height() as usize, picture.width() as usize);
-    let (colour, alpha, grey) = match &picture {
+    let (mut colour, alpha, grey) = match &picture {
         DynamicImage::ImageLuma8(raw) => levels(raw.as_raw(), 255.0, Layout::Grey),
         DynamicImage::ImageLumaA8(raw) => levels(raw.as_raw(), 255.0, Layout::GreyAlpha),
         DynamicImage::ImageRgb8(raw) => levels(raw.as_raw(), 255.0, Layout::Rgb),
@@ -185,7 +213,8 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
         DynamicImage::ImageLumaA16(raw) => levels(raw.as_raw(), 65535.0, Layout::GreyAlpha),
         DynamicImage::ImageRgb16(raw) => levels(raw.as_raw(), 65535.0, Layout::Rgb),
         DynamicImage::ImageRgba16(raw) => levels(raw.as_raw(), 65535.0, Layout::Rgba),
-        DynamicImage::ImageRgb32F(raw) => levels(raw.as_raw(), 1.0, Layout::GreyRgb),
+        DynamicImage::ImageRgb32F(raw) if wide.is_some() => levels(raw.as_raw(), 1.0, Layout::GreyRgb),
+        DynamicImage::ImageRgb32F(raw) => levels(raw.as_raw(), 1.0, Layout::Rgb),
         other => {
             return Err(refuse(&format!(
                 "its pixel layout {:?} is not one the core reads",
@@ -193,6 +222,24 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
             )));
         }
     };
+    // 16-bit grey and float levels are taken as sRGB: no profile is applied to them.
+    let model = match &picture {
+        DynamicImage::ImageLuma8(_) | DynamicImage::ImageLumaA8(_) => Some(Model::Grey),
+        DynamicImage::ImageRgb8(_)
+        | DynamicImage::ImageRgba8(_)
+        | DynamicImage::ImageRgb16(_)
+        | DynamicImage::ImageRgba16(_) => Some(Model::Rgb),
+        _ => None,
+    };
+    if let (Some(model), Some(bytes)) = (model, embedded)
+        && let Some(profile) = Profile::new(&bytes, model)
+    {
+        let converted = match model {
+            Model::Grey => profile.to_srgb(&colour.iter().map(|&[level, ..]| level).collect::<Vec<_>>(), 1.0),
+            _ => profile.to_srgb(colour.as_flattened(), 1.0),
+        };
+        colour = converted.map_err(|error| refuse(&error))?;
+    }
     Ok(Decoded {
         height,
         width,

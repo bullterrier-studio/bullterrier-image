@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 bullterrier-image-derive.workspace = true
 image.workspace = true
+moxcms.workspace = true
 rayon.workspace = true
 roxmltree.workspace = true
 serde.workspace = true
@@ -19,6 +20,8 @@ serde_path_to_error.workspace = true
 svgtypes.workspace = true
 tiff.workspace = true
 toml.workspace = true
+zune-core.workspace = true
+zune-jpeg.workspace = true
 
 [dev-dependencies]
 peak_alloc.workspace = true

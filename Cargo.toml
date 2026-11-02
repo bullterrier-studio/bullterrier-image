@@ -19,6 +19,7 @@ bullterrier-image = { path = "crates/core" }
 bullterrier-image-derive = { path = "crates/derive" }
 # the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
+moxcms = { version = "0.8", default-features = false, features = ["lut"] }  # the colour profiles of image files, to sRGB (`lut` for the CMYK ones; the `image` crate brings it too)
 numpy = "0.30"
 peak_alloc = "0.3"
 proc-macro2 = "1"
@@ -35,6 +36,8 @@ svgtypes = { version = "0.16", default-features = false, features = ["std"] }  #
 syn = "3"
 tiff = { version = "0.11", default-features = false }  # the `image` crate's own TIFF decoder (its features are on there), read directly for 32-bit levels
 toml = { version = "1", default-features = false, features = ["std", "parse", "serde", "preserve_order"] }
+zune-core = { version = "0.5", default-features = false }  # with zune-jpeg: the inks of a CMYK JPEG, which `image` mixes to RGB
+zune-jpeg = { version = "0.5", default-features = false, features = ["std"] }
 
 # Warnings, not errors, so a newer compiler's new lint never breaks a user's install; the gate (`poe check`) runs clippy
 # and rustdoc with `-D warnings`, so every one fails it.

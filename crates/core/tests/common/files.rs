@@ -65,6 +65,18 @@ fn adler32(bytes: &[u8]) -> u32 {
     (b << 16) | a
 }
 
+/// `raw` as a zlib stream (RFC 1950) of one stored (uncompressed) deflate block, so no compressor stands between the
+/// bytes and the expected levels. At most 65535 bytes.
+pub(crate) fn zlib(raw: &[u8]) -> Vec<u8> {
+    let length = u16::try_from(raw.len()).unwrap_or(u16::MAX);
+    let mut zlib = vec![0x78, 0x01, 0x01];
+    zlib.extend_from_slice(&length.to_le_bytes());
+    zlib.extend_from_slice(&(!length).to_le_bytes());
+    zlib.extend_from_slice(raw);
+    zlib.extend_from_slice(&adler32(raw).to_be_bytes());
+    zlib
+}
+
 /// The PNG chunk of type `kind` holding `data`: length, type, data, CRC.
 pub(crate) fn chunk(kind: &str, data: &[u8]) -> Vec<u8> {
     let length = u32::try_from(data.len()).unwrap_or(u32::MAX);
@@ -116,16 +128,15 @@ impl Png {
         self
     }
 
-    /// The pixels as the zlib stream a pixel chunk holds: one stored (uncompressed) deflate block, filter 0 on every row.
+    /// The pixels as the zlib stream a pixel chunk holds: filter 0 on every row.
     pub(crate) fn pixels(&self) -> Vec<u8> {
-        let raw: Vec<u8> = self.rows.iter().flat_map(|row| [&[0_u8][..], row].concat()).collect();
-        let length = u16::try_from(raw.len()).unwrap_or(u16::MAX);
-        let mut zlib = vec![0x78, 0x01, 0x01];
-        zlib.extend_from_slice(&length.to_le_bytes());
-        zlib.extend_from_slice(&(!length).to_le_bytes());
-        zlib.extend_from_slice(&raw);
-        zlib.extend_from_slice(&adler32(&raw).to_be_bytes());
-        zlib
+        zlib(
+            &self
+                .rows
+                .iter()
+                .flat_map(|row| [&[0_u8][..], row].concat())
+                .collect::<Vec<u8>>(),
+        )
     }
 
     /// The file's bytes.
