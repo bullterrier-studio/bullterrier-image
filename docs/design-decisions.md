@@ -445,6 +445,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 
 ## Finding the subject and depth
 
+- **ONNX is optional, and installing it is one command with a clear error before it.** Apple Vision is the default on macOS
+  (nothing to install); elsewhere, or when `segmenter` says `onnx`, the ONNX Runtime library and the model are needed. The
+  library finds the runtime by an explicit path (argument or `BT_IMAGE_ONNX_LIB`), then its cache, then the system, then a
+  download if allowed; otherwise a `BackendUnavailableError` whose message is the fix (`bt-image install onnx`, or
+  `allow_download=True`, or `BT_IMAGE_ALLOW_DOWNLOAD=1`). `bt-image install onnx` fetches runtime and default model together;
+  `bt-image models` lists the model catalogue (name, url, sha256, input size, normalisation, output kind), so a model is data
+  and swappable; `bt-image doctor` says which backends work and why not. The CLI asks before downloading and shows progress;
+  the library and a service never prompt or print. *Reason:* the library must not surprise anyone with network use or output,
+  and a person must never have to guess the fix. *Consequence:* every download has a pinned SHA-256 and leaves no partial
+  file, and nothing touches the network at import.
 - **Two backends behind one function**, `subject_matte(rgb)`: Apple Vision, the default on macOS, and IS-Net on ONNX
   Runtime, the default everywhere else; `segmenter=` or `BT_IMAGE_SEGMENTER` picks either, `--map subject=FILE` (or
   `maps={"subject": ...}`) skips both. *Reason:* the owner's choice: Vision cuts cleaner (the portable model smears at fine
