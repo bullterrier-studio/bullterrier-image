@@ -234,6 +234,16 @@ def test_a_greyscale_profile_is_applied_to_the_grey_levels(tmp_path):
     np.testing.assert_allclose(rgb[0, 1], 0.0, atol=1 / 255)
 
 
+def test_a_map_ignores_the_colour_profile_so_the_same_map_reads_the_same_in_8_and_16_bits(tmp_path):
+    """A map is data: its profile (here linear light, which would lift every mid level) must not move its levels."""
+    levels = np.array([[0, 32, 64, 128, 255]], np.uint8)
+    Image.fromarray(levels).save(tmp_path / "m8.png", icc_profile=linear_grey_profile())
+    Image.fromarray(levels.astype(np.uint16) * 257).save(tmp_path / "m16.png", icc_profile=linear_grey_profile())
+    for name in ("m8.png", "m16.png"):
+        np.testing.assert_allclose(imageio.load_map(tmp_path / name), levels / 255, atol=1e-6)
+    assert imageio.load(tmp_path / "m8.png")[0, 1, 0] > 32 / 255 + 0.1  # the same file as a photo is converted
+
+
 def test_a_greyscale_profile_is_applied_under_transparency_too(tmp_path):
     grey = Image.fromarray(np.array([[(128, 255), (128, 0)]], np.uint8), "LA")
     grey.save(tmp_path / "linear.png", icc_profile=linear_grey_profile())

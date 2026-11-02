@@ -368,35 +368,60 @@ fn a_profile_that_cannot_be_used_leaves_the_levels_as_they_are_without_an_error(
 }
 
 #[test]
-fn a_map_is_taken_from_the_colours_a_viewer_shows() -> Outcome {
+fn a_map_is_data_so_an_embedded_profile_is_not_applied_to_it_while_a_read_applies_it() -> Outcome {
     let rgb = [[153_u8, 128, 102], [255, 0, 0], [30, 60, 90]];
-    let shown = |pixel: &[u8; 3]| {
-        let [red, green, blue] = adobe_to_srgb(pixel.map(|level| f32::from(level) / 255.0));
-        (299.0 * red + 587.0 * green + 114.0 * blue) / 1000.0
+    let stored = |pixel: &[u8; 3]| {
+        let [red, green, blue] = pixel.map(|level| f32::from(level) / 255.0);
+        (299.0 * red + 587.0 * green + 114.0 * blue) / 1000.0 // BT.601 luma of the stored levels
     };
-    let cases: [(&str, Vec<u8>, Vec<f32>); 2] = [
+    let cases: [(&str, Vec<u8>, Vec<f32>, Vec<f32>); 2] = [
         (
-            "the brightness of an RGB file is taken after its profile is applied",
+            "an RGB file under an Adobe RGB profile",
             png(3, 2, &rgb.concat(), &adobe()),
-            rgb.iter().map(shown).collect(),
+            rgb.iter().map(stored).collect(),
+            rgb.iter()
+                .map(|pixel| {
+                    let [red, green, blue] = adobe_to_srgb(pixel.map(|level| f32::from(level) / 255.0));
+                    (299.0 * red + 587.0 * green + 114.0 * blue) / 1000.0
+                })
+                .collect(),
         ),
         (
-            "the level of a grey file is its level after its profile is applied",
+            "a grey file under a linear profile",
             png(3, 0, &[128, 0, 255], &linear_grey()),
+            vec![128.0 / 255.0, 0.0, 1.0],
             [128.0 / 255.0, 0.0, 1.0].map(linear_grey_to_srgb).to_vec(),
         ),
     ];
-    for (id, file, expected) in cases {
+    for (id, file, stored, converted) in cases {
         let (_folder, path) = written(&file)?;
         let map: Layer = read_map(&path)?;
-        assert_eq!(map.values().len(), expected.len(), "{id}");
-        for (index, (value, wanted)) in map.values().iter().zip(&expected).enumerate() {
+        assert_eq!(map.values().len(), stored.len(), "{id}");
+        for (index, (value, wanted)) in map.values().iter().zip(&stored).enumerate() {
             assert!(
-                (value - wanted).abs() <= LEVEL,
-                "{id}: value {index} is {value}, not {wanted}"
+                (value - wanted).abs() <= EXACT,
+                "{id}: the map's value {index} is {value}, not the stored {wanted}"
             );
         }
+        // the same file read as a picture is converted: the two differ, so the test sees which one was done
+        let seen = read(&path)?.into_values();
+        let first = seen.as_chunks::<3>().0.iter().map(|pixel| pixel[0]).collect::<Vec<_>>();
+        assert!(
+            converted.len() == first.len() && converted.iter().zip(&stored).any(|(c, s)| (c - s).abs() > LEVEL),
+            "{id}: the profile must change some level, or this test shows nothing"
+        );
     }
+    Ok(())
+}
+
+#[test]
+fn a_cmyk_jpeg_gives_the_same_map_with_a_profile_as_without() -> Outcome {
+    let (_plain, without) = written(&cmyk_jpeg())?;
+    let (_tagged, with) = written(&with_profile(&cmyk_jpeg(), &cmyk()))?;
+    assert!(
+        read_map(&without)? == read_map(&with)?,
+        "the CMYK profile changed the map"
+    );
     Ok(())
 }
 

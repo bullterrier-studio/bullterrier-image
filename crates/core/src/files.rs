@@ -92,7 +92,7 @@ pub fn read(path: &Path) -> Result<Image, Error> {
         colour,
         alpha,
         ..
-    } = decode(path)?;
+    } = decode(path, true)?;
     let image = Image::from_pixels(height, width, colour);
     Ok(match alpha {
         Some(alpha) => image.with_alpha(alpha),
@@ -105,8 +105,10 @@ pub fn read(path: &Path) -> Result<Image, Error> {
 ///
 /// A file with transparency (some pixel not fully opaque) gives its alpha. Any other gives its brightness, so a
 /// black-and-white mask or a greyscale depth map (white = subject, white = nearest) works as it is, and so does one
-/// saved with an opaque alpha channel. Brightness is the grey level itself for a grey file, else
-/// `(299 red + 587 green + 114 blue) / 1000` (ITU-R BT.601 luma). A 16-bit file keeps its range: the level over 65535.
+/// saved with an opaque alpha channel. An embedded colour profile is not applied: a map is data, so its levels are the
+/// file's own and the same map saved as 8-bit or 16-bit, tagged or not, reads the same. Brightness is the grey level
+/// itself for a grey file, else `(299 red + 587 green + 114 blue) / 1000` (ITU-R BT.601 luma). A 16-bit file keeps its
+/// range: the level over 65535.
 ///
 /// Orientation, the first-frame rule, the formats and the limit on pixels are as in [`read`], so the map lines up with
 /// the photo it was made for. Levels with no faithful 0..1 are refused instead of clipped: a TIFF of floating-point
@@ -122,7 +124,7 @@ pub fn read_map(path: &Path) -> Result<Layer, Error> {
         alpha,
         grey,
         wide,
-    } = decode(path)?;
+    } = decode(path, false)?;
     match wide {
         Some(Wide::Float) => {
             return Err(unreadable(
@@ -166,8 +168,9 @@ fn within_limit(width: u32, height: u32) -> Result<(), String> {
     Ok(())
 }
 
-/// The first frame of the file at `path`, upright.
-fn decode(path: &Path) -> Result<Decoded, Error> {
+/// The first frame of the file at `path`, upright; its embedded profile is applied if `colour_managed` (a picture's
+/// colours) and left alone otherwise (a map's levels are data).
+fn decode(path: &Path, colour_managed: bool) -> Result<Decoded, Error> {
     let refuse = |reason: &dyn Display| unreadable(path, reason);
     let mut reader = ImageReader::open(path)
         .and_then(ImageReader::with_guessed_format)
@@ -186,7 +189,9 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
         let (width, height) = decoder.dimensions();
         within_limit(width, height).map_err(|reason| refuse(&reason))?;
         // A profile the file cannot give is no profile: the colours are then taken as sRGB.
-        embedded = if format == Some(ImageFormat::Tiff) {
+        embedded = if !colour_managed {
+            None
+        } else if format == Some(ImageFormat::Tiff) {
             raw::tiff_profile(path)
         } else {
             decoder.icc_profile().ok().flatten()

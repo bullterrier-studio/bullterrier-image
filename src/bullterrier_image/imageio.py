@@ -53,9 +53,10 @@ def load_map(path: str | Path) -> np.ndarray:
     other gives its brightness, so a black-and-white mask or a greyscale depth map (white = subject, white = nearest)
     works as it is, and so does one an editor saved with an opaque alpha channel (so a cut-out whose subject fills the
     whole frame reads as brightness: the cut-out of a subject that covers everything is no cut-out). 8- and 16-bit files
-    keep their full range, so the same map saved in either reads the same; float levels, or integers beyond 16 bits, are
-    ImageReadError naming the mode. The formats, EXIF rotation, first-frame rule and ImageReadError are as in `load`,
-    so the map lines up with the photo it was made for.
+    keep their full range, so the same map saved in either reads the same; an embedded colour profile is ignored (a map
+    is data, not colour); float levels, or integers beyond 16 bits, are ImageReadError naming the mode. The formats,
+    EXIF rotation, first-frame rule and ImageReadError are as in `load`, so the map lines up with the photo it was
+    made for.
     """
     return native.read_map(path)
 
