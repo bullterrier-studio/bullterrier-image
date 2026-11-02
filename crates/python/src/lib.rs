@@ -33,7 +33,9 @@ mod _core {
     }
 
     #[pymodule_export]
-    use super::{CoreError, apply, check, effect, effects, params, read_recipe, register, unregister, vocabulary};
+    use super::{
+        CoreError, apply, check, effect, effects, params, read_recipe, region_presets, register, unregister, vocabulary,
+    };
 
     #[pymodule_export]
     use super::files::{read, read_map, write};
@@ -227,6 +229,24 @@ fn read_recipe<'py>(py: Python<'py>, text: &str, syntax: &str) -> PyResult<Bound
     }
     .map_err(core_error)?;
     from_json(py, &serde_json::to_value(&recipe).map_err(value_error)?)
+}
+
+/// The shipped presets of the region kind `kind` (only `"shards"` has any), by name in the order of the shipped file: a
+/// dict `{name: {"description": str, "params": {...}}}`, `params` the fields of the region the preset sets as a region
+/// declaration writes them.
+///
+/// `CoreError` naming the kinds that have presets if `kind` is not one of them.
+#[pyfunction]
+fn region_presets<'py>(py: Python<'py>, kind: &str) -> PyResult<Bound<'py, PyAny>> {
+    let presets: Map<String, Value> = bullterrier_image::region_presets(kind)
+        .map_err(core_error)?
+        .into_iter()
+        .map(|(name, preset)| {
+            let value = json!({"description": preset.description, "params": preset.params});
+            (name, value)
+        })
+        .collect();
+    from_json(py, &Value::Object(presets))
 }
 
 /// Add the Python function `function(rgb, params, **inputs) -> rgb` to the core's effects as `name`, in `category` (a

@@ -88,6 +88,42 @@ def test_the_parameters_of_an_effect_the_core_does_not_implement_are_refused_by_
         _core.params("no_such_effect")
 
 
+# --- region_presets: the shipped presets of a region kind ------------------------------------------------------------
+
+SHARD_PRESETS = {
+    "glass": (
+        "Dozens of splinters crowded round an impact point in the middle, big pieces far out, straight cracks.",
+        {"count": 46, "jitter": 1.0, "focus": 2.5},
+    ),
+    "torn": (
+        "A few big pieces with wide ragged edges, like paper torn apart by hand.",
+        {"count": 6, "jitter": 0.7, "edge": {"style": "torn", "amount": 5.76, "scale": 33.6}},
+    ),
+    "stone": (
+        "About a dozen cracked slabs with slightly rough edges, like a broken pavement.",
+        {"count": 14, "jitter": 0.8, "edge": {"style": "torn", "amount": 2.4, "scale": 8.64}},
+    ),
+    "mosaic": (
+        "Many small, nearly even tiles with straight edges, like a mosaic of cut glass.",
+        {"count": 70, "jitter": 0.25},
+    ),
+}
+
+
+def test_the_shard_presets_are_the_four_with_their_sentence_and_fields_in_file_order():
+    found = _core.region_presets("shards")
+    assert list(found) == list(SHARD_PRESETS)
+    assert found == {
+        name: {"description": sentence, "params": fields} for name, (sentence, fields) in SHARD_PRESETS.items()
+    }
+    assert type(found["glass"]["params"]["count"]) is int  # a whole number stays an int across the boundary
+
+
+def test_a_region_kind_without_presets_is_refused_naming_the_kinds_that_have_them():
+    with pytest.raises(ValueError, match=r"'grid'.*shards"):
+        _core.region_presets("grid")
+
+
 # --- the effects' metadata and the registry --------------------------------------------------------------------------
 
 

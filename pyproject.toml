@@ -427,7 +427,7 @@ exhaustive = true  # a new core module must be placed in a layer here
 # (types); the registry lists an effect's presets, which are read and checked with its parameter model, and names the
 # looks it finds beside them; a recipe's
 # framing is declared with the same parameter model and used by the steps' recipe; the region kinds are declared with it
-# too and read their presets. Each edge points down, so each gets a layer of its own (the framing, the registry, the
+# too and ask the core (`native`) for their presets. Each edge points down, so each gets a layer of its own (the framing, the registry, the
 # regions and the finder side by side: none knows another); the bridge runs a recipe in the Rust core, with the finders
 # it is given.
 layers = ["bridge", "steps", "framing | registry | regions | finder", "presets | looks", "params | vocabulary", "native", "types"]

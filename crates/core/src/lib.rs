@@ -58,6 +58,7 @@ pub use files::{read, read_map, write, write_with_quality};
 pub use inputs::{Inputs, Labels, Layer};
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
+pub use recipe::region::presets::region_presets;
 pub use recipe::{
     Assign, BlendMode, Drive, Each, Entry, Frame, Needs, Recipe, Region, Regions, STEP_KEYS, Step, frame, region,
 };

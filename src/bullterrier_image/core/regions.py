@@ -10,7 +10,7 @@ lengths of a torn `Edge` are design px.
 A declaration is checked when it is made (a value out of range) and when the recipe is (an unknown name, a name of the
 wrong kind of region, a cycle, a path that is no path): a `RecipeError` naming the region and what is valid.
 
-Dependency direction: imports `params` and `presets`; the steps build on it.
+Dependency direction: imports `params` and `native` (the shipped presets of a kind); the steps build on it.
 """
 
 import math
@@ -23,8 +23,8 @@ from pydantic import BeforeValidator, field_validator, model_validator
 
 from bullterrier_image.errors import RecipeError
 
+from . import native
 from .params import EffectParams, param
-from .presets import SHIPPED, read
 
 __all__ = [
     "FOUND_MAPS",
@@ -173,6 +173,11 @@ class Grid(_Laid):
         return shares
 
 
+# The core ships the presets of `shards` (name -> {"description", "params"}); asked once, when this module is imported.
+_SHARD_PRESETS = native.region_presets("shards")
+_PRESET_NAMES = ", ".join(f"'{name}'" for name in list(_SHARD_PRESETS)[:-1]) + f" or '{list(_SHARD_PRESETS)[-1]}'"
+
+
 class Shards(_Laid):
     """Irregular pieces like broken glass or stone: the cells round seeds scattered over the frame."""
 
@@ -216,7 +221,7 @@ class Shards(_Laid):
     )
     preset: str | None = param(
         None,
-        doc="The name of a shipped set of these fields ('glass', 'torn', 'stone' or 'mosaic'): its values are used for "
+        doc=f"The name of a shipped set of these fields ({_PRESET_NAMES}): its values are used for "
         "every field not given beside it (a given `edge` replaces the preset's whole `edge`). Not set = the defaults.",
     )
 
@@ -228,10 +233,9 @@ class Shards(_Laid):
         name = values.get("preset") if isinstance(values, dict) else None
         if not isinstance(name, str):
             return values
-        found = read("shards", cls, SHIPPED / "regions")
-        if name not in found:
-            raise ValueError(f"no preset {name!r}; the presets are: {', '.join(found)}")
-        return {**found[name].params, **values}
+        if name not in _SHARD_PRESETS:
+            raise ValueError(f"no preset {name!r}; the presets are: {', '.join(_SHARD_PRESETS)}")
+        return {**_SHARD_PRESETS[name]["params"], **values}
 
     @field_validator("impact")
     @classmethod

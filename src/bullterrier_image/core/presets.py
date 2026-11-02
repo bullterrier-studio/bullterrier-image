@@ -1,10 +1,10 @@
-"""Presets: named parameter sets for one effect or region kind, shipped in `presets/<name>.toml`.
+"""Presets: named parameter sets for one effect, shipped in `presets/<name>.toml`.
 
     [sepia]                                  # one table per preset, named as the preset is
     description = "Warm brown monochrome."   # required, one sentence
     stops = ["#1a0f08", "#f4e4c1"]           # the other keys are the effect's parameters
 
-`read` returns the presets of an effect or region kind by name, each checked by its own parameter model exactly as a
+`read` returns the presets of an effect by name, each checked by its own parameter model exactly as a
 recipe's step is (a misspelt or out-of-range key, or `subject`, which a recipe supplies itself, is a `RecipeError`
 naming the preset). A file is read and checked once, the first time it is asked for. Without a file there are no
 presets. The folder is a parameter only so that a test can read a throwaway one.
@@ -33,7 +33,7 @@ class Preset(NamedTuple):
 
 @cache
 def read(name: str, model: type[EffectParams], folder: Path = SHIPPED) -> dict[str, Preset]:
-    """The presets of the effect or region kind called `name` (its parameter model is `model`) by name, in file order;
+    """The presets of the effect called `name` (its parameter model is `model`) by name, in file order;
     empty when it has none. RecipeError when a preset lacks its `description` or `model` refuses its parameters."""
     file = folder / f"{name}.toml"
     if not file.is_file():

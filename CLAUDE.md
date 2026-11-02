@@ -96,7 +96,7 @@ included. The core opens one file, `Svg.file` (`run/laid.rs`: read through `take
 bytes: UTF-8 only, `<!ENTITY` refused before the parser, nothing in the file opened or run), and its limits are `Limits` in
 `ops/outlines` (`Limits::STANDARD`; tests pass a small one). `Pick` by `id` reads the ids an `Svg` made (`Made::Pieces`);
 a relative file path in a recipe file is the loader's to resolve. `Shards.preset` is expanded when the region is read
-(`recipe/region/presets.rs`, from `src/bullterrier_image/presets/regions/shards.toml`). Every user number that drives
+(`recipe/region/presets.rs`, from `crates/core/data/regions/shards.toml`; Python reads them through `_core.region_presets`). Every user number that drives
 allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of
 `Region::check` with neither a row nor a reason.
 Python is a facade over the core and runs no recipe itself. It reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the

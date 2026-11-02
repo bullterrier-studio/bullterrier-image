@@ -7,7 +7,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use bullterrier_image::region::{Edge, EdgeStyle, Shards};
 use bullterrier_image::{
-    Category, Effect, Error, Image, Input, Inputs, Options, Photo, Picture, Presets, Recipe, Region, Step, register,
+    Category, Effect, Error, Image, Input, Inputs, Options, Photo, Picture, Presets, Recipe, Region, Step,
+    region_presets, register,
 };
 use serde_json::{Value, json};
 
@@ -191,14 +192,15 @@ fn torn_shards_are_the_straight_ones_bent_by_the_seed() -> Result<(), Error> {
 
 // --- the presets ---------------------------------------------------------------------------------------------------
 
-/// The shipped presets of the shards kind, read from the file itself: each name with the table of its fields.
-fn shipped() -> Vec<(String, Value)> {
-    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/bullterrier_image/presets/regions/shards.toml");
-    let text = std::fs::read_to_string(file).unwrap_or_default();
-    let Ok(Value::Object(table)) = toml::from_str::<Value>(&text) else {
-        return Vec::new();
-    };
-    table.into_iter().collect()
+/// The shipped presets of the shards kind, read from the file itself: each name with the table of its fields. A missing
+/// or broken file fails the test that asks.
+fn shipped() -> Result<Vec<(String, Value)>, String> {
+    let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("data/regions/shards.toml");
+    let text = std::fs::read_to_string(&file).map_err(|error| format!("{}: {error}", file.display()))?;
+    match toml::from_str::<Value>(&text).map_err(|error| error.to_string())? {
+        Value::Object(table) => Ok(table.into_iter().collect()),
+        other => Err(format!("not a table of presets: {other}")),
+    }
 }
 
 /// The shards region `fields` (the `preset` and what is given beside it) is read as, or the message that refuses it.
@@ -219,15 +221,56 @@ fn written(shards: &Shards) -> Value {
 }
 
 #[test]
-fn the_shipped_presets_are_glass_torn_stone_and_mosaic() {
-    let names: Vec<String> = shipped().into_iter().map(|(name, _)| name).collect();
+fn the_shipped_presets_are_glass_torn_stone_and_mosaic() -> Result<(), String> {
+    let names: Vec<String> = shipped()?.into_iter().map(|(name, _)| name).collect();
     assert_eq!(names, ["glass", "torn", "stone", "mosaic"]);
+    Ok(())
+}
+
+#[test]
+fn region_presets_lists_the_four_with_their_sentence_and_fields_in_file_order() -> Result<(), Error> {
+    let found = region_presets("shards")?;
+    let names: Vec<&str> = found.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, ["glass", "torn", "stone", "mosaic"]);
+    let described: Vec<(&str, Value)> = found
+        .iter()
+        .map(|(_, preset)| (preset.description.as_str(), Value::Object(preset.params.clone())))
+        .collect();
+    let expected = [
+        (
+            "Dozens of splinters crowded round an impact point in the middle, big pieces far out, straight cracks.",
+            json!({"count": 46, "jitter": 1.0, "focus": 2.5}),
+        ),
+        (
+            "A few big pieces with wide ragged edges, like paper torn apart by hand.",
+            json!({"count": 6, "jitter": 0.7, "edge": {"style": "torn", "amount": 5.76, "scale": 33.6}}),
+        ),
+        (
+            "About a dozen cracked slabs with slightly rough edges, like a broken pavement.",
+            json!({"count": 14, "jitter": 0.8, "edge": {"style": "torn", "amount": 2.4, "scale": 8.64}}),
+        ),
+        (
+            "Many small, nearly even tiles with straight edges, like a mosaic of cut glass.",
+            json!({"count": 70, "jitter": 0.25}),
+        ),
+    ];
+    assert_eq!(described, expected);
+    Ok(())
+}
+
+#[test]
+fn region_presets_of_a_kind_without_presets_names_the_kinds_that_have_them() {
+    let refused = region_presets("grid")
+        .err()
+        .map(|error| error.to_string())
+        .unwrap_or_default();
+    assert!(refused.contains("'grid'") && refused.contains("shards"), "{refused}");
 }
 
 #[test]
 fn a_preset_sets_every_field_its_file_gives_and_leaves_the_others_at_their_defaults() -> Result<(), String> {
     let defaults = written(&Shards::default());
-    for (name, fields) in shipped() {
+    for (name, fields) in shipped()? {
         let made = written(&read(&json!({"preset": name}))?);
         for (field, value) in fields.as_object().into_iter().flatten() {
             match field.as_str() {

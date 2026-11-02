@@ -970,9 +970,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **Pieces of cuts are numbered by a sparse map.** One bit for each of up to 32 cuts is up to 2^32 kinds; `renumber_sparse`
   remembers the kinds that occur, not all that could.
 - **Shard presets are embedded from the one data file and expanded when a region is read.** `recipe/region/presets.rs`
-  includes `src/bullterrier_image/presets/regions/shards.toml` (one copy, still data); given fields win over the preset's,
-  and a given `edge` replaces the preset's whole `edge`. *Carried to R5:* the crate cannot be published while the file lives
-  outside it; move it into `crates/core` and have the facade read it through the core.
+  includes `crates/core/data/regions/shards.toml` (one copy, inside the crate so it can be published, still data);
+  given fields win over the preset's, and a given `edge` replaces the preset's whole `edge`. Python reads names,
+  sentences and values through `region_presets` (`_core.region_presets`), never the file; `tests/tools/test_rust_embeds.py`
+  fails on any `include_*!` that leaves its crate.
 - **Every user value that drives allocation or work has a maximum, and a test at it and one past it** (`crates/core/tests/it/limits.rs`):
   `Shards.count` 500, `Cuts.lines` 32, `Path.samples` 16, `Edge.octaves` 8, `Edge.scale` 480, `Edge.amount` 48, `Grid` shares
   1000 and 10000 pieces, `Bands.count` 100, a `Pick` 10000 pieces, `Svg.max_shapes` 100000, `Svg.max_kilobytes` 100000,

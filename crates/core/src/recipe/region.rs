@@ -19,7 +19,7 @@
 mod check;
 mod derived;
 mod laid;
-mod presets;
+pub(crate) mod presets;
 
 use std::collections::HashMap;
 use std::fmt;
