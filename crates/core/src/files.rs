@@ -18,6 +18,10 @@ use crate::{Error, Image, Layer};
 /// before any pixel is decoded or allocated.
 pub(crate) const MAX_PIXELS: u64 = 2 * 89_478_485; // constant: Pillow's decompression-bomb limit
 
+/// The most bytes a decoder may allocate at once while reading a file: [`MAX_PIXELS`] pixels of the widest kind it reads,
+/// RGBA of 16 bits (8 bytes). It bounds what a file's header does not say, as the limit on pixels bounds what it does.
+const MAX_ALLOC: u64 = MAX_PIXELS * 8; // constant: 4 channels of 2 bytes
+
 /// The channels of a decoded file, as the decoder lays them out.
 #[derive(Clone, Copy)]
 enum Layout {
@@ -152,7 +156,11 @@ fn decode(path: &Path) -> Result<Decoded, Error> {
     let mut reader = ImageReader::open(path)
         .and_then(ImageReader::with_guessed_format)
         .map_err(|error| refuse(&error))?;
-    reader.no_limits(); // the pixel limit below is the core's, and the first to apply
+    // The decoders' own limits stay off but one: the memory a decoder may ask for, since a file can claim a size in its
+    // header and then decode to another (a GIF frame larger than its screen, a profile that inflates to gigabytes).
+    let mut limits = image::Limits::no_limits();
+    limits.max_alloc = Some(MAX_ALLOC);
+    reader.limits(limits);
     let (mut picture, orientation, wide) = if let Some((picture, orientation, wide)) = wide_tiff(path, reader.format())?
     {
         (picture, orientation, Some(wide))

@@ -258,3 +258,17 @@ pub(crate) fn tiff_wide(
     file.extend(samples.concat());
     file
 }
+
+/// A GIF 35 bytes long whose screen is 1 x 1 pixel and whose only frame is 65535 x 65535: a decoder that trusts the frame
+/// allocates 17 GB for it. The frame holds two bytes of compressed data.
+pub(crate) fn gif_frame_larger_than_its_screen() -> Vec<u8> {
+    let mut bytes = b"GIF89a".to_vec();
+    bytes.extend_from_slice(&[1, 0, 1, 0, 0, 0, 0]); // screen 1 x 1, no colour table, background 0, aspect 0
+    bytes.push(0x2C); // an image
+    bytes.extend_from_slice(&[0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]); // at 0, 0; 65535 x 65535
+    bytes.push(0x80); // a colour table of 2 entries follows
+    bytes.extend_from_slice(&[0, 0, 0, 0xFF, 0xFF, 0xFF]);
+    bytes.extend_from_slice(&[2, 2, 0x4C, 0x01, 0]); // LZW minimum code size 2, one block of 2 bytes, end of data
+    bytes.push(0x3B); // end of file
+    bytes
+}

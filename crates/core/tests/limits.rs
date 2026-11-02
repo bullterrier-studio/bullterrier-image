@@ -689,6 +689,26 @@ fn a_file_of_the_most_pixels_is_read_as_far_as_its_data_and_one_pixel_more_is_re
     Ok(())
 }
 
+/// What a file's header says is not all it decodes to: a GIF of a 1 x 1 screen holds a frame of 65535 x 65535 pixels,
+/// and a decoder that believed the frame would allocate 17 GB. The memory a decoder may ask for is limited, so the file
+/// is refused, as a result, naming the path (the test is killed by the memory cap of the gate if it is not).
+#[test]
+fn a_gif_whose_frame_is_larger_than_its_screen_is_refused_without_the_memory_for_it() -> Outcome {
+    let folder = Folder::new()?;
+    let path = folder.write("frame.gif", common::files::gif_frame_larger_than_its_screen())?;
+    let path = std::path::Path::new(&path);
+    for result in [
+        bullterrier_image::read(path).map(drop),
+        bullterrier_image::read_map(path).map(drop),
+    ] {
+        assert!(
+            matches!(&result, Err(error) if error.kind() == ErrorKind::ImageRead && error.to_string().contains("frame.gif")),
+            "{result:?}"
+        );
+    }
+    Ok(())
+}
+
 // ---- completeness ------------------------------------------------------------------------------------------------
 
 /// The fields of the numeric bounds of `Region::check` that bound nothing allocated or run, with why. (The table above has
