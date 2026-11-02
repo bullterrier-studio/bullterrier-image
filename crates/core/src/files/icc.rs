@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use moxcms::{CmsError, ColorProfile, DataColorSpace, Layout, TransformExecutor, TransformOptions};
 
+use super::write::SRGB;
+
 /// Pixels converted at a time, so the working buffers stay small whatever the picture's size.
 const CHUNK: usize = 1 << 16; // constant: 65536 pixels, 768 KiB of output
 
@@ -56,6 +58,11 @@ impl Profile {
     /// The embedded profile `bytes` for samples of `model`, or None if it is unreadable or describes another colour
     /// space or cannot convert: the colours are then taken as sRGB, as viewers do.
     pub(super) fn new(bytes: &[u8], model: Model) -> Option<Self> {
+        // The profile this core writes is sRGB by definition: converting by it would only add the rounding error of
+        // two definitions of sRGB (up to 1.2 levels of 255), so a file the core wrote reads back as written.
+        if bytes == SRGB {
+            return None;
+        }
         let profile = ColorProfile::new_from_slice(bytes).ok()?;
         if profile.color_space != model.space() {
             return None;

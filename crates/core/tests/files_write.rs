@@ -182,6 +182,16 @@ fn a_lossless_file_reads_back_the_exact_8_bit_levels_written() -> Outcome {
 }
 
 #[test]
+fn the_profile_the_core_embeds_does_not_move_a_level_when_the_file_is_read_again() -> Outcome {
+    let image = noise(48, 64)?; // saturated colours: where two definitions of sRGB differ most
+    let (_folder, path) = target("a.png")?;
+    write(&path, &image)?;
+    let (largest, _) = error(&image, &read(&path)?);
+    assert!(largest < 1e-6, "a level moved by {largest}");
+    Ok(())
+}
+
+#[test]
 fn a_level_is_cut_to_a_whole_number_after_half_a_level_is_added() -> Outcome {
     // 255 x level + 0.5, cut: worked out by hand
     let rows: [(f32, u8); 5] = [

@@ -76,7 +76,8 @@ struct Decoded {
 /// file, the red, green and blue of a colour one, the inks of a CMYK TIFF or JPEG (the inks as
 /// stored, not the RGB a decoder mixes from them). Alpha is not touched. A profile that cannot be read, or
 /// that is for another colour space than the file's, is ignored and the levels are taken as sRGB, as viewers do; so are
-/// those of 16-bit grey and of floating-point TIFFs, and the inks of a 16-bit CMYK TIFF. The same file gives the same
+/// those of 16-bit grey and of floating-point TIFFs, and the inks of a 16-bit CMYK TIFF; so is the profile [`write()`]
+/// embeds, which is sRGB, so a file the core wrote reads back as written. The same file gives the same
 /// image every time.
 ///
 /// # Errors

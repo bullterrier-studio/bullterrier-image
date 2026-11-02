@@ -14,7 +14,7 @@ use crate::{Error, Image};
 /// The sRGB profile every file embeds: littlecms's built-in one (588 bytes), with the creation date in its header
 /// (bytes 24..36) set to 2000-01-01 00:00:00 instead of the time it was made, so a file's bytes do not depend on when it
 /// was written.
-const SRGB: &[u8] = include_bytes!("../../data/srgb.icc");
+pub(super) const SRGB: &[u8] = include_bytes!("../../data/srgb.icc");
 
 /// The JPEG quality of [`write()`](crate::write), the one the Python package saved with.
 const DEFAULT_QUALITY: u8 = 95; // constant: the quality `imageio.save` has always defaulted to
