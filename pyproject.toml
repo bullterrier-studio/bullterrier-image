@@ -28,10 +28,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 # Lower bounds are the oldest releases the suite passes with on Python 3.12 (`uv run poe check-min-deps` runs it against
-# exactly these). Below them: Pillow 10.1.0 writes different JPEG bytes for the same pixels and Pillow 11.0.0 cannot
-# build the geotagged picture of the metadata test, pydantic 2.7.0 fails at import, pyobjc 9.2 cannot read Vision's
-# pixel buffer, scipy before 1.16 warns on every `affine_transform` with a 1-D matrix (the radial effects use it, and the
-# suite turns warnings into errors), and numpy 1.26 and onnxruntime 1.17 are the first series with Python 3.12 wheels.
+# exactly these). Below them: Pillow 11.0.0 (it draws the fonts and resizes in places, and writes the tests' picture
+# files; the core reads and writes ours) cannot build the geotagged picture of the metadata test, pydantic 2.7.0 fails
+# at import, pyobjc 9.2 cannot read Vision's pixel buffer, scipy before 1.16 warns on every `affine_transform` with a
+# 1-D matrix (the radial effects use it, and the suite turns warnings into errors), and numpy 1.26 and onnxruntime 1.17
+# are the first series with Python 3.12 wheels.
 # No upper bounds: nothing is known to break on a newer release.
 dependencies = [
     "annotated-types>=0.4.0",
