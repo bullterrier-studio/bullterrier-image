@@ -60,13 +60,11 @@ impl Profile {
         if profile.color_space != model.space() {
             return None;
         }
+        // The default is fixed-point arithmetic, which loses the colours beyond sRGB's gamut that wide profiles hold.
+        let mut options = TransformOptions::default();
+        options.prefer_fixed_point = false;
         let transform = profile
-            .create_transform_f32(
-                model.layout(),
-                &ColorProfile::new_srgb(),
-                Layout::Rgb,
-                TransformOptions::default(),
-            )
+            .create_transform_f32(model.layout(), &ColorProfile::new_srgb(), Layout::Rgb, options)
             .ok()?;
         Some(Self { model, transform })
     }

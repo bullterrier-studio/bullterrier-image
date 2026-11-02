@@ -58,20 +58,32 @@ const ADOBE_PRIMARIES: [[f64; 3]; 3] = [
 ];
 const ADOBE_GAMMA: f64 = 563.0 / 256.0;
 
-/// What a viewer shows for an Adobe RGB colour of levels `rgb` (0..1): the levels over the gamma give linear light, the
-/// primaries give XYZ, the inverse of the sRGB primaries (D50) give linear sRGB, which is encoded and clipped to 0..1.
+/// ROMM RGB (ProPhoto) as an ICC profile holds it: primaries far wider than sRGB's (the green and blue are not real
+/// colours), D50, a gamma of 461/256 (1.8 as u8Fixed8).
+const ROMM_PRIMARIES: [[f64; 3]; 3] = [
+    [0.797_7, 0.288_0, 0.0],
+    [0.135_1, 0.711_9, 0.0],
+    [0.031_3, 0.0, 0.824_9],
+];
+const ROMM_GAMMA: f64 = 461.0 / 256.0;
+
+/// What a viewer shows for an Adobe RGB colour of levels `rgb` (0..1), see [`to_srgb`].
 fn adobe_to_srgb(rgb: [f32; 3]) -> [f32; 3] {
+    to_srgb(ADOBE_PRIMARIES, ADOBE_GAMMA, rgb)
+}
+
+/// What a viewer shows for a colour of levels `rgb` (0..1) in the profile of `primaries` (their D50 XYZ) and one
+/// `exponent` for all three curves: the levels over the exponent give linear light, the primaries give XYZ, the inverse
+/// of the sRGB primaries (D50) give linear sRGB, which is clipped to 0..1 and encoded. All in `f64`.
+fn to_srgb(primaries: [[f64; 3]; 3], exponent: f64, rgb: [f32; 3]) -> [f32; 3] {
     const XYZ_TO_SRGB: [[f64; 3]; 3] = [
         [3.133_856_1, -1.616_866_7, -0.490_614_6],
         [-0.978_768_4, 1.916_141_5, 0.033_454_0],
         [0.071_945_3, -0.228_991_4, 1.405_242_7],
     ];
-    let linear = rgb.map(|level| f64::from(level).powf(ADOBE_GAMMA));
-    let xyz: [f64; 3] = std::array::from_fn(|axis| {
-        (0..3)
-            .map(|primary| ADOBE_PRIMARIES[primary][axis] * linear[primary])
-            .sum()
-    });
+    let linear = rgb.map(|level| f64::from(level).powf(exponent));
+    let xyz: [f64; 3] =
+        std::array::from_fn(|axis| (0..3).map(|primary| primaries[primary][axis] * linear[primary]).sum());
     std::array::from_fn(|channel| {
         let light: f64 = (0..3).map(|axis| XYZ_TO_SRGB[channel][axis] * xyz[axis]).sum();
         single(srgb_encode(light.clamp(0.0, 1.0)))
@@ -160,6 +172,11 @@ fn applied_cases() -> Vec<Case> {
         .collect();
     let adobe_row: Vec<u8> = adobe_pixels.concat();
     let adobe_row16: Vec<u8> = adobe_row.iter().flat_map(|&level| [level, level]).collect();
+    let romm_pixels: [[u8; 3]; 3] = [[164, 248, 206], [200, 100, 50], [255, 255, 255]];
+    let romm_expected: Vec<f32> = romm_pixels
+        .iter()
+        .flat_map(|pixel| to_srgb(ROMM_PRIMARIES, ROMM_GAMMA, pixel.map(|level| f32::from(level) / 255.0)))
+        .collect();
     let inks: [u8; 12] = [
         0, 255, 255, 0, /* naively red */ 0, 0, 0, 0, /* white */ 0, 0, 0, 255, /* black */
     ];
@@ -194,6 +211,12 @@ fn applied_cases() -> Vec<Case> {
             "an RGB profile whose primaries are not sRGB's is applied to a PNG",
             png(5, 2, &adobe_row, &adobe()),
             adobe_expected.clone(),
+            LEVEL,
+        ),
+        case(
+            "colours beyond sRGB's gamut are converted exactly, then clipped",
+            png(3, 2, &romm_pixels.concat(), &matrix_rgb(ROMM_PRIMARIES, ROMM_GAMMA)),
+            romm_expected,
             LEVEL,
         ),
         case(
