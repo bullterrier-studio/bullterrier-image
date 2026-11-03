@@ -151,13 +151,15 @@ rust-fmt = { cmd = "cargo fmt --all --check", help = "Check the Rust formatting 
 rust-lint = { cmd = "cargo clippy --workspace --all-targets --locked --quiet -- -D warnings", help = "Lint the Rust code: clippy, dead code, missing docs, unreachable pub, unsafe ([workspace.lints] in Cargo.toml)" }
 rust-doc = { cmd = "cargo doc --workspace --no-deps --locked --quiet", env = { RUSTDOCFLAGS = "-D warnings" }, help = "Build the Rust documentation; any rustdoc warning (a broken link) fails" }
 rust-tools = { cmd = "uv run python tools/rust_tools.py check", help = "Check that the cargo tools the gate runs are installed at the versions Cargo.toml pins" }
+# A crate's Rust integration tests are one binary (tests/it/main.rs); tools/check_rust_test_layout.py, the table [tool.rust-tests.own-binaries]
+rust-test-layout = { cmd = "uv run python tools/check_rust_test_layout.py", help = "Check that the Rust integration tests are one binary per crate (tests/it/)" }
 rust-shear = { cmd = "cargo shear", help = "Find Rust dependencies no code uses (cargo-shear)" }
 rust-deny = { cmd = "cargo deny --offline --locked check bans licenses sources", help = "Check the Rust dependencies offline: banned crates, licences, sources (deny.toml)" }
 stubtest = { cmd = "uv run python -m mypy.stubtest --mypy-config-file pyproject.toml bullterrier_image._native._core", help = "Check the stub _core.pyi against the built extension" }
 rust-test = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast", help = "Run the Rust tests, every binary even after one fails" }
 dead-code = { cmd = "vulture src", help = "Find dead code in src (vulture)" }
 fast = { sequence = [{ ref = "rust-fmt" }, "ruff format --check .", { ref = "rust-lint" }, "ruff check .", "mypy", { ref = "rust-test" }], default_item_type = "cmd", help = "The inner loop: format, lint, types and the Rust tests; the Python suite, dead code, dependencies and the build checks are left to check" }
-check = { sequence = ["python tools/pre_push.py start", "ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-shear" }, { ref = "rust-deny" }, { ref = "build-check" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "test" }, "python tools/pre_push.py pass"], default_item_type = "cmd", help = "The full gate, Python and Rust (format, lint, workflows, dead code, docs, dependencies, distributions, types, tests); stops at the first failure; a pass on a clean tree is remembered, so pushing exactly that tree does not repeat it" }
+check = { sequence = ["python tools/pre_push.py start", "ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, { ref = "build-check" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "test" }, "python tools/pre_push.py pass"], default_item_type = "cmd", help = "The full gate, Python and Rust (format, lint, workflows, dead code, docs, dependencies, distributions, types, tests); stops at the first failure; a pass on a clean tree is remembered, so pushing exactly that tree does not repeat it" }
 # Not part of `check` (about 30 s, and a project environment of its own): `poe new-effect` end to end in a copy of the
 # tree, through `uv sync` and the new effect's own and contract tests (the `rebuild` test of tests/test_scaffold.py).
 # CI runs it on Linux.
@@ -198,6 +200,12 @@ tests = 1500
 # cap is that plus half again, the most a 24 GB Mac can give a gate. A 7 GB CI runner hits its own limit first.
 [tool.run-capped]
 cap-mb = 14000
+
+# Read by tools/check_rust_test_layout.py: the Rust test files that are binaries of their own (path -> why they need a
+# process to themselves). Every other integration test is a module of tests/it/.
+[tool.rust-tests.own-binaries]
+"crates/core/tests/memory.rs" = "a counting #[global_allocator] measures the whole process's peak heap"
+"crates/core/tests/parameters_are_read.rs" = "it walks every effect in the registry, which other tests fill"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -342,12 +342,13 @@ time). Fix findings properly; for a false positive use a targeted `# noqa: CODE 
 Follow the `testing-best-practices` skill. A test coupled to implementation or otherwise poor (weak sole assertion, tautology,
 golden file, sleep, mock of our own code) is worse than none: delete it. Reviewers treat such tests as blocking.
 
-- **Rust tests live in `crates/*/tests/` and use the public API** (`use bullterrier_image::...`); no `#[cfg(test)]` in
-  `src/`. Shared doubles and helpers: `crates/core/tests/it/common/`. A behaviour no public route reaches is tested through
-  the one that serves it, or earns a public name.
+- **Rust tests are black-box by default:** a test goes in `crates/*/tests/it/` and uses the public API
+  (`use bullterrier_image::...`); helpers in `crates/core/tests/it/common/`. It stays next to its code (`#[cfg(test)]`)
+  only when no public route reaches the behaviour it checks (a private kernel); never widen an item to `pub` to move a test.
 - **One Rust test binary per crate:** a new Rust test is a new module of `crates/*/tests/it/` (declared in its `main.rs`),
   never a new `tests/*.rs` (each is an executable that macOS scans on first launch). A file is a binary of its own only when
-  it needs its own process, with the reason in its first line, and is listed in `tests/tools/test_rust_test_binaries.py`.
+  it needs its own process, with the reason in its first line (`//! Own binary: <why>`), and is listed in
+  `[tool.rust-tests.own-binaries]` of `pyproject.toml`; `uv run poe rust-test-layout` (in `check`) fails otherwise.
   Tests share one process and run in parallel: a registered effect gets a name no other test has (`unique`, a per-module
   prefix and a counter), and no test asserts the whole registry.
 - Behaviour through the public contract; **property tests, not golden images**. E.g. `pixel_sort` keeps every column's pixel set;
