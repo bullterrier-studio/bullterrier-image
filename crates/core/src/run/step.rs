@@ -6,12 +6,14 @@ use std::sync::Arc;
 use serde_json::{Map, Value};
 
 use super::each::EachRun;
+use super::luts::Luts;
 use super::regions::Evaluator;
 use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
+use crate::params::Kind;
 use crate::recipe::drive;
 use crate::registry::Registry;
-use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Picture, Presets, Step};
+use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Lut, Picture, Presets, Step};
 
 /// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
 /// names, for an `each` step its looks the same.
@@ -19,12 +21,13 @@ pub(super) fn prepare(
     registry: &Registry,
     presets: &Presets,
     ratio: f64,
+    luts: &mut Luts<'_>,
     entry: &Entry,
     place: &str,
 ) -> Result<Prepared, Error> {
     Ok(match entry {
-        Entry::Step(step) => Prepared::Step(StepRun::new(registry, presets, ratio, step, place)?),
-        Entry::Each(each) => Prepared::Each(EachRun::new(registry, presets, ratio, each, place)?),
+        Entry::Step(step) => Prepared::Step(StepRun::new(registry, presets, ratio, luts, step, place)?),
+        Entry::Each(each) => Prepared::Each(EachRun::new(registry, presets, ratio, luts, each, place)?),
     })
 }
 
@@ -120,6 +123,8 @@ pub(super) struct StepRun {
     fields: Vec<(String, String)>,
     /// The region whose pieces the effect receives, if it takes a partition.
     partition: Option<String>,
+    /// The lookup table parameters of the effect that name a table, each with its table.
+    luts: Vec<(String, Arc<Lut>)>,
     laid: Laid,
 }
 
@@ -138,12 +143,44 @@ fn complete(
     }))
 }
 
+/// The table each lookup table parameter of `effect` names in `runs` (the parameters are the same at every level of a
+/// drive: a table is not drivable), found by `luts`; a parameter with no name is the identity table and has none.
+///
+/// # Errors
+/// [`Error::Lut`] if a name is no table, placed at the step and the parameter.
+fn tables(
+    effect: &dyn Effect,
+    runs: &Runs,
+    luts: &mut Luts<'_>,
+    place: &str,
+) -> Result<Vec<(String, Arc<Lut>)>, Error> {
+    let Some(table) = effect.params() else {
+        return Ok(Vec::new());
+    };
+    let params = match runs {
+        Runs::One(params) => params,
+        Runs::Driven { levels, .. } => &levels[0],
+    };
+    let mut found = Vec::new();
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Lut) {
+        if let Some(name) = params[field.name].as_str() {
+            let lut = luts.get(name).map_err(|error| match error {
+                Error::Lut(why) => Error::Lut(format!("{place}: effect '{}': `{}`: {why}", effect.name(), field.name)),
+                other => other,
+            })?;
+            found.push((field.name.to_owned(), lut));
+        }
+    }
+    Ok(found)
+}
+
 impl StepRun {
     /// The step `step` (at `place`, as `step 2`) resolved.
     pub(super) fn new(
         registry: &Registry,
         presets: &Presets,
         ratio: f64,
+        luts: &mut Luts<'_>,
         step: &Step,
         place: &str,
     ) -> Result<Self, Error> {
@@ -176,7 +213,9 @@ impl StepRun {
         } else {
             Runs::One(complete(&*effect, &step.effect, given, ratio, place)?)
         };
+        let luts = tables(&*effect, &runs, luts, place)?;
         Ok(Self {
+            luts,
             laid: Laid::new(
                 step.opacity.unwrap_or_else(|| effect.opacity()),
                 step.blend_mode,
@@ -205,6 +244,9 @@ impl StepRun {
         let mut offered = Inputs::default().with_size_ratio(ratio);
         for (parameter, layer) in &fields {
             offered = offered.with_field(parameter.as_str(), layer);
+        }
+        for (parameter, lut) in &self.luts {
+            offered = offered.with_lut(parameter.as_str(), lut);
         }
         let partition = self
             .partition

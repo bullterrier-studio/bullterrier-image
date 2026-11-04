@@ -15,6 +15,7 @@ mod cut;
 mod each;
 mod frame;
 mod laid;
+mod luts;
 mod maps;
 mod regions;
 mod size;
@@ -22,6 +23,7 @@ mod step;
 mod trace;
 
 use cut::Cut;
+use luts::Luts;
 pub use maps::Finder;
 use maps::{Found, Maps};
 use regions::Evaluator;
@@ -32,7 +34,7 @@ pub use trace::Stage;
 
 use crate::ops::par;
 use crate::registry::Registry;
-use crate::{Error, Image, Layer, Picture, Presets, Recipe};
+use crate::{Error, Image, Layer, Lut, Picture, Presets, Recipe};
 
 /// A picture a recipe is rendered on, with the maps of it that the recipe names (`subject`, `depth`, a region): handed in
 /// or found by a [`Finder`]. It borrows the picture: rendering never copies or changes it.
@@ -43,6 +45,7 @@ pub struct Photo<'a> {
     picture: Picture<'a>,
     maps: BTreeMap<String, Arc<Layer>>,
     finders: BTreeMap<String, Found>,
+    luts: BTreeMap<String, Arc<Lut>>,
 }
 
 impl fmt::Debug for Photo<'_> {
@@ -53,6 +56,7 @@ impl fmt::Debug for Photo<'_> {
             .field("width", &self.picture.width())
             .field("maps", &self.maps.keys().collect::<Vec<_>>())
             .field("finders", &self.finders.keys().collect::<Vec<_>>())
+            .field("luts", &self.luts.keys().collect::<Vec<_>>())
             .finish()
     }
 }
@@ -65,6 +69,7 @@ impl<'a> Photo<'a> {
             picture,
             maps: BTreeMap::new(),
             finders: BTreeMap::new(),
+            luts: BTreeMap::new(),
         }
     }
 
@@ -90,6 +95,17 @@ impl<'a> Photo<'a> {
     #[must_use]
     pub fn with_finder(mut self, name: impl Into<String>, finder: Arc<dyn Finder>) -> Self {
         self.finders.insert(name.into(), Found::new(finder));
+        self
+    }
+
+    /// This photo with `lut` for the name `name`: a step's parameter of the kind `lut` (such as `lut`'s `file`) that holds
+    /// `name` uses this table. The table is shared, not copied: render many photos, or many frames, with the same one.
+    /// A table of the same name given before is replaced; one no step names is not used. A name that is no given table
+    /// is read as the path of a `.cube` file (once per render, however many steps name it), and a path that cannot be
+    /// read is a render error naming it, before the first step runs.
+    #[must_use]
+    pub fn with_lut(mut self, name: impl Into<String>, lut: Arc<Lut>) -> Self {
+        self.luts.insert(name.into(), lut);
         self
     }
 
@@ -130,7 +146,8 @@ impl<'a> Photo<'a> {
     /// Whatever [`Recipe::checked`] refuses the recipe for, [`Error::Recipe`] for a step or recipe the core does not
     /// run yet or a photo given a map or finder that is no map of the recipe, [`Error::MapNotFound`] for a map a step
     /// uses that the photo has neither of nor a finder for (or whose finder fails or answers one of another size), and
-    /// [`Error::Foreign`] if an effect that runs elsewhere fails or returns a picture of another size.
+    /// [`Error::Foreign`] if an effect that runs elsewhere fails or returns a picture of another size, and [`Error::Lut`]
+    /// for a lookup table a step names that is neither given to the photo nor a readable `.cube` file.
     pub fn render(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Image, Error> {
         self.render_in(crate::registry::registry(), recipe, presets, options)
     }
@@ -182,11 +199,21 @@ impl<'a> Photo<'a> {
         // as the working picture has it, which a trace shows like a map a step uses
         let framed_subject = needs_subject.then(|| maps.get("subject", "`frame`")).transpose()?;
         let cut = Cut::plan(&recipe.frame, &working, framed_subject.clone())?;
+        let mut luts = Luts::new(&self.luts);
         let steps = recipe
             .steps
             .iter()
             .enumerate()
-            .map(|(index, entry)| prepare(registry, presets, ratio, entry, &format!("step {}", index + 1)))
+            .map(|(index, entry)| {
+                prepare(
+                    registry,
+                    presets,
+                    ratio,
+                    &mut luts,
+                    entry,
+                    &format!("step {}", index + 1),
+                )
+            })
             .collect::<Result<Vec<_>, _>>()?;
         // every map the photo gives that the steps use is found now, so that none is missing when its step runs
         let mut held = BTreeMap::new();

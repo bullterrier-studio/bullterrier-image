@@ -787,6 +787,36 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   today, effects are about 70 percent of the time and stay single-threaded, so the gain is small until they are ported;
   whole renders from Python threads side by side scale 2.8x at 4 and 3.6x at 10.
 
+- **A lookup table is a value of the core and reaches an effect in `Inputs`, by name (E1, `lut`).** Decisions:
+  - *`Lut` is a core type* (`crate::Lut`: size, domain, entries red-fastest as the `.cube` file lists them; `new`, `identity`,
+    `from_cube`, `from_cube_file`, `lookup`). It is always valid, so a lookup cannot fail. The `.cube` rules (64 MiB cap, UTF-8,
+    1D refused, a fault names the file and the line, never its text) are the core's alone; Python's reader is deleted.
+    A fault in a row's count says how many numbers there were, where the Python reader quoted the line.
+    *Error kind `lut`* (`Error::Lut`, `ErrorKind::Lut`, `LutError`): a table is neither an image nor a recipe, and a caller catches
+    it by its own class. *Rejected:* reusing `Recipe` (a bad file is no recipe fault) or `ImageRead` (a `.cube` is no picture).
+  - *The parameter holds a name, the table travels beside it.* A `lut` parameter (`LutName`, JSON string or `null`) is the name of
+    a table the photo was given (`Photo::with_lut(name, Arc<Lut>)`), else the path of a `.cube` file; `null` is the identity.
+    The runner finds the table when it prepares the step, before the first step runs, and offers it as
+    `Inputs::lut(parameter)`, as it offers a field's map (`Inputs::field`). A file is read once per render; a given name wins
+    over a file of that name; a name that is neither is `Error::Lut` placed at step and parameter, never a fall back to the
+    identity. *Reasons:* 100k floats in the recipe would be serialised, checked and scaled on every frame of a video, and a
+    `Recipe` stays plain data; the table is shared by `Arc` across frames and threads; a Rust user builds a `Lut` in code and
+    names it; a recipe file writes a path. *Rejected:* the table inside the parameter value (`serde` has no context to resolve a
+    name; the value would be the table), a render option `luts` (the photo already owns what a render is given by name:
+    maps, finders), `{"$object": n}` for the core's effects (the core would name Python). A Picture parameter (`blend`) is
+    meant to follow the same road: `Photo::with_picture`, `Inputs::picture`, a `picture` kind.
+  - *Relative paths are the loader's.* The core reads a path as the working folder's; a recipe file's folder is resolved by
+    `loader` (which reads the table and gives the recipe a `Lut`, so a bad file fails when the recipe is loaded, naming step,
+    parameter and file).
+  - *Python `Lut` is a thin wrapper over `_core.Lut`.* It holds the core's table (validated once, in Rust, shared by every
+    render, never copied) with a label and a content digest (SHA-256 of the entries and domain, computed on first use) for equality,
+    hashing and the pipeline's cache key. `Lut.table` is a new read-only array of the entries; `imageio.load_lut` and
+    `Lut(array)` call the core. *Rejected:* a numpy array handed over on every render (validation and a copy per frame, two
+    validators for one rule). A Python-registered effect with a `Lut` parameter still gets the `Lut` back: `registry.holding`
+    keeps it, and the recipe's value for it is a name (`$lut:<digest>`) the core hands the table to.
+  - *Why `Inputs`, not `Params`.* An effect declares a table only by its field of the kind `lut`; `parameters_are_read` offers
+    a table of its own to any effect given a name, so a lookup table parameter that is never looked up still fails.
+
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*

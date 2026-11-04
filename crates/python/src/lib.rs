@@ -2,6 +2,7 @@
 //! porting one never changes it.
 
 mod files;
+mod lut;
 mod run;
 
 use std::sync::Arc;
@@ -41,6 +42,9 @@ mod _core {
     use super::files::{read, read_map, write};
 
     #[pymodule_export]
+    use super::lut::PyLut;
+
+    #[pymodule_export]
     use super::run::{check_recipe, known_maps, needs, render, trace};
 }
 
@@ -64,7 +68,8 @@ create_exception!(
 /// The keyword arguments are what is on offer to the effect, which receives the part it declares and nothing else:
 /// `size_ratio` (working pixels per design pixel, a finite number above 0), `partition` (an int32 `(height, width)`
 /// array of piece numbers from 0; the pieces are as many as the largest number plus one) and `fields` (a dict from a
-/// field parameter's name to a float32 `(height, width)` array of finite values within 0..1).
+/// field parameter's name to a float32 `(height, width)` array of finite values within 0..1) and `luts` (a dict from a
+/// lookup table parameter's name to its `Lut`; a lookup table parameter not given one is the identity table).
 ///
 /// `CoreError` if the effect, its parameters, the array or an input are not what the core expects, or the effect
 /// declares an input that is not on offer: a programming error, since the package validates a user's values before
@@ -76,7 +81,11 @@ create_exception!(
 /// copied (a 1080p float32 frame is about 25 MB, as much work as a whole light effect); `numpy` works the same way on
 /// arrays it is given. A thread that renders must own its frame, or share it read-only.
 #[pyfunction]
-#[pyo3(signature = (effect, rgb, params, *, size_ratio=1.0, partition=None, fields=None))]
+#[pyo3(signature = (effect, rgb, params, *, size_ratio=1.0, partition=None, fields=None, luts=None))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the arguments are the Python function's keywords"
+)]
 fn apply<'py>(
     py: Python<'py>,
     effect: &str,
@@ -85,6 +94,7 @@ fn apply<'py>(
     size_ratio: f64,
     partition: Option<&Bound<'py, PyAny>>,
     fields: Option<&Bound<'py, PyDict>>,
+    luts: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
@@ -96,12 +106,16 @@ fn apply<'py>(
     }
     let labels = partition.map(labels_of).transpose()?;
     let layers = fields.map(layers_of).transpose()?.unwrap_or_default();
+    let tables = lut::tables_of(luts)?;
     let mut inputs = Inputs::default().with_size_ratio(size_ratio);
     if let Some(labels) = &labels {
         inputs = inputs.with_partition(labels);
     }
     for (parameter, layer) in &layers {
         inputs = inputs.with_field(parameter.as_str(), layer);
+    }
+    for (parameter, table) in &tables {
+        inputs = inputs.with_lut(parameter.as_str(), table);
     }
     let image = py
         .detach(|| bullterrier_image::apply(effect, &picture, params, &inputs))

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::effect::{Effect, Input};
-use crate::{Error, Picture};
+use crate::{Error, Lut, Picture};
 
 /// A map over the picture: one value from 0 to 1 for every pixel (a subject's alpha, a depth, a light), row after row.
 #[derive(Clone, PartialEq)]
@@ -170,12 +170,15 @@ impl Labels {
 /// What a step offers an effect besides the picture and its parameters, and what an effect receives of it: only the
 /// inputs it declares (see [`Effect::inputs`] and [`Effect::fields`]); the rest is absent.
 ///
-/// Build the offer with the `with_` methods; the core hands the effect the part of it that the effect declares.
+/// Build the offer with the `with_` methods; the core hands the effect the part of it that the effect declares. A lookup
+/// table (a parameter of the kind `lut`) is offered under its parameter's name, like a field's map; the parameter itself
+/// only names it (see [`LutName`](crate::params::LutName)).
 #[derive(Clone, Debug)]
 pub struct Inputs<'a> {
     size_ratio: f64,
     partition: Option<&'a Labels>,
     fields: BTreeMap<String, &'a Layer>,
+    luts: BTreeMap<String, &'a Lut>,
 }
 
 impl Default for Inputs<'_> {
@@ -185,6 +188,7 @@ impl Default for Inputs<'_> {
             size_ratio: 1.0,
             partition: None,
             fields: BTreeMap::new(),
+            luts: BTreeMap::new(),
         }
     }
 }
@@ -212,6 +216,13 @@ impl<'a> Inputs<'a> {
         self
     }
 
+    /// The offer with `lut` for the lookup table parameter called `parameter`.
+    #[must_use]
+    pub fn with_lut(mut self, parameter: impl Into<String>, lut: &'a Lut) -> Self {
+        self.luts.insert(parameter.into(), lut);
+        self
+    }
+
     /// Working pixels per design pixel: 1 unless the effect declared [`Input::SizeRatio`].
     #[must_use]
     pub fn size_ratio(&self) -> f64 {
@@ -228,6 +239,12 @@ impl<'a> Inputs<'a> {
     #[must_use]
     pub fn field(&self, parameter: &str) -> Option<&'a Layer> {
         self.fields.get(parameter).copied()
+    }
+
+    /// The table for the lookup table parameter called `parameter`, if one was offered: none means the identity table.
+    #[must_use]
+    pub fn lut(&self, parameter: &str) -> Option<&'a Lut> {
+        self.luts.get(parameter).copied()
     }
 
     /// The part of this offer `effect` declares, for a picture of `picture`'s size.
@@ -266,6 +283,8 @@ impl<'a> Inputs<'a> {
             }
             declared.fields.insert(field.parameter.clone(), layer);
         }
+        // a step offers a table for each lookup table parameter of its effect and no other
+        declared.luts.clone_from(&self.luts);
         Ok(declared)
     }
 }

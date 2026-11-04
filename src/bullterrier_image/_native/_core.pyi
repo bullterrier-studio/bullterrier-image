@@ -2,13 +2,14 @@
 # extension's own (`help(_core.apply)`); `uv run poe stubtest` (in `poe check`) checks this stub against it.
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
 import numpy as np
 
 __all__ = [
     "CoreError",
+    "Lut",
     "apply",
     "check",
     "check_recipe",
@@ -35,6 +36,25 @@ class CoreError(ValueError):
 class _Finder(Protocol):
     def find(self, rgb: np.ndarray) -> np.ndarray | None: ...
 
+class Lut:
+    def __init__(
+        self,
+        table: np.ndarray,
+        domain_min: Sequence[float] = ...,
+        domain_max: Sequence[float] = ...,
+    ) -> None: ...
+    @staticmethod
+    def identity(size: int) -> Lut: ...
+    @staticmethod
+    def from_cube(path: str | os.PathLike[str]) -> Lut: ...
+    @property
+    def size(self) -> int: ...
+    @property
+    def domain_min(self) -> tuple[float, float, float]: ...
+    @property
+    def domain_max(self) -> tuple[float, float, float]: ...
+    def table(self) -> np.ndarray: ...
+
 def apply(
     effect: str,
     rgb: np.ndarray,
@@ -43,6 +63,7 @@ def apply(
     size_ratio: float = 1.0,
     partition: np.ndarray | None = None,
     fields: dict[str, np.ndarray] | None = None,
+    luts: Mapping[str, Lut] | None = None,
 ) -> np.ndarray: ...
 def check(effect: str, params: dict[str, Any]) -> dict[str, Any]: ...
 def check_recipe(recipe: dict[str, Any], *, presets: Mapping[str, str] | None = None) -> None: ...
@@ -70,6 +91,7 @@ def render(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, _Finder] | None = None,
+    luts: Mapping[str, Lut] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
     threads: int = 1,
@@ -80,6 +102,7 @@ def trace(
     *,
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, _Finder] | None = None,
+    luts: Mapping[str, Lut] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
     threads: int = 1,

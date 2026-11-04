@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 use serde_json::json;
 
+use super::lut::tables_of;
 use super::{CoreError, core_error, found, from_json, photo_array, picture_of, to_json, value_error};
 
 /// Run `recipe` on `rgb` (float32, C-contiguous, `(height, width, 3)`) and return the picture it makes: a new float32
@@ -33,6 +34,10 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, to
 /// "found nothing" means the piece adds nothing. `background` and `light` are made from the photo. A name that is no map of the
 /// recipe is refused.
 ///
+/// `luts` hands lookup tables in by name: a dict `{name: Lut}`. A step's lookup table parameter (such as `lut`'s `file`)
+/// that holds a name in it uses that table, shared with every render it is given to; any other name is read as the path
+/// of a `.cube` file, once per render, and a path that cannot be read is a `CoreError` of kind `lut` naming it.
+///
 /// `presets` holds the presets the steps name, by effect: the TOML text of the effect's presets file, one `[name]` table
 /// for each preset with its `description` and the effect's parameters (`{"grade": "[warm]\ndescription = ...\n"}`).
 ///
@@ -50,7 +55,7 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, to
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None, threads=1))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, presets=None, size=None, threads=1))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -61,13 +66,14 @@ pub(crate) fn render<'py>(
     recipe: &Bound<'py, PyDict>,
     maps: Option<&Bound<'py, PyDict>>,
     finders: Option<&Bound<'py, PyDict>>,
+    luts: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
     size: Option<u32>,
     threads: usize,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
-    let photo = photo_with(Photo::new(picture), maps, finders)?;
+    let photo = photo_with(Photo::new(picture), maps, finders, luts)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
     let options = options_of(size, threads);
     let image = py
@@ -128,7 +134,7 @@ pub(crate) fn known_maps(recipe: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
 /// with its alpha, `(height, width, 4)`. The last stage is exactly what `render` returns. Naming the stages is left to
 /// the caller.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, presets=None, size=None, threads=1))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, presets=None, size=None, threads=1))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -139,13 +145,14 @@ pub(crate) fn trace<'py>(
     recipe: &Bound<'py, PyDict>,
     maps: Option<&Bound<'py, PyDict>>,
     finders: Option<&Bound<'py, PyDict>>,
+    luts: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
     size: Option<u32>,
     threads: usize,
 ) -> PyResult<Bound<'py, PyList>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
-    let photo = photo_with(Photo::new(picture), maps, finders)?;
+    let photo = photo_with(Photo::new(picture), maps, finders, luts)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
     let options = options_of(size, threads);
     let stages = py
@@ -164,11 +171,12 @@ fn options_of(size: Option<u32>, threads: usize) -> Options {
     size.map_or(options, |size| options.with_size(size))
 }
 
-/// `photo` with the maps handed in and the finders given.
+/// `photo` with the maps handed in, the finders given and the lookup tables given.
 fn photo_with<'a>(
     mut photo: Photo<'a>,
     maps: Option<&Bound<'_, PyDict>>,
     finders: Option<&Bound<'_, PyDict>>,
+    luts: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<Photo<'a>> {
     for (name, array) in maps.into_iter().flatten() {
         let name = name.extract::<String>()?;
@@ -190,6 +198,9 @@ fn photo_with<'a>(
                 finder: finder.unbind(),
             }),
         );
+    }
+    for (name, table) in tables_of(luts)? {
+        photo = photo.with_lut(name, table);
     }
     Ok(photo)
 }

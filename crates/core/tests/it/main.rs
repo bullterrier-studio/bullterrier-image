@@ -57,6 +57,7 @@ mod resample;
 mod rotate;
 mod rounding;
 mod run_frame;
+mod run_luts;
 mod run_maps;
 mod run_regions;
 mod run_render;

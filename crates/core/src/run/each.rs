@@ -1,5 +1,6 @@
 //! An `each` step: a look for each piece of a partition, blended across the pieces' borders.
 
+use super::luts::Luts;
 use super::regions::Evaluator;
 use super::step::{Laid, StepRun};
 use crate::ops::blur;
@@ -38,6 +39,7 @@ impl EachRun {
         registry: &Registry,
         presets: &Presets,
         ratio: f64,
+        luts: &mut Luts<'_>,
         each: &Each,
         place: &str,
     ) -> Result<Self, Error> {
@@ -47,7 +49,16 @@ impl EachRun {
             .enumerate()
             .map(|(index, look)| {
                 look.as_ref()
-                    .map(|step| StepRun::new(registry, presets, ratio, step, &format!("{place}, look {}", index + 1)))
+                    .map(|step| {
+                        StepRun::new(
+                            registry,
+                            presets,
+                            ratio,
+                            luts,
+                            step,
+                            &format!("{place}, look {}", index + 1),
+                        )
+                    })
                     .transpose()
             })
             .collect::<Result<_, _>>()?;
