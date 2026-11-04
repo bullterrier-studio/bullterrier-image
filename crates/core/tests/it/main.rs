@@ -72,6 +72,7 @@ mod run_trace;
 mod scale;
 mod shards;
 mod shards_sites;
+mod sharpen;
 mod spatial;
 mod svg;
 mod svg_drawing;

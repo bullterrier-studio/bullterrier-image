@@ -3,6 +3,7 @@
 #![allow(dead_code, reason = "each test module uses a different part")]
 
 pub(crate) mod files;
+pub(crate) mod gaussian;
 pub(crate) mod icc;
 pub(crate) mod ops;
 pub(crate) mod pixels;
