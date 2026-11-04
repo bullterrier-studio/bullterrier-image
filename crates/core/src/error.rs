@@ -23,6 +23,7 @@ use crate::params::Scalar;
 /// | [`Error::ImageRead`] | `ImageRead` | `ImageReadError` |
 /// | [`Error::ImageWrite`] | `ImageWrite` | `ImageWriteError` |
 /// | [`Error::BackendUnavailable`] | `BackendUnavailable` | `BackendUnavailableError` |
+/// | [`Error::Lut`] | `Lut` | `LutError` |
 /// | [`Error::Duplicate`], [`Error::Params`], [`Error::Inputs`], [`Error::Foreign`] | `Other` | none: a `ValueError` |
 ///
 /// The ones in the last row are the caller's programming errors, or, for [`Error::Foreign`], whatever an effect that
@@ -66,6 +67,10 @@ pub enum Error {
     /// The core cannot do what was asked with this format: it writes no file of this extension, or the format holds no
     /// transparency. The text names the extension and what to use instead. Nothing was written.
     BackendUnavailable(String),
+    /// A colour lookup table could not be made or read: a `.cube` file that is missing, unreadable, over its size limit,
+    /// not UTF-8 or malformed, or entries and a domain that make no table. The text names the file and, for a fault in
+    /// one, the line.
+    Lut(String),
     /// A parameter value breaks a rule of the effect's declaration.
     Invalid {
         /// Where in a recipe the effect was: `step 2`, `step 2, look 1`. None when the parameters were checked on
@@ -141,6 +146,8 @@ pub enum ErrorKind {
     ImageWrite,
     /// The core writes no file of that format.
     BackendUnavailable,
+    /// A colour lookup table is unusable.
+    Lut,
     /// Anything else: a programming error of the caller, or a failure outside the core. Bindings raise their plain
     /// error (a `ValueError` in Python).
     Other,
@@ -159,6 +166,7 @@ impl ErrorKind {
         Self::ImageRead,
         Self::ImageWrite,
         Self::BackendUnavailable,
+        Self::Lut,
         Self::Other,
     ];
 
@@ -176,6 +184,7 @@ impl ErrorKind {
             Self::ImageRead => "image_read",
             Self::ImageWrite => "image_write",
             Self::BackendUnavailable => "backend_unavailable",
+            Self::Lut => "lut",
             Self::Other => "other",
         }
     }
@@ -255,6 +264,7 @@ impl Error {
             Self::ImageRead(_) => ErrorKind::ImageRead,
             Self::ImageWrite(_) => ErrorKind::ImageWrite,
             Self::BackendUnavailable(_) => ErrorKind::BackendUnavailable,
+            Self::Lut(_) => ErrorKind::Lut,
             Self::Duplicate(_) | Self::Params { .. } | Self::Inputs(_) | Self::Foreign { .. } => ErrorKind::Other,
         }
     }
@@ -333,6 +343,7 @@ impl fmt::Display for Error {
             | Self::ImageRead(message)
             | Self::ImageWrite(message)
             | Self::BackendUnavailable(message)
+            | Self::Lut(message)
             | Self::MapNotFound { message, .. } => formatter.write_str(message),
             Self::Foreign { effect, source } => write!(formatter, "the effect {effect:?} failed: {source}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
@@ -366,6 +377,7 @@ impl std::error::Error for Error {
             | Self::ImageRead(_)
             | Self::ImageWrite(_)
             | Self::BackendUnavailable(_)
+            | Self::Lut(_)
             | Self::Size { .. } => None,
         }
     }

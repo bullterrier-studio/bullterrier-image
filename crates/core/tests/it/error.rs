@@ -53,6 +53,10 @@ fn rows() -> Vec<(Error, ErrorKind)> {
             Error::BackendUnavailable("cannot write '.bmp' pictures".to_owned()),
             ErrorKind::BackendUnavailable,
         ),
+        (
+            Error::Lut("cannot read film.cube as a .cube file: not UTF-8".to_owned()),
+            ErrorKind::Lut,
+        ),
         (Error::Duplicate("grade".to_owned()), ErrorKind::Other),
         (Error::Inputs("no partition".to_owned()), ErrorKind::Other),
         (Error::foreign("fx", "broke"), ErrorKind::Other),

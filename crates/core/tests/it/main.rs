@@ -29,6 +29,8 @@ mod hsv;
 mod hue_range;
 mod inputs;
 mod limits;
+mod lut;
+mod lut_cube;
 mod noise;
 mod params;
 mod params_colors;

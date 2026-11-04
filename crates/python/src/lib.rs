@@ -50,7 +50,7 @@ create_exception!(
     PyValueError,
     "An error of the Rust core: a `ValueError` whose `kind` attribute names which of the package's exceptions it is \
      (`ErrorKind::name` in the core: `recipe`, `unknown_effect`, `subject_not_found`, `depth_not_found`, \
-     `map_not_found`, `invalid_image`, `non_finite_image`, `image_read`, `image_write`, `backend_unavailable`, or `other`: a programming error). The package turns the \
+     `map_not_found`, `invalid_image`, `non_finite_image`, `image_read`, `image_write`, `backend_unavailable`, `lut`, or `other`: a programming error). The package turns the \
      kind into its `BullterrierImageError` subclass. When a Python function registered with `register` raised, its \
      own exception comes back instead, unchanged."
 );

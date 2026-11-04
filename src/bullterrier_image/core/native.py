@@ -18,6 +18,7 @@ from bullterrier_image.errors import (
     ImageReadError,
     ImageWriteError,
     InvalidImageError,
+    LutError,
     MapNotFoundError,
     NonFiniteImageError,
     RecipeError,
@@ -37,6 +38,7 @@ _RAISED_AS: dict[str, type[BullterrierImageError]] = {
     "image_read": ImageReadError,
     "image_write": ImageWriteError,
     "backend_unavailable": BackendUnavailableError,
+    "lut": LutError,
 }
 
 
