@@ -38,5 +38,53 @@
   {
     "label": "a drivable ratio",
     "parameter": { "name": "gain", "kind": "float", "meaning": "1 leaves the picture as it is.", "default": 1.0, "unit": "ratio", "min": 0, "max": 4, "cyclic": false, "drivable": true }
+  },
+  {
+    "label": "a list of colours, at least two, no limit",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "The stops of the gradient, in order.", "default": ["#000000", "#ffffff"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 2 }
+  },
+  {
+    "label": "a list of colours with both lengths",
+    "parameter": { "name": "palette", "kind": "colors", "meaning": "The palette.", "default": ["#336699"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1, "max_length": 8, "advanced": true }
+  },
+  {
+    "label": "a list of colours with no upper limit written",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#112233", "#445566", "#778899"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1, "max_length": null }
+  },
+  {
+    "label": "an optional colour, none by default",
+    "parameter": { "name": "ink", "kind": "color", "meaning": "The colour of the marks; none uses the photo's own.", "default": null, "unit": null, "min": null, "max": null, "cyclic": false, "nullable": true }
+  },
+  {
+    "label": "an optional colour with a default",
+    "parameter": { "name": "border", "kind": "color", "meaning": "", "default": "#000000", "unit": null, "min": null, "max": null, "cyclic": false, "nullable": true }
+  },
+  {
+    "label": "a field name",
+    "parameter": { "name": "field", "kind": "field", "meaning": "The selection the effect works from.", "default": "depth", "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "free text",
+    "parameter": { "name": "chars", "kind": "text", "meaning": "The characters, darkest first.", "default": " .:-=+*#%@", "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "free text with lengths",
+    "parameter": { "name": "label", "kind": "text", "meaning": "", "default": "ab", "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1, "max_length": 16 }
+  },
+  {
+    "label": "a picture, a flat grey by default",
+    "parameter": { "name": "image", "kind": "picture", "meaning": "The picture laid over the photo.", "default": "#808080", "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "a lookup table, the identity by default",
+    "parameter": { "name": "file", "kind": "lut", "meaning": "The 3D table applied to the photo.", "default": null, "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "nullable false written",
+    "parameter": { "name": "cell", "kind": "float", "meaning": "", "default": 2.0, "unit": "px", "min": 1, "max": 9, "cyclic": false, "nullable": false }
+  },
+  {
+    "label": "an optional number",
+    "parameter": { "name": "limit", "kind": "float", "meaning": "", "default": null, "unit": "px", "min": 1, "max": 9, "cyclic": false, "nullable": true }
   }
 ]

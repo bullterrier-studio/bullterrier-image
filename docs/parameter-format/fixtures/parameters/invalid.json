@@ -17,7 +17,7 @@
   },
   {
     "label": "a kind outside the list",
-    "parameter": { "name": "path", "kind": "text", "meaning": "", "default": "a", "unit": null, "min": null, "max": null, "cyclic": false }
+    "parameter": { "name": "path", "kind": "vector", "meaning": "", "default": "a", "unit": null, "min": null, "max": null, "cyclic": false }
   },
   {
     "label": "a name that starts with a digit",
@@ -46,5 +46,105 @@
   {
     "label": "choices on a number",
     "parameter": { "name": "cell", "kind": "float", "meaning": "", "default": 32, "unit": "px", "min": 2, "max": 512, "cyclic": false, "choices": ["a"] }
+  },
+  {
+    "label": "colours without min_length",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#000000"], "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "colours with min_length 0",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": [], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 0 }
+  },
+  {
+    "label": "colours with a fractional min_length",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#000000"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1.5 }
+  },
+  {
+    "label": "a colour list element that is not #rrggbb",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#000000", "red"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1 }
+  },
+  {
+    "label": "a colour list element that is #rgb",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#000"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1 }
+  },
+  {
+    "label": "a colour list whose default is one colour",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": "#000000", "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1 }
+  },
+  {
+    "label": "a colour list with a unit",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#000000"], "unit": "count", "min": null, "max": null, "cyclic": false, "min_length": 1 }
+  },
+  {
+    "label": "a colour list with choices",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#000000"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1, "choices": ["a"] }
+  },
+  {
+    "label": "a colour list with a negative max_length",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": ["#000000"], "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1, "max_length": -1 }
+  },
+  {
+    "label": "min_length on a number",
+    "parameter": { "name": "cell", "kind": "float", "meaning": "", "default": 2, "unit": "px", "min": 1, "max": 9, "cyclic": false, "min_length": 1 }
+  },
+  {
+    "label": "max_length on a switch",
+    "parameter": { "name": "invert", "kind": "bool", "meaning": "", "default": false, "unit": null, "min": null, "max": null, "cyclic": false, "max_length": 3 }
+  },
+  {
+    "label": "nullable on a switch",
+    "parameter": { "name": "invert", "kind": "bool", "meaning": "", "default": null, "unit": null, "min": null, "max": null, "cyclic": false, "nullable": true }
+  },
+  {
+    "label": "nullable on a choice",
+    "parameter": { "name": "kind", "kind": "choice", "meaning": "", "default": "grid", "unit": null, "min": null, "max": null, "cyclic": false, "choices": ["grid"], "nullable": true }
+  },
+  {
+    "label": "nullable that is not a switch",
+    "parameter": { "name": "ink", "kind": "color", "meaning": "", "default": null, "unit": null, "min": null, "max": null, "cyclic": false, "nullable": "yes" }
+  },
+  {
+    "label": "a null default on a colour that is not nullable",
+    "parameter": { "name": "ink", "kind": "color", "meaning": "", "default": null, "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "a null default on a nullable written false",
+    "parameter": { "name": "ink", "kind": "color", "meaning": "", "default": null, "unit": null, "min": null, "max": null, "cyclic": false, "nullable": false }
+  },
+  {
+    "label": "a null default on a colour list that is not nullable",
+    "parameter": { "name": "colors", "kind": "colors", "meaning": "", "default": null, "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1 }
+  },
+  {
+    "label": "a null default on a number that is not nullable",
+    "parameter": { "name": "cell", "kind": "float", "meaning": "", "default": null, "unit": "px", "min": 1, "max": 9, "cyclic": false }
+  },
+  {
+    "label": "a lookup table with a default",
+    "parameter": { "name": "file", "kind": "lut", "meaning": "", "default": "film.cube", "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "a field with an empty name",
+    "parameter": { "name": "field", "kind": "field", "meaning": "", "default": "", "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "a field with a number default",
+    "parameter": { "name": "field", "kind": "field", "meaning": "", "default": 1, "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "text with a number default",
+    "parameter": { "name": "chars", "kind": "text", "meaning": "", "default": 1, "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "text with a unit",
+    "parameter": { "name": "chars", "kind": "text", "meaning": "", "default": "a", "unit": "px", "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "a picture that is not #rrggbb",
+    "parameter": { "name": "image", "kind": "picture", "meaning": "", "default": "texture.png", "unit": null, "min": null, "max": null, "cyclic": false }
+  },
+  {
+    "label": "a picture with bounds",
+    "parameter": { "name": "image", "kind": "picture", "meaning": "", "default": "#808080", "unit": null, "min": 0, "max": 1, "cyclic": false }
   }
 ]

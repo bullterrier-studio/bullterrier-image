@@ -240,12 +240,12 @@ effect with any other (`FieldName`, `Picture`, `Lut`, lists, optional colours) k
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
 
 **The format.** What a parameter is, as JSON (keys, kinds, the closed list of units, ranges, `cyclic`, `drivable`,
-`advanced`), is the ecosystem's parameter format, version 1: [docs/parameter-format/parameters.md](docs/parameter-format/parameters.md),
-with its [schema](docs/parameter-format/schemas/parameter-1.schema.json) and
+`advanced`), is the ecosystem's parameter format, version 2: [docs/parameter-format/parameters.md](docs/parameter-format/parameters.md),
+with its [schema](docs/parameter-format/schemas/parameter-2.schema.json) and
 [fixtures](docs/parameter-format/fixtures/parameters). The copy is not edited: a change is a new version in the
 ecosystem's format first, then a new copy here. `tests/_native/test_parameter_format.py` validates every field of every
-Rust-declared effect. A port that needs `FieldName`, `Picture`, lists or optional colours needs format v2 first. What
-follows is what image adds.
+Rust-declared effect. Version 2 also describes lists of colours, `FieldName`, `Picture`, `Lut`, text and optional values. What follows is what
+image adds.
 - **Numeric** (`int`, `float`): a `unit` from the format's list and inclusive `min`/`max` that hold the default.
 - **Counts and densities:** a few marks read as a `count` (their sizes are `px`, so the same count looks alike at any
   size). Numerous marks take `density`: marks per 1000 design px², the one meaning everywhere (`params.scaled`

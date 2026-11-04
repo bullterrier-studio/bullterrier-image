@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "parameter-2",
+  "title": "Parameter description, version 2",
+  "description": "One parameter of an effect or a drawing. Arithmetic rules (min <= max, default within range, a cyclic range of exactly one turn, min_length <= max_length, a default's length within them) are checked by each package's declaration, not here.",
+  "type": "object",
+  "required": ["name", "kind", "meaning", "default", "unit", "min", "max", "cyclic"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$" },
+    "kind": { "enum": ["float", "int", "bool", "choice", "color", "colors", "field", "text", "picture", "lut"] },
+    "meaning": { "type": "string" },
+    "default": { "type": ["number", "boolean", "string", "array", "null"] },
+    "unit": { "enum": [null, "px", "fraction", "degrees", "stops", "count", "ratio", "cycles", "density"] },
+    "min": { "type": ["number", "null"] },
+    "max": { "type": ["number", "null"] },
+    "cyclic": { "type": "boolean" },
+    "choices": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "min_length": { "type": "integer", "minimum": 0 },
+    "max_length": { "type": ["integer", "null"], "minimum": 0 },
+    "nullable": { "type": "boolean" },
+    "drivable": { "type": "boolean" },
+    "advanced": { "type": "boolean" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "float" } } },
+      "then": {
+        "properties": { "default": { "type": ["number", "null"] }, "unit": { "not": { "const": null } }, "min": { "type": "number" }, "max": { "type": "number" } }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "int" } } },
+      "then": {
+        "properties": { "default": { "type": ["integer", "null"] }, "unit": { "not": { "const": null } }, "min": { "type": "integer" }, "max": { "type": "integer" } }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "bool" } } },
+      "then": { "properties": { "default": { "type": "boolean" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "color" } } },
+      "then": { "properties": { "default": { "type": ["string", "null"], "pattern": "^#[0-9a-f]{6}$" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "choice" } } },
+      "then": {
+        "required": ["choices"],
+        "properties": { "default": { "type": "string" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null }, "choices": { "minItems": 1 } }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "colors" } } },
+      "then": {
+        "required": ["min_length"],
+        "properties": {
+          "default": { "type": ["array", "null"], "items": { "type": "string", "pattern": "^#[0-9a-f]{6}$" } },
+          "unit": { "const": null },
+          "min": { "const": null },
+          "max": { "const": null },
+          "min_length": { "minimum": 1 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "field" } } },
+      "then": { "properties": { "default": { "type": ["string", "null"], "minLength": 1 }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "text" } } },
+      "then": { "properties": { "default": { "type": ["string", "null"] }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "picture" } } },
+      "then": { "properties": { "default": { "type": ["string", "null"], "pattern": "^#[0-9a-f]{6}$" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "lut" } } },
+      "then": { "properties": { "default": { "const": null }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+    },
+    {
+      "if": { "properties": { "kind": { "enum": ["float", "int", "bool", "color", "colors", "field", "text", "picture", "lut"] } } },
+      "then": { "properties": { "choices": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "kind": { "not": { "enum": ["colors", "text"] } } } },
+      "then": { "properties": { "min_length": false, "max_length": false } }
+    },
+    {
+      "if": { "properties": { "kind": { "enum": ["bool", "choice"] } } },
+      "then": { "properties": { "nullable": false } }
+    },
+    {
+      "if": {
+        "not": {
+          "anyOf": [
+            { "required": ["nullable"], "properties": { "nullable": { "const": true } } },
+            { "properties": { "kind": { "const": "lut" } } }
+          ]
+        }
+      },
+      "then": { "properties": { "default": { "not": { "type": "null" } } } }
+    },
+    {
+      "if": { "properties": { "cyclic": { "const": true } } },
+      "then": { "properties": { "kind": { "const": "float" }, "unit": { "enum": ["degrees", "cycles"] } } }
+    }
+  ]
+}
