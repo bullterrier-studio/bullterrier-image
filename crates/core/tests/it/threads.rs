@@ -97,6 +97,7 @@ fn cases() -> Vec<Case> {
                 Step::new("color_balance"),
                 Step::new("selective_color").param("width", 360).param("hue_shift", 40),
                 Step::new("vignette").param("roundness", 0.6).param("feather", 0.2),
+                Step::new("scanlines").param("spacing", 2.5).param("softness", 0.5),
             ]),
             &thin_and_odd,
         ),

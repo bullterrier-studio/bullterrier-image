@@ -1,6 +1,6 @@
 //! `vignette`, `scanlines` and `equalize`: values worked out by hand from their documented formulas.
 
-use bullterrier_image::effects::vignette;
+use bullterrier_image::effects::{scanlines, vignette};
 use bullterrier_image::params::{Color, EffectParams};
 use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
@@ -97,5 +97,70 @@ proptest! {
         let out = run(&params, &[[value; 3]; 7])?;
         let (low, high) = (value.min(tint) - 1e-6, value.max(tint) + 1e-6);
         prop_assert!(out.iter().flatten().all(|v| (low..=high).contains(v)), "{:?}", out);
+    }
+}
+
+// --- scanlines ---------------------------------------------------------------------------------------------------
+
+fn lines(spacing: f32, thickness: f32, offset: f32, softness: f32) -> scanlines::Params {
+    scanlines::Params {
+        spacing,
+        thickness,
+        darkness: 1.0,
+        offset,
+        softness,
+    }
+}
+
+#[test]
+fn a_hard_line_blackens_the_rows_it_covers_and_a_row_it_half_covers_by_half() -> Result<(), Error> {
+    // lines [1, 3) and [5, 7) of a period of 4
+    let whole = grid(&lines(4.0, 0.5, 1.0, 0.0), 8, 1, 1.0)?;
+    assert_close(&whole, &[1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0], "whole rows");
+    // lines [0.5, 2.5) and [4.5, 6.5)
+    let half = grid(&lines(4.0, 0.5, 0.5, 0.0), 8, 1, 1.0)?;
+    assert_close(&half, &[0.5, 0.0, 0.5, 1.0, 0.5, 0.0, 0.5, 1.0], "rows half covered");
+    Ok(())
+}
+
+#[test]
+fn a_fully_soft_line_swells_along_sin_squared_and_the_rows_add_up_to_the_hard_ones() -> Result<(), Error> {
+    // the darkness is 0.5 (1 + cos(pi (x - 1) / 2)): its integral over each row is 0.5 +- 1/pi
+    let swell = 0.5 + std::f32::consts::FRAC_1_PI;
+    let dip = 0.5 - std::f32::consts::FRAC_1_PI;
+    let out = grid(&lines(4.0, 0.5, 0.0, 1.0), 4, 1, 1.0)?;
+    assert_close(&out, &[1.0 - swell, 1.0 - swell, 1.0 - dip, 1.0 - dip], "a soft line");
+    Ok(())
+}
+
+#[test]
+fn a_zero_thickness_or_darkness_changes_nothing_and_a_full_one_darkens_everything_alike() -> Result<(), Error> {
+    assert_close(&grid(&lines(3.0, 0.0, 0.7, 0.4), 6, 1, 0.8)?, &[0.8; 6], "no line");
+    let none = scanlines::Params {
+        darkness: 0.0,
+        ..lines(3.0, 0.5, 0.0, 0.0)
+    };
+    assert_close(&grid(&none, 6, 1, 0.8)?, &[0.8; 6], "no darkness");
+    let touching = scanlines::Params {
+        darkness: 0.5,
+        ..lines(2.5, 1.0, 0.3, 0.7)
+    };
+    assert_close(&grid(&touching, 6, 1, 0.8)?, &[0.4; 6], "lines that touch");
+    Ok(())
+}
+
+proptest! {
+    #[test]
+    fn the_average_darkening_over_whole_periods_is_darkness_times_thickness_whatever_the_softness(
+        period in 1_u8..=9, periods in 1_u8..=4, thickness in 0.0_f32..=1.0, offset in 0.0_f32..=40.0,
+        softness in 0.0_f32..=1.0, darkness in 0.0_f32..=1.0,
+    ) {
+        let params = scanlines::Params { spacing: f32::from(period), thickness, darkness, offset, softness };
+        let height = usize::from(period) * usize::from(periods);
+        let out = grid(&params, height, 1, 1.0)?;
+        let darkening: f32 = out.iter().map(|gain| 1.0 - gain).sum();
+        let expected = darkness * thickness * f32::from(period) * f32::from(periods);
+        prop_assert!((darkening - expected).abs() <= 1e-3, "{darkening} not {expected}");
+        prop_assert!(out.iter().all(|gain| (-1e-6..=1.0 + 1e-6).contains(gain)), "{:?}", out);
     }
 }
