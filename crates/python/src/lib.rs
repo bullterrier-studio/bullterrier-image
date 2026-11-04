@@ -124,10 +124,11 @@ fn effects(declared: bool) -> Vec<String> {
 }
 
 /// The parameters of the effect called `effect`, as its Rust struct declares them: a dict `{"doc": str, "fields":
-/// [...]}`, each field a dict with `name`, `kind` (`"float"`, `"int"`, `"bool"`, `"choice"` or `"color"`), `meaning`,
-/// `default`, `unit`, `min`, `max`, `cyclic`, `choices`, `drivable` and `advanced`. A default or bound is the literal
-/// the declaration wrote, a whole number an `int` and a decimal a `float`; a colour's default is its `'#rrggbb'` text and
-/// a choice's its name.
+/// [...]}`, each field a dict with `name`, `kind` (`"float"`, `"int"`, `"bool"`, `"choice"`, `"color"` or `"colors"`),
+/// `meaning`, `default`, `unit`, `min`, `max`, `cyclic`, `choices`, `drivable` and `advanced`, and, for a list of colours
+/// only, `min_length` and (when it has a ceiling) `max_length`. A default or bound is the literal the declaration wrote,
+/// a whole number an `int` and a decimal a `float`; a colour's default is its `'#rrggbb'` text, a list's a list of
+/// those and a choice's its name.
 ///
 /// `CoreError` if the core implements no effect of that name.
 #[pyfunction]

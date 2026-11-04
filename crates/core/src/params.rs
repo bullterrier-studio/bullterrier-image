@@ -22,8 +22,11 @@
 //! }
 //! ```
 //!
+//! A list of colours is a `Vec<Color>` with `#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`.
+//!
 //! The declaration is checked when the crate compiles: a field has a doc, a number a unit and a range that holds its
-//! default, `cyclic` is for degrees spanning a turn, `drivable` for a decimal number. The derive also writes
+//! default, a list of colours a `min_length` and a default of a length inside its lengths, `cyclic` is for degrees
+//! spanning a turn, `drivable` for a decimal number. The derive also writes
 //! [`Declared::values`], which reads every field, so rustc cannot report a field that `render` never reads;
 //! `tests/parameters_are_read.rs` does: it fails for a parameter that changes no result. A parameter that matters
 //! only while another is set (`grade.pivot` needs `contrast` other than 1) gets a row in that test's `conditional`.
@@ -38,6 +41,9 @@ use serde_json::{Map, Value};
 
 mod check;
 mod scale;
+
+#[cfg(test)]
+mod derived;
 
 pub use bullterrier_image_derive::{Choice, Params};
 

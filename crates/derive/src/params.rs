@@ -2,9 +2,16 @@
 
 use proc_macro2::{Literal, TokenStream};
 use quote::{ToTokens, quote};
-use syn::{Attribute, Data, DeriveInput, Error, Expr, ExprLit, Field, Fields, Ident, Lit, Meta, Type, UnOp};
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::{
+    Attribute, Data, DeriveInput, Error, Expr, ExprLit, Field, Fields, GenericArgument, Ident, Lit, LitStr, Meta,
+    PathArguments, Token, Type, UnOp, bracketed, token,
+};
 
 use crate::snake_case;
+
+mod colors;
 
 /// The turn a cyclic field spans, in degrees.
 const TURN: f64 = 360.0;
@@ -70,10 +77,12 @@ struct Declared {
 /// What a field's `#[param(..)]` attribute says.
 #[derive(Default)]
 struct Settings {
-    default: Option<Expr>,
+    default: Option<Given>,
     unit: Option<Ident>,
     min: Option<Expr>,
     max: Option<Expr>,
+    min_length: Option<Expr>,
+    max_length: Option<Expr>,
     drivable: bool,
     advanced: bool,
     cyclic: bool,
@@ -119,36 +128,49 @@ enum Written {
     Switch(bool),
     /// A colour: `"#rrggbb"`.
     Text(String),
+    /// A list of colours: `["#rrggbb", ..]`.
+    List(Vec<String>),
     /// A variant of a choice.
     Name(Ident),
 }
 
-/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool` and `Color` by their written names (a type
-/// alias is not recognised) and takes any other type for a choice enum, whose names come from its `Choice` impl.
+/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool`, `Color` and `Vec<Color>` by their written
+/// names (a type alias is not recognised) and takes any other type for a choice enum, whose names come from its
+/// `Choice` impl.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
     Float,
     Int,
     Switch,
     Colour,
+    Colours,
     Choice,
 }
 
 fn shape(ty: &Type) -> Shape {
     let Type::Path(path) = ty else { return Shape::Choice };
-    match path
-        .path
-        .segments
-        .last()
-        .map(|segment| segment.ident.to_string())
-        .as_deref()
-    {
-        Some("f32") => Shape::Float,
-        Some("i32") => Shape::Int,
-        Some("bool") => Shape::Switch,
-        Some("Color") => Shape::Colour,
+    let Some(last) = path.path.segments.last() else {
+        return Shape::Choice;
+    };
+    match last.ident.to_string().as_str() {
+        "f32" => Shape::Float,
+        "i32" => Shape::Int,
+        "bool" => Shape::Switch,
+        "Color" => Shape::Colour,
+        "Vec" if colour_argument(&last.arguments) => Shape::Colours,
         _ => Shape::Choice,
     }
+}
+
+/// Whether `arguments` are `<Color>`: the one type a list may hold.
+fn colour_argument(arguments: &PathArguments) -> bool {
+    let PathArguments::AngleBracketed(written) = arguments else {
+        return false;
+    };
+    matches!(
+        written.args.iter().collect::<Vec<_>>().as_slice(),
+        [GenericArgument::Type(element)] if shape(element) == Shape::Colour
+    )
 }
 
 /// What a checked field contributes: the expression of its default value, and the table's kind, choices, default, unit
@@ -161,6 +183,8 @@ struct Parts {
     unit: TokenStream,
     min: TokenStream,
     max: TokenStream,
+    min_length: TokenStream,
+    max_length: TokenStream,
 }
 
 /// A way to say what is wrong with the field being declared.
@@ -178,9 +202,14 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     let settings = settings(field, name)?;
     let default = settings.default.as_ref().ok_or_else(|| broken("needs a default"))?;
     let written = written(default).ok_or_else(|| {
-        broken("the default is a number, true or false, a '#rrggbb' colour in quotes or a variant name")
+        broken("the default is a number, true or false, a '#rrggbb' colour in quotes, a list of them or a variant name")
     })?;
     let ty = &field.ty;
+    if shape(ty) != Shape::Colours && (settings.min_length.is_some() || settings.max_length.is_some()) {
+        return Err(broken(
+            "only a list of colours (Vec<Color>) takes min_length and max_length",
+        ));
+    }
     let parts = match shape(ty) {
         Shape::Float | Shape::Int => number_parts(&settings, &written, shape(ty), &broken)?,
         other => other_parts(&settings, &written, other, ty, &broken)?,
@@ -193,6 +222,8 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         unit,
         min,
         max,
+        min_length,
+        max_length,
     } = parts;
     let (label, cyclic, drivable, advanced) = (name.to_string(), settings.cyclic, settings.drivable, settings.advanced);
     let row = quote! {
@@ -206,8 +237,8 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             max: #max,
             cyclic: #cyclic,
             choices: #choices,
-            min_length: ::core::option::Option::None,
-            max_length: ::core::option::Option::None,
+            min_length: #min_length,
+            max_length: #max_length,
             drivable: #drivable,
             advanced: #advanced,
         }
@@ -216,6 +247,12 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         Shape::Float => quote!(crate::params::decimal(self.#name)),
         Shape::Colour => quote!(::serde_json::Value::Array(
             self.#name.0.iter().copied().map(crate::params::decimal).collect()
+        )),
+        Shape::Colours => quote!(::serde_json::Value::Array(
+            self.#name
+                .iter()
+                .map(|colour| ::serde_json::Value::Array(colour.0.iter().copied().map(crate::params::decimal).collect()))
+                .collect()
         )),
         Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
         Shape::Int | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
@@ -228,7 +265,8 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     })
 }
 
-/// A switch, a colour or a choice: no unit, no bounds, not cyclic, not drivable, and a default of its own kind.
+/// A switch, a colour, a list of colours or a choice: no unit, no bounds, not cyclic, not drivable, and a default of its
+/// own kind.
 fn other_parts(
     settings: &Settings,
     written: &Written,
@@ -242,7 +280,7 @@ fn other_parts(
         if shape == Shape::Choice {
             let ty = ty.to_token_stream().to_string().replace(' ', "");
             broken(&format!(
-                "`{ty}` is not f32, i32, bool or Color, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
+                "`{ty}` is not f32, i32, bool, Color or Vec<Color>, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
                  (a number is f32 or i32)"
             ))
         } else {
@@ -257,6 +295,9 @@ fn other_parts(
     }
     if settings.drivable {
         return Err(wrong("only a decimal number (f32) can be drivable"));
+    }
+    if shape == Shape::Colours {
+        return colors::parts(settings, written, broken);
     }
     let (value, default) = match (shape, written) {
         (Shape::Switch, Written::Switch(on)) => (quote!(#on), quote!(crate::params::Scalar::Bool(#on))),
@@ -288,7 +329,9 @@ fn other_parts(
         default,
         unit: none.clone(),
         min: none.clone(),
-        max: none,
+        max: none.clone(),
+        min_length: none.clone(),
+        max_length: none,
     })
 }
 
@@ -343,6 +386,8 @@ fn number_parts(settings: &Settings, written: &Written, shape: Shape, broken: Br
         unit: quote!(::core::option::Option::Some(crate::params::Unit::#unit)),
         min: quote!(::core::option::Option::Some(#low)),
         max: quote!(::core::option::Option::Some(#high)),
+        min_length: quote!(::core::option::Option::None),
+        max_length: quote!(::core::option::Option::None),
     })
 }
 
@@ -391,12 +436,14 @@ fn settings(field: &Field, name: &Ident) -> syn::Result<Settings> {
             "unit" => settings.unit = Some(meta.value()?.parse()?),
             "min" => settings.min = Some(meta.value()?.parse()?),
             "max" => settings.max = Some(meta.value()?.parse()?),
+            "min_length" => settings.min_length = Some(meta.value()?.parse()?),
+            "max_length" => settings.max_length = Some(meta.value()?.parse()?),
             "drivable" => settings.drivable = true,
             "advanced" => settings.advanced = true,
             "cyclic" => settings.cyclic = true,
             _ => {
                 return Err(meta.error(format!(
-                    "parameter `{name}`: `{key}` is not a setting; they are default, unit, min, max, drivable, advanced, cyclic"
+                    "parameter `{name}`: `{key}` is not a setting; they are default, unit, min, max, min_length, max_length, drivable, advanced, cyclic"
                 )));
             }
         }
@@ -406,8 +453,31 @@ fn settings(field: &Field, name: &Ident) -> syn::Result<Settings> {
     Ok(settings)
 }
 
-/// `expr` as a default: a number (a minus sign allowed), true or false, a colour text or a variant name.
-fn written(expr: &Expr) -> Option<Written> {
+/// What `default = ..` says: a list of texts in brackets (syn's `full` feature, which would parse an array expression, is
+/// not enabled), else one expression.
+enum Given {
+    List(Vec<String>),
+    One(Expr),
+}
+
+impl Parse for Given {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        if !input.peek(token::Bracket) {
+            return input.parse().map(Self::One);
+        }
+        let items;
+        bracketed!(items in input);
+        let texts = Punctuated::<LitStr, Token![,]>::parse_terminated(&items)?;
+        Ok(Self::List(texts.iter().map(LitStr::value).collect()))
+    }
+}
+
+/// `given` as a default: a number (a minus sign allowed), true or false, a colour text, a list of them or a variant name.
+fn written(given: &Given) -> Option<Written> {
+    let expr = match given {
+        Given::List(texts) => return Some(Written::List(texts.clone())),
+        Given::One(expr) => expr,
+    };
     match expr {
         Expr::Lit(ExprLit {
             lit: Lit::Bool(switch), ..
@@ -442,11 +512,11 @@ fn number(expr: &Expr) -> Option<Number> {
     }
 }
 
-/// The three channels, 0..1 as `f32` literals, of the colour `hex` (`#rrggbb`).
+/// The three channels, 0..1 as `f32` literals, of the colour `hex` (`#rrggbb`, lowercase as the parameter format writes it).
 fn colour(hex: &str) -> Option<[Literal; 3]> {
     let digits = hex
         .strip_prefix('#')
-        .filter(|digits| digits.len() == 6 && digits.chars().all(|digit| digit.is_ascii_hexdigit()))?;
+        .filter(|digits| digits.len() == 6 && digits.chars().all(|digit| matches!(digit, '0'..='9' | 'a'..='f')))?;
     let channel = |at: usize| u8::from_str_radix(&digits[at..at + 2], 16).ok();
     let levels = [channel(0)?, channel(2)?, channel(4)?];
     Some(levels.map(|level| Literal::f32_suffixed(f32::from(level) / 255.0))) // constant: 8-bit levels
@@ -481,327 +551,4 @@ fn doc_of(attributes: &[Attribute]) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::expand;
-    use syn::{DeriveInput, parse_quote};
-
-    /// A documented `Params` struct whose one field, documented, is written in the call.
-    macro_rules! documented {
-        ($($field:tt)*) => {{
-            let input: DeriveInput = parse_quote! {
-                /// The parameters of a probe.
-                struct Params {
-                    /// A field.
-                    $($field)*
-                }
-            };
-            input
-        }};
-    }
-
-    fn expanded(input: &DeriveInput) -> Result<String, String> {
-        expand(input)
-            .map(|code| code.to_string())
-            .map_err(|error| error.to_string())
-    }
-
-    /// Each row must be refused with an error that names every word of `named`.
-    fn assert_refused(rows: &[(&str, DeriveInput, &[&str])]) {
-        for (rule, input, named) in rows {
-            let error = expanded(input).err();
-            assert!(
-                error
-                    .as_deref()
-                    .is_some_and(|text| named.iter().all(|name| text.contains(name))),
-                "{rule}: {error:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_complete_declaration_is_accepted_for_every_kind_of_field() {
-        let good = [
-            documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, drivable, advanced)] cell: f32, },
-            documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: i32, },
-            // a whole number may span all of i32
-            documented! { #[param(default = 0, unit = count, min = -2147483648, max = 2147483647)] cells: i32, },
-            // the bounds are inclusive: a default may sit on either
-            documented! { #[param(default = 0.0, unit = px, min = 0, max = 32)] low: f32, },
-            documented! { #[param(default = 32.0, unit = px, min = 0, max = 32)] high: f32, },
-            documented! { #[param(default = false)] keep: bool, },
-            documented! { #[param(default = "#101018")] tint: Color, },
-            documented! { #[param(default = Grid)] kind: Kind, },
-            documented! { #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)] angle: f32, },
-            // as rustfmt wraps a long attribute
-            documented! {
-                #[param(
-                    default = -90.0,
-                    unit = degrees,
-                    min = -180,
-                    max = 180,
-                    cyclic,
-                )]
-                lean: f32,
-            },
-        ];
-        for input in &good {
-            let code = expanded(input);
-            assert!(code.as_ref().is_ok_and(|code| code.contains("Declared")), "{code:?}");
-        }
-    }
-
-    #[test]
-    fn a_declaration_missing_a_part_is_refused_naming_the_field() {
-        assert_refused(&[
-            (
-                "no doc",
-                parse_quote! { /// The parameters.
-                struct Params { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: f32, } },
-                &["cell", "doc"],
-            ),
-            ("no param attribute", documented! { cell: f32, }, &["cell", "param"]),
-            (
-                "no default",
-                documented! { #[param(unit = px, min = 0, max = 32)] cell: f32, },
-                &["cell", "default"],
-            ),
-            (
-                "no unit",
-                documented! { #[param(default = 4.0, min = 0, max = 32)] cell: f32, },
-                &["cell", "unit"],
-            ),
-            (
-                "no min",
-                documented! { #[param(default = 4.0, unit = px, max = 32)] cell: f32, },
-                &["cell", "min"],
-            ),
-            (
-                "no max",
-                documented! { #[param(default = 4.0, unit = px, min = 0)] cell: f32, },
-                &["cell", "max"],
-            ),
-            (
-                "a value given twice",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, min = 1)] cell: f32, },
-                &["cell", "`min`", "twice"],
-            ),
-            (
-                "a flag given twice",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, drivable, drivable)] cell: f32, },
-                &["cell", "`drivable`", "twice"],
-            ),
-            (
-                "a second param attribute",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] #[param(drivable)] cell: f32, },
-                &["cell", "one #[param"],
-            ),
-            (
-                "a setting nobody knows",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, strength = 2)] cell: f32, },
-                &["cell", "strength"],
-            ),
-        ]);
-    }
-
-    #[test]
-    fn a_number_that_breaks_its_range_is_refused_naming_the_field() {
-        assert_refused(&[
-            (
-                "min above max",
-                documented! { #[param(default = 4.0, unit = px, min = 32, max = 0)] cell: f32, },
-                &["cell", "min"],
-            ),
-            (
-                "default below the range",
-                documented! { #[param(default = -1.0, unit = px, min = 0, max = 32)] cell: f32, },
-                &["cell", "default"],
-            ),
-            (
-                "default above the range",
-                documented! { #[param(default = 33, unit = px, min = 0, max = 32)] cell: f32, },
-                &["cell", "default"],
-            ),
-            (
-                "cyclic, not in degrees",
-                documented! { #[param(default = 0.0, unit = px, min = 0, max = 360, cyclic)] cell: f32, },
-                &["cell", "cyclic"],
-            ),
-            (
-                "cyclic, not a turn",
-                documented! { #[param(default = 0.0, unit = degrees, min = 0, max = 180, cyclic)] cell: f32, },
-                &["cell", "cyclic"],
-            ),
-            (
-                "a decimal default for a whole number",
-                documented! { #[param(default = 4.5, unit = count, min = 3, max = 32)] cells: i32, },
-                &["cells", "whole"],
-            ),
-            (
-                "a decimal bound for a whole number",
-                documented! { #[param(default = 4, unit = count, min = 3, max = 32.0)] cells: i32, },
-                &["cells", "whole"],
-            ),
-            (
-                "a whole number whose max is beyond i32",
-                documented! { #[param(default = 4, unit = count, min = 3, max = 5000000000)] cells: i32, },
-                &["cells", "max", "i32"],
-            ),
-            (
-                "a whole number whose min is beyond i32",
-                documented! { #[param(default = 4, unit = count, min = -2147483649, max = 32)] cells: i32, },
-                &["cells", "min", "i32"],
-            ),
-            (
-                "a whole number whose default is beyond i32",
-                documented! { #[param(default = 5000000000, unit = count, min = 3, max = 6000000000)] cells: i32, },
-                &["cells", "i32"],
-            ),
-            (
-                "a whole number that is drivable",
-                documented! { #[param(default = 4, unit = count, min = 3, max = 32, drivable)] cells: i32, },
-                &["cells", "drivable"],
-            ),
-        ]);
-    }
-
-    #[test]
-    fn a_switch_colour_or_choice_with_a_setting_or_default_of_another_kind_is_refused_naming_the_field() {
-        assert_refused(&[
-            (
-                "a unit on a switch",
-                documented! { #[param(default = false, unit = px)] keep: bool, },
-                &["keep", "unit"],
-            ),
-            (
-                "a bound on a colour",
-                documented! { #[param(default = "#101018", min = 0)] tint: Color, },
-                &["tint", "min"],
-            ),
-            (
-                "a bound on a choice",
-                documented! { #[param(default = Grid, max = 3)] kind: Kind, },
-                &["kind", "max"],
-            ),
-            (
-                "cyclic on a switch",
-                documented! { #[param(default = false, cyclic)] keep: bool, },
-                &["keep", "cyclic"],
-            ),
-            (
-                "drivable on a switch",
-                documented! { #[param(default = false, drivable)] keep: bool, },
-                &["keep", "drivable"],
-            ),
-            (
-                "a colour that is not #rrggbb",
-                documented! { #[param(default = "red")] tint: Color, },
-                &["tint", "#rrggbb"],
-            ),
-            (
-                "a number for a switch",
-                documented! { #[param(default = 1.0)] keep: bool, },
-                &["keep", "true or false"],
-            ),
-            (
-                "a colour for a switch",
-                documented! { #[param(default = "#ffffff")] keep: bool, },
-                &["keep", "true or false"],
-            ),
-            (
-                "a switch for a colour",
-                documented! { #[param(default = true)] tint: Color, },
-                &["tint", "#rrggbb"],
-            ),
-            (
-                "a number for a colour",
-                documented! { #[param(default = 1.0)] tint: Color, },
-                &["tint", "#rrggbb"],
-            ),
-            (
-                "a number for a choice",
-                documented! { #[param(default = 1)] kind: Kind, },
-                &["kind", "variants"],
-            ),
-            (
-                "a switch for a choice",
-                documented! { #[param(default = true)] kind: Kind, },
-                &["kind", "variants"],
-            ),
-            (
-                "a colour for a choice",
-                documented! { #[param(default = "#ffffff")] kind: Kind, },
-                &["kind", "variants"],
-            ),
-            (
-                "a variant for a number",
-                documented! { #[param(default = Grid, unit = px, min = 0, max = 32)] cell: f32, },
-                &["cell", "number"],
-            ),
-            (
-                "a colour whose digits are not all hex",
-                documented! { #[param(default = "#+f+f+f")] tint: Color, },
-                &["tint", "#rrggbb"],
-            ),
-        ]);
-    }
-
-    #[test]
-    fn a_type_the_derive_does_not_know_is_refused_naming_the_field_and_the_type() {
-        assert_refused(&[
-            (
-                "f64 is not a decimal the derive knows",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: f64, },
-                &["cell", "`f64`"],
-            ),
-            (
-                "u32 is not a whole number the derive knows",
-                documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: u32, },
-                &["cells", "`u32`"],
-            ),
-            (
-                "an optional number is not a number",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: Option<f32>, },
-                &["cell", "`Option<f32>`"],
-            ),
-            (
-                "an alias of f32 is not recognised by its name",
-                documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: Real, },
-                &["cell", "`Real`", "(a number is f32 or i32)"],
-            ),
-            (
-                "an unknown type with a number for its default",
-                documented! { #[param(default = 4.0)] cell: f64, },
-                &["cell", "`f64`", "variants"],
-            ),
-            (
-                "an unknown type that is drivable",
-                documented! { #[param(default = Grid, drivable)] kind: Kind, },
-                &["kind", "`Kind`", "f32"],
-            ),
-        ]);
-    }
-
-    #[test]
-    fn what_is_not_a_documented_struct_of_named_fields_is_refused_naming_it() {
-        let undocumented: DeriveInput = parse_quote! {
-            struct Params {
-                /// A size.
-                #[param(default = 4.0, unit = px, min = 0, max = 32)]
-                cell: f32,
-            }
-        };
-        let tuple: DeriveInput = parse_quote! {
-            /// The parameters.
-            struct Params(f32);
-        };
-        let choice: DeriveInput = parse_quote! {
-            /// The parameters.
-            enum Params { A }
-        };
-        assert_refused(&[
-            ("no doc on the struct", undocumented, &["Params", "doc"]),
-            ("a tuple struct", tuple, &["Params", "named fields"]),
-            ("an enum", choice, &["Params", "struct"]),
-        ]);
-    }
-}
+mod tests;

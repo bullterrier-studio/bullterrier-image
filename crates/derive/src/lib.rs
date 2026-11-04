@@ -2,15 +2,18 @@
 //! (`bullterrier_image::params`); an effect imports them from there.
 //!
 //! - `#[derive(Params)]` on an effect's `Params` struct: each field is declared once, by its type, its `///` doc
-//!   comment and a `#[param(default = .., unit = .., min = .., max = .., drivable, advanced, cyclic)]` attribute. The
-//!   struct's own doc comment documents the effect's parameters as a whole. The derive writes `Default`, the values
-//!   as a recipe writes them and the table the Python package builds the effect's model from, and refuses a broken declaration at compile time, naming the
-//!   field, for each rule it checks: a doc, a default of the field's kind, a unit and range holding the default,
-//!   `cyclic` and `drivable` where they apply, a setting given once. It recognises `f32`, `i32`, `bool` and `Color`
-//!   by those written names and takes any other type for a choice enum: `f64`, `u32`, `Option<f32>` or an alias of
-//!   `f32` (`type Real = f32`) is not recognised, and a number declaration on one is refused with an error naming the
-//!   type. Left to others: an unknown `unit` is rustc's own error ("no variant `Banana` found for enum `params::Unit`"),
-//!   which is adequate, and that a choice's doc names every variant is checked when Python builds the model.
+//!   comment and a `#[param(default = .., unit = .., min = .., max = .., min_length = .., max_length = .., drivable,
+//!   advanced, cyclic)]` attribute. The struct's own doc comment documents the effect's parameters as a whole. The
+//!   derive writes `Default`, the values as a recipe writes them and the table the Python package builds the effect's
+//!   model from, and refuses a broken declaration at compile time, naming the field, for each rule it checks: a doc, a
+//!   default of the field's kind, a unit and range holding the default, `cyclic` and `drivable` where they apply, a
+//!   setting given once. A `Vec<Color>` is a list of colours: its default is an array of lowercase `"#rrggbb"` texts,
+//!   `min_length` (at least 1) is required, `max_length` optional, and the default's length lies within both. It
+//!   recognises `f32`, `i32`, `bool`, `Color` and `Vec<Color>` by those written names and takes any other type for a
+//!   choice enum: `f64`, `u32`, `Option<f32>` or an alias of `f32` (`type Real = f32`) is not recognised, and a number
+//!   declaration on one is refused with an error naming the type. Left to others: an unknown `unit` is rustc's own
+//!   error ("no variant `Banana` found for enum `params::Unit`"), which is adequate, and that a choice's doc names every
+//!   variant is checked when Python builds the model.
 //! - `#[derive(Choice)]` on a fieldless enum: the choices of a parameter, named in `snake_case` in declaration order,
 //!   and the name of each variant. It reads them from text, so the names are written once, in the enum; two variants with the same name are refused.
 //!
