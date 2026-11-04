@@ -47,11 +47,14 @@ fn conditional() -> Vec<Conditional> {
     ]
 }
 
-/// A 12 x 12 picture with a different, non-grey colour at (almost) every pixel, so a parameter of any colour step shows.
+/// A 12 x 12 picture with a different, non-grey colour at (almost) every pixel, so a parameter of any colour step shows;
+/// green and blue are squeezed to a shorter range than red, so a step that treats channels alike or apart shows too.
 fn picture_values() -> Vec<f32> {
     (0..SIDE)
         .flat_map(|row| (0..SIDE).flat_map(move |column| (0..3_u8).map(move |channel| (row, column, channel))))
-        .map(|(row, column, channel)| f32::from((row * 7 + column * 13 + channel * 5) % 23) / 22.0)
+        .map(|(row, column, channel)| {
+            f32::from((row * 7 + column * 13 + channel * 5) % 23) / (22.0 + 8.0 * f32::from(channel))
+        })
         .collect()
 }
 

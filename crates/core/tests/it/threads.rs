@@ -94,6 +94,15 @@ fn cases() -> Vec<Case> {
             &thin_and_odd,
         ),
         case(
+            "effects that read the whole picture before they work pixel by pixel",
+            Recipe::new([
+                Step::new("auto_levels").param("clip", 0.02),
+                grade(0.1),
+                Step::new("auto_levels").param("mode", "linked"),
+            ]),
+            &thin_and_odd,
+        ),
+        case(
             "a shrink",
             sized(150),
             &[(301, 257), (257, 301), (400, 400), (1, 20_011), (20_011, 1)],

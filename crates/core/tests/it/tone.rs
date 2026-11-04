@@ -1,7 +1,7 @@
-//! The tone remap `levels` rests on, seen through the effect: input and output points, the midtone gamma and the
-//! cut of points that are equal or crossed.
+//! The tone remaps `levels` and `auto_levels` rest on, seen through the two effects: the Levels remap and the percentile
+//! points of the automatic stretch.
 
-use bullterrier_image::effects::levels;
+use bullterrier_image::effects::{auto_levels, levels};
 use bullterrier_image::params::EffectParams;
 use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
@@ -141,4 +141,64 @@ proptest! {
             "{out:?}"
         );
     }
+}
+
+// --- auto_levels -------------------------------------------------------------------------------------------------
+
+#[test]
+fn the_darkest_and_brightest_values_go_to_black_and_white_and_the_rest_between() -> Result<(), Error> {
+    let stretch = auto_levels::Params {
+        clip: 0.0,
+        ..auto_levels::Params::default()
+    };
+    // the range is 0.2..0.9, so out = (v - 0.2) / 0.7
+    let out = reds(&run(&stretch, &greys(&[0.2, 0.3, 0.5, 0.7, 0.9]))?);
+    assert_close(&out, &[0.0, 1.0 / 7.0, 3.0 / 7.0, 5.0 / 7.0, 1.0], "clip 0");
+    Ok(())
+}
+
+#[test]
+fn the_clipped_share_at_each_end_is_saturated() -> Result<(), Error> {
+    // 5 values and a clip of 0.2 drop one at each end, so the points are 0.3 and 0.7 and out = (v - 0.3) / 0.4
+    let stretch = auto_levels::Params {
+        clip: 0.2,
+        ..auto_levels::Params::default()
+    };
+    let out = reds(&run(&stretch, &greys(&[0.9, 0.3, 0.5, 0.7, 0.2]))?);
+    assert_close(&out, &[1.0, 0.0, 0.5, 1.0, 0.0], "clip 0.2");
+    Ok(())
+}
+
+#[test]
+fn per_channel_stretches_each_channel_alone_and_linked_all_alike() -> Result<(), Error> {
+    // red runs 0.1..0.5, green 0.4..0.8, blue stays 0.3
+    let pixels = [[0.1, 0.4, 0.3], [0.3, 0.6, 0.3], [0.5, 0.8, 0.3]];
+    let alone = auto_levels::Params {
+        clip: 0.0,
+        mode: auto_levels::Mode::PerChannel,
+    };
+    let out = run(&alone, &pixels)?;
+    let channel = |index: usize| out.iter().map(|pixel| pixel[index]).collect::<Vec<_>>();
+    assert_close(&channel(0), &[0.0, 0.5, 1.0], "red alone");
+    assert_close(&channel(1), &[0.0, 0.5, 1.0], "green alone");
+    assert_close(
+        &channel(2),
+        &[0.3, 0.3, 0.3],
+        "a channel with no range is left as it is",
+    );
+    // one range 0.1..0.8 for all: out = (v - 0.1) / 0.7
+    let together = auto_levels::Params {
+        clip: 0.0,
+        mode: auto_levels::Mode::Linked,
+    };
+    let out = run(&together, &pixels)?;
+    let expected = [
+        [0.0, 3.0 / 7.0, 2.0 / 7.0],
+        [2.0 / 7.0, 5.0 / 7.0, 2.0 / 7.0],
+        [4.0 / 7.0, 1.0, 2.0 / 7.0],
+    ];
+    for (pixel, expected) in out.iter().zip(expected) {
+        assert_close(pixel, &expected, "linked");
+    }
+    Ok(())
 }
