@@ -135,3 +135,24 @@ fn the_real_axis_runs_left_to_right_and_the_imaginary_axis_upwards_in_steps_of_f
     );
     Ok(())
 }
+
+#[test]
+fn a_point_that_escapes_on_the_last_iteration_it_is_given_is_outside_and_one_fewer_leaves_it_inside()
+-> Result<(), Error> {
+    // c = 1 has the orbit 1, 2, 5, 26, 677: past 256 on the fifth step
+    let at = |iterations| {
+        run_sized(
+            &fractal::Params {
+                x: 1.0,
+                iterations,
+                ..count_as_grey(Kind::Mandelbrot)
+            },
+            1,
+            1,
+            0.0,
+        )
+    };
+    assert_grey(at(5)?[0], 5.766_877, "five steps");
+    assert_eq!(at(4)?[0], RED, "four steps");
+    Ok(())
+}

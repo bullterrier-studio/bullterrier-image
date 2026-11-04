@@ -111,6 +111,21 @@ fn repeat_fits_the_colours_in_again_and_reflect_runs_every_second_repeat_backwar
     Ok(())
 }
 
+#[test]
+fn a_radial_gradient_beyond_its_radius_stays_on_the_last_colour_however_often_it_repeats() -> Result<(), Error> {
+    // the far corner of a 11 px square is past a radius of a tenth of the side; the end of the last repeat is the last colour
+    for repeat in [1, 2, 3, 4] {
+        let params = gradient::Params {
+            radius: 0.1,
+            repeat,
+            ..red_to_blue(Kind::Radial)
+        };
+        let corner = run_sized(&params, 11, 11, 0.0)?[0];
+        assert_close(corner, BLUE, &format!("repeat {repeat}"));
+    }
+    Ok(())
+}
+
 proptest! {
     #[test]
     fn only_the_size_of_the_picture_decides_the_gradient_and_every_pixel_is_between_its_colours(

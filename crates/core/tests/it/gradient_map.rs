@@ -75,9 +75,10 @@ struct Quantiles {
 }
 
 /// `numpy.quantile(values, [shadow_clip, 1 - highlight_clip], method=...)` for each method, offline (numpy 2.5). The
-/// first picture has fractional indexes throughout; the other two have whole ones at a quantile (a jump of the
-/// distribution), where the discrete methods choose.
-const QUANTILES: [Quantiles; 3] = [
+/// first picture has fractional indexes throughout; the other three have whole ones at a quantile (a jump of the
+/// distribution), where the discrete methods choose. In the last, `closest_observation` meets a whole index of each
+/// parity: it takes the value below at 1 and the one above at 6.
+const QUANTILES: [Quantiles; 4] = [
     Quantiles {
         values: &[0.0, 0.03, 0.1, 0.17, 0.3, 0.42, 0.5, 0.61, 0.78, 0.9, 1.0],
         shadow_clip: 0.15,
@@ -136,6 +137,26 @@ const QUANTILES: [Quantiles; 3] = [
             (QuantileMethod::Weibull, 0.525, 0.825),
             (QuantileMethod::MedianUnbiased, 0.525, 0.808_333),
             (QuantileMethod::NormalUnbiased, 0.525, 0.806_25),
+        ],
+    },
+    Quantiles {
+        values: &[0.0, 0.05, 0.2, 0.3, 0.4, 0.55, 0.6, 0.7, 0.85, 1.0],
+        shadow_clip: 0.25,
+        highlight_clip: 0.25,
+        points: [
+            (QuantileMethod::Linear, 0.225, 0.675),
+            (QuantileMethod::Lower, 0.2, 0.6),
+            (QuantileMethod::Higher, 0.3, 0.7),
+            (QuantileMethod::Nearest, 0.2, 0.7),
+            (QuantileMethod::Midpoint, 0.25, 0.65),
+            (QuantileMethod::InvertedCdf, 0.2, 0.7),
+            (QuantileMethod::AveragedInvertedCdf, 0.2, 0.7),
+            (QuantileMethod::ClosestObservation, 0.05, 0.7),
+            (QuantileMethod::InterpolatedInvertedCdf, 0.125, 0.65),
+            (QuantileMethod::Hazen, 0.2, 0.7),
+            (QuantileMethod::Weibull, 0.1625, 0.7375),
+            (QuantileMethod::MedianUnbiased, 0.1875, 0.7125),
+            (QuantileMethod::NormalUnbiased, 0.190_625, 0.709_375),
         ],
     },
 ];
