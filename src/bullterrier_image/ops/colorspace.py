@@ -64,25 +64,6 @@ def rgb_to_hsv(rgb: np.ndarray) -> np.ndarray:
     return np.stack([hue, saturation, value], axis=-1).astype(np.float32)
 
 
-def hsv_to_rgb(hsv: np.ndarray) -> np.ndarray:
-    """Convert hue, saturation, value to sRGB; the inverse of `rgb_to_hsv`.
-
-    Args:
-        hsv: last axis length 3 (h, s, v). Hue is a share of the full colour circle and wraps, so 1.25 and -0.75 both
-            mean 0.25; saturation and value are 0..1.
-
-    Returns:
-        float32 array of the same shape holding sRGB (r, g, b), 0..1 for in-range saturation and value.
-    """
-    hsv = np.asarray(hsv, dtype=np.float32)
-    hue, saturation, value = hsv[..., 0:1], hsv[..., 1:2], hsv[..., 2:3]
-    # For channel offset n (5, 3, 1 for r, g, b) the channel is value, dipping to value*(1-saturation) over a
-    # trapezoid of the hue circle: the standard branch-free HSV formula.
-    k = (np.array([5, 3, 1], dtype=np.float32) + hue * 6) % 6  # constant: channel offsets and six sectors, standard HSV
-    ramp = np.clip(np.minimum(k, 4 - k), 0, 1)  # constant: the trapezoid's plateau starts 4 sectors on, standard HSV
-    return (value - value * saturation * ramp).astype(np.float32)
-
-
 # JFIF full-range YCbCr (ITU-T T.871): Y is the luma of the Rec. 601 weights, Cb and Cr are the blue and red differences
 # scaled to span the full range, centred on 128 of 255.
 _RGB_TO_YCBCR = np.array(

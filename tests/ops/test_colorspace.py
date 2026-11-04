@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from bullterrier_image.ops.colorspace import (
-    hsv_to_rgb,
     rgb_to_hsv,
     rgb_to_oklab,
     rgb_to_ycbcr,
@@ -66,26 +65,15 @@ def test_rgb_to_hsv_matches_the_textbook_values(rgb: tuple[float, ...], hsv: tup
     np.testing.assert_allclose(rgb_to_hsv(np.array(rgb)), hsv, atol=1e-6)
 
 
-@pytest.mark.parametrize(("rgb", "hsv"), HSV_PAIRS)
-def test_hsv_to_rgb_matches_the_textbook_values(rgb: tuple[float, ...], hsv: tuple[float, ...]) -> None:
-    np.testing.assert_allclose(hsv_to_rgb(np.array(hsv)), rgb, atol=1e-6)
-
-
-def test_hsv_agrees_with_the_standard_library_in_both_directions() -> None:
+def test_rgb_to_hsv_agrees_with_the_standard_library() -> None:
     colours = np.random.default_rng(5).random((200, 3), dtype=np.float32)
     expected_hsv = np.array([colorsys.rgb_to_hsv(*map(float, c)) for c in colours])
     np.testing.assert_allclose(rgb_to_hsv(colours), expected_hsv, atol=1e-5)
-    np.testing.assert_allclose(hsv_to_rgb(expected_hsv), colours, atol=1e-5)
 
 
 def test_hue_is_always_below_one_even_for_a_red_with_a_trace_of_blue() -> None:
     reds = np.array([[1.0, 0.0, 1e-9], [1.0, 0.0, 0.0]], dtype=np.float32)
     assert (rgb_to_hsv(reds)[:, 0] < 1).all()
-
-
-def test_hue_wraps_around_the_colour_circle() -> None:
-    np.testing.assert_allclose(hsv_to_rgb(np.array([1.25, 1, 1])), hsv_to_rgb(np.array([0.25, 1, 1])), atol=1e-6)
-    np.testing.assert_allclose(hsv_to_rgb(np.array([-0.75, 1, 1])), hsv_to_rgb(np.array([0.25, 1, 1])), atol=1e-6)
 
 
 # 8-bit (Y, Cb, Cr) of the primaries and grey, as every JPEG tool tabulates them (JFIF, ITU-T T.871): the chroma of a

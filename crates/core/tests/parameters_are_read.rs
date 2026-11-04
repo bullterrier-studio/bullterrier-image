@@ -38,6 +38,23 @@ fn conditional() -> Vec<Conditional> {
             field: "pivot",
             with: vec![("contrast", json!(2.0))],
         },
+        // the range of colours selected changes nothing while no change is set for them (the defaults keep hue,
+        // saturation and lightness)
+        Conditional {
+            effect: "selective_color",
+            field: "hue",
+            with: vec![("hue_shift", json!(90.0))],
+        },
+        Conditional {
+            effect: "selective_color",
+            field: "width",
+            with: vec![("hue_shift", json!(90.0))],
+        },
+        Conditional {
+            effect: "selective_color",
+            field: "feather",
+            with: vec![("hue_shift", json!(90.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

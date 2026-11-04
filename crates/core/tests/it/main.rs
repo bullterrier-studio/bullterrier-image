@@ -22,6 +22,8 @@ mod files_icc;
 mod files_read;
 mod files_write;
 mod grid_shift;
+mod hsv;
+mod hue_range;
 mod inputs;
 mod limits;
 mod noise;
