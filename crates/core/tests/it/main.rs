@@ -14,6 +14,7 @@ mod cuts;
 mod cuts_ends;
 mod debug;
 mod deep;
+mod dehaze;
 mod each;
 mod each_weights;
 mod effect;

@@ -179,8 +179,15 @@ fn cases() -> Vec<Case> {
             &thin_and_odd,
         ),
         case(
-            "the guided filter, on the rows and the columns turned into rows",
-            Recipe::new([Step::new("tone_map").param("radius", 5).param("amount", 1.0)]),
+            "the guided filter and the minimum filter, on the rows and the columns turned into rows",
+            Recipe::new([
+                Step::new("tone_map").param("radius", 5).param("amount", 1.0),
+                Step::new("dehaze")
+                    .param("patch", 9)
+                    .param("radius", 4)
+                    .param("edge", "wrap"),
+                Step::new("dehaze").param("patch", 4).param("amount", 0.5),
+            ]),
             // (shapes that cut the rows into bands and pair them, thinner ones than the squarish are slow in a debug build)
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1), (5, 2_003)],
         ),

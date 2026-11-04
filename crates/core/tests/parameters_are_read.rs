@@ -30,6 +30,10 @@ struct Conditional {
 }
 
 /// Every parameter that is not read at the defaults, and why.
+#[expect(
+    clippy::too_many_lines,
+    reason = "a table, one row for each parameter that matters only under a condition"
+)]
 fn conditional() -> Vec<Conditional> {
     vec![
         // contrast leaves values where they are at 1, whatever the pivot
@@ -125,6 +129,38 @@ fn conditional() -> Vec<Conditional> {
             effect: "lens_flare",
             field: "ring_width",
             with: vec![("ghosts", json!(0)), ("halo", json!(0.0))],
+        },
+        // the default patch (15 px) covers the whole 12 px picture, whose darkest value is 0: no haze is found, so nothing
+        // else matters until the patch is smaller
+        Conditional {
+            effect: "dehaze",
+            field: "amount",
+            with: vec![("patch", json!(3))],
+        },
+        Conditional {
+            effect: "dehaze",
+            field: "radius",
+            with: vec![("patch", json!(3))],
+        },
+        Conditional {
+            effect: "dehaze",
+            field: "edge_threshold",
+            with: vec![("patch", json!(3))],
+        },
+        Conditional {
+            effect: "dehaze",
+            field: "transmission_floor",
+            with: vec![("patch", json!(3))],
+        },
+        Conditional {
+            effect: "dehaze",
+            field: "airlight_fraction",
+            with: vec![("patch", json!(3))],
+        },
+        Conditional {
+            effect: "dehaze",
+            field: "edge",
+            with: vec![("patch", json!(3))],
         },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
