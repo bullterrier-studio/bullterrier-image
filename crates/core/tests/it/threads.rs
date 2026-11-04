@@ -89,6 +89,14 @@ fn cases() -> Vec<Case> {
             Recipe::new([
                 Step::new("pixel_grid").param("cell", 4),
                 Step::new("pattern"),
+                Step::new("gradient")
+                    .param("kind", "conic")
+                    .param("repeat", 3)
+                    .param("reflect", true)
+                    .param("x", 0.3)
+                    .opacity(0.5),
+                Step::new("gradient").param("kind", "radial").opacity(0.3),
+                Step::new("gradient").param("angle", 33).opacity(0.3),
                 grade(0.2),
                 Step::new("levels").param("black", 0.1).param("gamma", 1.4),
                 Step::new("curves").param("midtones", 0.35).param("red_shadows", 0.4),

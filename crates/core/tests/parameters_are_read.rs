@@ -61,6 +61,27 @@ fn conditional() -> Vec<Conditional> {
             field: "quantile_method",
             with: vec![("shadow_clip", json!(0.37)), ("highlight_clip", json!(0.13))],
         },
+        // a linear band is always centred and has no radius; reversing needs a second repeat
+        Conditional {
+            effect: "gradient",
+            field: "x",
+            with: vec![("kind", json!("radial"))],
+        },
+        Conditional {
+            effect: "gradient",
+            field: "y",
+            with: vec![("kind", json!("radial"))],
+        },
+        Conditional {
+            effect: "gradient",
+            field: "radius",
+            with: vec![("kind", json!("radial"))],
+        },
+        Conditional {
+            effect: "gradient",
+            field: "reflect",
+            with: vec![("repeat", json!(2))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

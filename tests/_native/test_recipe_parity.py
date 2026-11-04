@@ -99,6 +99,37 @@ ROWS = [
     pytest.param("pixel_grid", {"cell": True}, False, id="pixel_grid: a bool for a whole number"),
     pytest.param("pixel_grid", {"keep_brightness": 1}, False, id="pixel_grid: a number for a switch"),
     pytest.param("pixel_grid", {"keep_brightness": "yes"}, False, id="pixel_grid: text for a switch"),
+    # lists of colours: a floor on the length (gradient_map two, gradient one), each element read as a colour
+    pytest.param("gradient_map", {"stops": ["#000000", "#ffffff"]}, True, id="gradient_map: the shortest list"),
+    pytest.param(
+        "gradient_map",
+        {"stops": ["#abc", [0, 0.5, 1], (0.25, 0.5, 0.75), " #ABCDEF "]},
+        True,
+        id="gradient_map: every way of writing a colour in one list",
+    ),
+    pytest.param("gradient_map", {"stops": ["#000000"] * 40}, True, id="gradient_map: a long list"),
+    pytest.param("gradient_map", {"stops": ["#000000"]}, False, id="gradient_map: one colour is too few"),
+    pytest.param("gradient_map", {"stops": []}, False, id="gradient_map: an empty list"),
+    pytest.param(
+        "gradient_map", {"stops": ["#000000", "nope"]}, False, id="gradient_map: the second element is not a colour"
+    ),
+    pytest.param(
+        "gradient_map", {"stops": ["#000000", [0, 0, 2]]}, False, id="gradient_map: a channel above 1 in element 1"
+    ),
+    pytest.param(
+        "gradient_map", {"stops": ["#000", "#fff", [0, 0]]}, False, id="gradient_map: two channels in element 2"
+    ),
+    pytest.param("gradient_map", {"stops": "#000000"}, False, id="gradient_map: a colour for a list"),
+    pytest.param("gradient_map", {"stops": None}, False, id="gradient_map: None for a list"),
+    pytest.param("gradient", {"colors": ["#102030"]}, True, id="gradient: one colour is a flat fill"),
+    pytest.param("gradient", {"colors": []}, False, id="gradient: an empty list"),
+    pytest.param("gradient", {"colors": ["#102030", 7]}, False, id="gradient: a number for element 1"),
+    # a choice of thirteen, and the whole number and switch of a generated picture
+    pytest.param("gradient_map", {"quantile_method": "closest_observation"}, True, id="gradient_map: a listed method"),
+    pytest.param("gradient_map", {"quantile_method": "quartile"}, False, id="gradient_map: a method not listed"),
+    pytest.param("gradient", {"repeat": 64, "reflect": True}, True, id="gradient: highest repeat, reflected"),
+    pytest.param("gradient", {"repeat": 65}, False, id="gradient: repeat above the highest"),
+    pytest.param("gradient", {"repeat": 2.0}, False, id="gradient: a whole decimal for a repeat"),
 ]
 
 
