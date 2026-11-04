@@ -82,6 +82,12 @@ fn conditional() -> Vec<Conditional> {
             field: "reflect",
             with: vec![("repeat", json!(2))],
         },
+        // the value beyond the edge is seen only by the edge rule that uses it
+        Conditional {
+            effect: "gaussian_blur",
+            field: "constant_value",
+            with: vec![("edge", json!("constant"))],
+        },
         // a table that is none is the identity, which the amount mixes in without change
         Conditional {
             effect: "lut",

@@ -29,6 +29,7 @@ rayon = "1"  # the threads of a render (`Options::with_threads`)
 pyo3 = { version = "0.30", features = ["abi3-py312"] }
 quote = "1"
 roxmltree = { version = "0.21", default-features = false, features = ["std"] }  # the svg region reads a file
+rustfft = "6.4"  # the Fourier transform: blurs and convolutions with a wide kernel cost the same at any width (`ops/fft.rs`)
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }  # a recipe file's order is data (regions, first offender)
 serde_path_to_error = "0.1"

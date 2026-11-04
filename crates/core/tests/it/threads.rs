@@ -141,6 +141,20 @@ fn cases() -> Vec<Case> {
             &thin_and_odd,
         ),
         case(
+            "blurs summed tap by tap and by the Fourier transform",
+            Recipe::new([
+                Step::new("gaussian_blur").param("radius", 3).param("edge", "wrap"),
+                Step::new("gaussian_blur")
+                    .param("radius", 14)
+                    .param("edge", "constant")
+                    .param("constant_value", 0.3),
+            ]),
+            // (a radius is in design px, 480 to the longest side: sigma is 1.3 and 5.9 px on the squarish pictures, so only the
+            // second is filtered by the transform there, and 6 times that on the thin ones. The transform is slow in a debug
+            // build, so these are only shapes that cut the rows into bands and pair them)
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "effects that read the whole picture before they work pixel by pixel",
             Recipe::new([
                 Step::new("auto_levels").param("clip", 0.02),

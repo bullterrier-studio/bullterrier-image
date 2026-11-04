@@ -22,6 +22,7 @@ mod files_icc;
 mod files_read;
 mod files_write;
 mod fractal;
+mod gaussian_blur;
 mod gradient;
 mod gradient_map;
 mod grid_shift;

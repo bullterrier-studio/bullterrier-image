@@ -78,6 +78,42 @@ fn a_render_holds_a_few_pictures_however_many_steps_it_has() -> Result<(), Error
     Ok(())
 }
 
+/// The most bytes, beyond the photo's own, that a render of one `gaussian_blur` step of design radius `radius` on
+/// `threads` threads holds at once.
+fn blur_peak(radius: f64, threads: usize) -> Result<usize, Error> {
+    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
+    let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
+    let recipe = Recipe::new([Step::new("gaussian_blur").param("radius", radius)]);
+    let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?);
+    let before = HEAP.current_usage();
+    HEAP.reset_peak_usage();
+    let result = photo.render(&recipe, &Presets::new(), Options::default().with_threads(threads))?;
+    let peak = HEAP.peak_usage() - before;
+    drop(result);
+    Ok(peak)
+}
+
+#[test]
+fn a_blur_holds_its_picture_and_a_channels_working_space_on_any_threads() -> Result<(), Error> {
+    // The blurred picture, and the channel being blurred three times over (as a plane, turned on its side, and
+    // turned back): 1 + 3 x 1/3 = 2 pictures, which the Fourier transform's few lines of working space (about
+    // 2 x 1024 x 8 bytes a thread) does not add to. Radius 2 is sigma 2.5 px here, summed; radius 20 is sigma 25, so
+    // its kernel reaches 100 px and the transform filters it.
+    for (radius, threads) in [(2.0, 1), (20.0, 1), (20.0, 10)] {
+        let peak = blur_peak(radius, threads)?;
+        assert!(
+            peak <= 2 * IMAGE + IMAGE / 10,
+            "radius {radius} on {threads} threads held {peak} bytes, {} pictures",
+            peak / IMAGE
+        );
+        assert!(
+            peak >= 2 * IMAGE,
+            "the blur held {peak} bytes: less than the picture and the channel's planes"
+        );
+    }
+    Ok(())
+}
+
 #[test]
 fn a_render_on_ten_threads_holds_no_more_pictures_than_one_on_a_single_thread() -> Result<(), Error> {
     // the pool's own memory and a band's working space are far below a picture; a render that gave each thread a copy would not be
