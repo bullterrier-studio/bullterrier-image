@@ -5,8 +5,9 @@ from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import EffectParams, Picture, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Picture
 from bullterrier_image.ops.composite import BlendMode, composite
 from bullterrier_image.ops.place import Anchor, Resample, place
 

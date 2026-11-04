@@ -55,9 +55,10 @@ from . import finding, imageio
 from .checks import matte_warnings, still_warnings
 from .core.bridge import known_maps, maps_needed, needs_finder
 from .core.finder import Finder, find_map
-from .core.params import Lut, Picture, describe_error
+from .core.params import describe_error
 from .core.regions import FOUND_MAPS, Svg
 from .core.steps import file_name, runs
+from .core.values import Lut, Picture
 from .errors import BullterrierImageError, ProjectError, RecipeError, SubjectNotFoundError
 from .ops.maps import map_problem
 from .ops.resample import resize

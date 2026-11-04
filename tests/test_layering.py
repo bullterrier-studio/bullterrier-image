@@ -36,7 +36,7 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 LAYERS = "Layers: app > adapters > effects > core > ops > errors"
 EFFECTS_APART = "Effects never import each other"
 CORE_ORDER = (
-    "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > native > types"
+    "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > native|values > types"
 )
 CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER]
 

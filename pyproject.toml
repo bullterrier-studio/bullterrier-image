@@ -427,7 +427,7 @@ type = "independence"
 modules = ["bullterrier_image.effects.*"]
 
 [[tool.importlinter.contracts]]
-name = "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > native > types"
+name = "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > native|values > types"
 type = "layers"
 containers = ["bullterrier_image.core"]
 exhaustive = true  # a new core module must be placed in a layer here
@@ -438,7 +438,7 @@ exhaustive = true  # a new core module must be placed in a layer here
 # too and ask the core (`native`) for their presets. Each edge points down, so each gets a layer of its own (the framing, the registry, the
 # regions and the finder side by side: none knows another); the bridge runs a recipe in the Rust core, with the finders
 # it is given.
-layers = ["bridge", "steps", "framing | registry | regions | finder", "presets | looks", "params | vocabulary", "native", "types"]
+layers = ["bridge", "steps", "framing | registry | regions | finder", "presets | looks", "params | vocabulary", "native | values", "types"]
 # `native` (the extension's entry points, raising the package's exceptions) imports no core module; params and registry call it.
 
 # Read by git-cliff when `uv run poe release` writes a release's section of CHANGELOG.md: the Conventional Commits since

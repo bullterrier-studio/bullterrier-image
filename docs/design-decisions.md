@@ -26,7 +26,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   each other; shared numeric code goes to `ops/`, named by concept.
 - **A second picture is an asset: a parameter whose value is a picture.** An effect that uses a
   file of its own (a texture to blend, a logo, the photo inside a double exposure, a colour reference, a displacement
-  map) declares a `Picture` field (read-only RGBA pixels with a content digest, in `core/params.py`). A recipe file writes a path,
+  map) declares a `Picture` field (read-only RGBA pixels with a content digest, in `core/values.py`). A recipe file writes a path,
   relative to the recipe file, and the recipe reader reads it with `imageio` once, when the recipe is loaded; `fx`
   takes a path, an array, a `Picture` or a colour (a colour is a flat 1x1 picture, which is why every Picture field has
   a default). The effect receives an RGBA
@@ -39,7 +39,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   adapters layer, beside `imageio` (`bullterrier_image/loader.py`); the pipeline's fingerprint covers each asset's content, not only the recipe text;
   a large asset is counted nowhere (the effect contract measures the budget on an effect's default 1x1 pictures, and a recipe's
   assets are held as loaded), so a real budget for assets is a decision still to make; another kind of asset file gets its own value type and reader in the adapters layer together with its first effect:
-  the `.cube` lookup table is `Lut` (`core/params.py`), read by `imageio.load_lut` (`LutError` names file and line) and held by `lut`'s `file`.
+  the `.cube` lookup table is `Lut` (`core/values.py`), read by `imageio.load_lut` (`LutError` names file and line) and held by `lut`'s `file`.
   `lut` interpolates trilinearly with no parameter for it: nearest-entry lookup only bands, so no look needs the choice.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
   `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry

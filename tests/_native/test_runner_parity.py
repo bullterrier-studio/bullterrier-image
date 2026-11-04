@@ -15,11 +15,12 @@ import pytest
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core's runner is compared with the definitions
 from bullterrier_image.core import bridge, native, registry
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
+from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.presets import SHIPPED
 from bullterrier_image.core.regions import Given, Grid
 from bullterrier_image.core.registry import effect, unregister
 from bullterrier_image.core.steps import Recipe, Step
+from bullterrier_image.core.values import Lut, Picture
 from bullterrier_image.errors import (
     DepthNotFoundError,
     MapNotFoundError,

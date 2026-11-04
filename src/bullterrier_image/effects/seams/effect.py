@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.pieces import border_distance
 from bullterrier_image.ops.voronoi import line_coverage
 

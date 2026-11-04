@@ -16,19 +16,12 @@ from bullterrier_image import fx
 from bullterrier_image import recipe as facade
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the effects the Rust core implements
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import (
-    UNITS,
-    Drive,
-    EffectParams,
-    FieldName,
-    drivable_fields,
-    field_name_fields,
-    param,
-)
+from bullterrier_image.core.params import UNITS, Drive, EffectParams, drivable_fields, field_name_fields, param
 from bullterrier_image.core.params import signature as signature_of
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step, drives
+from bullterrier_image.core.values import FieldName
 from bullterrier_image.errors import MapNotFoundError, RecipeError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import Band, Curve, Edge, Finder, Framing, Given, Grid, Line

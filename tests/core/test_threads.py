@@ -8,8 +8,8 @@ import pytest
 
 from bullterrier_image import RecipeError
 from bullterrier_image import recipe as facade
-from bullterrier_image.core.params import Picture
 from bullterrier_image.core.steps import Recipe, Step
+from bullterrier_image.core.values import Picture
 from bullterrier_image.recipe import Framing
 
 PLAIN = Recipe((Step("grade", params={"exposure": 0.5}),), name="plain", size=None)

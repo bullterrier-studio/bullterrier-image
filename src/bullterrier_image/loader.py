@@ -119,7 +119,7 @@ from bullterrier_image.errors import BullterrierImageError, ImageReadError, LutE
 from . import imageio
 from .core import looks, registry
 from .core.framing import Framing
-from .core.params import Picture, arrays_as_values, lut_fields, picture_fields
+from .core.params import arrays_as_values, lut_fields, picture_fields
 from .core.regions import (
     Band,
     Bands,
@@ -137,6 +137,7 @@ from .core.regions import (
 )
 from .core.regions import Path as PathRegion  # `Path` is pathlib's here
 from .core.steps import Each, Recipe, Step
+from .core.values import Picture
 
 __all__ = ["load_recipe", "with_files"]
 

@@ -5,8 +5,9 @@ from typing import Self
 import numpy as np
 from pydantic import model_validator
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.quadtree import leaves
 
 # constant: pixels drawn at once; bounds the working memory and never changes the result

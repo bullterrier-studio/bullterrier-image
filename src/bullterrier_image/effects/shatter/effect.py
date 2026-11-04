@@ -6,8 +6,9 @@ from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.sites import detail_weights, sites
 from bullterrier_image.ops.triangles import triangles
 from bullterrier_image.ops.voronoi import cells, line_coverage

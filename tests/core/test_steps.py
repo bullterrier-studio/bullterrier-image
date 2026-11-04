@@ -16,10 +16,11 @@ from pydantic import model_validator
 from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
 from bullterrier_image.core.bridge import maps_needed, needs_finder
-from bullterrier_image.core.params import Drive, EffectParams, Lut, Picture, param
+from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step, drives, fixed, references, runs
+from bullterrier_image.core.values import Lut, Picture
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (

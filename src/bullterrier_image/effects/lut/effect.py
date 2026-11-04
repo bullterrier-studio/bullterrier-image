@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from bullterrier_image.core.params import EffectParams, Lut, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Lut
 
 
 class LutParams(EffectParams):

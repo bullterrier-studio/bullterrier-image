@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.convolve import convolve
 from bullterrier_image.ops.light import highlights, screen
 

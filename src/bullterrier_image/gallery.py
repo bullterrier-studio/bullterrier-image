@@ -167,7 +167,8 @@ def stub_text() -> str:
         "",
         "import numpy",
         "",
-        "from .core.params import Drive, Lut, Picture",
+        "from .core.params import Drive",
+        "from .core.values import Lut, Picture",
         "from .recipe import Step",
         "",
         "class _Effect[**P](Protocol):",
@@ -183,8 +184,8 @@ def stub_text() -> str:
         # Python before 3.14 writes `X | None` of a Literal as Optional[X]; a stub is written the short way
         written = inspect.signature(getattr(fx, name)).replace(return_annotation=inspect.Signature.empty)
         signature = re.sub(r"Optional\[(Literal\[[^\]]*\])\]", r"\1 | None", str(written))
-        signature = signature.replace("bullterrier_image.core.params.Picture", "Picture")
-        signature = signature.replace("bullterrier_image.core.params.Lut", "Lut")
+        signature = signature.replace("bullterrier_image.core.values.Picture", "Picture")
+        signature = signature.replace("bullterrier_image.core.values.Lut", "Lut")
         signature = signature.replace("bullterrier_image.core.params.Drive", "Drive")
         lines += ["@_effect", f"def {name}{signature} -> Step:"]
         doc = registry.documentation(name).replace("\\", "\\\\").replace('"""', "'''")

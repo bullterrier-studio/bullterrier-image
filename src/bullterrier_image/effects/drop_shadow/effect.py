@@ -5,8 +5,9 @@ from typing import Literal
 
 import numpy as np
 
-from bullterrier_image.core.params import Color, EffectParams, FieldName, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color, FieldName
 from bullterrier_image.ops.blur import gaussian_blur
 from bullterrier_image.ops.cutout import put_behind
 from bullterrier_image.ops.shift import BoxedImage

@@ -51,9 +51,9 @@ app        cli, pipeline, gallery, sheet, checks, fx, public API      (may impor
 adapters   imageio (files), finding (finding the subject), loader (recipe files)   (may import core, ops)
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
-core       params (EffectParams, param, Color), registry, steps (the recipe model: Step, Each, Recipe), regions and
-           framing (its declarations), finder (Finder), native (the extension's entry points), bridge (a recipe
-           run by the Rust core)                                          (may import ops)
+core       params (EffectParams, param), values (Color, FieldName, Picture, Lut), registry, steps (the recipe model:
+           Step, Each, Recipe), regions and framing (its declarations), finder (Finder), native (the extension's
+           entry points), bridge (a recipe run by the Rust core)                                          (may import ops)
 ops        pure numeric primitives                                    (may import errors, _native)
 errors     BullterrierImageError and its subclasses                            (imports nothing from bullterrier_image)
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)

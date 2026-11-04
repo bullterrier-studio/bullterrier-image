@@ -50,7 +50,8 @@ opacity=0.7)` (0..1, default 1); a step's own `opacity` replaces it. No paramete
 `each`, `looks`). Names must be unique across every installed package.
 """
 
-from .core.params import Color, EffectParams, FieldName, Lut, Picture, param
+from .core.params import EffectParams, param
 from .core.registry import CATEGORIES, effect
+from .core.values import Color, FieldName, Lut, Picture
 
 __all__ = ["CATEGORIES", "Color", "EffectParams", "FieldName", "Lut", "Picture", "effect", "param"]

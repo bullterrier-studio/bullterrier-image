@@ -20,8 +20,9 @@ from PIL import Image, JpegImagePlugin
 import bullterrier_image
 from bullterrier_image import ProjectError, UnknownEffectError, gallery, imageio
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.ops.resample import resize
 

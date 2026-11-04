@@ -5,8 +5,9 @@ from functools import partial
 import numpy as np
 from scipy.special import ndtr
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.noise import fractal
 from bullterrier_image.ops.ramp import ramp
 

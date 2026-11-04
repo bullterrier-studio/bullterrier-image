@@ -25,9 +25,10 @@ from bullterrier_image import (
 from bullterrier_image import recipe as facade
 from bullterrier_image.core import looks, registry
 from bullterrier_image.core.bridge import maps_needed
-from bullterrier_image.core.params import EffectParams, FieldName, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import runs
+from bullterrier_image.core.values import FieldName
 from bullterrier_image.errors import BackendUnavailableError, RecipeError
 from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_matte

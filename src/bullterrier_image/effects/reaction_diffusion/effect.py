@@ -5,8 +5,9 @@ from typing import Literal
 import numpy as np
 from scipy import ndimage
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.color import luminance
 from bullterrier_image.ops.ramp import ramp
 from bullterrier_image.ops.warp import remap

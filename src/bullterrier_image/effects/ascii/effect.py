@@ -5,8 +5,9 @@ from typing import Annotated
 import numpy as np
 from pydantic import AfterValidator
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.textart import check_palette, text_art
 
 # A text-art palette: at least two distinct characters, checked when the value is written.

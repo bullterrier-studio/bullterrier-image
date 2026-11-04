@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from bullterrier_image.core.params import Color, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color
 from bullterrier_image.ops.noise import fractal
 
 TOP, BOTTOM, LEFT, RIGHT = 0, 1, 2, 3  # constant: the four sides, numbered so each tears from a seed of its own

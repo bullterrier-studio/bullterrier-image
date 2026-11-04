@@ -37,8 +37,9 @@ from bullterrier_image import (
 )
 from bullterrier_image.cli import main
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import Color, EffectParams, Picture, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
+from bullterrier_image.core.values import Color, Picture
 
 # --- the public surface: explicit, one home per name ------------------------------------------------------------
 

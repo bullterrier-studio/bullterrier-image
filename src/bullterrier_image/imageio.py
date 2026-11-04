@@ -12,7 +12,7 @@ import numpy as np
 from PIL import Image
 
 from bullterrier_image.core import native
-from bullterrier_image.core.params import Lut
+from bullterrier_image.core.values import Lut
 from bullterrier_image.errors import LutError
 from bullterrier_image.ops.image import as_image
 

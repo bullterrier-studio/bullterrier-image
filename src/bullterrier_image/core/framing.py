@@ -15,7 +15,8 @@ Dependency direction: imports `params` only.
 
 from typing import Any, Literal
 
-from .params import Color, EffectParams, param
+from .params import EffectParams, param
+from .values import Color
 
 __all__ = ["Framing"]
 

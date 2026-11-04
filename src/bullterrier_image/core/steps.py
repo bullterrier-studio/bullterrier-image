@@ -43,8 +43,6 @@ from .framing import Framing
 from .params import (
     Drive,
     EffectParams,
-    Lut,
-    Picture,
     ValidatedModel,
     arrays_as_values,
     bounds,
@@ -54,6 +52,7 @@ from .params import (
     whole_number_fields,
 )
 from .regions import Kind, check, needs
+from .values import Lut, Picture
 
 MAX_THREADS = 256  # constant: the most threads a render may ask for; the core refuses more (`par::MOST_THREADS`)
 MAX_SIZE = 16384  # constant: longest side, px; the core also caps the pixels of a picture

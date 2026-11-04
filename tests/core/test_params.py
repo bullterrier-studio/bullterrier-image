@@ -13,11 +13,8 @@ from pydantic import ValidationError
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is the declaration compared with
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import (
-    Color,
     Drive,
     EffectParams,
-    FieldName,
-    Picture,
     core_field,
     describe_error,
     drivable_fields,
@@ -27,6 +24,7 @@ from bullterrier_image.core.params import (
     whole_number_fields,
 )
 from bullterrier_image.core.params import signature as signature_of
+from bullterrier_image.core.values import Color, FieldName, Picture
 from bullterrier_image.errors import RecipeError
 
 

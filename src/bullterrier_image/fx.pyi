@@ -6,7 +6,8 @@ from typing import Any, Literal, Protocol, Union
 
 import numpy
 
-from .core.params import Drive, Lut, Picture
+from .core.params import Drive
+from .core.values import Lut, Picture
 from .recipe import Step
 
 class _Effect[**P](Protocol):

@@ -18,8 +18,9 @@ import pytest
 from onnx import TensorProto, helper
 
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import EffectParams, FieldName, Picture, core_effect, param, scaled
+from bullterrier_image.core.params import EffectParams, core_effect, param, scaled
 from bullterrier_image.core.registry import effect, unregister
+from bullterrier_image.core.values import FieldName, Picture
 
 ROOT = Path(__file__).resolve().parents[1]
 
