@@ -1,6 +1,6 @@
 //! `vignette`, `scanlines` and `equalize`: values worked out by hand from their documented formulas.
 
-use bullterrier_image::effects::{scanlines, vignette};
+use bullterrier_image::effects::{equalize, scanlines, vignette};
 use bullterrier_image::params::{Color, EffectParams};
 use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
@@ -162,5 +162,101 @@ proptest! {
         let expected = darkness * thickness * f32::from(period) * f32::from(periods);
         prop_assert!((darkening - expected).abs() <= 1e-3, "{darkening} not {expected}");
         prop_assert!(out.iter().all(|gain| (-1e-6..=1.0 + 1e-6).contains(gain)), "{:?}", out);
+    }
+}
+
+// --- equalize ----------------------------------------------------------------------------------------------------
+
+#[test]
+fn one_unclipped_tile_maps_a_pixel_to_the_share_of_pixels_at_or_below_its_bin() -> Result<(), Error> {
+    // 4 bins; the greys sit in bins 0, 0, 2, 3, so the counts are 2, 0, 1, 1 and the cumulative shares 0.5, 0.5, 0.75, 1
+    let params = equalize::Params {
+        tiles: 1,
+        limit: 4.0,
+        bins: 4,
+    };
+    let pixels = [0.125, 0.125, 0.625, 0.875].map(|grey| [grey; 3]);
+    let out = run(&params, &pixels)?;
+    assert_close(
+        &out.iter().map(|pixel| pixel[0]).collect::<Vec<_>>(),
+        &[0.5, 0.5, 0.75, 1.0],
+        "classic equalisation",
+    );
+    Ok(())
+}
+
+#[test]
+fn a_limit_of_one_flattens_the_histogram_so_the_mapping_is_the_uniform_ramp() -> Result<(), Error> {
+    let params = equalize::Params {
+        tiles: 1,
+        limit: 1.0,
+        bins: 4,
+    };
+    let pixels = [0.125, 0.125, 0.625, 0.875].map(|grey| [grey; 3]);
+    let out = run(&params, &pixels)?;
+    assert_close(
+        &out.iter().map(|pixel| pixel[0]).collect::<Vec<_>>(),
+        &[0.25, 0.25, 0.75, 1.0],
+        "a flat histogram",
+    );
+    Ok(())
+}
+
+#[test]
+#[expect(clippy::cast_precision_loss, reason = "a position is below 32")]
+fn neighbouring_tiles_blend_by_the_distance_to_their_centres() -> Result<(), Error> {
+    // 16 rows by 32 columns in 2 x 2 tiles of 8 x 16: the left half is one dark grey (bin 64 of 256), the right half
+    // one bright grey (bin 192). The left tiles map the dark grey to 1; the right tiles map it (below all their pixels)
+    // to 0. So a left pixel at column x is 1 - w, w the share of the way from the left tile's centre (column 7.5) to the
+    // right tile's (23.5), (x - 7.5) / 16 held to 0..1; right pixels map to 1 in both tiles. Also turned on its side,
+    // and with the grey halves swapped, where a dark pixel at x is w itself.
+    let (dark, bright) = (64.5_f32 / 256.0, 192.5_f32 / 256.0);
+    let params = equalize::Params {
+        tiles: 2,
+        limit: 256.0,
+        bins: 256,
+    };
+    for (turned, dark_first) in [(false, true), (true, true), (false, false)] {
+        let (height, width) = if turned { (32, 16) } else { (16, 32) };
+        let along = |index: usize| if turned { index / width } else { index % width };
+        let greys: Vec<f32> = (0..height * width)
+            .map(|index| {
+                if (along(index) < 16) == dark_first {
+                    dark
+                } else {
+                    bright
+                }
+            })
+            .collect();
+        let out = grid_of(&params, height, width, &greys)?;
+        let share = |position: usize| ((position as f32 - 7.5) / 16.0).clamp(0.0, 1.0);
+        let expected: Vec<f32> = (0..height * width)
+            .map(|index| match (along(index), dark_first) {
+                (position @ 0..16, true) => 1.0 - share(position),
+                (position @ 16.., false) => share(position),
+                _ => 1.0,
+            })
+            .collect();
+        assert_close(&out, &expected, &format!("turned {turned}, dark first {dark_first}"));
+    }
+    Ok(())
+}
+
+proptest! {
+    #[test]
+    fn equalising_keeps_a_colours_hue_and_never_leaves_0_to_1(
+        values in prop::collection::vec(0.0_f32..=1.0, 3 * 40), tiles in 1_i32..=6, limit in 1.0_f32..=8.0, bins in 2_i32..=64,
+    ) {
+        let pixels: Vec<[f32; 3]> = values.chunks(3).map(|c| [c[0], c[1], c[2]]).collect();
+        let out = run(&equalize::Params { tiles, limit, bins }, &pixels)?;
+        for (before, after) in pixels.iter().zip(&out) {
+            prop_assert!(after.iter().all(|v| (0.0..=1.0 + 1e-6).contains(v)), "{:?}", after);
+            // the channels are scaled alike: before x after[i] == after x before[i]
+            for i in 0..3 {
+                for j in 0..3 {
+                    prop_assert!((after[i] * before[j] - after[j] * before[i]).abs() <= 1e-5);
+                }
+            }
+        }
     }
 }

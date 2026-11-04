@@ -107,6 +107,7 @@ fn cases() -> Vec<Case> {
                 Step::new("auto_levels").param("clip", 0.02),
                 grade(0.1),
                 Step::new("auto_levels").param("mode", "linked"),
+                Step::new("equalize").param("tiles", 5).param("bins", 64),
             ]),
             &thin_and_odd,
         ),
