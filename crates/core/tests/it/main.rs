@@ -21,6 +21,7 @@ mod error;
 mod files_icc;
 mod files_read;
 mod files_write;
+mod fractal;
 mod gradient;
 mod gradient_map;
 mod grid_shift;

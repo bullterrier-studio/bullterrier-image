@@ -21,3 +21,27 @@ pub(crate) fn run<P: EffectParams>(params: &P, pixels: &[[f32; 3]]) -> Result<Ve
         .map(|pixel| [pixel[0], pixel[1], pixel[2]])
         .collect())
 }
+
+/// `params` applied to a `height` x `width` picture whose every channel is `fill`: for an effect that reads only the
+/// picture's size. Row after row.
+pub(crate) fn run_sized<P: EffectParams>(
+    params: &P,
+    height: usize,
+    width: usize,
+    fill: f32,
+) -> Result<Vec<[f32; 3]>, Error> {
+    let values = vec![fill; height * width * 3];
+    let image = apply(
+        P::EFFECT,
+        &Picture::new(height, width, &values)?,
+        Value::Object(params.values()),
+        &Inputs::default(),
+    )?;
+    Ok(image
+        .into_values()
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|pixel| [pixel[0], pixel[1], pixel[2]])
+        .collect())
+}

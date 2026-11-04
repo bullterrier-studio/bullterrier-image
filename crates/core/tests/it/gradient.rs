@@ -1,33 +1,16 @@
 //! `gradient` and the conic layout it adds to the core's gradients: positions worked out by hand from the documented
 //! directions, how `repeat` and `reflect` fold the colours along them, and that only the picture's size is read.
 
+use bullterrier_image::Error;
 use bullterrier_image::effects::gradient::{self, Kind};
-use bullterrier_image::params::{Color, Declared, EffectParams};
-use bullterrier_image::{Error, Inputs, Picture, apply};
+use bullterrier_image::params::Color;
 use proptest::prelude::*;
-use serde_json::Value;
+
+use crate::common::pixels::run_sized;
 
 const TOLERANCE: f32 = 1e-5;
 const RED: [f32; 3] = [1.0, 0.0, 0.0];
 const BLUE: [f32; 3] = [0.0, 0.0, 1.0];
-
-/// The gradient over a `height` x `width` picture of `fill` in every channel, row after row.
-fn render(params: &gradient::Params, height: usize, width: usize, fill: f32) -> Result<Vec<[f32; 3]>, Error> {
-    let values = vec![fill; height * width * 3];
-    let image = apply(
-        gradient::Params::EFFECT,
-        &Picture::new(height, width, &values)?,
-        Value::Object(params.values()),
-        &Inputs::default(),
-    )?;
-    Ok(image
-        .into_values()
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .map(|pixel| [pixel[0], pixel[1], pixel[2]])
-        .collect())
-}
 
 fn red_to_blue(kind: Kind) -> gradient::Params {
     gradient::Params {
@@ -59,7 +42,7 @@ fn a_conic_gradient_turns_clockwise_from_its_start_angle_and_is_at_its_start_on_
             y,
             ..red_to_blue(Kind::Conic)
         };
-        Ok(render(&params, 101, 101, 0.0)?[row * 101 + column])
+        Ok(run_sized(&params, 101, 101, 0.0)?[row * 101 + column])
     };
     for (angle, row, column, turn) in [
         (0.0, 50, 100, 0.0),
@@ -91,7 +74,7 @@ fn a_conic_gradient_turns_clockwise_from_its_start_angle_and_is_at_its_start_on_
 fn repeat_fits_the_colours_in_again_and_reflect_runs_every_second_repeat_backwards() -> Result<(), Error> {
     // one row of 8 px, angle 0: the pixel centres are at 1/16, 3/16 ... of the width
     let row = |repeat, reflect| {
-        render(
+        run_sized(
             &gradient::Params {
                 angle: 0.0,
                 repeat,
@@ -138,8 +121,8 @@ proptest! {
             angle, x, y, repeat, reflect,
             ..red_to_blue([Kind::Linear, Kind::Radial, Kind::Conic][kind])
         };
-        let dark = render(&params, height, width, 0.0)?;
-        prop_assert_eq!(&dark, &render(&params, height, width, 0.7)?);
+        let dark = run_sized(&params, height, width, 0.0)?;
+        prop_assert_eq!(&dark, &run_sized(&params, height, width, 0.7)?);
         // red falls and blue rises along the ramp, and nothing else is ever in it
         for pixel in dark {
             prop_assert!(pixel[1] == 0.0 && (pixel[0] + pixel[2] - 1.0).abs() <= 1e-6 && pixel[2] >= 0.0 && pixel[0] >= 0.0);

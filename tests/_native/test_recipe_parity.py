@@ -130,6 +130,11 @@ ROWS = [
     pytest.param("gradient", {"repeat": 64, "reflect": True}, True, id="gradient: highest repeat, reflected"),
     pytest.param("gradient", {"repeat": 65}, False, id="gradient: repeat above the highest"),
     pytest.param("gradient", {"repeat": 2.0}, False, id="gradient: a whole decimal for a repeat"),
+    pytest.param("fractal", {"colors": ["#102030"]}, False, id="fractal: one colour is too few"),
+    pytest.param("fractal", {"colors": ["#102030", "#405060"]}, True, id="fractal: two colours"),
+    pytest.param("fractal", {"iterations": 2000, "zoom": 10000}, True, id="fractal: highest iterations and zoom"),
+    pytest.param("fractal", {"iterations": 0}, False, id="fractal: iterations below the lowest"),
+    pytest.param("fractal", {"c_real": -2.5}, False, id="fractal: constant below the lowest"),
 ]
 
 
