@@ -151,14 +151,15 @@ fn place(n: f64, q: f64, method: QuantileMethod) -> Place {
             gamma: if whole(n * q - 1.0) { 0.5 } else { 1.0 },
         },
         // at a whole index, the even-numbered of the two values (counting from 1)
+        // constant: Hyndman and Fan type 3 takes the index n q - 1 less half an observation
         ClosestObservation => discrete(n * q - 1.5, |gamma, index| {
             whole(gamma) && index.floor().rem_euclid(2.0) > 0.5
         }),
         InterpolatedInvertedCdf => continuous(virtual_index(n, q, 0.0, 1.0)),
         Hazen => continuous(virtual_index(n, q, 0.5, 0.5)),
         Weibull => continuous(virtual_index(n, q, 0.0, 0.0)),
-        MedianUnbiased => continuous(virtual_index(n, q, 1.0 / 3.0, 1.0 / 3.0)),
-        NormalUnbiased => continuous(virtual_index(n, q, 3.0 / 8.0, 3.0 / 8.0)),
+        MedianUnbiased => continuous(virtual_index(n, q, 1.0 / 3.0, 1.0 / 3.0)), // constant: Hyndman and Fan type 8, alpha = beta = 1/3
+        NormalUnbiased => continuous(virtual_index(n, q, 3.0 / 8.0, 3.0 / 8.0)), // constant: Hyndman and Fan type 9, alpha = beta = 3/8
     }
 }
 
