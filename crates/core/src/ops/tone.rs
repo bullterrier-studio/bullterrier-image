@@ -52,7 +52,7 @@ impl Remap {
 pub(crate) struct Curve {
     inputs: Vec<f64>,
     /// For each stretch between two points, the cubic's coefficients in (x - its first input), highest power first.
-    pieces: Vec<[f64; 4]>,
+    pieces: Vec<[f64; 4]>, // constant: a cubic has four coefficients
 }
 
 impl Curve {
@@ -108,6 +108,8 @@ fn sign(number: f64) -> i8 {
     i8::from(number > 0.0) - i8::from(number < 0.0)
 }
 
+const END_SLOPE_CAP: f64 = 3.0; // constant: Fritsch and Butland's cap of an end slope at three chords
+
 /// The slope at an end point from the stretch beside it (`width`, `chord`) and the next one (`next_width`,
 /// `next_chord`): the one-sided three-point estimate, set to zero if it points away from the chord and to three times
 /// the chord if the chords change direction and it is steeper than that.
@@ -115,8 +117,8 @@ fn end_slope(width: f64, next_width: f64, chord: f64, next_chord: f64) -> f64 {
     let estimate = ((2.0 * width + next_width) * chord - width * next_chord) / (width + next_width);
     if sign(estimate) != sign(chord) {
         0.0
-    } else if sign(chord) != sign(next_chord) && estimate.abs() > 3.0 * chord.abs() {
-        3.0 * chord
+    } else if sign(chord) != sign(next_chord) && estimate.abs() > END_SLOPE_CAP * chord.abs() {
+        END_SLOPE_CAP * chord
     } else {
         estimate
     }
