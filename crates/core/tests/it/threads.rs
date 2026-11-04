@@ -90,6 +90,7 @@ fn cases() -> Vec<Case> {
                 Step::new("pattern"),
                 grade(0.2),
                 Step::new("levels").param("black", 0.1).param("gamma", 1.4),
+                Step::new("curves").param("midtones", 0.35).param("red_shadows", 0.4),
             ]),
             &thin_and_odd,
         ),
