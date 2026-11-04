@@ -22,7 +22,8 @@
 //! }
 //! ```
 //!
-//! A list of colours is a `Vec<Color>` with `#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`.
+//! A lookup table is a `LutName` with no default (it is none: the identity table); it reaches the effect in its
+//! [`Inputs`](crate::Inputs), not in the values. A list of colours is a `Vec<Color>` with `#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`.
 //!
 //! The declaration is checked when the crate compiles: a field has a doc, a number a unit and a range that holds its
 //! default, a list of colours a `min_length` and a default of a length inside its lengths, `cyclic` is for degrees
@@ -48,8 +49,8 @@ mod derived;
 pub use bullterrier_image_derive::{Choice, Params};
 
 /// The names a choice picks from, in declaration order: what `#[derive(Choice)]` implements for a fieldless enum. The
-/// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool`, `Color` and `Vec<Color>`
-/// by their written names.
+/// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool`, `Color`, `Vec<Color>` and
+/// `LutName` by their written names.
 pub trait Choice {
     /// The names, in `snake_case`.
     const CHOICES: &'static [&'static str];
@@ -140,6 +141,9 @@ pub enum Kind {
     Color,
     /// A list of colours (`Vec<Color>`), at least `min_length` long.
     Colors,
+    /// A 3D colour lookup table (`LutName`): the name of a table the photo was given, or the path of a `.cube` file;
+    /// none is the identity table. The default is always none.
+    Lut,
 }
 
 /// The unit a number is in. Python's `UNITS` (`core/params.py`) lists the same names; a model checks its unit against them.
@@ -179,6 +183,8 @@ pub enum Scalar {
     Text(&'static str),
     /// The `'#rrggbb'` texts of a list of colours.
     List(&'static [&'static str]),
+    /// No value: the default of a lookup table, which is the identity table.
+    Null,
 }
 
 impl fmt::Display for Scalar {
@@ -191,7 +197,30 @@ impl fmt::Display for Scalar {
             Self::Bool(flag) => write!(formatter, "{flag}"),
             Self::Text(text) => formatter.write_str(text),
             Self::List(items) => write!(formatter, "[{}]", items.join(", ")),
+            Self::Null => formatter.write_str("null"),
         }
+    }
+}
+
+/// The value of a lookup table parameter: the name of a table the photo was given (see
+/// `Photo::with_lut`), else the path of a `.cube` file; none is the identity table. A recipe
+/// writes it as a string or `null`. The table itself never travels in the parameters: a render hands it to the effect in
+/// its [`Inputs`](crate::Inputs).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct LutName(pub Option<String>);
+
+impl LutName {
+    /// The table called `name`: a name given to the photo, or a path.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(Some(name.into()))
+    }
+
+    /// As a recipe writes it: the name, or `null` for none.
+    #[must_use]
+    pub fn json(&self) -> Value {
+        self.0.clone().map_or(Value::Null, Value::from)
     }
 }
 

@@ -397,6 +397,7 @@ _PLAIN_KINDS: dict[str, Any] = {
     "bool": bool,
     "color": Color,
     "colors": tuple[Color, ...],
+    "lut": Lut,
 }  # the kinds of `Kind` in crates/core/src/params.rs -> their annotation; a "choice" is a `Literal` of its names
 
 
@@ -414,16 +415,27 @@ def _annotation(effect: str, entry: dict[str, Any]) -> Any:
     return _PLAIN_KINDS[kind]
 
 
+def _default(entry: dict[str, Any]) -> Any:
+    """The default of the field `entry`: a list of colours as a tuple, a lookup table (declared as none) as the identity
+    table, else the literal the declaration wrote."""
+    match entry["kind"]:
+        case "colors":
+            return tuple(entry["default"])
+        case "lut":
+            return Lut.identity()
+        case _:
+            return entry["default"]
+
+
 def core_field(effect: str, entry: dict[str, Any]) -> tuple[Any, Any]:
     """The annotation and the `param` spec of the field `entry` of the Rust declaration of `effect` (one of the `fields`
     of `_core.params(effect)`), as `class X(EffectParams, core="x")` gives them to the model. A default and a bound are
     the literal the declaration wrote; a list of colours is a tuple, with the `min_length` (and `max_length`) the
     declaration gives. ValueError if its kind is one the core has and this module has not."""
     annotation = _annotation(effect, entry)
-    kind = entry["kind"]
     lengths = {key: entry[key] for key in ("min_length", "max_length") if key in entry}  # written for a list only
     spec = param(
-        tuple(entry["default"]) if kind == "colors" else entry["default"],
+        _default(entry),
         doc=entry["meaning"],
         unit=entry["unit"],
         min=entry["min"],

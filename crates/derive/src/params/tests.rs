@@ -52,6 +52,8 @@ fn a_complete_declaration_is_accepted_for_every_kind_of_field() {
         // a floor and a ceiling are inclusive: a default may sit on either, a trailing comma is fine
         documented! { #[param(default = ["#000000", "#ffffff",], min_length = 1, max_length = 2)] stops: Vec<Color>, },
         documented! { #[param(default = ["#000000"], min_length = 1, max_length = 1, advanced)] stops: Vec<Color>, },
+        documented! { #[param()] file: LutName, },
+        documented! { #[param(advanced)] file: LutName, },
         documented! { #[param(default = Grid)] kind: Kind, },
         documented! { #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)] angle: f32, },
         // as rustfmt wraps a long attribute
@@ -365,6 +367,31 @@ fn a_list_of_colours_that_breaks_its_rules_is_refused_naming_the_field() {
             "max_length on a number",
             documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, max_length = 3)] cell: f32, },
             &["cell", "max_length", "list of colours"],
+        ),
+        (
+            "a default on a lookup table",
+            documented! { #[param(default = "film.cube")] file: LutName, },
+            &["file", "default", "identity"],
+        ),
+        (
+            "a unit on a lookup table",
+            documented! { #[param(unit = px)] file: LutName, },
+            &["file", "unit"],
+        ),
+        (
+            "a bound on a lookup table",
+            documented! { #[param(max = 1)] file: LutName, },
+            &["file", "max"],
+        ),
+        (
+            "drivable on a lookup table",
+            documented! { #[param(drivable)] file: LutName, },
+            &["file", "drivable"],
+        ),
+        (
+            "min_length on a lookup table",
+            documented! { #[param(min_length = 1)] file: LutName, },
+            &["file", "min_length"],
         ),
         (
             "a list of anything but colours",

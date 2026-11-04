@@ -10,7 +10,7 @@ impl Table {
     ///
     /// The result has every parameter, in normal form: a parameter not given has its declared default; a decimal is a
     /// float even when given as a whole number; a colour is three numbers 0..1 (given as `'#rrggbb'`, `'#rgb'` in
-    /// either case, spaces around allowed, or three numbers); a list of colours is a list of those, between its
+    /// either case, spaces around allowed, or three numbers); a lookup table is a non-empty string (a name or a path) or `null`; a list of colours is a list of those, between its
     /// `min_length` and `max_length` long (the spellings may be mixed; the first element that is no colour is named by
     /// its place, counting from 0). Rules: a name the effect does not declare is refused,
     /// listing the declared ones; a decimal takes any number but not a switch or text; a whole number takes only a
@@ -55,7 +55,7 @@ impl Scalar {
         match self {
             Self::Int(whole) => Some(whole as f64),
             Self::Float(real) => Some(real),
-            Self::Bool(_) | Self::Text(_) | Self::List(_) => None,
+            Self::Bool(_) | Self::Text(_) | Self::List(_) | Self::Null => None,
         }
     }
 
@@ -67,6 +67,7 @@ impl Scalar {
             Self::Bool(flag) => Value::from(flag),
             Self::Text(text) => Value::from(text),
             Self::List(items) => Value::from(items.to_vec()),
+            Self::Null => Value::Null,
         }
     }
 }
@@ -97,6 +98,11 @@ impl Field {
                 .ok_or(Constraint::OneOf(self.choices)),
             Kind::Color => colour(value).map(Value::from).ok_or(Constraint::Colour),
             Kind::Colors => self.colours(value),
+            Kind::Lut => match value {
+                Value::Null => Ok(Value::Null),
+                Value::String(name) if !name.is_empty() => Ok(value.clone()),
+                _ => Err(Constraint::LutName),
+            },
         }
     }
 

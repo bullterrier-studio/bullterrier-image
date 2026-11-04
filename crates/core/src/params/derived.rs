@@ -6,7 +6,7 @@
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use super::{Color, Declared, Params};
+use super::{Color, Declared, LutName, Params};
 use crate::{Constraint, Error};
 
 /// The parameters of a gradient.
@@ -19,6 +19,9 @@ struct Gradient {
     /// The colours the marks cycle through, two to four.
     #[param(default = ["#000000", "#ffffff"], min_length = 2, max_length = 4, advanced)]
     palette: Vec<Color>,
+    /// The table graded with.
+    #[param()]
+    file: LutName,
 }
 
 fn check(given: &Value) -> Result<Map<String, Value>, Error> {
@@ -65,6 +68,26 @@ fn the_table_describes_each_list_with_its_lengths_and_the_texts_of_its_default()
             "drivable": false, "advanced": true,
         }))
     );
+}
+
+#[test]
+fn a_lookup_table_has_no_value_by_default_and_is_written_as_its_name() -> Result<(), Error> {
+    let written = serde_json::to_value(Gradient::table()).ok();
+    let field = written.map(|table| table["fields"][2].clone());
+    assert_eq!(field.as_ref().map(|field| &field["kind"]), Some(&json!("lut")));
+    assert_eq!(field.map(|field| field["default"].clone()), Some(Value::Null));
+    assert_eq!(Gradient::default().file, LutName(None));
+    assert_eq!(Gradient::default().values()["file"], Value::Null);
+    let named = Gradient {
+        file: LutName::new("film"),
+        ..Gradient::default()
+    };
+    assert_eq!(named.values()["file"], json!("film"));
+    // what the check makes of a name reads back into the struct
+    let read: Gradient = serde_json::from_value(Value::Object(check(&json!({"file": "film"}))?))
+        .map_err(|error| Error::Recipe(error.to_string()))?;
+    assert_eq!(read.file, LutName::new("film"));
+    Ok(())
 }
 
 #[test]

@@ -134,8 +134,8 @@ enum Written {
     Name(Ident),
 }
 
-/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool`, `Color` and `Vec<Color>` by their written
-/// names (a type alias is not recognised) and takes any other type for a choice enum, whose names come from its
+/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool`, `Color`, `Vec<Color>` and `LutName` by their
+/// written names (a type alias is not recognised) and takes any other type for a choice enum, whose names come from its
 /// `Choice` impl.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
@@ -144,6 +144,7 @@ enum Shape {
     Switch,
     Colour,
     Colours,
+    Lut,
     Choice,
 }
 
@@ -157,6 +158,7 @@ fn shape(ty: &Type) -> Shape {
         "i32" => Shape::Int,
         "bool" => Shape::Switch,
         "Color" => Shape::Colour,
+        "LutName" => Shape::Lut,
         "Vec" if colour_argument(&last.arguments) => Shape::Colours,
         _ => Shape::Choice,
     }
@@ -200,19 +202,25 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         broken("needs a doc comment: what it does, its unit and range in words, what raising it does")
     })?;
     let settings = settings(field, name)?;
-    let default = settings.default.as_ref().ok_or_else(|| broken("needs a default"))?;
-    let written = written(default).ok_or_else(|| {
-        broken("the default is a number, true or false, a '#rrggbb' colour in quotes, a list of them or a variant name")
-    })?;
     let ty = &field.ty;
     if shape(ty) != Shape::Colours && (settings.min_length.is_some() || settings.max_length.is_some()) {
         return Err(broken(
             "only a list of colours (Vec<Color>) takes min_length and max_length",
         ));
     }
-    let parts = match shape(ty) {
-        Shape::Float | Shape::Int => number_parts(&settings, &written, shape(ty), &broken)?,
-        other => other_parts(&settings, &written, other, ty, &broken)?,
+    let parts = if shape(ty) == Shape::Lut {
+        lut_parts(&settings, &broken)?
+    } else {
+        let default = settings.default.as_ref().ok_or_else(|| broken("needs a default"))?;
+        let written = written(default).ok_or_else(|| {
+            broken(
+                "the default is a number, true or false, a '#rrggbb' colour in quotes, a list of them or a variant name",
+            )
+        })?;
+        match shape(ty) {
+            Shape::Float | Shape::Int => number_parts(&settings, &written, shape(ty), &broken)?,
+            other => other_parts(&settings, &written, other, ty, &broken)?,
+        }
     };
     let Parts {
         kind,
@@ -254,6 +262,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
                 .map(|colour| ::serde_json::Value::Array(colour.0.iter().copied().map(crate::params::decimal).collect()))
                 .collect()
         )),
+        Shape::Lut => quote!(self.#name.json()),
         Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
         Shape::Int | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
     };
@@ -280,7 +289,7 @@ fn other_parts(
         if shape == Shape::Choice {
             let ty = ty.to_token_stream().to_string().replace(' ', "");
             broken(&format!(
-                "`{ty}` is not f32, i32, bool, Color or Vec<Color>, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
+                "`{ty}` is not f32, i32, bool, Color, Vec<Color> or LutName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
                  (a number is f32 or i32)"
             ))
         } else {
@@ -327,6 +336,34 @@ fn other_parts(
         choices,
         value,
         default,
+        unit: none.clone(),
+        min: none.clone(),
+        max: none.clone(),
+        min_length: none.clone(),
+        max_length: none,
+    })
+}
+
+/// A lookup table (`LutName`): its default is none, the identity table, so it is not written; no unit, bounds, lengths,
+/// cyclic or drivable either.
+fn lut_parts(settings: &Settings, broken: Broken<'_>) -> syn::Result<Parts> {
+    if settings.default.is_some() {
+        return Err(broken(
+            "a lookup table's default is none (the identity table): leave `default` out",
+        ));
+    }
+    if settings.unit.is_some() || settings.min.is_some() || settings.max.is_some() {
+        return Err(broken("only a number takes a unit, min and max"));
+    }
+    if settings.cyclic || settings.drivable {
+        return Err(broken("only a decimal number can be cyclic or drivable"));
+    }
+    let none = quote!(::core::option::Option::None);
+    Ok(Parts {
+        kind: quote!(crate::params::Kind::Lut),
+        choices: quote!(&[]),
+        value: quote!(crate::params::LutName::default()),
+        default: quote!(crate::params::Scalar::Null),
         unit: none.clone(),
         min: none.clone(),
         max: none.clone(),

@@ -24,7 +24,7 @@ from bullterrier_image.core.params import (
     whole_number_fields,
 )
 from bullterrier_image.core.params import signature as signature_of
-from bullterrier_image.core.values import Color, FieldName, Picture
+from bullterrier_image.core.values import Color, FieldName, Lut, Picture
 from bullterrier_image.errors import RecipeError
 
 
@@ -853,6 +853,7 @@ KIND_SCHEMA = {
     "int": "integer",
     "bool": "boolean",
     "colors": "array",
+    "lut": "string",
 }  # the JSON-schema type of each plain kind
 OF_ANOTHER_KIND: dict[
     str, list[Any]
@@ -863,6 +864,7 @@ OF_ANOTHER_KIND: dict[
     "choice": [1, "no such choice"],
     "color": ["red", [2, 0, 0]],
     "colors": ["#ffffff", 7, None, ["red"]],
+    "lut": [1, "film.cube", None],  # a path becomes a Lut in the loader or `fx`, never in the model
 }
 
 
@@ -887,7 +889,11 @@ def test_a_model_declared_in_rust_has_its_structs_fields_docs_defaults_and_range
             field["cyclic"],
         )
         # a literal keeps its kind: `min = 0` is the int 0 and `default = 0.0` the float 0.0 (the schema shows it)
-        declared = tuple(field["default"]) if field["kind"] == "colors" else field["default"]  # a list is a tuple here
+        declared = field["default"]
+        if field["kind"] == "colors":
+            declared = tuple(declared)  # a list is a tuple here
+        elif field["kind"] == "lut":
+            declared = Lut.identity()  # a table declared as none is the identity table
         assert [type(value) for value in (doc.default, doc.minimum, doc.maximum)] == [
             type(value) for value in (declared, field["min"], field["max"])
         ]
@@ -1056,6 +1062,32 @@ def test_the_json_schema_of_a_list_has_its_lengths_and_only_a_ceiling_when_decla
     properties = LISTED.model_json_schema()["properties"]
     assert (properties["stops"]["minItems"], "maxItems" in properties["stops"]) == (1, False)
     assert (properties["palette"]["minItems"], properties["palette"]["maxItems"]) == (2, 4)
+
+
+LUT: dict[str, Any] = {
+    "name": "file",
+    "kind": "lut",
+    "meaning": "The table.",
+    "default": None,
+    "unit": None,
+    "min": None,
+    "max": None,
+    "cyclic": False,
+    "choices": [],
+    "drivable": False,
+    "advanced": False,
+}
+
+
+def test_a_lookup_table_defaults_to_the_identity_and_takes_a_lut_only():
+    model = model_of(LUT)
+    assert model.parse({}).model_dump()["file"] == Lut.identity()
+    table = Lut.identity(5)
+    assert model.parse({"file": table}).model_dump()["file"] is table
+    assert model.fields_doc()[0].type == "lookup table"
+    for given in ["film.cube", 1, np.zeros((2, 2, 2, 3))]:
+        with pytest.raises(RecipeError, match=r"`file`.*lookup table"):
+            model.parse({"file": given})
 
 
 def test_a_kind_the_core_has_and_this_package_has_not_is_refused_naming_the_field():

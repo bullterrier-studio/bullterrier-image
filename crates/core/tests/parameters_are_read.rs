@@ -150,6 +150,8 @@ fn candidates(field: &Field) -> Vec<Value> {
             .map(|name| json!(name))
             .collect(),
         Kind::Color => vec![json!([0.9, 0.1, 0.2]), json!([0.1, 0.8, 0.3])],
+        // a name: the test offers its own table to any effect that is given one (see `render`)
+        Kind::Lut => vec![json!("table")],
         // the shortest list and one element more (where allowed), of colours that are not the default of any effect
         Kind::Colors => {
             let shortest = field.min_length.unwrap_or(1);
