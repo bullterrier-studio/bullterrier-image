@@ -122,6 +122,10 @@ fn cases() -> Vec<Case> {
                     .param("ghosts", 7)
                     .param("halo", 30)
                     .param("ring", 20),
+                Step::new("light_leak")
+                    .param("angle", 40)
+                    .param("blobs", 5)
+                    .param("seed", 9),
                 grade(0.2),
                 Step::new("levels").param("black", 0.1).param("gamma", 1.4),
                 Step::new("curves").param("midtones", 0.35).param("red_shadows", 0.4),

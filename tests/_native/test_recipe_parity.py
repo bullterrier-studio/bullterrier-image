@@ -139,6 +139,9 @@ ROWS = [
     pytest.param("lens_flare", {"ghosts": 12, "spacing": 3.0, "amount": 10.0}, True, id="lens_flare: highest ghosts"),
     pytest.param("lens_flare", {"ghosts": 13}, False, id="lens_flare: ghosts above the highest"),
     pytest.param("lens_flare", {"ring_width": 0.5}, False, id="lens_flare: ring width below the lowest"),
+    pytest.param("light_leak", {"blobs": 16, "seed": 2147483647}, True, id="light_leak: highest blobs and seed"),
+    pytest.param("light_leak", {"blobs": 0}, False, id="light_leak: blobs below the lowest"),
+    pytest.param("light_leak", {"seed": 2147483648}, False, id="light_leak: seed above the highest"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),

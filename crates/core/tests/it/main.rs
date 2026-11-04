@@ -29,6 +29,7 @@ mod hsv;
 mod hue_range;
 mod inputs;
 mod lens_flare;
+mod light_leak;
 mod limits;
 mod lut;
 mod lut_cube;
