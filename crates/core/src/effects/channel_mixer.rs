@@ -17,9 +17,9 @@ pub(crate) const META: Meta = Meta {
 /// Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights: black
 /// and white, infrared, colour swaps.
 ///
-/// The weights are named `<output>_from_<input>`, so a row of the matrix is one output channel: out[i] = sum over j
-/// of matrix[i][j] * in[j]. The defaults are the identity matrix. A row summing to 1 keeps greys at their brightness in
-/// that channel. The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light, and
+/// The weights are named `<output>_from_<input>`, so a row of the matrix is one output channel: each output is the sum
+/// of the three input channels, each times its weight in that row. The defaults are the identity matrix. A row summing
+/// to 1 keeps greys at their brightness in that channel. The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light, and
 /// the result is clipped to 0..1.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
