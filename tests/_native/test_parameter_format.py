@@ -76,8 +76,9 @@ def test_the_schema_accepts_a_parameter_an_effect_declares(parameter):
     ],
 )
 def test_the_schema_accepts_a_list_of_colours_as_the_core_writes_it(extra):
-    """No effect declares a list yet, so the field is written as `Field` serialises it (crates/core/src/params.rs; the
-    same JSON is asserted in crates/core/src/params/derived.rs)."""
+    """The lengths as `Field` serialises them (crates/core/src/params.rs; the same JSON is asserted in
+    crates/core/src/params/derived.rs): a floor alone, as `gradient_map` writes it, and a floor with a ceiling, which no
+    effect declares."""
     field = {
         "name": "stops",
         "kind": "colors",
