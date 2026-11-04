@@ -4,6 +4,7 @@
 
 pub(crate) mod files;
 pub(crate) mod gaussian;
+pub(crate) mod guided;
 pub(crate) mod icc;
 pub(crate) mod ops;
 pub(crate) mod pixels;

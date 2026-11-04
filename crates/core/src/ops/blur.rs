@@ -237,10 +237,11 @@ fn direct(half: &[f64], line: &mut [f32], edge: Extension, extended: &mut Vec<f3
     }
 }
 
-/// The `rows` x `cols` map `values` turned on its side: `cols` rows of `rows`.
-fn transposed(values: &[f32], rows: usize, cols: usize) -> Vec<f32> {
+/// The `rows` x `cols` map `values` turned on its side: `cols` rows of `rows`. (Filters that work along rows turn the map to
+/// work down its columns, so that every pass is a pass over bands of whole rows.)
+pub(crate) fn transposed<T: Copy + Default + Send + Sync>(values: &[T], rows: usize, cols: usize) -> Vec<T> {
     const TILE: usize = 16; // constant: output rows made together, so that a read takes a whole 64-byte cache line of f32
-    let mut turned = vec![0.0; values.len()];
+    let mut turned = vec![T::default(); values.len()];
     par::rows(&mut turned, rows, |first, band| {
         for (tile, out) in band.chunks_mut(TILE * rows).enumerate() {
             let first_col = first + tile * TILE;

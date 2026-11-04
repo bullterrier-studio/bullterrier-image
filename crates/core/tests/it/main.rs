@@ -80,6 +80,7 @@ mod svg_drawing;
 mod threads;
 mod threads_rows;
 mod tone;
+mod tone_map;
 mod torn;
 mod trace;
 mod typed_params;
