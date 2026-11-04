@@ -18,6 +18,7 @@ pub(crate) mod noise;
 pub(crate) mod outlines;
 pub(crate) mod par;
 pub(crate) mod pieces;
+pub(crate) mod ramp;
 pub(crate) mod random;
 pub(crate) mod raster;
 pub(crate) mod resample;

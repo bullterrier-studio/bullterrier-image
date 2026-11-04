@@ -7,6 +7,7 @@ use std::thread;
 
 use bullterrier_image::frame::{Fit, Resample};
 use bullterrier_image::{BlendMode, Error, ErrorKind, Frame, Image, Options, Photo, Picture, Presets, Recipe, Step};
+use serde_json::json;
 
 /// The thread counts a render is compared at: the default, a few, an odd one, more than rows, and every core.
 const THREADS: [usize; 6] = [1, 2, 3, 10, 37, 0];
@@ -108,6 +109,9 @@ fn cases() -> Vec<Case> {
                 grade(0.1),
                 Step::new("auto_levels").param("mode", "linked"),
                 Step::new("equalize").param("tiles", 5).param("bins", 64),
+                Step::new("gradient_map")
+                    .param("stops", json!(["#102040", "#c04020", "#f0f0a0"]))
+                    .param("shadow_clip", 0.05),
             ]),
             &thin_and_odd,
         ),

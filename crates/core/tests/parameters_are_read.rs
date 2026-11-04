@@ -55,6 +55,12 @@ fn conditional() -> Vec<Conditional> {
             field: "feather",
             with: vec![("hue_shift", json!(90.0))],
         },
+        // the picture's tones repeat, so the methods read the same clip points at the default shares, which fall among ties
+        Conditional {
+            effect: "gradient_map",
+            field: "quantile_method",
+            with: vec![("shadow_clip", json!(0.37)), ("highlight_clip", json!(0.13))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",
