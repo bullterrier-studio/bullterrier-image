@@ -42,7 +42,7 @@ inside the package (`Recipe`, `fx`, `RecipeError`, effects, parameters) carry no
 A **microkernel**: a small `core` (contracts, registry, recipe engine) plus **plugins** (effects) found by auto-discovery. A
 recipe is a **pipes-and-filters** list of steps, each a pure filter `image -> image`. One **vertical slice** per effect, joined by
 its name; `tests/` mirrors `src/`:
-`src/bullterrier_image/effects/<name>/` (`effect.py`, `__init__.py`; code only), `tests/effects/<name>/test_<name>.py`,
+`crates/core/src/effects/<name>.rs` (an effect the core runs; a Python one is `src/bullterrier_image/effects/<name>/`, code only), `tests/effects/<name>/test_<name>.py`,
 `examples/effects/<name>.toml`, `docs/gallery/<name>.jpg`. `gallery.effect_files(name)` is the one place that knows these paths.
 Shared numeric code lives in `ops/`, named by concept.
 
@@ -60,12 +60,13 @@ _native    home of the Rust extension `_native._core`, beside errors          (i
 ```
 **Rust core:** `crates/core` (crate `bullterrier-image`, pure Rust: `ops/` by concept, one `effects/<name>.rs` per
 ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` derives) and `crates/python` (PyO3
-bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect keeps its docstring and
-`@effect`; its body is `_core.apply("<name>", rgb, params.model_dump())` (`from bullterrier_image._native import
-_core`). Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
+bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect has **no Python folder**: the registry registers every
+effect the core declares (`registry._register_core_effects`) with a function that calls `_core.apply("<name>", rgb,
+params.model_dump())`. Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
 opacity and inputs (`pub(crate) const META: Meta`) and has `pub(crate) fn render(picture: &Picture, params: &Params, inputs: &Inputs) -> Image`; its
-Python model is `class XParams(EffectParams, core="x")`, built from that declaration. `@effect(params=XParams)` takes
-category and opacity from the core and refuses them if given. The core's registry (`Effect` trait, `register`) also
+documentation is the `///` doc of `Params`, its Python model `class XParams(EffectParams, core="x")` is built from that
+declaration, and category and opacity come from the core (`@effect(params=XParams)` on a hand-written Python model of a core
+effect refuses them). The core's registry (`Effect` trait, `register`) also
 takes foreign effects, such as a Python function (`_core.register(name, category, opacity, fn, *, inputs=, fields=)`; `fn(rgb,
 params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect only the inputs it declares: `size_ratio`
 (1 if undeclared), `partition` (`Labels`) and, under each field parameter's name, a `Layer`. Rust effects never refer to each other.
@@ -273,15 +274,14 @@ hue, temperature, tint, angle, spacing, opacity, blend, octaves, persistence, la
 ## Adding an effect
 
 Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template in `src/bullterrier_image/effects/_template/`
-defines the shape; `grade` (`effects/grade/`, `crates/core/src/effects/grade.rs`) is the worked example. An effect that
+defines the shape; `grade` (`crates/core/src/effects/grade.rs`) is the worked example. An effect that
 works from a map keeps a Python body until the core takes maps (`effects/relight/`).
-1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the package (`__init__.py`, `effect.py` with an
-   empty `core="<name>"` model, its body calling the core), the Rust kernel `crates/core/src/effects/<name>.rs` (`META` with the
+1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the Rust kernel `crates/core/src/effects/<name>.rs` (`META` with the
    category, a public `Params` with one example field, `render`), `tests/effects/<name>/test_<name>.py` and
-   `examples/effects/<name>.toml`. The model is built from the kernel, so the effect imports only once the extension is rebuilt with it (`uv run` and `uv sync`
+   `examples/effects/<name>.toml`; no Python file. The effect exists once the extension is rebuilt with the kernel (`uv run` and `uv sync`
    do); then it passes the gate as written (`uv run poe check-scaffold` proves it in a copy; CI runs it).
 2. **Fill in:** replace the example field with the effect's own in `Params` (the one declaration), `META` (opacity below 1
-   if its steps should be mixed in partway), and the kernel with the effect (the Python docstring documents it; its first
+   if its steps should be mixed in partway), and the kernel with the effect (the `///` doc of `Params` documents it for users; its first
    sentence is the summary; a parameter that matters only while another is set gets a row in
    `parameters_are_read.rs`); in the test file, the behaviour's properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
    `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.

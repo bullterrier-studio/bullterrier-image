@@ -1,6 +1,6 @@
 //! The Rust kernel of `$name`: <replace with what it does, in one line>.
-//! What it does is documented once, on the Python effect, whose body runs this through the core (`_core.apply`):
-//! `src/bullterrier_image/effects/$name/effect.py`. Its parameters are declared here.
+//! This file is the whole effect: the Python registry builds `fx.$name`, its model and its documentation from `Params`
+//! below, so there is no Python folder to write. What it does is documented once, on `Params`.
 
 use serde::Deserialize;
 
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 // The parameters are declared once, here: each field's `///` doc comment and `#[param(..)]` make its description,
-// default and range, and the Python model is built from them (`${Name}Params` in effect.py). Replace the example
+// default and range, and the Python model is built from them. Replace the example
 // field. Every field has a doc (what it does, its unit and range in words, what raising it does) and a default. A
 // number (`f32`, or `i32` for a whole number) also has a `unit` (px, fraction, degrees, stops, count, ratio, cycles,
 // density) and an inclusive `min` and `max` that hold the default; `drivable` (only an `f32`), `advanced` and `cyclic`
@@ -34,7 +34,11 @@ pub(crate) const META: Meta = Meta {
 // `crates/core/tests/parameters_are_read.rs`; one that matters only while another is set needs a row in that test's
 // `conditional`.
 
-/// The settings of `$name`: every value that shapes its result.
+// Replace the doc below with what the effect does, for its users (`help(fx.$name)`, the catalogue): its first sentence
+// is the summary, then what each step does and in which order. An effect is a pure function: a float32 RGB picture in
+// 0..1 in, a new picture of the same shape and range out, the same for the same values, the input never modified.
+
+/// Mix the picture toward its negative by `amount`.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {

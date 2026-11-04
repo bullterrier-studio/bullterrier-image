@@ -11,7 +11,6 @@ every branch: that is what keeps parallel work free of merge conflicts. These ar
 source checkout of bullterrier-image.
 """
 
-import ast
 import inspect
 import keyword
 import re
@@ -70,11 +69,11 @@ def render_effects_pages() -> dict[str, str]:
 class EffectFiles(NamedTuple):
     """Where everything about one effect lives in a source checkout, by its name."""
 
-    package: Path  # src/bullterrier_image/effects/<name>/: its code, `__init__.py` and `effect.py`
+    package: Path  # src/bullterrier_image/effects/<name>/: its Python code; an effect the core runs has none
     tests: Path  # tests/effects/<name>/test_<name>.py: its behaviour tests
     example: Path  # examples/effects/<name>.toml: the short recipe that shows it, rendered for its picture
     picture: Path  # docs/gallery/<name>.jpg: its gallery picture (JPEG, longest side 480 px), shown by the catalogue
-    kernel: Path  # crates/core/src/effects/<name>.rs: its Rust kernel, which its Python body calls (once ported)
+    kernel: Path  # crates/core/src/effects/<name>.rs: its Rust kernel, which declares and runs it (once ported)
 
 
 def effect_files(name: str, *, checkout: Path = CHECKOUT) -> EffectFiles:
@@ -196,18 +195,17 @@ def stub_text() -> str:
 def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[Path]:
     """Write the files of a new effect called `name`, in `category` (one of `registry.CATEGORIES`), into `checkout`,
     each made from the template in `src/bullterrier_image/effects/_template/` and placed where `effect_files` says: its
-    package (`__init__.py`, and `effect.py` with a parameter model built from the kernel's declaration and a body that
-    calls the core), its Rust kernel (`Params`, which declares one documented example field, and `render`), its tests
-    (`test_<name>.py`) and its example recipe. Returns the files written, sorted.
+    Rust kernel (`Params`, which declares one documented example field, and `render`), its tests (`test_<name>.py`) and
+    its example recipe. Returns the files written, sorted.
 
-    The effect is registered whenever bullterrier_image is imported; once the extension is rebuilt with its kernel
-    (`uv sync`, which a Rust file's change triggers), it passes the contract tests and its own as written. Replacing the
+    The kernel is the whole effect: the registry builds the Python side from its declaration, so there is no package.
+    Once the extension is rebuilt with the kernel (`uv sync`, which a Rust file's change triggers), the effect is
+    registered and passes the contract tests and its own as written. Replacing the
     example with the real effect is the author's part. Its gallery picture is rendered later, from its example recipe,
     by `poe gallery --only <name>` (or at integration). Raises `ProjectError`, writing nothing, when `name` is not a
     lowercase Python identifier (a letter, then letters, digits and _) or is a Python or Rust keyword (the kernel is a
-    Rust module of that name), is a name the template's `effect.py` already uses (its imports) or one `fx` defines for
-    itself (so `fx.<name>` would not be the effect), the category is unknown, an effect of that name exists or any of
-    its files, or `checkout` holds no template.
+    Rust module of that name) or one `fx` defines for itself (so `fx.<name>` would not be the effect), the category is
+    unknown, an effect of that name exists or any of its files, or `checkout` holds no template.
     """
     if not re.fullmatch(r"[a-z][a-z0-9_]*", name) or keyword.iskeyword(name):
         raise ProjectError(
@@ -226,19 +224,15 @@ def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[P
     for taken in files:
         if taken.exists():
             raise ProjectError(f"{taken} already exists: choose another name")
-    if not (layout.template / "effect.py.tmpl").is_file():
+    if not (layout.template / "kernel.rs.tmpl").is_file():
         raise ProjectError(
             f"no effect template in {layout.template}: this needs a source checkout of bullterrier-image"
         )
-    if name in _names_in_the_template_effect(layout.template):
-        raise ProjectError(f"{name!r} cannot name an effect: the template's effect.py already uses {name!r} for itself")
     if name in _names_fx_defines():
         raise ProjectError(
             f"{name!r} cannot name an effect: fx defines {name!r} for itself, so fx.{name} would not build the effect"
         )
     targets = {  # template file -> where its copy goes
-        "__init__.py.tmpl": files.package / "__init__.py",
-        "effect.py.tmpl": files.package / "effect.py",
         "test_effect.py.tmpl": files.tests,
         "example.toml.tmpl": files.example,
         "kernel.rs.tmpl": files.kernel,
@@ -253,32 +247,13 @@ def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[P
 
 
 def _words(name: str, category: str) -> dict[str, str]:
-    """What the template's placeholders stand for: $name, $Name (the name in CamelCase, for the model), $category and
-    $Category (its name as the Rust core's `Category` variant)."""
+    """What the template's placeholders stand for: $name, $category and $Category (its name as the Rust core's
+    `Category` variant)."""
     return {
         "name": name,
-        "Name": "".join(part.capitalize() for part in name.split("_")),
         "category": category,
         "Category": category.capitalize(),
     }
-
-
-def _names_in_the_template_effect(template: Path) -> set[str]:
-    """The module-level names the template's effect.py binds for itself (its imports, mainly), read from the template,
-    so the list follows the template: an effect of one of these names would replace it or be replaced by it."""
-    placeholder = "zzplaceholder"  # stands in for the name, so the names made from it can be told apart
-    source = Template((template / "effect.py.tmpl").read_text(encoding="utf-8")).substitute(
-        _words(placeholder, registry.CATEGORIES[0])
-    )
-    names: set[str] = set()
-    for node in ast.parse(source).body:
-        if isinstance(node, ast.Import | ast.ImportFrom):
-            names |= {(alias.asname or alias.name).split(".")[0] for alias in node.names}
-        elif isinstance(node, ast.ClassDef | ast.FunctionDef):
-            names.add(node.name)
-        elif isinstance(node, ast.Assign):
-            names |= {target.id for target in node.targets if isinstance(target, ast.Name)}
-    return {name for name in names if placeholder not in name.lower()}
 
 
 def _names_fx_defines() -> set[str]:

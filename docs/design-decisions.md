@@ -587,7 +587,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   registered at run time under a lock, and refuses a name that is taken, native or not. A ported effect's file declares
   `pub(crate) const META: Meta` (category, opacity, inputs) beside `Params` and `render`; `build.rs` makes the effect
   from the three and the file's name, so a name is written once and adding an effect still edits nothing else. Python
-  reads category and opacity of a ported effect from the core (`@effect(params=...)` refuses them there), the
+  registers every effect the core declares, with no Python folder of its own (`registry._register_core_effects`: its
+  model, documentation, category and opacity are the core's), the
   vocabulary of categories and inputs comes from the core (`_core.vocabulary`), and a test keeps `CATEGORIES` and
   `INPUTS` equal to it. A Python function can be registered as an `Effect` (`_core.register`, which takes the
   interpreter lock back, since `_core.apply` releases it): the trait fits it. *Reason:* one home for each fact. *Presets in

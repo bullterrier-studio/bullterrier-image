@@ -1,4 +1,8 @@
-"""The effect library: one folder per effect, found automatically.
+"""The effect library: one folder per effect that is written in Python, found automatically.
+
+An effect the Rust core runs has no folder here: its kernel `crates/core/src/effects/<name>.rs` declares its parameters,
+category, opacity and documentation, and the registry registers it from that declaration (see
+`bullterrier_image.core.registry`). What follows is for the effects still written in Python.
 
 An effect is a function `(rgb, params) -> rgb`: it takes the image representation described in
 `imageio` and its validated parameter model (an `EffectParams` subclass, see `bullterrier_image.core.params`) and

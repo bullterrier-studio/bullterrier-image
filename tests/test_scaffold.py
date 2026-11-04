@@ -1,7 +1,7 @@
 """`poe new-effect` (tools/dev.py): a new effect is a set of new files named for it, written from the template, that
-works as written: its package (`src/bullterrier_image/effects/<name>/`), its Rust kernel
-(`crates/core/src/effects/<name>.rs`), its tests (`tests/effects/<name>/`) and its example recipe
-(`examples/effects/<name>.toml`), where `gallery.effect_files` says they belong.
+works as written: its Rust kernel (`crates/core/src/effects/<name>.rs`, which is the whole effect: the registry builds
+its Python side from it), its tests (`tests/effects/<name>/`) and its example recipe (`examples/effects/<name>.toml`),
+where `gallery.effect_files` says they belong.
 
 The scaffold always writes into the checkout it runs from, so these tests run it on a copy: in-process through
 `gallery.new_effect(checkout=...)`, or as the command, in a fresh interpreter importing the copy. The last two prove
@@ -67,9 +67,9 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
     assert {path: after[path] for path in before} == before  # nothing that was there changed
     assert sorted(checkout / path for path in set(after) - set(before)) == written  # it reports what it wrote
     for path in written:
-        assert path.is_relative_to(files.package) or path in (files.tests, files.example, files.kernel), path
+        assert path in (files.tests, files.example, files.kernel), path
         assert "$" not in path.read_text(encoding="utf-8"), f"{path.name} still holds a template placeholder"
-    assert (files.package / "effect.py") in written
+    assert not files.package.exists()  # the kernel is the whole effect: no Python folder
     assert files.kernel in written
     assert files.tests in written
     recipe = tomllib.loads(files.example.read_text(encoding="utf-8"))
@@ -113,9 +113,7 @@ REFUSED = {  # name, category -> what the refusal must name
     "a Rust keyword: type": ("type", "light", ["'type'", "Rust keyword"]),
     "a reserved Rust keyword: box": ("box", "light", ["'box'", "Rust keyword"]),
     "empty": ("", "light", ["''"]),
-    # a name the generated effect.py or fx already uses, saying which
-    "np": ("np", "light", ["'np'", "effect.py"]),  # the function would hide numpy from its own body
-    "effect": ("effect", "light", ["'effect'", "effect.py"]),
+    # a name fx already uses, saying which
     "registry": ("registry", "light", ["'registry'", "fx"]),  # a module fx imports for itself: it never builds it
     "cache": ("cache", "light", ["'cache'", "fx"]),
     "an unknown category, listing the categories": (
@@ -137,7 +135,7 @@ def test_a_bad_name_or_category_is_refused_saying_why_and_nothing_is_written(che
 
 
 @pytest.mark.parametrize("name", ["os", "core", "sys"])
-def test_a_name_shared_with_some_other_module_is_fine_when_neither_effect_py_nor_fx_uses_it(checkout, name):
+def test_a_name_shared_with_some_other_module_is_fine_when_fx_does_not_use_it(checkout, name):
     written = gallery.new_effect(name, "light", checkout=checkout)
     assert gallery.effect_files(name, checkout=checkout).tests in written
 
@@ -198,7 +196,6 @@ def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_exi
     kernel = f"crates/core/src/effects/{PROBE}.rs"
     assert kernel in created  # its Rust kernel among them ...
     places = (
-        f"src/bullterrier_image/effects/{PROBE}/",
         f"tests/effects/{PROBE}/",
         f"examples/effects/{PROBE}.",
         kernel,
@@ -244,8 +241,6 @@ def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tm
         assert done.returncode == 0, f"{' '.join(command[:5])} failed in the copy:\n{done.stdout[-4000:]}{done.stderr}"
     passed = {line.split("::", 1)[1] for line in done.stdout.splitlines() if line.startswith("PASSED ")}
     assert {  # each scan ran over the new files, and passed
-        f"test_every_number_is_a_parameter_or_a_cited_constant[effects/{PROBE}/effect.py]",
-        f"test_no_literal_option_of_a_library_call_in_the_source[effects/{PROBE}/effect.py]",
         f"test_every_number_in_the_rust_core_is_a_parameter_or_a_cited_constant[effects/{PROBE}.rs]",
         f"test_no_rust_effect_refers_to_another[{PROBE}.rs]",
     } <= passed, done.stdout[-4000:]
