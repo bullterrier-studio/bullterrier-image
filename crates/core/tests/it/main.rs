@@ -26,6 +26,7 @@ mod gaussian_blur;
 mod gradient;
 mod gradient_map;
 mod grid_shift;
+mod highpass;
 mod hsv;
 mod hue_range;
 mod inputs;

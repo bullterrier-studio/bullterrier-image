@@ -71,6 +71,13 @@ pub enum Edge {
     Wrap,
 }
 
+impl Edge {
+    /// The rule this choice names.
+    pub(crate) fn extension(self) -> Extension {
+        EdgeOrConstant::from(self).extension(0.0)
+    }
+}
+
 /// What a filter sees beyond the edge of the picture: the four rules of [`Edge`], or a constant value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Choice)]
 pub enum EdgeOrConstant {
