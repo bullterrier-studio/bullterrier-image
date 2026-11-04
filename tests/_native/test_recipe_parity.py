@@ -155,6 +155,11 @@ ROWS = [
     ),
     pytest.param("motion_blur", {"edge": "constant"}, False, id="motion_blur: constant is not one of its four edges"),
     pytest.param("motion_blur", {"length": 501}, False, id="motion_blur: length above the highest"),
+    pytest.param(
+        "lens_blur", {"radius": 100, "highlights": 50, "edge": "mirror"}, True, id="lens_blur: highest settings"
+    ),
+    pytest.param("lens_blur", {"radius": 100.5}, False, id="lens_blur: radius above the highest"),
+    pytest.param("lens_blur", {"edge": "constant"}, False, id="lens_blur: constant is not one of its four edges"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),
