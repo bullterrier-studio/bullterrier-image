@@ -1,17 +1,29 @@
-//! Filtering of lines of samples by a symmetric kernel through the Fourier transform, at a cost per line that grows with
-//! the line's length and hardly with the kernel's reach.
+//! Filtering of lines of samples, and of planes, by a kernel through the Fourier transform, at a cost that grows with
+//! the size of what is filtered and hardly with the kernel's reach.
 //!
-//! Two real lines are filtered by one complex transform (one in the real part, one in the imaginary part: the kernel is
-//! real, so each part is filtered alone), which halves the work. Which line goes with which is the caller's to fix by
-//! the lines' positions, never by the thread that has them, so the result does not depend on the number of threads.
+//! Two real lines (or planes) are filtered by one complex transform (one in the real part, one in the imaginary part:
+//! the kernel is real, so each part is filtered alone), which halves the work. Which goes with which is the caller's to
+//! fix by position, never by the thread that has them, so the result does not depend on the number of threads.
 
 use std::sync::Arc;
 
 use rustfft::num_complex::Complex;
 use rustfft::{Fft, FftPlanner};
 
+use super::blur::transposed;
 use super::edge::Extension;
 use super::length::float;
+use super::par;
+
+/// The length of the transform of `n` samples: the smallest of 2^k and 3 x 2^k that holds them. rustfft runs these two
+/// families at the same time per sample (1.8 ns on one core of an M4, lines of 4096, 6144 and 8192), where any other length,
+/// 5-smooth ones included, takes 1.4 to 2.4 times as long: more than the padding it saves (measured for the Gaussian at
+/// 12 MP: 0.50 s at a power of two, 1.04 s at 4320).
+pub(crate) fn transform_length(n: usize) -> usize {
+    let two = n.next_power_of_two();
+    let three = 3 * n.div_ceil(3).next_power_of_two(); // constant: 3 x 2^k, the other length rustfft runs at full speed
+    two.min(three)
+}
 
 /// A filter for lines of one length by one kernel, planned once and shared between threads (each thread has its own
 /// [`Scratch`]).
@@ -38,9 +50,7 @@ impl LineFilter {
     /// `half` (the kernel is symmetric, so the other side is the same).
     pub(crate) fn new(half: &[f64], len: usize) -> Self {
         let reach = half.len() - 1;
-        // A power of two: rustfft's radix-4 transform runs about twice as fast as its mixed-radix one for the lengths in
-        // between (measured at 12 MP: 0.50 s against 1.04 s for sigma 40), which more than pays for the longer line.
-        let size = (len + 2 * reach).next_power_of_two(); // the extended line fits without wrapping into itself
+        let size = transform_length(len + 2 * reach); // the extended line fits without wrapping into itself
         // The kernel centred on sample 0 of a circular buffer, so that output sample i lines up with input sample i.
         let mut centred = vec![Complex::new(0.0_f64, 0.0); size];
         centred[0].re = half[0];
@@ -123,4 +133,142 @@ fn range(values: &[f32]) -> (f32, f32) {
         .fold((f32::INFINITY, f32::NEG_INFINITY), |(low, high), &value| {
             (low.min(value), high.max(value))
         })
+}
+
+/// A filter for planes of one size by one 2-D kernel, planned once. A plane arrives already extended by the kernel's
+/// reach on every side (the caller's, because the edge rule is), and the filter gives back the part within.
+pub(crate) struct PlaneFilter {
+    /// The size of the transform, at least that of the extended planes (see [`transform_length`]).
+    rows: usize,
+    cols: usize,
+    /// The size of the extended planes.
+    extended: (usize, usize),
+    /// The reach of the kernel: the margin of an extended plane.
+    reach: (usize, usize),
+    along: Planned,
+    down: Planned,
+    /// The kernel's spectrum divided by the number of samples (the inverse transform does not scale), in the layout the
+    /// planes have between the two passes: `cols` rows of `rows` bins.
+    response: Vec<Complex<f32>>,
+}
+
+/// The transforms of one length.
+struct Planned {
+    forward: Arc<dyn Fft<f32>>,
+    inverse: Arc<dyn Fft<f32>>,
+}
+
+impl Planned {
+    fn new(len: usize) -> Self {
+        let mut planner = FftPlanner::<f32>::new();
+        Self {
+            forward: planner.plan_fft_forward(len),
+            inverse: planner.plan_fft_inverse(len),
+        }
+    }
+
+    /// Every line of `bins` (rows of the length planned for) transformed, one band after the other.
+    fn rows(&self, bins: &mut [Complex<f32>], len: usize, inverse: bool) {
+        let fft = if inverse { &self.inverse } else { &self.forward };
+        par::rows(bins, len, |_, band| {
+            let mut work = vec![Complex::new(0.0, 0.0); fft.get_inplace_scratch_len()];
+            fft.process_with_scratch(band, &mut work);
+        });
+    }
+}
+
+impl PlaneFilter {
+    /// A filter for `height` x `width` planes by the kernel `weights` (row after row, `2 reach.0 + 1` rows of
+    /// `2 reach.1 + 1`), which turns the plane's samples into the kernel's weighted sums as a convolution does: the
+    /// kernel's middle weighs the sample itself and the kernel is flipped.
+    pub(crate) fn new(weights: &[f64], reach: (usize, usize), height: usize, width: usize) -> Self {
+        let extended = (height + 2 * reach.0, width + 2 * reach.1);
+        // The extended plane fits without wrapping into itself.
+        let (rows, cols) = (transform_length(extended.0), transform_length(extended.1));
+        let (along, down) = (Planned::new(cols), Planned::new(rows));
+        // The kernel in the corner of a circular buffer, its first row and column at sample (0, 0): the convolution of an
+        // extended plane with it puts what the kernel's middle weighs at `2 reach` samples further along than the sample
+        // itself, which `apply` reads from.
+        let mut corner = vec![Complex::new(0.0_f32, 0.0); rows * cols];
+        let scale = float(rows * cols);
+        let kernel_cols = 2 * reach.1 + 1;
+        for (index, weight) in weights.iter().enumerate() {
+            let (row, col) = (index / kernel_cols, index % kernel_cols);
+            #[expect(clippy::cast_possible_truncation, reason = "narrowing is the point")]
+            {
+                corner[row * cols + col].re = (weight / scale) as f32;
+            }
+        }
+        let mut filter = Self {
+            rows,
+            cols,
+            extended,
+            reach,
+            along,
+            down,
+            response: Vec::new(),
+        };
+        filter.response = filter.spectrum(corner, 2 * reach.0 + 1);
+        filter
+    }
+
+    /// The spectrum of `bins`, `rows` x `cols` of which only the first `filled` rows are not zero (a row of zeros has a
+    /// spectrum of zeros), in the turned layout.
+    fn spectrum(&self, mut bins: Vec<Complex<f32>>, filled: usize) -> Vec<Complex<f32>> {
+        self.along.rows(&mut bins[..filled * self.cols], self.cols, false);
+        let mut turned = transposed(&bins, self.rows, self.cols);
+        self.down.rows(&mut turned, self.rows, false);
+        turned
+    }
+
+    /// The `height` x `width` parts within `first` and `second`, if there is one, convolved with the kernel. Both are
+    /// `extended` planes (row after row) and the parts are the planes less the margin of the kernel's reach: the
+    /// samples whose neighbours the kernel reads are all within the plane, so none wraps around.
+    pub(crate) fn apply(&self, first: &[f32], second: Option<&[f32]>) -> (Vec<f32>, Option<Vec<f32>>) {
+        let (rows, cols) = (self.rows, self.cols);
+        let mut bins = vec![Complex::new(0.0_f32, 0.0); rows * cols];
+        par::rows(&mut bins, cols, |first_row, band| {
+            for (offset, line) in band.chunks_exact_mut(cols).enumerate() {
+                let row = first_row + offset;
+                if row >= self.extended.0 {
+                    continue;
+                }
+                let at = row * self.extended.1..(row + 1) * self.extended.1;
+                for (bin, &value) in line.iter_mut().zip(&first[at.clone()]) {
+                    bin.re = value;
+                }
+                for (bin, &value) in line.iter_mut().zip(second.map_or(&[][..], |second| &second[at])) {
+                    bin.im = value;
+                }
+            }
+        });
+        let mut turned = self.spectrum(bins, self.extended.0);
+        par::rows(&mut turned, rows, |first_row, band| {
+            let responses = &self.response[first_row * rows..];
+            for (bin, response) in band.iter_mut().zip(responses) {
+                *bin *= response;
+            }
+        });
+        self.down.rows(&mut turned, rows, true);
+        let mut bins = transposed(&turned, cols, rows);
+        drop(turned);
+        let (height, width) = (self.extended.0 - 2 * self.reach.0, self.extended.1 - 2 * self.reach.1);
+        // only the rows that are kept are transformed back
+        let kept = 2 * self.reach.0..2 * self.reach.0 + height;
+        self.along
+            .rows(&mut bins[kept.start * cols..kept.end * cols], cols, true);
+        let part = |pick: fn(&Complex<f32>) -> f32| {
+            let mut plane = vec![0.0; height * width];
+            par::rows(&mut plane, width, |first_row, band| {
+                for (offset, line) in band.chunks_exact_mut(width).enumerate() {
+                    let from = (2 * self.reach.0 + first_row + offset) * cols + 2 * self.reach.1;
+                    for (value, bin) in line.iter_mut().zip(&bins[from..]) {
+                        *value = pick(bin);
+                    }
+                }
+            });
+            plane
+        };
+        (part(|bin| bin.re), second.map(|_| part(|bin| bin.im)))
+    }
 }

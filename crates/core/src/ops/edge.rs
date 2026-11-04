@@ -37,9 +37,19 @@ impl Extension {
 
     /// The extended line's sample at `index`, which lies outside `0..line.len()`.
     fn beyond(self, line: &[f32], index: isize) -> f32 {
-        let len = line.len().cast_signed();
+        match self.locate(line.len(), index) {
+            Source::Sample(at) => line[at],
+            Source::Value(value) => value,
+        }
+    }
+
+    /// What lies at `index` of a line of `len` samples (not empty), however far outside it: one of its samples, or the
+    /// rule's own value.
+    pub(crate) fn locate(self, len: usize, index: isize) -> Source {
+        let len = len.cast_signed();
         let source = match self {
-            Self::Constant(value) => return value,
+            Self::Constant(value) if !(0..len).contains(&index) => return Source::Value(value),
+            Self::Constant(_) => index,
             Self::Nearest => index.clamp(0, len - 1),
             Self::Wrap => index.rem_euclid(len),
             // the line and its mirror image, side by side, repeat with this period
@@ -54,8 +64,17 @@ impl Extension {
                 if at < len { at } else { 2 * (len - 1) - at }
             }
         };
-        line[source.cast_unsigned()]
+        Source::Sample(source.cast_unsigned())
     }
+}
+
+/// What lies at a place of an extended line.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum Source {
+    /// The line's sample at this index.
+    Sample(usize),
+    /// A value of the rule's own.
+    Value(f32),
 }
 
 /// What a filter sees beyond the edge of the picture, where the edge is all there is to choose.

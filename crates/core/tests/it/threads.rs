@@ -186,6 +186,25 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "line blurs summed tap by tap, row by row and by the Fourier transform",
+            Recipe::new([
+                Step::new("motion_blur")
+                    .param("angle", 20)
+                    .param("length", 8)
+                    .param("edge", "nearest"),
+                Step::new("motion_blur")
+                    .param("angle", 0)
+                    .param("length", 60)
+                    .param("edge", "wrap"),
+                Step::new("motion_blur")
+                    .param("angle", 33)
+                    .param("length", 40)
+                    .param("edge", "mirror"),
+            ]),
+            // (lengths are in design px: 6 times them on the thin pictures)
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "effects that read the whole picture before they work pixel by pixel",
             Recipe::new([
                 Step::new("auto_levels").param("clip", 0.02),

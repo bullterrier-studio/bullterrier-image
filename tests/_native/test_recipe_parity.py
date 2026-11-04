@@ -150,6 +150,11 @@ ROWS = [
         "tone_map", {"edge_threshold": 0.01, "radius": 500, "pivot": 8}, True, id="tone_map: lowest threshold"
     ),
     pytest.param("tone_map", {"edge_threshold": 0.009}, False, id="tone_map: threshold below the lowest"),
+    pytest.param(
+        "motion_blur", {"angle": 360, "length": 500, "edge": "wrap"}, True, id="motion_blur: highest angle and length"
+    ),
+    pytest.param("motion_blur", {"edge": "constant"}, False, id="motion_blur: constant is not one of its four edges"),
+    pytest.param("motion_blur", {"length": 501}, False, id="motion_blur: length above the highest"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),

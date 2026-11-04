@@ -39,6 +39,7 @@ mod limits;
 mod lut;
 mod lut_cube;
 mod lut_effect;
+mod motion_blur;
 mod noise;
 mod params;
 mod params_colors;

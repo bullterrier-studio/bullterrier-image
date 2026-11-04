@@ -6,6 +6,7 @@ pub(crate) mod blur;
 pub(crate) mod cast;
 pub(crate) mod color;
 pub(crate) mod colorspace;
+pub(crate) mod convolve;
 pub(crate) mod cutout;
 pub(crate) mod cuts;
 pub(crate) mod edge;

@@ -250,14 +250,14 @@ fn weights(sigma: f64, truncate: f64) -> Vec<f64> {
 }
 
 /// How the lines of one length are blurred by one kernel.
-enum Smoothing {
+pub(crate) enum Smoothing {
     /// Summed tap by tap, the weights at distance 0, 1, ... from a sample.
     Direct(Vec<f64>),
     Fourier(LineFilter),
 }
 
 impl Smoothing {
-    fn new(half: &[f64], len: usize) -> Self {
+    pub(crate) fn new(half: &[f64], len: usize) -> Self {
         if half.len() - 1 < FFT_FROM_REACH {
             Self::Direct(half.to_vec())
         } else {
@@ -267,7 +267,7 @@ impl Smoothing {
 
     /// The lines of `len` samples that `lines` holds, one after the other, blurred in place. The lines are taken two at
     /// a time from the first, however the rows are cut into bands, so that the result does not depend on the threads.
-    fn smooth(&self, lines: &mut [f32], len: usize, edge: Extension) {
+    pub(crate) fn smooth(&self, lines: &mut [f32], len: usize, edge: Extension) {
         par::rows(lines, 2 * len, |_, band| match self {
             Self::Direct(half) => {
                 let (mut extended, mut sums) = (Vec::new(), Vec::new());
