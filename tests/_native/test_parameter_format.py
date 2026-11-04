@@ -93,3 +93,26 @@ def test_the_schema_accepts_a_list_of_colours_as_the_core_writes_it(extra):
         "advanced": False,
     } | extra
     assert [error.message for error in SCHEMA.iter_errors(field)] == []
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param({"kind": "field", "name": "field", "default": "depth"}, id="a field: a name, never null"),
+        pytest.param({"kind": "color", "name": "color", "default": None, "nullable": True}, id="an optional colour"),
+    ],
+)
+def test_the_schema_accepts_a_field_and_an_optional_colour_as_the_core_writes_them(extra):
+    """The fields as `Field` serialises them (crates/core/src/params.rs; the same JSON is asserted in
+    crates/core/src/params/derived.rs): `nullable` is written only where it is true."""
+    field = {
+        "meaning": "A selection or a colour.",
+        "unit": None,
+        "min": None,
+        "max": None,
+        "cyclic": False,
+        "choices": [],
+        "drivable": False,
+        "advanced": False,
+    } | extra
+    assert [error.message for error in SCHEMA.iter_errors(field)] == []

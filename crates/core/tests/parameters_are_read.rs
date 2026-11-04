@@ -11,7 +11,7 @@
 use std::error::Error;
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
-use bullterrier_image::{Category, Effect, Image, Inputs, Lut, Picture, effect, effects};
+use bullterrier_image::{Category, Effect, FieldParam, Image, Inputs, Layer, Lut, Picture, effect, effects};
 use serde_json::{Map, Value, json};
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -156,6 +156,8 @@ fn candidates(field: &Field) -> Vec<Value> {
             .map(|name| json!(name))
             .collect(),
         Kind::Color => vec![json!([0.9, 0.1, 0.2]), json!([0.1, 0.8, 0.3])],
+        // a name: the test offers its own selection to any effect that is given one (see `render`)
+        Kind::Field => vec![json!("ramp")],
         // a name: the test offers its own table to any effect that is given one (see `render`)
         Kind::Lut => vec![json!("table")],
         // the shortest list and one element more (where allowed), of colours that are not the default of any effect
@@ -196,7 +198,32 @@ fn render(
             .map(|entry| [entry % 2, entry / 2 % 2, entry / 4].map(|corner| if corner == 1 { 0.0 } else { 1.0 }))
             .collect(),
     )?;
+    // a field named `ramp` is a ramp across the picture, any other name a flat selection
+    let selections = table
+        .fields
+        .iter()
+        .filter(|field| field.kind == Kind::Field)
+        .map(|field| {
+            let side = usize::from(SIDE);
+            let ramp = params[field.name] == "ramp";
+            let values: Vec<f32> = (0..SIDE)
+                .flat_map(|_| {
+                    (0..SIDE).map(move |column| {
+                        if ramp {
+                            f32::from(column) / f32::from(SIDE - 1)
+                        } else {
+                            0.5
+                        }
+                    })
+                })
+                .collect();
+            Layer::new(side, side, values).map(|layer| (field.name, layer))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let mut inputs = Inputs::default();
+    for (name, layer) in &selections {
+        inputs = inputs.with_field(*name, layer);
+    }
     for field in table.fields.iter().filter(|field| field.kind == Kind::Lut) {
         if params[field.name].is_string() {
             inputs = inputs.with_lut(field.name, &negative);
@@ -300,6 +327,7 @@ impl Effect for Brighten {
             choices: &[],
             min_length: None,
             max_length: None,
+            nullable: false,
             drivable: false,
             advanced: false,
         };
@@ -320,6 +348,98 @@ impl Effect for Brighten {
         let gain = gain as f32;
         Ok(picture.map(|pixel| pixel.map(|value| value * gain)))
     }
+}
+
+/// A foreign effect with a field and an optional colour: it darkens by the selection it is handed when `reads`, and
+/// adds `tint` when one is set. With `reads` false it ignores its selection: the known-bad case for a field.
+struct Follow {
+    reads: bool,
+}
+
+impl Effect for Follow {
+    fn name(&self) -> &'static str {
+        "follow"
+    }
+
+    fn category(&self) -> Category {
+        Category::Utilities
+    }
+
+    fn fields(&self) -> &[FieldParam] {
+        static FIELDS: std::sync::OnceLock<[FieldParam; 1]> = std::sync::OnceLock::new();
+        FIELDS.get_or_init(|| [FieldParam::new("follow", "depth")])
+    }
+
+    fn params(&self) -> Option<Table> {
+        let base = Field {
+            name: "follow",
+            kind: Kind::Field,
+            meaning: "A selection.",
+            default: Scalar::Text("depth"),
+            unit: None,
+            min: None,
+            max: None,
+            cyclic: false,
+            choices: &[],
+            min_length: None,
+            max_length: None,
+            nullable: false,
+            drivable: false,
+            advanced: false,
+        };
+        let tint = Field {
+            name: "tint",
+            kind: Kind::Color,
+            meaning: "A colour.",
+            default: Scalar::Null,
+            nullable: true,
+            ..base.clone()
+        };
+        Some(Table {
+            doc: "The parameters of follow.",
+            fields: vec![base, tint],
+        })
+    }
+
+    fn apply(
+        &self,
+        picture: &Picture<'_>,
+        params: Value,
+        inputs: &Inputs<'_>,
+    ) -> Result<Image, bullterrier_image::Error> {
+        let layer = inputs.field("follow").map(Layer::values).unwrap_or_default();
+        let tint = serde_json::from_value::<[f32; 3]>(params["tint"].clone()).ok();
+        let width = picture.width();
+        Ok(picture.map_at(|row, column, pixel| {
+            let weight = if self.reads {
+                1.0 - 0.5 * layer.get(row * width + column).copied().unwrap_or(0.0)
+            } else {
+                1.0
+            };
+            let mixed = pixel.map(|value| value * weight);
+            tint.map_or(mixed, |tint| {
+                [0, 1, 2].map(|channel| mixed[channel] * 0.5 + tint[channel] * 0.5)
+            })
+        }))
+    }
+}
+
+#[test]
+fn a_field_and_an_optional_colour_are_tried_and_found_read() -> Outcome {
+    let found = problems(&Follow { reads: true }, &[])?;
+    assert!(found.is_empty(), "{found:?}");
+    Ok(())
+}
+
+#[test]
+fn a_field_the_effect_never_reads_is_found_and_named() -> Outcome {
+    let found = problems(&Follow { reads: false }, &[])?;
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(
+        found[0].contains("follow.follow") && found[0].contains("never read"),
+        "{found:?}"
+    );
+    Ok(())
 }
 
 #[test]

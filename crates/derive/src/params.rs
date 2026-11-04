@@ -134,16 +134,18 @@ enum Written {
     Name(Ident),
 }
 
-/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool`, `Color`, `Vec<Color>` and `LutName` by their
-/// written names (a type alias is not recognised) and takes any other type for a choice enum, whose names come from its
-/// `Choice` impl.
+/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool`, `Color`, `Option<Color>`, `Vec<Color>`,
+/// `FieldName` and `LutName` by their written names (a type alias is not recognised) and takes any other type for a
+/// choice enum, whose names come from its `Choice` impl.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
     Float,
     Int,
     Switch,
     Colour,
+    OptionalColour,
     Colours,
+    Field,
     Lut,
     Choice,
 }
@@ -159,12 +161,14 @@ fn shape(ty: &Type) -> Shape {
         "bool" => Shape::Switch,
         "Color" => Shape::Colour,
         "LutName" => Shape::Lut,
+        "FieldName" => Shape::Field,
+        "Option" if colour_argument(&last.arguments) => Shape::OptionalColour,
         "Vec" if colour_argument(&last.arguments) => Shape::Colours,
         _ => Shape::Choice,
     }
 }
 
-/// Whether `arguments` are `<Color>`: the one type a list may hold.
+/// Whether `arguments` are `<Color>`: the one type a list or an option may hold.
 fn colour_argument(arguments: &PathArguments) -> bool {
     let PathArguments::AngleBracketed(written) = arguments else {
         return false;
@@ -209,12 +213,22 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         ));
     }
     let parts = if shape(ty) == Shape::Lut {
-        lut_parts(&settings, &broken)?
+        let value = quote!(crate::params::LutName::default());
+        unset_parts(
+            &settings,
+            "a lookup table",
+            "none (the identity table)",
+            (quote!(Lut), value),
+            &broken,
+        )?
+    } else if shape(ty) == Shape::OptionalColour {
+        let value = quote!(::core::option::Option::None);
+        unset_parts(&settings, "an optional colour", "none", (quote!(Color), value), &broken)?
     } else {
         let default = settings.default.as_ref().ok_or_else(|| broken("needs a default"))?;
         let written = written(default).ok_or_else(|| {
             broken(
-                "the default is a number, true or false, a '#rrggbb' colour in quotes, a list of them or a variant name",
+                "the default is a number, true or false, a '#rrggbb' colour or a field name in quotes, a list of colours or a variant name",
             )
         })?;
         match shape(ty) {
@@ -234,6 +248,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         max_length,
     } = parts;
     let (label, cyclic, drivable, advanced) = (name.to_string(), settings.cyclic, settings.drivable, settings.advanced);
+    let nullable = shape(ty) == Shape::OptionalColour;
     let row = quote! {
         crate::params::Field {
             name: #label,
@@ -247,6 +262,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             choices: #choices,
             min_length: #min_length,
             max_length: #max_length,
+            nullable: #nullable,
             drivable: #drivable,
             advanced: #advanced,
         }
@@ -262,6 +278,10 @@ fn declare(field: &Field) -> syn::Result<Declared> {
                 .map(|colour| ::serde_json::Value::Array(colour.0.iter().copied().map(crate::params::decimal).collect()))
                 .collect()
         )),
+        Shape::OptionalColour => quote!(self.#name.map_or(::serde_json::Value::Null, |colour| {
+            ::serde_json::Value::Array(colour.0.iter().copied().map(crate::params::decimal).collect())
+        })),
+        Shape::Field => quote!(::serde_json::Value::from(self.#name.0.clone())),
         Shape::Lut => quote!(self.#name.json()),
         Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
         Shape::Int | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
@@ -289,7 +309,7 @@ fn other_parts(
         if shape == Shape::Choice {
             let ty = ty.to_token_stream().to_string().replace(' ', "");
             broken(&format!(
-                "`{ty}` is not f32, i32, bool, Color, Vec<Color> or LutName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
+                "`{ty}` is not f32, i32, bool, Color, Option<Color>, Vec<Color>, FieldName or LutName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
                  (a number is f32 or i32)"
             ))
         } else {
@@ -321,6 +341,11 @@ fn other_parts(
             let choice = snake_case(&variant.to_string());
             (quote!(<#ty>::#variant), quote!(crate::params::Scalar::Text(#choice)))
         }
+        (Shape::Field, Written::Text(selection)) if !selection.is_empty() => (
+            quote!(crate::params::FieldName::new(#selection)),
+            quote!(crate::params::Scalar::Text(#selection)),
+        ),
+        (Shape::Field, _) => return Err(broken("the default of a field is the name of a selection, in quotes")),
         (Shape::Switch, _) => return Err(broken("the default of a switch is true or false")),
         (Shape::Colour, _) => return Err(broken("the default of a colour is '#rrggbb', in quotes")),
         _ => return Err(wrong("the default of a choice is the name of one of its variants")),
@@ -329,6 +354,7 @@ fn other_parts(
     let (kind, choices) = match shape {
         Shape::Switch => (quote!(Bool), quote!(&[])),
         Shape::Colour => (quote!(Color), quote!(&[])),
+        Shape::Field => (quote!(Field), quote!(&[])),
         _ => (quote!(Choice), quote!(<#ty as crate::params::Choice>::CHOICES)),
     };
     Ok(Parts {
@@ -344,13 +370,20 @@ fn other_parts(
     })
 }
 
-/// A lookup table (`LutName`): its default is none, the identity table, so it is not written; no unit, bounds, lengths,
-/// cyclic or drivable either.
-fn lut_parts(settings: &Settings, broken: Broken<'_>) -> syn::Result<Parts> {
+/// A lookup table (`LutName`) or an optional colour (`Option<Color>`): it has no value until a step gives one, so its
+/// default is not written; no unit, bounds, lengths, cyclic or drivable either. `noun` names it for an error, `absent` what
+/// its default is; `kind` and `value` are the table's kind and the expression of the field's value when none is given.
+fn unset_parts(
+    settings: &Settings,
+    noun: &str,
+    absent: &str,
+    (kind, value): (TokenStream, TokenStream),
+    broken: Broken<'_>,
+) -> syn::Result<Parts> {
     if settings.default.is_some() {
-        return Err(broken(
-            "a lookup table's default is none (the identity table): leave `default` out",
-        ));
+        return Err(broken(&format!(
+            "the default of {noun} is {absent}: leave `default` out"
+        )));
     }
     if settings.unit.is_some() || settings.min.is_some() || settings.max.is_some() {
         return Err(broken("only a number takes a unit, min and max"));
@@ -360,9 +393,9 @@ fn lut_parts(settings: &Settings, broken: Broken<'_>) -> syn::Result<Parts> {
     }
     let none = quote!(::core::option::Option::None);
     Ok(Parts {
-        kind: quote!(crate::params::Kind::Lut),
+        kind: quote!(crate::params::Kind::#kind),
         choices: quote!(&[]),
-        value: quote!(crate::params::LutName::default()),
+        value,
         default: quote!(crate::params::Scalar::Null),
         unit: none.clone(),
         min: none.clone(),

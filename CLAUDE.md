@@ -242,9 +242,12 @@ declaration, a default or bound keeping the literal as written (a whole number s
 user's values when a step is made; `Table::check` in Rust is the same rules, compared with Python's by parity tests
 (`tests/_native`); running an effect trusts its parameters. Rust kinds: `f32`, `i32`, `bool`, `Color`, `Vec<Color>`
 (`#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`: `min_length` of at least 1 required, `max_length`
-optional, the default lowercase `#rrggbb`; Python sees a `tuple[Color, ...]`), `LutName` (`#[param()]`, no default: none is
-the identity table; the table reaches the effect in `Inputs`, see "Rust core"; Python sees a `Lut`) and a choice; an effect with
-any other (`FieldName`, `Picture`, text, optional values) keeps a Python model, each field `param(default, doc=...)`, until its
+optional, the default lowercase `#rrggbb`; Python sees a `tuple[Color, ...]`), `Option<Color>` (`#[param()]`, no default: none until
+a step gives one, and the `///` doc says what none means; written `nullable`; Python sees `Color | None`), `FieldName`
+(`#[param(default = "depth")]`: the name of the selection the effect works from, which it finds as a `Layer` in `Inputs`
+under the parameter's name, and `Native` lists as one of its `fields()`; Python sees a `FieldName`), `LutName` (`#[param()]`, no
+default: none is the identity table; the table reaches the effect in `Inputs`, see "Rust core"; Python sees a `Lut`) and a
+choice; an effect with any other (`Picture`, text, other optional values) keeps a Python model, each field `param(default, doc=...)`, until its
 port extends the macro.
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
 
@@ -253,8 +256,8 @@ Every field has a default and a description (what it does, unit and range in wor
 with its [schema](docs/parameter-format/schemas/parameter-2.schema.json) and
 [fixtures](docs/parameter-format/fixtures/parameters). The copy is not edited: a change is a new version in the
 ecosystem's format first, then a new copy here. `tests/_native/test_parameter_format.py` validates every field of every
-Rust-declared effect. Version 2 also describes `FieldName`, `Picture`, text and optional values, which the Rust
-declaration does not support yet (it does `colors` and `lut`). What follows is what image adds.
+Rust-declared effect. Version 2 also describes `Picture`, text and other optional values, which the Rust
+declaration does not support yet (it does `colors`, `field`, `lut` and an optional `color`). What follows is what image adds.
 - **Numeric** (`int`, `float`): a `unit` from the format's list and inclusive `min`/`max` that hold the default.
 - **Counts and densities:** a few marks read as a `count` (their sizes are `px`, so the same count looks alike at any
   size). Numerous marks take `density`: marks per 1000 design px², the one meaning everywhere (`params.scaled`

@@ -23,7 +23,11 @@
 //! ```
 //!
 //! A lookup table is a `LutName` with no default (it is none: the identity table); it reaches the effect in its
-//! [`Inputs`](crate::Inputs), not in the values. A list of colours is a `Vec<Color>` with `#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`.
+//! [`Inputs`](crate::Inputs), not in the values. A field is a `FieldName` with `#[param(default = "depth")]`: the name of
+//! the selection the effect works from, which it also finds as a [`Layer`](crate::Layer) in its `Inputs` under the
+//! parameter's name. A colour that may be left out is an `Option<Color>` with `#[param()]`: none until a step gives one,
+//! and the effect's doc says what none means. A list of colours is a `Vec<Color>` with
+//! `#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`.
 //!
 //! The declaration is checked when the crate compiles: a field has a doc, a number a unit and a range that holds its
 //! default, a list of colours a `min_length` and a default of a length inside its lengths, `cyclic` is for degrees
@@ -49,8 +53,8 @@ mod derived;
 pub use bullterrier_image_derive::{Choice, Params};
 
 /// The names a choice picks from, in declaration order: what `#[derive(Choice)]` implements for a fieldless enum. The
-/// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool`, `Color`, `Vec<Color>` and
-/// `LutName` by their written names.
+/// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool`, `Color`, `Option<Color>`,
+/// `Vec<Color>`, `FieldName` and `LutName` by their written names.
 pub trait Choice {
     /// The names, in `snake_case`.
     const CHOICES: &'static [&'static str];
@@ -93,6 +97,10 @@ pub struct Table {
 
 /// One parameter, described.
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the flags are the keys of the parameter format, each written as it is"
+)]
 pub struct Field {
     /// The name, as the effect's parameters are given by name.
     pub name: &'static str,
@@ -119,6 +127,10 @@ pub struct Field {
     /// The most elements of a list of colours; none when it has no limit, and not written then.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_length: Option<usize>,
+    /// The value may be left out, and the default is `null` (an `Option<Color>`); not written when false. A lookup table
+    /// is always so and does not say it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub nullable: bool,
     /// A pixel-by-pixel drive may vary it.
     pub drivable: bool,
     /// It tunes the technique rather than chooses the look.
@@ -141,6 +153,9 @@ pub enum Kind {
     Color,
     /// A list of colours (`Vec<Color>`), at least `min_length` long.
     Colors,
+    /// The name of a selection (`FieldName`): `depth`, `light`, `subject` or a region the recipe declares. The effect finds
+    /// the selection as a [`Layer`](crate::Layer) in its inputs, under the parameter's name.
+    Field,
     /// A 3D colour lookup table (`LutName`): the name of a table the photo was given, or the path of a `.cube` file;
     /// none is the identity table. The default is always none.
     Lut,
@@ -179,11 +194,11 @@ pub enum Scalar {
     Float(f64),
     /// A switch.
     Bool(bool),
-    /// A colour's `'#rrggbb'` text, or a choice's name.
+    /// A colour's `'#rrggbb'` text, a choice's name, or a field's name.
     Text(&'static str),
     /// The `'#rrggbb'` texts of a list of colours.
     List(&'static [&'static str]),
-    /// No value: the default of a lookup table, which is the identity table.
+    /// No value: the default of a lookup table (the identity table) or of an optional colour.
     Null,
 }
 
@@ -221,6 +236,21 @@ impl LutName {
     #[must_use]
     pub fn json(&self) -> Value {
         self.0.clone().map_or(Value::Null, Value::from)
+    }
+}
+
+/// The value of a field parameter: the name of a selection (`depth`, `light`, `subject` or a region of the recipe) that an
+/// effect works from. A recipe writes it as a string; the selection itself reaches the effect in its
+/// [`Inputs`](crate::Inputs).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct FieldName(pub String);
+
+impl FieldName {
+    /// The selection called `name`.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(name.into())
     }
 }
 

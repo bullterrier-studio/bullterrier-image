@@ -6,7 +6,7 @@
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use super::{Color, Declared, LutName, Params};
+use super::{Color, Declared, FieldName, LutName, Params};
 use crate::{Constraint, Error};
 
 /// The parameters of a gradient.
@@ -22,6 +22,12 @@ struct Gradient {
     /// The table graded with.
     #[param()]
     file: LutName,
+    /// The selection the marks follow: `depth`, `light`, `subject` or a region.
+    #[param(default = "depth")]
+    follow: FieldName,
+    /// The colour of the marks; none keeps the picture's own.
+    #[param(advanced)]
+    tint: Option<Color>,
 }
 
 fn check(given: &Value) -> Result<Map<String, Value>, Error> {
@@ -87,6 +93,64 @@ fn a_lookup_table_has_no_value_by_default_and_is_written_as_its_name() -> Result
     let read: Gradient = serde_json::from_value(Value::Object(check(&json!({"file": "film"}))?))
         .map_err(|error| Error::Recipe(error.to_string()))?;
     assert_eq!(read.file, LutName::new("film"));
+    Ok(())
+}
+
+#[test]
+fn a_field_has_a_name_for_its_default_and_an_optional_colour_none_marked_nullable() {
+    let written = serde_json::to_value(Gradient::table()).ok();
+    let field = |at: usize| written.as_ref().map(|table| table["fields"][at].clone());
+    assert_eq!(
+        field(3),
+        Some(json!({
+            "name": "follow",
+            "kind": "field",
+            "meaning": "The selection the marks follow: `depth`, `light`, `subject` or a region.",
+            "default": "depth",
+            "unit": null, "min": null, "max": null, "cyclic": false, "choices": [],
+            "drivable": false, "advanced": false,
+        })),
+        "a field is not nullable, so no `nullable` is written"
+    );
+    assert_eq!(
+        field(4),
+        Some(json!({
+            "name": "tint",
+            "kind": "color",
+            "meaning": "The colour of the marks; none keeps the picture's own.",
+            "default": null,
+            "unit": null, "min": null, "max": null, "cyclic": false, "choices": [],
+            "nullable": true,
+            "drivable": false, "advanced": true,
+        }))
+    );
+    assert_eq!(Gradient::default().follow, FieldName::new("depth"));
+    assert_eq!(Gradient::default().tint, None);
+}
+
+#[test]
+fn values_write_a_field_as_its_name_and_an_optional_colour_as_three_numbers_or_null() {
+    assert_eq!(Gradient::default().values()["follow"], json!("depth"));
+    assert_eq!(Gradient::default().values()["tint"], Value::Null);
+    let chosen = Gradient {
+        follow: FieldName::new("near"),
+        tint: Some(Color([0.1, 0.3, 1.0])),
+        ..Gradient::default()
+    };
+    assert_eq!(chosen.values()["follow"], json!("near"));
+    assert_eq!(chosen.values()["tint"], json!([0.1, 0.3, 1.0]));
+}
+
+#[test]
+fn what_the_check_makes_of_a_field_and_an_optional_colour_is_read_back_into_the_struct() -> Result<(), Error> {
+    let checked = check(&json!({"follow": "light", "tint": "#fff"}))?;
+    let read: Gradient =
+        serde_json::from_value(Value::Object(checked)).map_err(|error| Error::Recipe(error.to_string()))?;
+    assert_eq!(read.follow, FieldName::new("light"));
+    assert_eq!(read.tint, Some(Color([1.0, 1.0, 1.0])));
+    let unset: Gradient =
+        serde_json::from_value(Value::Object(check(&json!({}))?)).map_err(|error| Error::Recipe(error.to_string()))?;
+    assert_eq!((unset.follow, unset.tint), (FieldName::new("depth"), None));
     Ok(())
 }
 

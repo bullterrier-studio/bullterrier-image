@@ -218,6 +218,8 @@ pub enum Constraint {
     TooFew(usize),
     /// The list has more elements than this.
     TooMany(usize),
+    /// A field is the name of a selection, in a non-empty string.
+    FieldName,
     /// A lookup table is the name of a table or the path of a `.cube` file, in a non-empty string, or `null` for none.
     LutName,
 }
@@ -314,6 +316,7 @@ impl fmt::Display for Constraint {
             ),
             Self::TooFew(least) => write!(formatter, "must have at least {least} elements"),
             Self::TooMany(most) => write!(formatter, "must have at most {most} elements"),
+            Self::FieldName => formatter.write_str("must be the name of a field, a non-empty string"),
             Self::LutName => {
                 formatter.write_str("must be the name of a lookup table or the path of a .cube file, or null")
             }

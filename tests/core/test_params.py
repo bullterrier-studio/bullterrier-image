@@ -854,6 +854,7 @@ KIND_SCHEMA = {
     "bool": "boolean",
     "colors": "array",
     "lut": "string",
+    "field": "string",
 }  # the JSON-schema type of each plain kind
 OF_ANOTHER_KIND: dict[
     str, list[Any]
@@ -865,6 +866,7 @@ OF_ANOTHER_KIND: dict[
     "color": ["red", [2, 0, 0]],
     "colors": ["#ffffff", 7, None, ["red"]],
     "lut": [1, "film.cube", None],  # a path becomes a Lut in the loader or `fx`, never in the model
+    "field": [1, "", None, True],
 }
 
 
@@ -1088,6 +1090,63 @@ def test_a_lookup_table_defaults_to_the_identity_and_takes_a_lut_only():
     for given in ["film.cube", 1, np.zeros((2, 2, 2, 3))]:
         with pytest.raises(RecipeError, match=r"`file`.*lookup table"):
             model.parse({"file": given})
+
+
+# No effect declares a field or an optional colour yet, so the entries are written as `_core.params` writes them
+# (`nullable` only where it applies). The same values are checked against `Table::check` in
+# crates/core/tests/it/params_field.rs: a row added to one is added to the other.
+FIELD: dict[str, Any] = {
+    "name": "field",
+    "kind": "field",
+    "meaning": "The selection to follow.",
+    "default": "depth",
+    "unit": None,
+    "min": None,
+    "max": None,
+    "cyclic": False,
+    "choices": [],
+    "drivable": False,
+    "advanced": False,
+}
+OPTIONAL_COLOR: dict[str, Any] = {
+    **FIELD,
+    "name": "color",
+    "kind": "color",
+    "meaning": "The glow's colour.",
+    "default": None,
+    "nullable": True,
+}
+NO_NAME: list[Any] = ["", 3, True, ["depth"], {"by": "depth"}, None]
+NO_COLOR: list[Any] = ["red", [2, 0, 0], 1, False, ""]
+BLUE = (0.0, 0.0, 1.0)
+
+
+def test_a_field_defaults_to_its_declared_name_and_takes_a_non_empty_name_only():
+    model = model_of(FIELD)
+    assert model.parse({}).model_dump()["field"] == "depth"
+    assert model.parse({"field": "near"}).model_dump()["field"] == "near"
+    assert model.fields_doc()[0].default == "depth"
+    for given in NO_NAME:
+        with pytest.raises(RecipeError, match=r"`field`"):
+            model.parse({"field": given})
+
+
+def test_an_optional_colour_defaults_to_none_and_takes_a_colour_or_none():
+    model = model_of(OPTIONAL_COLOR)
+    assert model.parse({}).model_dump()["color"] is None
+    assert model.parse({"color": None}).model_dump()["color"] is None
+    spellings: list[Any] = ["#00f", " #0000FF ", [0, 0, 1], (0.0, 0.0, 1.0)]
+    for given in spellings:
+        assert model.parse({"color": given}).model_dump()["color"] == BLUE, given
+    for given in NO_COLOR:
+        with pytest.raises(RecipeError, match=r"`color`"):
+            model.parse({"color": given})
+
+
+def test_a_model_with_a_field_and_an_optional_colour_has_both_in_its_json_schema():
+    properties = model_of(FIELD, OPTIONAL_COLOR).model_json_schema()["properties"]
+    assert properties["field"]["type"] == "string"
+    assert {"type": "null"} in properties["color"]["anyOf"]
 
 
 def test_a_kind_the_core_has_and_this_package_has_not_is_refused_naming_the_field():

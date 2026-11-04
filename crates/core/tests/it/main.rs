@@ -35,6 +35,7 @@ mod lut_effect;
 mod noise;
 mod params;
 mod params_colors;
+mod params_field;
 mod params_lut;
 mod params_scale;
 mod path_coverage;

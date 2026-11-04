@@ -23,6 +23,7 @@ fn number(name: &'static str, kind: Kind, default: Scalar, unit: Unit, (min, max
         choices: &[],
         min_length: None,
         max_length: None,
+        nullable: false,
         drivable: false,
         advanced: false,
     }
@@ -42,6 +43,7 @@ fn palette() -> Field {
         choices: &[],
         min_length: Some(2),
         max_length: Some(4),
+        nullable: false,
         drivable: false,
         advanced: false,
     }

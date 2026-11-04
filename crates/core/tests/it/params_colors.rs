@@ -20,6 +20,7 @@ fn colors(name: &'static str, default: &'static [&'static str], (least, most): (
         choices: &[],
         min_length: Some(least),
         max_length: most,
+        nullable: false,
         drivable: false,
         advanced: false,
     }

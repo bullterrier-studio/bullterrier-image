@@ -7,7 +7,7 @@
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
-use crate::params::{Declared, Table};
+use crate::params::{Declared, Kind, Table};
 use crate::{Error, Image, Inputs, Picture};
 
 /// The sections of the effect catalogue. Every effect is in exactly one.
@@ -220,17 +220,30 @@ pub(crate) struct Meta {
 pub(crate) struct Native<P> {
     name: &'static str,
     meta: &'static Meta,
+    /// The `FieldName` parameters of `P`, read from its declaration, so a field is declared once.
+    fields: Vec<FieldParam>,
     render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
 }
 
-impl<P> Native<P> {
+impl<P: Declared> Native<P> {
     /// The effect called `name` (its file's name) with its `meta` and `render`.
-    pub(crate) const fn new(
+    pub(crate) fn new(
         name: &'static str,
         meta: &'static Meta,
         render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
     ) -> Self {
-        Self { name, meta, render }
+        let fields = P::table()
+            .fields
+            .iter()
+            .filter(|field| field.kind == Kind::Field)
+            .map(|field| FieldParam::new(field.name, field.default.to_string()))
+            .collect();
+        Self {
+            name,
+            meta,
+            fields,
+            render,
+        }
     }
 }
 
@@ -251,6 +264,10 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
         self.meta.inputs
     }
 
+    fn fields(&self) -> &[FieldParam] {
+        &self.fields
+    }
+
     fn params(&self) -> Option<Table> {
         Some(P::table())
     }
@@ -261,5 +278,51 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
             source,
         })?;
         Ok((self.render)(picture, &params, inputs))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! A `Native` effect lists the field parameters its `Params` declares. No effect of the core has one yet, and a
+    //! `Native` is the core's own, so this is the one place it can be made.
+
+    use serde::Deserialize;
+
+    use super::{Category, FieldParam, Meta, Native};
+    use crate::params::{FieldName, Params};
+    use crate::{Effect, Image, Inputs, Picture};
+
+    /// The parameters of a probe.
+    #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
+    #[serde(deny_unknown_fields)]
+    struct Probe {
+        /// A size in px.
+        #[param(default = 4.0, unit = px, min = 0, max = 32)]
+        size: f32,
+        /// The selection the blur follows.
+        #[param(default = "depth")]
+        follow: FieldName,
+        /// The selection that limits it.
+        #[param(default = "light")]
+        within: FieldName,
+    }
+
+    const META: Meta = Meta {
+        category: Category::Utilities,
+        opacity: 1.0,
+        inputs: &[],
+    };
+
+    fn render(picture: &Picture<'_>, _params: &Probe, _inputs: &Inputs<'_>) -> Image {
+        picture.map(|pixel| pixel)
+    }
+
+    #[test]
+    fn the_fields_are_the_field_parameters_of_the_declaration_with_their_default_names() {
+        let probe = Native::new("probe", &META, render);
+        assert_eq!(
+            probe.fields(),
+            [FieldParam::new("follow", "depth"), FieldParam::new("within", "light")]
+        );
     }
 }

@@ -54,6 +54,10 @@ fn a_complete_declaration_is_accepted_for_every_kind_of_field() {
         documented! { #[param(default = ["#000000"], min_length = 1, max_length = 1, advanced)] stops: Vec<Color>, },
         documented! { #[param()] file: LutName, },
         documented! { #[param(advanced)] file: LutName, },
+        documented! { #[param(default = "depth")] field: FieldName, },
+        documented! { #[param(default = "depth", advanced)] field: FieldName, },
+        documented! { #[param()] color: Option<Color>, },
+        documented! { #[param(advanced)] color: Option<Color>, },
         documented! { #[param(default = Grid)] kind: Kind, },
         documented! { #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)] angle: f32, },
         // as rustfmt wraps a long attribute
@@ -392,6 +396,46 @@ fn a_list_of_colours_that_breaks_its_rules_is_refused_naming_the_field() {
             "min_length on a lookup table",
             documented! { #[param(min_length = 1)] file: LutName, },
             &["file", "min_length"],
+        ),
+        (
+            "no default on a field",
+            documented! { #[param()] field: FieldName, },
+            &["field", "default"],
+        ),
+        (
+            "a field default that is no name",
+            documented! { #[param(default = 3)] field: FieldName, },
+            &["field", "name"],
+        ),
+        (
+            "an empty field default",
+            documented! { #[param(default = "")] field: FieldName, },
+            &["field", "name"],
+        ),
+        (
+            "a unit on a field",
+            documented! { #[param(default = "depth", unit = px)] field: FieldName, },
+            &["field", "unit"],
+        ),
+        (
+            "drivable on a field",
+            documented! { #[param(default = "depth", drivable)] field: FieldName, },
+            &["field", "drivable"],
+        ),
+        (
+            "a default on an optional colour",
+            documented! { #[param(default = "#000000")] color: Option<Color>, },
+            &["color", "default", "none"],
+        ),
+        (
+            "a bound on an optional colour",
+            documented! { #[param(max = 1)] color: Option<Color>, },
+            &["color", "max"],
+        ),
+        (
+            "min_length on an optional colour",
+            documented! { #[param(min_length = 1)] color: Option<Color>, },
+            &["color", "min_length"],
         ),
         (
             "a list of anything but colours",

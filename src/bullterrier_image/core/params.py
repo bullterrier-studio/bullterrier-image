@@ -398,12 +398,14 @@ _PLAIN_KINDS: dict[str, Any] = {
     "color": Color,
     "colors": tuple[Color, ...],
     "lut": Lut,
+    "field": FieldName,
 }  # the kinds of `Kind` in crates/core/src/params.rs -> their annotation; a "choice" is a `Literal` of its names
 
 
 def _annotation(effect: str, entry: dict[str, Any]) -> Any:
     """The annotation of the field `entry` of the Rust declaration of `effect`; ValueError if its kind is one the core
-    has and this module has not (a kind added to `Kind` without a line in `_PLAIN_KINDS`)."""
+    has and this module has not (a kind added to `Kind` without a line in `_PLAIN_KINDS`). A `nullable` field may also
+    be none."""
     kind = entry["kind"]
     if kind == "choice":
         return Literal[tuple(entry["choices"])]
@@ -412,7 +414,8 @@ def _annotation(effect: str, entry: dict[str, Any]) -> Any:
             f"the Rust core declares {effect}.{entry['name']} of the kind {kind!r}, which EffectParams cannot build a "
             f"field from (it knows {', '.join([*_PLAIN_KINDS, 'choice'])})"
         )
-    return _PLAIN_KINDS[kind]
+    annotation = _PLAIN_KINDS[kind]
+    return annotation | None if entry.get("nullable") else annotation
 
 
 def _default(entry: dict[str, Any]) -> Any:

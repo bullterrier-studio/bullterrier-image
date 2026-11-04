@@ -49,6 +49,7 @@ impl Effect for Tablet {
                 choices: &[],
                 min_length: None,
                 max_length: None,
+                nullable: false,
                 drivable: false,
                 advanced: false,
             }],

@@ -19,7 +19,7 @@ Checked against the code on 2026-10-31.
 | Cyclic | stored flag; only `degrees`, range exactly 360 | derived from the unit: `deg` and `cycle` |
 | Cyclic upper end | `[min, max]` kept: 360 stays 360 (picture(min) equals picture(max) is a contract test) | `[min, max)`: `max` is stored as `min` |
 | Bounded degrees | 10 fields | none (a `deg` is always cyclic) |
-| Kinds in the Rust declaration | float, int, bool, choice, color, colors, lut | numbers only |
+| Kinds in the Rust declaration | float, int, bool, choice, color, colors, field, lut, nullable colour | numbers only |
 | Absent values | every key written; `null`, `[]`, `false` | `kind`, `cyclic`, `choices` and the flags do not exist |
 | `min == max` | allowed | refused |
 | Reserved names | step keys, `partition`, `size_ratio` | `into`, `pen_mm` |
@@ -129,7 +129,7 @@ colours, 4 optional colours, 10 field names, a picture, a lookup table and free 
 - **New kinds:** `colors`, `field`, `text`, `picture`, `lut`.
 - **New keys:** `min_length`, `max_length`, `nullable`. Like `choices`, each is written only where it applies.
 - **New section:** "Values", which says how a value is written for each kind.
-- **Nothing removed or renamed.** Image's Rust declaration supports `colors` and `lut` so far; the other new kinds arrive with their
+- **Nothing removed or renamed.** Image's Rust declaration supports `colors`, `field`, `lut` and a `nullable` `color` so far; the other new kinds arrive with their
   first effect.
 
 ## Proof
