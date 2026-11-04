@@ -157,6 +157,8 @@ const fn field(name: &'static str, kind: Kind, meaning: &'static str, default: S
         max: None,
         cyclic: false,
         choices: &[],
+        min_length: None,
+        max_length: None,
         drivable: false,
         advanced: false,
     }

@@ -201,6 +201,14 @@ pub enum Constraint {
     OneOf(&'static [&'static str]),
     /// A colour is `'#rrggbb'`, `'#rgb'` or three numbers from 0 to 1.
     Colour,
+    /// A list of colours is needed.
+    ColourList,
+    /// The element at this place (counting from 0) of a list of colours is no colour.
+    ColourAt(usize),
+    /// The list has fewer elements than this.
+    TooFew(usize),
+    /// The list has more elements than this.
+    TooMany(usize),
 }
 
 impl Error {
@@ -287,6 +295,13 @@ impl fmt::Display for Constraint {
             Self::AtMost(high) => write!(formatter, "must be <= {high}"),
             Self::OneOf(names) => write!(formatter, "must be one of {}", names.join(", ")),
             Self::Colour => formatter.write_str("must be '#rrggbb', '#rgb' or three numbers from 0 to 1"),
+            Self::ColourList => formatter.write_str("must be a list of colours"),
+            Self::ColourAt(at) => write!(
+                formatter,
+                "must be a list of colours, and element {at} is not '#rrggbb', '#rgb' or three numbers from 0 to 1"
+            ),
+            Self::TooFew(least) => write!(formatter, "must have at least {least} elements"),
+            Self::TooMany(most) => write!(formatter, "must have at most {most} elements"),
         }
     }
 }

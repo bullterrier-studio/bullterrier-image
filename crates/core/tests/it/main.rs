@@ -28,6 +28,7 @@ mod inputs;
 mod limits;
 mod noise;
 mod params;
+mod params_colors;
 mod params_scale;
 mod path_coverage;
 mod paths;

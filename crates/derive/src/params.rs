@@ -206,6 +206,8 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             max: #max,
             cyclic: #cyclic,
             choices: #choices,
+            min_length: ::core::option::Option::None,
+            max_length: ::core::option::Option::None,
             drivable: #drivable,
             advanced: #advanced,
         }

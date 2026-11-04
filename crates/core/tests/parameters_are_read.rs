@@ -91,7 +91,7 @@ fn real(bound: Option<Scalar>) -> Option<f64> {
 }
 
 /// Other values a parameter could take: both bounds and the points a third and two thirds of the way, a switch flipped,
-/// every other choice, two colours that are not the defaults of any effect.
+/// every other choice, two colours that are not the defaults of any effect, two lists of such colours.
 fn candidates(field: &Field) -> Vec<Value> {
     match field.kind {
         Kind::Float => real(field.min)
@@ -123,6 +123,24 @@ fn candidates(field: &Field) -> Vec<Value> {
             .map(|name| json!(name))
             .collect(),
         Kind::Color => vec![json!([0.9, 0.1, 0.2]), json!([0.1, 0.8, 0.3])],
+        // the shortest list and one element more (where allowed), of colours that are not the default of any effect
+        Kind::Colors => {
+            let shortest = field.min_length.unwrap_or(1);
+            [shortest, shortest + 1]
+                .into_iter()
+                .filter(|length| field.max_length.is_none_or(|most| *length <= most))
+                .map(|length| {
+                    Value::Array(
+                        [[0.9, 0.1, 0.2], [0.1, 0.8, 0.3], [0.2, 0.2, 0.9]]
+                            .into_iter()
+                            .cycle()
+                            .take(length)
+                            .map(|channels| json!(channels))
+                            .collect(),
+                    )
+                })
+                .collect()
+        }
     }
 }
 
@@ -232,6 +250,8 @@ impl Effect for Brighten {
             max: Some(Scalar::Int(2)),
             cyclic: false,
             choices: &[],
+            min_length: None,
+            max_length: None,
             drivable: false,
             advanced: false,
         };

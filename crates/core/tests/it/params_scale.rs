@@ -21,6 +21,27 @@ fn number(name: &'static str, kind: Kind, default: Scalar, unit: Unit, (min, max
         max: Some(Scalar::Int(max)),
         cyclic: false,
         choices: &[],
+        min_length: None,
+        max_length: None,
+        drivable: false,
+        advanced: false,
+    }
+}
+
+/// A list of two to four colours.
+fn palette() -> Field {
+    Field {
+        name: "palette",
+        kind: Kind::Colors,
+        meaning: "Colours.",
+        default: Scalar::List(&["#ff0000", "#0000ff"]),
+        unit: None,
+        min: None,
+        max: None,
+        cyclic: false,
+        choices: &[],
+        min_length: Some(2),
+        max_length: Some(4),
         drivable: false,
         advanced: false,
     }
@@ -114,6 +135,25 @@ fn every_other_unit_is_left_as_it_is() -> Outcome {
         for ratio in [0.5, 1.0, 3.0] {
             assert_eq!(measured(field, &written, ratio)?, written, "{field} at {ratio}");
         }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_list_of_colours_is_left_as_it_is() -> Outcome {
+    // checked to channels, and the same at every ratio: a colour has no size
+    let written = json!(["#ff0000", [0, 1, 0], "#00f"]);
+    let expected = json!([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
+    let tinting = Double::unique()
+        .with_table(Table {
+            doc: "The parameters of an effect that tints.",
+            fields: vec![palette()],
+        })
+        .register()?;
+    for ratio in [0.5, 1.0, 3.0] {
+        render_at(Step::new(tinting.name()).param("palette", written.clone()), ratio)?;
+        let received = tinting.received();
+        assert_eq!(received[received.len() - 1].params["palette"], expected, "at {ratio}");
     }
     Ok(())
 }

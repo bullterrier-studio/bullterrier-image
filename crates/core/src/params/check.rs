@@ -10,7 +10,9 @@ impl Table {
     ///
     /// The result has every parameter, in normal form: a parameter not given has its declared default; a decimal is a
     /// float even when given as a whole number; a colour is three numbers 0..1 (given as `'#rrggbb'`, `'#rgb'` in
-    /// either case, spaces around allowed, or three numbers). Rules: a name the effect does not declare is refused,
+    /// either case, spaces around allowed, or three numbers); a list of colours is a list of those, between its
+    /// `min_length` and `max_length` long (the spellings may be mixed; the first element that is no colour is named by
+    /// its place, counting from 0). Rules: a name the effect does not declare is refused,
     /// listing the declared ones; a decimal takes any number but not a switch or text; a whole number takes only a
     /// whole one (`3.0` is not); a switch takes `true` or `false`; a choice takes a listed name; a number lies within
     /// its inclusive `min` and `max`, except a `cyclic` one (an angle whose range is one turn), which takes any real
@@ -53,7 +55,7 @@ impl Scalar {
         match self {
             Self::Int(whole) => Some(whole as f64),
             Self::Float(real) => Some(real),
-            Self::Bool(_) | Self::Text(_) => None,
+            Self::Bool(_) | Self::Text(_) | Self::List(_) => None,
         }
     }
 
@@ -64,6 +66,7 @@ impl Scalar {
             Self::Float(real) => Value::from(real),
             Self::Bool(flag) => Value::from(flag),
             Self::Text(text) => Value::from(text),
+            Self::List(items) => Value::from(items.to_vec()),
         }
     }
 }
@@ -93,7 +96,30 @@ impl Field {
                 .map(Value::from)
                 .ok_or(Constraint::OneOf(self.choices)),
             Kind::Color => colour(value).map(Value::from).ok_or(Constraint::Colour),
+            Kind::Colors => self.colours(value),
         }
+    }
+
+    /// `value` as a list of colours, each in normal form, or the first rule it breaks: not a list, too few or too many
+    /// elements, or the first element that is no colour.
+    fn colours(&self, value: &Value) -> Result<Value, Constraint> {
+        let items = value.as_array().ok_or(Constraint::ColourList)?;
+        if let Some(least) = self.min_length
+            && items.len() < least
+        {
+            return Err(Constraint::TooFew(least));
+        }
+        if let Some(most) = self.max_length
+            && items.len() > most
+        {
+            return Err(Constraint::TooMany(most));
+        }
+        items
+            .iter()
+            .enumerate()
+            .map(|(at, item)| colour(item).map(Value::from).ok_or(Constraint::ColourAt(at)))
+            .collect::<Result<Vec<_>, _>>()
+            .map(Value::Array)
     }
 
     /// `real` moved into the turn by whole turns when the field is cyclic and it lies outside.

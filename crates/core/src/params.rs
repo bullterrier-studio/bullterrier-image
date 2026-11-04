@@ -4,7 +4,7 @@
 //! attribute (default, unit, range; see [`Params`]), and a choice is a fieldless enum (see [`Choice`]). The derives
 //! write `Default` and a [`Table`] describing every field, which the Python package builds the effect's parameter model
 //! from (`bullterrier_image.core.params`), so the documented ranges, defaults and descriptions are written nowhere
-//! else. A [`Field`] is a parameter in the ecosystem's parameter format, version 1 (`docs/parameter-format/parameters.md`
+//! else. A [`Field`] is a parameter in the ecosystem's parameter format, version 2 (`docs/parameter-format/parameters.md`
 //! in the repository: keys, kinds, units, ranges), and `tests/_native/test_parameter_format.py` validates every declared
 //! field against its schema.
 //!
@@ -42,8 +42,8 @@ mod scale;
 pub use bullterrier_image_derive::{Choice, Params};
 
 /// The names a choice picks from, in declaration order: what `#[derive(Choice)]` implements for a fieldless enum. The
-/// four other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool` and `Color` by their
-/// written names.
+/// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool`, `Color` and `Vec<Color>`
+/// by their written names.
 pub trait Choice {
     /// The names, in `snake_case`.
     const CHOICES: &'static [&'static str];
@@ -93,7 +93,8 @@ pub struct Field {
     pub kind: Kind,
     /// What it does, its unit and range in words, what raising it does (its doc comment).
     pub meaning: &'static str,
-    /// The value an effect uses when none is given: a colour as its `'#rrggbb'` text, a choice as its name.
+    /// The value an effect uses when none is given: a colour as its `'#rrggbb'` text, a list of colours as those texts,
+    /// a choice as its name.
     pub default: Scalar,
     /// The unit of a number.
     pub unit: Option<Unit>,
@@ -105,6 +106,12 @@ pub struct Field {
     pub cyclic: bool,
     /// The names of a choice, in declaration order; none for any other kind.
     pub choices: &'static [&'static str],
+    /// The fewest elements of a list of colours; none for any other kind, and not written then.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_length: Option<usize>,
+    /// The most elements of a list of colours; none when it has no limit, and not written then.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_length: Option<usize>,
     /// A pixel-by-pixel drive may vary it.
     pub drivable: bool,
     /// It tunes the technique rather than chooses the look.
@@ -125,6 +132,8 @@ pub enum Kind {
     Choice,
     /// A colour: three numbers 0..1.
     Color,
+    /// A list of colours (`Vec<Color>`), at least `min_length` long.
+    Colors,
 }
 
 /// The unit a number is in. Python's `UNITS` (`core/params.py`) lists the same names; a model checks its unit against them.
@@ -149,7 +158,8 @@ pub enum Unit {
     Density,
 }
 
-/// A default or a bound as the declaration writes it: a whole number stays whole, a decimal stays decimal.
+/// A default or a bound as the declaration writes it: a whole number stays whole, a decimal stays decimal. (A list of
+/// colours is not a scalar, but it is a default all the same, so it is one more way to write one.)
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Scalar {
@@ -161,6 +171,8 @@ pub enum Scalar {
     Bool(bool),
     /// A colour's `'#rrggbb'` text, or a choice's name.
     Text(&'static str),
+    /// The `'#rrggbb'` texts of a list of colours.
+    List(&'static [&'static str]),
 }
 
 impl fmt::Display for Scalar {
@@ -172,6 +184,7 @@ impl fmt::Display for Scalar {
             Self::Float(real) => write!(formatter, "{real}"),
             Self::Bool(flag) => write!(formatter, "{flag}"),
             Self::Text(text) => formatter.write_str(text),
+            Self::List(items) => write!(formatter, "[{}]", items.join(", ")),
         }
     }
 }
