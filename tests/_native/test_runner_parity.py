@@ -1029,6 +1029,39 @@ def test_a_lut_in_a_step_reaches_its_effect(photo):
     np.testing.assert_allclose(identity, photo, atol=1e-5)
 
 
+class TableParams(EffectParams):
+    """The parameters of an effect written in Python that takes a lookup table."""
+
+    file: Lut = param(Lut.identity(), doc="The table.")
+
+
+@pytest.fixture
+def table_probe(throwaway_effects):
+    """Registers `table_probe`, a Python effect with a Lut parameter: it fills the photo with the mean of its table's
+    entries, so its output tells which table it received."""
+
+    def table_probe(rgb: np.ndarray, params: TableParams) -> np.ndarray:
+        """Fills the photo with the mean of a table."""
+        return np.full_like(rgb, params.file.table.mean())
+
+    return effect(category="utilities", params=TableParams)(table_probe)
+
+
+def test_a_lut_in_a_step_reaches_a_python_effect_as_the_lut_and_each_step_gets_its_own(photo, table_probe):
+    dark, light = Lut(np.full((2, 2, 2, 3), 0.25, np.float32)), Lut(np.full((2, 2, 2, 3), 0.75, np.float32))
+    one = core_render(photo, Recipe([Step("table_probe", params={"file": dark}, opacity=1)]))
+    np.testing.assert_allclose(one, 0.25, atol=1e-6)
+    both = Recipe(
+        [
+            Step("table_probe", params={"file": dark}, opacity=1),
+            Step("table_probe", params={"file": light}, opacity=0.5),
+        ]
+    )
+    np.testing.assert_allclose(core_render(photo, both), 0.5, atol=1e-6)  # 0.25 with 0.75 laid over it at one half
+    default = core_render(photo, Recipe([Step("table_probe", opacity=1)]))
+    np.testing.assert_allclose(default, 0.5, atol=1e-6)  # the identity table's mean
+
+
 # --- real effects written in Python --------------------------------------------------------------------------------
 
 

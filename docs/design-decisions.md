@@ -39,7 +39,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   adapters layer, beside `imageio` (`bullterrier_image/loader.py`); the pipeline's fingerprint covers each asset's content, not only the recipe text;
   a large asset is counted nowhere (the effect contract measures the budget on an effect's default 1x1 pictures, and a recipe's
   assets are held as loaded), so a real budget for assets is a decision still to make; another kind of asset file gets its own value type and reader in the adapters layer together with its first effect:
-  the `.cube` lookup table is `Lut` (`core/values.py`), read by `imageio.load_lut` (`LutError` names file and line) and held by `lut`'s `file`.
+  the `.cube` lookup table is `Lut` (`core/values.py`, wrapping the core's table), read by the core (`imageio.load_lut`; `LutError` names file and line) and held by `lut`'s `file`.
   `lut` interpolates trilinearly with no parameter for it: nearest-entry lookup only bands, so no look needs the choice.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
   `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
@@ -646,8 +646,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *The registry mirrors Python effects into the core* at registration and `unregister`, in one place, so the two never
     disagree; an effect with a Rust model is skipped (the core has it). The core runs the wrapper, which validates, scales and
     calls the effect, and passes `size_ratio` on only if the effect declares it: a Python effect has no parameter table, so the
-    core hands it design values unscaled. A `Picture` or `Lut` parameter cannot be JSON: it travels as `{"$object": n}`, held
-    by `registry.holding` for the call (a `ContextVar`; the core calls back on the calling thread). `_core.effects()` therefore
+    core hands it design values unscaled. A `Picture` parameter cannot be JSON: it travels as `{"$object": n}`, held
+    by `registry.holding` for the call (a `ContextVar`; the core calls back on the calling thread); a `Lut` is written as a name
+    and the core is given its table. `_core.effects()` therefore
     lists mirrors too, and `effects(declared=True)` the effects whose parameters the core declares, which is what a model
     declared with `core=` needs.
   - *ClipColor deviates from the W3C text.* The `color` mode's ClipColor pulls toward the luminosity `SetLum` set instead of

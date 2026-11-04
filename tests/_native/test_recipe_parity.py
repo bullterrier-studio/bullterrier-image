@@ -19,6 +19,7 @@ from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.presets import SHIPPED as SHIPPED_PRESETS
 from bullterrier_image.core.registry import CATEGORIES, INPUTS, STEP_KEYS
 from bullterrier_image.core.steps import Each, Recipe, Step
+from bullterrier_image.core.values import Lut
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.ops.composite import BlendMode
 
@@ -135,15 +136,24 @@ ROWS = [
     pytest.param("fractal", {"iterations": 2000, "zoom": 10000}, True, id="fractal: highest iterations and zoom"),
     pytest.param("fractal", {"iterations": 0}, False, id="fractal: iterations below the lowest"),
     pytest.param("fractal", {"c_real": -2.5}, False, id="fractal: constant below the lowest"),
+    # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
+    pytest.param("lut", {}, True, id="lut: defaults"),
+    pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),
+    pytest.param("lut", {"amount": 1}, True, id="lut: highest amount, a whole number for a decimal"),
+    pytest.param("lut", {"amount": 1.01}, False, id="lut: amount above the highest"),
+    pytest.param("lut", {"amount": -0.01}, False, id="lut: amount below the lowest"),
+    pytest.param("lut", {"strength": 1}, False, id="lut: a parameter the effect lacks"),
 ]
 
 
 def python_answer(effect: str, given: dict) -> dict | None:
     """The complete parameters Python's model makes of `given`, or None when it refuses them."""
     try:
-        return registry.get(effect).validate(given).model_dump()
+        values = registry.get(effect).validate(given).model_dump()
     except ValueError:  # RecipeError, which is one
         return None
+    # the identity table Python's model defaults to is the `null` the core writes
+    return {key: None if value == Lut.identity() else value for key, value in values.items()}
 
 
 def core_answer(effect: str, given: dict) -> dict | None:

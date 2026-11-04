@@ -56,7 +56,7 @@ def test_a_value_the_effect_cannot_read_is_refused_naming_its_kind(value, kind):
 
 FIELD_KEYS = {"name", "kind", "meaning", "default", "unit", "min", "max", "cyclic", "choices", "drivable", "advanced"}
 LIST_KEYS = {"min_length", "max_length"}  # written for a list of colours only; `max_length` only when it has a ceiling
-KINDS = {"float", "int", "bool", "choice", "color", "colors"}
+KINDS = {"float", "int", "bool", "choice", "color", "colors", "lut"}
 
 
 @pytest.mark.parametrize("effect", _core.effects(declared=True))

@@ -398,7 +398,9 @@ def references(step: Step | Each) -> list[Reference]:
     return [*masked, *driving, *working, *drawn]
 
 
-Hold = Callable[[object], dict[str, int]]  # `registry.holding`'s: keeps an object, returns the reference to it
+Hold = Callable[
+    [object], object
+]  # `registry.holding`'s: keeps an object, returns the reference or name to put in its place
 
 
 def recipe_dict(recipe: "Recipe", hold: Hold) -> dict[str, Any]:

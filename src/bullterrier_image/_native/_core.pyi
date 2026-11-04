@@ -3,7 +3,7 @@
 
 import os
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Protocol
+from typing import Any, Protocol, final
 
 import numpy as np
 
@@ -36,13 +36,14 @@ class CoreError(ValueError):
 class _Finder(Protocol):
     def find(self, rgb: np.ndarray) -> np.ndarray | None: ...
 
+@final
 class Lut:
-    def __init__(
-        self,
+    def __new__(
+        cls,
         table: np.ndarray,
         domain_min: Sequence[float] = ...,
         domain_max: Sequence[float] = ...,
-    ) -> None: ...
+    ) -> Lut: ...
     @staticmethod
     def identity(size: int) -> Lut: ...
     @staticmethod

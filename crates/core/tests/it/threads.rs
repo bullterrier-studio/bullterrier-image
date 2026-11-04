@@ -3,10 +3,13 @@
 //! The pictures are large enough, and of odd shapes (one row, one column, fewer rows than threads), that the rows are cut
 //! into several bands at the larger thread counts.
 
+use std::sync::Arc;
 use std::thread;
 
 use bullterrier_image::frame::{Fit, Resample};
-use bullterrier_image::{BlendMode, Error, ErrorKind, Frame, Image, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::{
+    BlendMode, Error, ErrorKind, Frame, Image, Lut, Options, Photo, Picture, Presets, Recipe, Step,
+};
 use serde_json::json;
 
 /// The thread counts a render is compared at: the default, a few, an odd one, more than rows, and every core.
@@ -19,14 +22,24 @@ fn values(height: usize, width: usize, seed: usize) -> Vec<f32> {
         .collect()
 }
 
-/// `recipe` rendered on the `height` x `width` picture of `seed` with `threads`.
+/// A lookup table of five entries per axis that bends every channel and mixes red into blue: the table `film`.
+fn film() -> Result<Lut, Error> {
+    let entries = (0..125_usize)
+        .map(|entry| {
+            let [red, green, blue] =
+                [entry % 5, entry / 5 % 5, entry / 25].map(|index| f32::from(u8::try_from(index).unwrap_or(0)) / 4.0);
+            [red * red, green.sqrt(), f32::midpoint(blue, red)]
+        })
+        .collect();
+    Lut::new(5, [0.0; 3], [1.0; 3], entries)
+}
+
+/// `recipe` rendered on the `height` x `width` picture of `seed` with `threads`, the photo given the table `film`.
 fn render(height: usize, width: usize, seed: usize, recipe: &Recipe, threads: usize) -> Result<Image, Error> {
     let values = values(height, width, seed);
-    Photo::new(Picture::new(height, width, &values)?).render(
-        recipe,
-        &Presets::new(),
-        Options::default().with_threads(threads),
-    )
+    Photo::new(Picture::new(height, width, &values)?)
+        .with_lut("film", Arc::new(film()?))
+        .render(recipe, &Presets::new(), Options::default().with_threads(threads))
 }
 
 /// The index of the first value where `a` and `b` differ in a single bit, or that of the shorter one's end if they differ
@@ -111,6 +124,7 @@ fn cases() -> Vec<Case> {
                     .param("blue_from_blue", 0.8),
                 Step::new("color_balance"),
                 Step::new("selective_color").param("width", 360).param("hue_shift", 40),
+                Step::new("lut").param("file", "film").param("amount", 0.8),
                 Step::new("vignette").param("roundness", 0.6).param("feather", 0.2),
                 Step::new("scanlines").param("spacing", 2.5).param("softness", 0.5),
             ]),

@@ -4,7 +4,8 @@ Promises:
 - `Color` is three floats 0..1, written '#rrggbb', '#rgb' or as three numbers 0..1; `FieldName` is the name of a
   selection.
 - `Picture` and `Lut` are read-only and compare, hash and print by a content digest, never by their arrays; a wrong
-  array is a `RecipeError` (`Picture`) or a `LutError` (`Lut`).
+  array is a `RecipeError` (`Picture`) or a `LutError` (`Lut`). A `Lut` is the Rust core's table (checked there once,
+  shared by every render), a `Picture` holds its pixels.
 - `ValidatedPicture` and `ValidatedLut` are what a `Picture` or `Lut` field is validated as; `PictureForms`, `LutForms`
   and `ColorForms` (from `types`) are what a caller may write in `fx`.
 """
@@ -20,8 +21,10 @@ import numpy as np
 from PIL import ImageColor
 from pydantic import BeforeValidator, PlainValidator, StringConstraints, WithJsonSchema
 
+from bullterrier_image._native import _core
 from bullterrier_image.errors import LutError, RecipeError
 
+from . import native
 from .types import Color as ColorForms
 
 _HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
@@ -168,20 +171,19 @@ PictureForms = Picture | os.PathLike[str] | np.ndarray | ColorForms
 """A picture as a caller may write it in `fx`: a Picture, a path, an array, or a colour."""
 
 
-_LUT_MAX = 256  # the largest LUT_3D_SIZE the Adobe/Resolve .cube specification allows
-
-
 class Lut:
     """A 3D colour lookup table an effect uses besides the photo (a film look, a grade): read-only and hashable.
 
     `Lut(table)`: `table` is a finite float array (n, n, n, 3) with 2 <= n <= 256, indexed `[red, green, blue]` by the
     input colour's position on each axis, holding the output colour; `domain_min` and `domain_max` are the input
     values at the first and last entry of each axis (three numbers each, min below max). Anything else is a
-    `LutError`. `Lut.identity()` is the table that changes nothing. Two tables are equal when their values are, and
-    hash alike; `label` (a file name, say) is only for messages.
+    `LutError`. `Lut.identity()` is the table that changes nothing. The table is held by the Rust core, which checked it
+    and shares it with every render that uses it; `table` is a read-only copy of its entries as float32. Two tables
+    are equal when their values are, and hash alike; `label` (a file name, say) is only for messages.
     """
 
-    __slots__ = ("digest", "domain_max", "domain_min", "label", "table")
+    __slots__ = ("_core", "_digest", "label")
+    _digest: str | None
 
     def __init__(
         self,
@@ -192,36 +194,51 @@ class Lut:
     ) -> None:
         """The table, with the domain it covers, called `label` in messages."""
         data = np.asarray(table)
-        size = data.shape[0] if data.ndim else 0
-        if data.shape != (size, size, size, 3) or data.dtype.kind != "f" or not 2 <= size <= _LUT_MAX:
+        if data.dtype.kind != "f":
             raise LutError(
-                f"a lookup table is a float array of shape (n, n, n, 3) with 2 to {_LUT_MAX} entries per axis, got "
-                f"{data.dtype} of shape {data.shape}"
+                f"a lookup table is a float array of shape (n, n, n, 3), got {data.dtype} of shape {data.shape}"
             )
-        low, high = np.asarray(domain_min, np.float64), np.asarray(domain_max, np.float64)
-        if low.shape != (3,) or high.shape != (3,) or not (np.isfinite(low).all() and np.isfinite(high).all()):
-            raise LutError(f"{label}: the domain is three finite numbers for its minimum and for its maximum")
-        if not (low < high).all():
-            raise LutError(f"{label}: the domain minimum must be below its maximum on every channel, got {low}, {high}")
-        if not np.isfinite(data).all():
-            raise LutError(f"{label}: the values of a lookup table must be finite")
-        values = np.array(data, np.float32)
-        values.setflags(write=False)
-        self.table, self.label = values, label
-        self.domain_min, self.domain_max = tuple(low.tolist()), tuple(high.tolist())
-        self.digest = hashlib.sha256(values.tobytes() + low.tobytes() + high.tobytes()).hexdigest()
+        self._set(native.make_lut(data.astype(np.float32), tuple(domain_min), tuple(domain_max)), label)
+
+    def _set(self, held: _core.Lut, label: str) -> None:
+        self._core, self.label, self._digest = held, label, None
 
     @classmethod
     def identity(cls, size: int = 2) -> Self:
-        """The table of `size` entries per axis that returns every colour as it is, over the domain 0..1."""
-        axis = np.linspace(0.0, 1.0, size, dtype=np.float32)
-        red, green, blue = np.meshgrid(axis, axis, axis, indexing="ij")
-        return cls(np.stack([red, green, blue], axis=-1), label="identity")
+        """The table of `size` entries per axis (2 to 256) that returns every colour as it is, over the domain 0..1."""
+        made = cls.__new__(cls)
+        made._set(native.identity_lut(size), "identity")  # noqa: SLF001  (a table of the core, labelled)
+        return made
 
     @property
     def size(self) -> int:
         """Entries per axis."""
-        return int(self.table.shape[0])
+        return int(self._core.size)
+
+    @property
+    def table(self) -> np.ndarray:
+        """The entries, a new read-only float32 array (n, n, n, 3) indexed `[red, green, blue]`."""
+        entries = self._core.table()
+        entries.setflags(write=False)
+        return entries
+
+    @property
+    def domain_min(self) -> tuple[float, float, float]:
+        """The input value at the first entry of each axis (red, green, blue)."""
+        return self._core.domain_min
+
+    @property
+    def domain_max(self) -> tuple[float, float, float]:
+        """The input value at the last entry of each axis (red, green, blue)."""
+        return self._core.domain_max
+
+    @property
+    def digest(self) -> str:
+        """A SHA-256 hex digest of the entries and the domain: equal tables have equal digests."""
+        if self._digest is None:
+            domain = np.asarray([*self.domain_min, *self.domain_max], np.float32)
+            self._digest = hashlib.sha256(self.table.tobytes() + domain.tobytes()).hexdigest()
+        return self._digest
 
     def __eq__(self, other: object) -> bool:
         """Equal values and domain (by digest), whatever the labels."""
@@ -234,6 +251,19 @@ class Lut:
     def __repr__(self) -> str:
         """`Lut('film.cube', 33)`: label, then entries per axis, never the values; `Lut.identity(2)` for an identity."""
         return f"Lut.identity({self.size})" if self.label == "identity" else f"Lut({self.label!r}, {self.size})"
+
+
+def read_lut(path: str | os.PathLike[str]) -> Lut:
+    """The `Lut` of the Adobe/Resolve `.cube` file at `path`, read by the core and labelled with `path` as given; the
+    rules and the `LutError`s are `imageio.load_lut`'s."""
+    made = Lut.__new__(Lut)
+    made._set(native.read_lut(path), str(path))  # noqa: SLF001  (a table of the core, labelled)
+    return made
+
+
+def core_table(lut: Lut) -> _core.Lut:
+    """The core's table of `lut`, which a render or `apply` is given."""
+    return lut._core  # noqa: SLF001  (the core layer hands it on)
 
 
 def _to_lut(value: object) -> Lut:

@@ -46,7 +46,7 @@ def test_a_cube_file_is_read_with_red_changing_fastest(tmp_path):
     [
         pytest.param(lambda: _core.Lut(np.zeros((2, 2, 3), np.float32)), "shape", id="three dimensions"),
         pytest.param(lambda: _core.Lut(np.zeros((2, 3, 2, 3), np.float32)), "shape", id="not a cube"),
-        pytest.param(lambda: _core.Lut(np.zeros((1, 1, 1, 3), np.float32)), "entries per axis", id="one entry"),
+        pytest.param(lambda: _core.Lut(np.zeros((1, 1, 1, 3), np.float32)), "n from 2 to 256", id="one entry"),
         pytest.param(lambda: _core.Lut(np.full((2, 2, 2, 3), np.nan, np.float32)), "finite", id="NaN entries"),
         pytest.param(lambda: _core.Lut(ramp(2), (1, 1, 1), (0, 0, 0)), "below", id="a domain upside down"),
         pytest.param(lambda: _core.Lut.identity(257), "257", id="an identity too large"),

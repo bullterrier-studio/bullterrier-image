@@ -69,7 +69,11 @@ declaration, and category and opacity come from the core (`@effect(params=XParam
 effect refuses them). The core's registry (`Effect` trait, `register`) also
 takes foreign effects, such as a Python function (`_core.register(name, category, opacity, fn, *, inputs=, fields=)`; `fn(rgb,
 params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect only the inputs it declares: `size_ratio`
-(1 if undeclared), `partition` (`Labels`) and, under each field parameter's name, a `Layer`. Rust effects never refer to each other.
+(1 if undeclared), `partition` (`Labels`), under each field parameter's name a `Layer` and under each lookup table parameter's name a `Lut`
+(`Inputs::lut`; none is the identity). A `lut` parameter (`LutName`) holds the name of a table the photo was given
+(`Photo::with_lut(name, Arc<Lut>)`), else the path of a `.cube` file read once per render, else an error naming it; the runner
+finds the table before step 1 and offers it, so the table never travels in the recipe (`crate::Lut`, `lut.rs`, `lut/cube.rs`:
+the `.cube` reader and trilinear lookup are the core's). Rust effects never refer to each other.
 The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
 (`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
 look, `Table::check` those of an effect's parameters (`_core.check`, `_core.check_recipe`, `_core.read_recipe`). The Python
@@ -111,8 +115,9 @@ Python is a facade over the core and runs no recipe itself. It reaches the core 
 `steps.recipe_dict` writes; `size` a whole number, a name in `maps` or `finders` no recipe has, and each map the recipes need
 found once, by `core/finder.py`'s `find_map`, are its checks; a finder's not-found error is told to the core). `recipe.py`
 binds the default finders and names a trace's stages (drawing the numbered pieces is `ops/pieces`). The registry
-mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture` or
-`Lut` parameter travels as `{"$object": n}` (`registry.holding`). `_core.effects()` lists those mirrors too;
+mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture`
+parameter travels as `{"$object": n}` and a `Lut` as the name `$lut:<digest>` of a table the render is given (`registry.holding`);
+the Python `Lut` wraps the core's table (`_core.Lut`). `_core.effects()` lists those mirrors too;
 `effects(declared=True)` only the effects whose parameters the core declares.
 **Threads:** `Options::with_threads(n)` (default 1: none started; 0: every core; at most 256, else refused) makes `render` and
 `trace` install a rayon pool of that size (`ops/par.rs`); the render stays on the calling thread, only row bands run on the

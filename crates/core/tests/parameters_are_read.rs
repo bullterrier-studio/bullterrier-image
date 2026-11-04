@@ -11,7 +11,7 @@
 use std::error::Error;
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
-use bullterrier_image::{Category, Effect, Image, Inputs, Picture, effect, effects};
+use bullterrier_image::{Category, Effect, Image, Inputs, Lut, Picture, effect, effects};
 use serde_json::{Map, Value, json};
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -81,6 +81,12 @@ fn conditional() -> Vec<Conditional> {
             effect: "gradient",
             field: "reflect",
             with: vec![("repeat", json!(2))],
+        },
+        // a table that is none is the identity, which the amount mixes in without change
+        Conditional {
+            effect: "lut",
+            field: "amount",
+            with: vec![("file", json!("table"))],
         },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
@@ -181,9 +187,22 @@ fn render(
     picture: &Picture<'_>,
 ) -> Result<Vec<f32>, Box<dyn Error>> {
     let params = table.check(effect.name(), given)?;
-    Ok(effect
-        .apply(picture, Value::Object(params), &Inputs::default())?
-        .into_values())
+    // a name for a lookup table is a table the effect finds in its inputs: any name gets the negative
+    let negative = Lut::new(
+        2,
+        [0.0; 3],
+        [1.0; 3],
+        (0..8_usize)
+            .map(|entry| [entry % 2, entry / 2 % 2, entry / 4].map(|corner| if corner == 1 { 0.0 } else { 1.0 }))
+            .collect(),
+    )?;
+    let mut inputs = Inputs::default();
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Lut) {
+        if params[field.name].is_string() {
+            inputs = inputs.with_lut(field.name, &negative);
+        }
+    }
+    Ok(effect.apply(picture, Value::Object(params), &inputs)?.into_values())
 }
 
 fn differs(left: &[f32], right: &[f32]) -> bool {
@@ -307,7 +326,7 @@ impl Effect for Brighten {
 fn every_parameter_of_every_effect_of_the_core_is_read() -> Outcome {
     let rows = conditional();
     let names = effects();
-    for name in ["grade", "pattern", "pixel_grid"] {
+    for name in ["grade", "pattern", "pixel_grid", "lut"] {
         assert!(names.iter().any(|known| known == name), "{name} is not among {names:?}");
     }
     let mut walked = 0;

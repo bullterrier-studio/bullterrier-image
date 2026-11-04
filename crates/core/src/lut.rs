@@ -59,7 +59,7 @@ impl Lut {
     ) -> Result<Self, String> {
         if !(Self::MIN_SIZE..=Self::MAX_SIZE).contains(&size) {
             return Err(format!(
-                "a lookup table has {} to {} entries per axis, got {size}",
+                "a lookup table has the shape (n, n, n, 3) with n from {} to {}, got n = {size}",
                 Self::MIN_SIZE,
                 Self::MAX_SIZE
             ));

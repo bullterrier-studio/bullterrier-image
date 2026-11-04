@@ -167,6 +167,7 @@ def _each(
                 rgb,
                 document,
                 maps={name: found[name] for name in known if name in maps or name in want["maps"]},
+                luts=hold.tables(),
                 finders={"subject": _Finds(finders["subject"])}
                 if want["finds_pieces"] and "subject" in finders
                 else None,

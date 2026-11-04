@@ -31,6 +31,7 @@ mod inputs;
 mod limits;
 mod lut;
 mod lut_cube;
+mod lut_effect;
 mod noise;
 mod params;
 mod params_colors;
