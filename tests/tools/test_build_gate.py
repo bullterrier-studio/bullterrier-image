@@ -98,13 +98,11 @@ def _without_the_template_exclusion(project: Path) -> None:
 
 
 def _picture_in_the_package(project: Path) -> None:
-    (project / "src" / "bullterrier_image" / "effects" / "grade" / "grade.jpg").write_bytes(b"\xff\xd8\xff\xd9")
+    (project / "src" / "bullterrier_image" / "stray.jpg").write_bytes(b"\xff\xd8\xff\xd9")
 
 
 def _test_in_the_package(project: Path) -> None:
-    (project / "src" / "bullterrier_image" / "effects" / "grade" / "test_grade.py").write_text(
-        "def test_x(): ...\n", encoding="utf-8"
-    )
+    (project / "src" / "bullterrier_image" / "test_stray.py").write_text("def test_x(): ...\n", encoding="utf-8")
 
 
 def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_each_file(project, uv_run_env):
@@ -116,9 +114,9 @@ def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_eac
     assert result.returncode != 0
     assert "W102" in report  # check-wheel-contents: wheel library contains files not in the package tree
     for shipped in (
-        "bullterrier_image/effects/_template/effect.py.tmpl",
-        "bullterrier_image/effects/grade/grade.jpg",
-        "test_grade.py",
+        "bullterrier_image/effects/_template/kernel.rs.tmpl",
+        "bullterrier_image/stray.jpg",
+        "test_stray.py",
     ):
         assert shipped in report
 
