@@ -1076,8 +1076,8 @@ def test_registering_an_effect_again_with_another_category_and_opacity_replaces_
 
 
 def test_emptying_the_registry_empties_the_core_of_python_effects_but_not_of_its_own(registry_emptied):
-    own = {name for name in _core.effects() if name in {"grade", "pattern", "pixel_grid"}}
-    assert own == {"grade", "pattern", "pixel_grid"}
+    own = set(_core.effects(declared=True))
+    assert {"grade", "pattern", "pixel_grid"} <= own
     everything = set(registry.all_effects())
     with registry_emptied():  # unregisters every effect, and registers them again afterwards
         assert set(_core.effects()) == own  # a core effect cannot be removed from the core, only from the registry

@@ -89,6 +89,7 @@ fn cases() -> Vec<Case> {
                 Step::new("pixel_grid").param("cell", 4),
                 Step::new("pattern"),
                 grade(0.2),
+                Step::new("levels").param("black", 0.1).param("gamma", 1.4),
             ]),
             &thin_and_odd,
         ),

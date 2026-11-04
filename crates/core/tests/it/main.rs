@@ -60,6 +60,7 @@ mod svg;
 mod svg_drawing;
 mod threads;
 mod threads_rows;
+mod tone;
 mod torn;
 mod trace;
 mod typed_params;
