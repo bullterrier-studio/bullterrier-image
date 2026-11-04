@@ -28,6 +28,7 @@ mod grid_shift;
 mod hsv;
 mod hue_range;
 mod inputs;
+mod lens_flare;
 mod limits;
 mod lut;
 mod lut_cube;

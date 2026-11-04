@@ -88,6 +88,33 @@ fn conditional() -> Vec<Conditional> {
             field: "amount",
             with: vec![("file", json!("table"))],
         },
+        // on a 12 px picture the default ghosts (size 30 px) screen it to white, hiding the light's own features; the
+        // default ring (72 px out, 12 px wide) lies wholly beyond the picture
+        Conditional {
+            effect: "lens_flare",
+            field: "x",
+            with: vec![("ghosts", json!(0))],
+        },
+        Conditional {
+            effect: "lens_flare",
+            field: "y",
+            with: vec![("ghosts", json!(0))],
+        },
+        Conditional {
+            effect: "lens_flare",
+            field: "halo",
+            with: vec![("ghosts", json!(0))],
+        },
+        Conditional {
+            effect: "lens_flare",
+            field: "ring",
+            with: vec![("ghosts", json!(0)), ("halo", json!(0.0)), ("ring_width", json!(300.0))],
+        },
+        Conditional {
+            effect: "lens_flare",
+            field: "ring_width",
+            with: vec![("ghosts", json!(0)), ("halo", json!(0.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

@@ -78,7 +78,7 @@ def test_the_halo_falls_smoothly_from_the_light_to_nothing_at_its_radius() -> No
     assert out[LIGHT] == pytest.approx(1.0, abs=1e-5)
     half = round(reach / 2)
     assert out[LIGHT[0], LIGHT[1] + half] == pytest.approx((1 - (half / reach) ** 2) ** 2, abs=1e-5)
-    assert (out[distances(*LIGHT) >= reach] == 0).all()
+    assert (out[distances(*LIGHT) >= reach + 1e-3] == 0).all()  # x and y are single precision: the light is 1e-6 px off
     assert (out[distances(*LIGHT) < 0.9 * reach] > 0).all()
 
 
@@ -94,7 +94,7 @@ def test_the_ring_is_a_thin_shell_round_the_light() -> None:
     assert out[LIGHT[0], LIGHT[1] + off] == pytest.approx((1 - ((off - ring) / wide) ** 2) ** 2, abs=1e-5)
     assert out[LIGHT] == 0
     away = np.abs(distances(*LIGHT) - ring)
-    assert (out[away >= wide] == 0).all()
+    assert (out[away >= wide + 1e-3] == 0).all()
     assert (out[away < 0.8 * wide] > 0).all()
 
 

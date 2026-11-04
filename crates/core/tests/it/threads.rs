@@ -63,6 +63,7 @@ struct Case {
 }
 
 /// The looks compared.
+#[expect(clippy::too_many_lines, reason = "a table of looks, one row per kind of effect")]
 fn cases() -> Vec<Case> {
     let thin_and_odd = [(1, 20_011), (20_011, 1), (3, 10_007), (201, 199), (131, 257)];
     let turned = |resample, fit| {
@@ -116,6 +117,11 @@ fn cases() -> Vec<Case> {
                     .param("x", -0.5)
                     .param("iterations", 30)
                     .opacity(0.3),
+                Step::new("lens_flare")
+                    .param("x", 0.3)
+                    .param("ghosts", 7)
+                    .param("halo", 30)
+                    .param("ring", 20),
                 grade(0.2),
                 Step::new("levels").param("black", 0.1).param("gamma", 1.4),
                 Step::new("curves").param("midtones", 0.35).param("red_shadows", 0.4),

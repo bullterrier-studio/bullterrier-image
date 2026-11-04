@@ -13,6 +13,7 @@ pub(crate) mod gradient;
 pub(crate) mod grid;
 pub(crate) mod length;
 pub(crate) mod levels;
+pub(crate) mod light;
 pub(crate) mod nearest;
 pub(crate) mod noise;
 pub(crate) mod outlines;

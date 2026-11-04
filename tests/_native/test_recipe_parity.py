@@ -136,6 +136,9 @@ ROWS = [
     pytest.param("fractal", {"iterations": 2000, "zoom": 10000}, True, id="fractal: highest iterations and zoom"),
     pytest.param("fractal", {"iterations": 0}, False, id="fractal: iterations below the lowest"),
     pytest.param("fractal", {"c_real": -2.5}, False, id="fractal: constant below the lowest"),
+    pytest.param("lens_flare", {"ghosts": 12, "spacing": 3.0, "amount": 10.0}, True, id="lens_flare: highest ghosts"),
+    pytest.param("lens_flare", {"ghosts": 13}, False, id="lens_flare: ghosts above the highest"),
+    pytest.param("lens_flare", {"ring_width": 0.5}, False, id="lens_flare: ring width below the lowest"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),
