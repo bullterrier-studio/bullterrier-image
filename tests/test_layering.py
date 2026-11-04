@@ -74,6 +74,9 @@ def test_the_package_keeps_every_import_contract():
         assert re.search(rf"{re.escape(name)} KEPT", result.stdout), f"{name!r} not reported kept:\n{result.stdout}"
 
 
+# Two effects still written in Python (the core's have no folder): a host that imports, and the one it must not import.
+HOST, OTHER = (path.parent.name for path in sorted((PACKAGE / "effects").glob("[!_]*/effect.py"))[:2])
+
 # One forbidden import per rule, each in a copy of the package: the linter must fail, naming the module and the rule.
 FORBIDDEN = {
     "effect to effect": (
@@ -88,15 +91,15 @@ FORBIDDEN = {
     "core to effects": ("core/steps.py", "import bullterrier_image.effects", "bullterrier_image.core.steps", LAYERS),
     "core to imageio": ("core/bridge.py", "import bullterrier_image.imageio", "bullterrier_image.core.bridge", LAYERS),
     "effects to imageio": (
-        "effects/grade/effect.py",
+        f"effects/{HOST}/effect.py",
         "import bullterrier_image.imageio",
-        "bullterrier_image.effects.grade.effect",
+        f"bullterrier_image.effects.{HOST}.effect",
         LAYERS,
     ),
     "effect folder to effect folder": (
-        "effects/grade/effect.py",
-        "import bullterrier_image.effects.sharpen.effect",
-        "bullterrier_image.effects.grade.effect",
+        f"effects/{HOST}/effect.py",
+        f"import bullterrier_image.effects.{OTHER}.effect",
+        f"bullterrier_image.effects.{HOST}.effect",
         EFFECTS_APART,
     ),
     "recipe to pipeline": ("recipe.py", "import bullterrier_image.pipeline", "bullterrier_image.recipe", LAYERS),
@@ -190,8 +193,8 @@ def test_a_layer_may_import_the_layers_below_it(module, line, tmp_path):
 
 def _effects_declared_in_the_source() -> set[str]:
     """Names of the functions decorated with `effect(...)` in the effect modules that discovery imports (the
-    `effect.py` of every folder of `effects/` not starting with `_`), read from
-    the source with `ast`: an oracle independent of the registry."""
+    `effect.py` of every folder of `effects/` not starting with `_`), and of the Rust kernels the core declares
+    (`crates/core/src/effects/*.rs`), read from the source: an oracle independent of the registry."""
     names = set()
     effects = PACKAGE / "effects"
     for path in sorted(effects.glob("*/effect.py")):
@@ -202,7 +205,7 @@ def _effects_declared_in_the_source() -> set[str]:
                 isinstance(d, ast.Call) and getattr(d.func, "id", None) == "effect" for d in node.decorator_list
             ):
                 names.add(node.name)
-    return names
+    return names | {kernel.stem for kernel in (PACKAGE.parents[1] / "crates" / "core" / "src" / "effects").glob("*.rs")}
 
 
 def test_importing_the_package_loads_no_effect_and_no_heavy_library():

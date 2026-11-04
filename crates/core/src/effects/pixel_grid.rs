@@ -1,5 +1,5 @@
 //! `pixel_grid`: the picture seen on an LCD screen, each cell split into red, green and blue stripes. What it does is
-//! documented once, on the Python effect; its parameters are declared here.
+//! documented once, on `Params`.
 
 use serde::Deserialize;
 
@@ -16,9 +16,13 @@ pub(crate) const META: Meta = Meta {
 
 const CHANNELS: f64 = 3.0; // constant: one stripe for each of red, green and blue
 
-/// An LCD pixel grid: square cells of `cell` px, each split into three vertical sub-pixels (red, green, blue) that
-/// light only their own channel, with a dark `gap` between them, mixed into the picture by `amount`, and optionally
-/// brightened to keep the picture's average brightness.
+/// The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between.
+///
+/// A stripe is a third of the cell wide and lights only its own channel, in a rectangle that leaves half the gap
+/// free on each side (the gap's width is `gap` x the stripe's, horizontally and vertically alike). A pixel on a
+/// stripe's edge is lit in proportion to the area it shares with it. The result is the picture mixed with that
+/// pattern by `amount`, so it never brightens the picture; with `keep_brightness` the gains are divided by their mean
+/// over a whole cell (the same at every picture size), which brightens a lit stripe above the picture (clipped at 1).
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {

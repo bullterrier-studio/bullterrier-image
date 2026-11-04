@@ -35,6 +35,7 @@ import inspect
 import os
 import re
 import threading
+import types
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -44,6 +45,7 @@ from typing import Any
 
 import numpy as np
 
+from bullterrier_image._native import _core
 from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, UnknownEffectError
 from bullterrier_image.ops.maps import map_problem
 
@@ -388,9 +390,32 @@ def _load_effect_packages() -> None:
                 # reported the same way, naming the package, with the original error chained.
                 except Exception as error:
                     raise BullterrierImageError(_failure(entry_point, error)) from error
+            _register_core_effects()
             _LOADING.done = True
         finally:
             _LOADING.running = False
+
+
+def _register_core_effects() -> None:
+    """Register each effect the Rust core declares that no Python package registered: the declaration (parameters,
+    documentation, category, opacity) is the whole effect, so it has no Python folder."""
+    for name in native.effects(declared=True):
+        if name in _EFFECTS:
+            continue
+        model = types.new_class(f"{name.title().replace('_', '')}Params", (EffectParams,), {"core": name})
+        run = _core_runner(name)
+        run.__doc__ = model.__doc__
+        _register(run, None, model, None)
+
+
+def _core_runner(name: str) -> Callable[[np.ndarray, Any], np.ndarray]:
+    """The function of the core effect `name`: it hands the validated parameters to the core."""
+
+    def run(rgb: np.ndarray, params: Any) -> np.ndarray:
+        return _core.apply(name, rgb, params.model_dump())
+
+    run.__name__ = run.__qualname__ = name
+    return run
 
 
 def _effect_packages() -> list[metadata.EntryPoint]:
