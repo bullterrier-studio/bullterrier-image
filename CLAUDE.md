@@ -361,8 +361,12 @@ golden file, sleep, mock of our own code) is worse than none: delete it. Reviewe
   assertions.
 - Tests run in random order (pytest-randomly; rerun with `-p randomly --randomly-seed=N`, disable with `-p no:randomly`); none
   may depend on another.
-- **Mutation-check your tests:** break the code on purpose (a sign, a boundary, an ignored argument) and see a test fail.
-  Surviving mutants on core behaviour are review findings. Use `PYTHONDONTWRITEBYTECODE=1` and clear `__pycache__` between mutants.
+- **Mutation-check your tests, lightly:** when a port or change adds logic with weak oracles (boundaries, numeric primitives,
+  parameter checks), break the code on purpose (a sign, a boundary, an ignored argument), about five targeted mutants per
+  new kernel or primitive, once per finished kernel, not per commit, and see a test fail. A survivor gets a test, or is named
+  equivalent or marginal and left. Skip thin kernels whose behaviour tests already compare hand-worked values. Before the crate
+  is published, one separate deeper pass over `ops/` and the parameter checks (`cargo-mutants` or by hand, under `memguard`);
+  not a CI gate. Use `PYTHONDONTWRITEBYTECODE=1` and clear `__pycache__` between mutants.
 - Refactors prove behaviour is preserved by comparing outputs before and after (byte-identical), in the report, not committed.
 
 **Tests describe behaviour, not implementation:** they must survive any behaviour-preserving refactor.
