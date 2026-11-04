@@ -1,31 +1,13 @@
 //! The tone remaps `levels`, `auto_levels` and `curves` rest on, seen through the three effects: the Levels remap, the
 //! percentile points of the automatic stretch and the monotone cubic (PCHIP, Fritsch-Carlson) of a tone curve.
 
+use bullterrier_image::Error;
 use bullterrier_image::effects::{auto_levels, curves, levels};
-use bullterrier_image::params::EffectParams;
-use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
-use serde_json::Value;
+
+use crate::common::pixels::run;
 
 const TOLERANCE: f32 = 1e-6;
-
-/// `params` applied to `pixels` (a picture one pixel high).
-fn run<P: EffectParams>(params: &P, pixels: &[[f32; 3]]) -> Result<Vec<[f32; 3]>, Error> {
-    let values: Vec<f32> = pixels.iter().flatten().copied().collect();
-    let image = apply(
-        P::EFFECT,
-        &Picture::new(1, pixels.len(), &values)?,
-        Value::Object(params.values()),
-        &Inputs::default(),
-    )?;
-    Ok(image
-        .into_values()
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .map(|pixel| [pixel[0], pixel[1], pixel[2]])
-        .collect())
-}
 
 /// The grey pixels of `values`.
 fn greys(values: &[f32]) -> Vec<[f32; 3]> {

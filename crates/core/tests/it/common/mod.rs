@@ -5,6 +5,7 @@
 pub(crate) mod files;
 pub(crate) mod icc;
 pub(crate) mod ops;
+pub(crate) mod pixels;
 pub(crate) mod recipe;
 pub(crate) mod run;
 
