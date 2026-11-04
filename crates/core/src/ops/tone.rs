@@ -51,10 +51,8 @@ impl Remap {
 #[derive(Debug, Clone)]
 pub(crate) struct Curve {
     inputs: Vec<f64>,
-    /// For each stretch between two points, the cubic's coefficients in (x - the stretch's first input), highest power first.
+    /// For each stretch between two points, the cubic's coefficients in (x - its first input), highest power first.
     pieces: Vec<[f64; 4]>,
-    low: f64,
-    high: f64,
 }
 
 impl Curve {
@@ -91,8 +89,6 @@ impl Curve {
         Self {
             inputs: inputs.to_vec(),
             pieces,
-            low: outputs.iter().copied().fold(f64::INFINITY, f64::min),
-            high: outputs.iter().copied().fold(f64::NEG_INFINITY, f64::max),
         }
     }
 
@@ -103,8 +99,7 @@ impl Curve {
         let piece = (self.inputs.partition_point(|&input| input <= x) - 1).min(self.pieces.len() - 1);
         let [cubic, square, slope, start] = self.pieces[piece];
         let along = x - self.inputs[piece];
-        // the clamp only removes rounding error, so the promise above holds exactly
-        single((((cubic * along + square) * along + slope) * along + start).clamp(self.low, self.high))
+        single(((cubic * along + square) * along + slope) * along + start)
     }
 }
 
