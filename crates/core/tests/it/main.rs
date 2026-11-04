@@ -7,6 +7,7 @@ mod apply;
 mod bands_narrowing;
 mod blend;
 mod colour;
+mod colour_mix;
 mod cutout;
 mod cutout_by_hand;
 mod cuts;
