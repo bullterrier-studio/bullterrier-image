@@ -184,6 +184,18 @@ fn the_clipped_share_at_each_end_is_saturated() -> Result<(), Error> {
 }
 
 #[test]
+fn a_clip_that_leaves_no_range_leaves_the_values_as_they_are() -> Result<(), Error> {
+    // 3 values and a clip of 0.4 drop one at each end: the same middle value is both points
+    let stretch = auto_levels::Params {
+        clip: 0.4,
+        ..auto_levels::Params::default()
+    };
+    let values = [0.2, 0.5, 0.9];
+    assert_close(&reds(&run(&stretch, &greys(&values))?), &values, "clip 0.4 of 3 values");
+    Ok(())
+}
+
+#[test]
 fn per_channel_stretches_each_channel_alone_and_linked_all_alike() -> Result<(), Error> {
     // red runs 0.1..0.5, green 0.4..0.8, blue stays 0.3
     let pixels = [[0.1, 0.4, 0.3], [0.3, 0.6, 0.3], [0.5, 0.8, 0.3]];
@@ -237,7 +249,7 @@ type ByHand = ([f32; 5], [(f32, f32); 3]);
 /// slopes and cubic Hermite form (h = 0.25, so a slope is the chord over 0.25): the first by the harmonic mean of the
 /// chords, the second where every point turns (slope 0 inside, three-point estimates at the ends). Checked once against
 /// `scipy.interpolate.PchipInterpolator` to 7 places.
-const BY_HAND: [ByHand; 2] = [
+const BY_HAND: [ByHand; 3] = [
     // chords 0.4, 3.2, 0.4, 0: slopes 0 at both ends (the estimates point away), 0.7111 (= 2 * 0.4 * 3.2 / 3.6) at the
     // 0.25 and 0.5 points and 0 at the 0.75 point. At 0.125: 0.5 * 0.1 - 0.125 * 0.25 * 0.7111 = 1 / 36; at 0.375 the
     // two slopes cancel: (0.1 + 0.9) / 2; at 0.625: 0.5 * 0.9 + 0.125 * 0.25 * 0.7111 + 0.5 * 1 = 35 / 36
@@ -251,6 +263,12 @@ const BY_HAND: [ByHand; 2] = [
     (
         [0.1, 0.7, 0.3, 0.8, 0.5],
         [(0.125, 0.5375), (0.375, 0.5), (0.625, 0.55)],
+    ),
+    // chords 0.4, -2, 2.8, -0.4: the start estimate (3 * 0.4 + 2) / 2 = 1.6 is steeper than three times the first chord,
+    // so the slope is capped at 3 * 0.4 = 1.2; at 0.125: 0.5 * 0.5 + 0.125 * 0.25 * 1.2 + 0.5 * 0.6 = 0.5875
+    (
+        [0.5, 0.6, 0.1, 0.8, 0.7],
+        [(0.125, 0.5875), (0.375, 0.35), (0.625, 0.45)],
     ),
 ];
 
@@ -275,6 +293,18 @@ fn a_curve_passes_through_every_point_even_when_it_is_not_monotone() -> Result<(
     Ok(())
 }
 
+#[test]
+fn a_curve_is_held_at_its_end_points_beyond_them() -> Result<(), Error> {
+    // a picture can hold values outside 0..1, where a cubic carried on would run away
+    let heights = [0.1, 0.7, 0.3, 0.8, 0.5];
+    assert_close(
+        &master(heights, &[-0.3, 1.4, 7.0])?,
+        &[0.1, 0.5, 0.5],
+        "beyond the ends",
+    );
+    Ok(())
+}
+
 proptest! {
     #[test]
     fn a_rising_curve_never_reorders_tones_and_never_leaves_its_outputs(
@@ -284,7 +314,10 @@ proptest! {
         let sweep: Vec<f32> = (0..=400_u16).map(|step| f32::from(step) / 400.0).collect();
         let out = master(heights, &sweep)?;
         prop_assert!(out.windows(2).all(|pair| pair[0] <= pair[1] + TOLERANCE), "brighter in, darker out: {out:?}");
-        prop_assert!(out.iter().all(|&value| (heights[0]..=heights[4]).contains(&value)), "{out:?}");
+        prop_assert!(
+            out.iter().all(|&value| (heights[0] - TOLERANCE..=heights[4] + TOLERANCE).contains(&value)),
+            "{out:?}"
+        );
     }
 
     #[test]
