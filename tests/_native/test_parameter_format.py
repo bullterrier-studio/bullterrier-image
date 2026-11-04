@@ -66,3 +66,29 @@ def test_the_walk_reaches_the_effects_declared_in_rust():
 @pytest.mark.parametrize("parameter", EMITTED)
 def test_the_schema_accepts_a_parameter_an_effect_declares(parameter):
     assert [error.message for error in SCHEMA.iter_errors(parameter)] == []
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        pytest.param({"min_length": 2}, id="a floor only: no ceiling is written"),
+        pytest.param({"min_length": 2, "max_length": 4}, id="both ends"),
+    ],
+)
+def test_the_schema_accepts_a_list_of_colours_as_the_core_writes_it(extra):
+    """No effect declares a list yet, so the field is written as `Field` serialises it (crates/core/src/params.rs; the
+    same JSON is asserted in crates/core/src/params/derived.rs)."""
+    field = {
+        "name": "stops",
+        "kind": "colors",
+        "meaning": "The colours of the ramp in order.",
+        "default": ["#12002b", "#ff2bd6"],
+        "unit": None,
+        "min": None,
+        "max": None,
+        "cyclic": False,
+        "choices": [],
+        "drivable": False,
+        "advanced": False,
+    } | extra
+    assert [error.message for error in SCHEMA.iter_errors(field)] == []

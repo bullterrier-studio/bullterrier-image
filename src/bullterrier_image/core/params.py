@@ -634,6 +634,7 @@ _PLAIN_KINDS: dict[str, Any] = {
     "int": int,
     "bool": bool,
     "color": Color,
+    "colors": tuple[Color, ...],
 }  # the kinds of `Kind` in crates/core/src/params.rs -> their annotation; a "choice" is a `Literal` of its names
 
 
@@ -649,6 +650,28 @@ def _annotation(effect: str, entry: dict[str, Any]) -> Any:
             f"field from (it knows {', '.join([*_PLAIN_KINDS, 'choice'])})"
         )
     return _PLAIN_KINDS[kind]
+
+
+def core_field(effect: str, entry: dict[str, Any]) -> tuple[Any, Any]:
+    """The annotation and the `param` spec of the field `entry` of the Rust declaration of `effect` (one of the `fields`
+    of `_core.params(effect)`), as `class X(EffectParams, core="x")` gives them to the model. A default and a bound are
+    the literal the declaration wrote; a list of colours is a tuple, with the `min_length` (and `max_length`) the
+    declaration gives. ValueError if its kind is one the core has and this module has not."""
+    annotation = _annotation(effect, entry)
+    kind = entry["kind"]
+    lengths = {key: entry[key] for key in ("min_length", "max_length") if key in entry}  # written for a list only
+    spec = param(
+        tuple(entry["default"]) if kind == "colors" else entry["default"],
+        doc=entry["meaning"],
+        unit=entry["unit"],
+        min=entry["min"],
+        max=entry["max"],
+        advanced=entry["advanced"],
+        drivable=entry["drivable"],
+        cyclic=entry["cyclic"],
+        **lengths,
+    )
+    return annotation, spec
 
 
 def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
@@ -670,20 +693,10 @@ def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
         )
     declared = native.params(effect)
     cls.__doc__ = declared["doc"]
-    fields = declared["fields"]
-    cls.__annotations__ = {entry["name"]: _annotation(effect, entry) for entry in fields}
-    for entry in fields:
-        spec = param(
-            entry["default"],
-            doc=entry["meaning"],
-            unit=entry["unit"],
-            min=entry["min"],
-            max=entry["max"],
-            advanced=entry["advanced"],
-            drivable=entry["drivable"],
-            cyclic=entry["cyclic"],
-        )
-        setattr(cls, entry["name"], spec)
+    fields = {entry["name"]: core_field(effect, entry) for entry in declared["fields"]}
+    cls.__annotations__ = {name: annotation for name, (annotation, _) in fields.items()}
+    for name, (_, spec) in fields.items():
+        setattr(cls, name, spec)
 
 
 _TURN = 360  # constant: a full turn, in degrees

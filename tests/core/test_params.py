@@ -18,6 +18,7 @@ from bullterrier_image.core.params import (
     EffectParams,
     FieldName,
     Picture,
+    core_field,
     describe_error,
     drivable_fields,
     field_name_fields,
@@ -849,7 +850,12 @@ def test_scaling_gives_a_new_model_and_leaves_the_first_alone():
 # the oracle is the table the core reports, which is what the declaration says.
 
 RUST_EFFECTS = _core.effects(declared=True)
-KIND_SCHEMA = {"float": "number", "int": "integer", "bool": "boolean"}  # the JSON-schema type of each plain kind
+KIND_SCHEMA = {
+    "float": "number",
+    "int": "integer",
+    "bool": "boolean",
+    "colors": "array",
+}  # the JSON-schema type of each plain kind
 OF_ANOTHER_KIND: dict[
     str, list[Any]
 ] = {  # a value of the wrong kind for each kind of field: strict models refuse every one
@@ -858,6 +864,7 @@ OF_ANOTHER_KIND: dict[
     "bool": [1, "true"],
     "choice": [1, "no such choice"],
     "color": ["red", [2, 0, 0]],
+    "colors": ["#ffffff", 7, None, ["red"]],
 }
 
 
@@ -882,10 +889,11 @@ def test_a_model_declared_in_rust_has_its_structs_fields_docs_defaults_and_range
             field["cyclic"],
         )
         # a literal keeps its kind: `min = 0` is the int 0 and `default = 0.0` the float 0.0 (the schema shows it)
+        declared = tuple(field["default"]) if field["kind"] == "colors" else field["default"]  # a list is a tuple here
         assert [type(value) for value in (doc.default, doc.minimum, doc.maximum)] == [
-            type(value) for value in (field["default"], field["min"], field["max"])
+            type(value) for value in (declared, field["min"], field["max"])
         ]
-        assert doc.default == field["default"]
+        assert doc.default == declared
     assert drivable_fields(model) == {field["name"] for field in table["fields"] if field["drivable"]}
 
 
@@ -898,6 +906,10 @@ def test_each_kind_of_rust_field_is_the_matching_json_schema_type_and_choices_ke
             assert schema["enum"] == field["choices"]
         elif field["kind"] == "color":
             assert "anyOf" in schema
+        elif field["kind"] == "colors":
+            assert schema["type"] == "array"
+            assert schema["minItems"] == field["min_length"]
+            assert schema.get("maxItems") == field.get("max_length")
         else:
             assert schema["type"] == KIND_SCHEMA[field["kind"]]
 
@@ -935,6 +947,122 @@ def test_a_rust_declared_model_is_an_ordinary_class_that_pickles_and_validates()
         Copy.parse({name: high + 2}, "effect 'grade'")
     with pytest.raises(RecipeError, match="`nope` is not a parameter"):
         Copy.parse({"nope": 1})
+
+
+# --- a list of colours declared in Rust ----------------------------------------------------------------------------
+# No effect declares one yet, so the fields are written as `_core.params` writes them (crates/core/src/params.rs,
+# `Field`): `min_length` and `max_length` appear for a list only, and `max_length` only when it has a ceiling. The
+# same rows are checked against `Table::check` in crates/core/tests/it/params_colors.rs.
+
+LISTS = [
+    {
+        "name": "stops",
+        "kind": "colors",
+        "meaning": "The colours of the ramp in order.",
+        "default": ["#12002b", "#ff2bd6"],
+        "unit": None,
+        "min": None,
+        "max": None,
+        "cyclic": False,
+        "choices": [],
+        "min_length": 1,
+        "drivable": False,
+        "advanced": False,
+    },
+    {
+        "name": "palette",
+        "kind": "colors",
+        "meaning": "Two to four colours.",
+        "default": ["#000000", "#ffffff"],
+        "unit": None,
+        "min": None,
+        "max": None,
+        "cyclic": False,
+        "choices": [],
+        "min_length": 2,
+        "max_length": 4,
+        "drivable": False,
+        "advanced": True,
+    },
+]
+
+
+def model_of(*fields: dict[str, Any]) -> type[EffectParams]:
+    """A model with the fields the core would declare, built as `class X(EffectParams, core="x")` builds them."""
+    built = {field["name"]: core_field("probe", field) for field in fields}
+    body = {"__annotations__": {name: annotation for name, (annotation, _) in built.items()}}
+    return type("Listed", (EffectParams,), body | {name: spec for name, (_, spec) in built.items()})
+
+
+LISTED = model_of(*LISTS)
+
+
+def test_a_list_of_colours_defaults_to_the_declared_texts_read_as_colours_in_order():
+    stops = LISTED.parse({}).model_dump()["stops"]
+    assert stops == ((18 / 255, 0.0, 43 / 255), (1.0, 43 / 255, 214 / 255))
+    assert LISTED.fields_doc()[0].default == ("#12002b", "#ff2bd6")
+    assert LISTED.fields_doc()[0].type == "list of colours"
+
+
+@pytest.mark.parametrize(
+    ("given", "expected"),
+    [
+        pytest.param(["#abc"], ((170 / 255, 187 / 255, 204 / 255),), id="short hex"),
+        pytest.param([" #FF8000 "], ((1.0, 128 / 255, 0.0),), id="capital hex, spaces around"),
+        pytest.param([[0, 0.5, 1]], ((0.0, 0.5, 1.0),), id="three numbers"),
+        pytest.param([(0.25, 0.5, 0.75)], ((0.25, 0.5, 0.75),), id="a tuple of three numbers"),
+        pytest.param(
+            ["#ff0000", [0, 1, 0], "#00f"],
+            ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+            id="mixed spellings, in order",
+        ),
+        pytest.param(["#101010"] * 64, ((16 / 255,) * 3,) * 64, id="no ceiling on stops"),
+    ],
+)
+def test_every_spelling_of_a_colour_is_read_in_a_list_as_it_is_alone(given, expected):
+    assert LISTED.parse({"stops": given}).model_dump()["stops"] == expected
+
+
+@pytest.mark.parametrize(
+    ("given", "field", "complaint"),
+    [
+        pytest.param({"stops": []}, "stops", "at least 1", id="empty, floor of one"),
+        pytest.param({"palette": ["#101010"]}, "palette", "at least 2", id="one, floor of two"),
+        pytest.param({"palette": ["#101010"] * 5}, "palette", "at most 4", id="five, ceiling of four"),
+        pytest.param({"stops": ["red", "#ffffff"]}, "stops[0]", "a colour is", id="first element"),
+        pytest.param({"stops": ["#ffffff", "#ggg"]}, "stops[1]", "a colour is", id="last element"),
+        pytest.param({"stops": ["#ffffff", [0, 0, 2]]}, "stops[1]", "a colour is", id="a channel above 1"),
+        pytest.param({"stops": ["#ffffff", [0, 0]]}, "stops[1]", "a colour is", id="two channels"),
+        pytest.param({"stops": [[True, 0, 0]]}, "stops[0]", "a colour is", id="a bool channel"),
+        pytest.param({"stops": ["#ffffff", 7]}, "stops[1]", "a colour is", id="a number"),
+        pytest.param({"stops": "#ffffff"}, "stops", "must be a list", id="one colour is not a list"),
+        pytest.param({"stops": 7}, "stops", "must be a list", id="a number is not a list"),
+        pytest.param({"stops": None}, "stops", "must be a list", id="None is not a list"),
+    ],
+)
+def test_a_list_of_colours_that_breaks_a_rule_is_refused_naming_the_field_and_the_place(given, field, complaint):
+    with pytest.raises(RecipeError, match=re.escape(f"`{field}`") + f".*{complaint}"):
+        LISTED.parse(given)
+
+
+def test_the_lengths_are_inclusive_at_both_ends():
+    for given, field, length in [
+        ({"stops": ["#101010"]}, "stops", 1),
+        ({"palette": ["#101010", "#202020"]}, "palette", 2),
+        ({"palette": ["#101010", "#202020", "#303030", "#404040"]}, "palette", 4),
+    ]:
+        assert len(LISTED.parse(given).model_dump()[field]) == length
+
+
+def test_the_json_schema_of_a_list_has_its_lengths_and_only_a_ceiling_when_declared():
+    properties = LISTED.model_json_schema()["properties"]
+    assert (properties["stops"]["minItems"], "maxItems" in properties["stops"]) == (1, False)
+    assert (properties["palette"]["minItems"], properties["palette"]["maxItems"]) == (2, 4)
+
+
+def test_a_kind_the_core_has_and_this_package_has_not_is_refused_naming_the_field():
+    with pytest.raises(ValueError, match=r"probe\.cells.*'tuple'"):
+        core_field("probe", {**LISTS[0], "name": "cells", "kind": "tuple"})
 
 
 @pytest.mark.parametrize("name", ["ghost", "gradient"])  # no such effect; a Python effect the core runs by callback
