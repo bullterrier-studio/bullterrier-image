@@ -1,16 +1,6 @@
-"""The two steps every glowing effect shares: picking out the highlights, and screening light over the picture."""
+"""Screening light over a picture, as the Python light effects that remain do."""
 
 import numpy as np
-
-
-def highlights(rgb: np.ndarray, threshold: float) -> np.ndarray:
-    """The part of each value above `threshold`, rescaled so that white is 1: `(value - threshold) / (1 - threshold)`.
-
-    `rgb` is a float picture in 0..1; every channel is judged on its own, so coloured light keeps its colour. The
-    result has the input's shape and dtype, lies in 0..1, is 0 wherever the input is at or below `threshold` and rises
-    linearly to 1 at white. `threshold` must be in 0..1 and below 1 (a threshold of 1 has nothing above it).
-    """
-    return np.clip((rgb - threshold) / (1.0 - threshold), 0.0, 1.0)
 
 
 def screen(base: np.ndarray, light: np.ndarray) -> np.ndarray:
