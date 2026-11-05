@@ -16,6 +16,7 @@ use proptest::prelude::*;
 use serde_json::Value;
 
 use crate::common::compare::first_difference_within;
+use crate::common::edge::source;
 
 /// The pictures are compared at this distance: the sums are made in f64 and f32 is 6e-8 at 1.
 const TOLERANCE: f32 = 1e-5;
@@ -53,35 +54,6 @@ fn impulse(size: usize) -> Vec<f32> {
     let centre = (size / 2 * size + size / 2) * 3;
     dark[centre..centre + 3].fill(1.0);
     dark
-}
-
-/// Where the sample at `index` of a line of `len` samples comes from, found by folding the index back into the line one
-/// bounce at a time; none for the constant rule beyond the line. (The core finds it by modular arithmetic.)
-fn source(rule: EdgeOrConstant, mut index: i64, len: i64) -> Option<usize> {
-    let inside = |index: i64| (0..len).contains(&index);
-    match rule {
-        EdgeOrConstant::Constant => inside(index).then_some(index),
-        EdgeOrConstant::Nearest => Some(index.clamp(0, len - 1)),
-        EdgeOrConstant::Wrap => {
-            while !inside(index) {
-                index += if index < 0 { len } else { -len };
-            }
-            Some(index)
-        }
-        EdgeOrConstant::Reflect => {
-            while !inside(index) {
-                index = if index < 0 { -index - 1 } else { 2 * len - 1 - index };
-            }
-            Some(index)
-        }
-        EdgeOrConstant::Mirror => {
-            while len > 1 && !inside(index) {
-                index = if index < 0 { -index } else { 2 * (len - 1) - index };
-            }
-            Some(if len > 1 { index } else { 0 })
-        }
-    }
-    .and_then(|index| usize::try_from(index).ok())
 }
 
 /// scipy's weights at distances -reach..=reach: exp(-d^2 / 2 sigma^2), cut off at `int(truncate x sigma + 0.5)`, summing

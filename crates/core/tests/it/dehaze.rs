@@ -15,6 +15,7 @@ use bullterrier_image::{Edge, Error, Inputs, Picture, apply};
 use serde_json::Value;
 
 use crate::common::compare::first_difference_within;
+use crate::common::edge::folded;
 use crate::common::guided::guided_filter;
 
 /// The pictures are compared at this distance: the reference is made in f64 where the effect makes it in f32, and the
@@ -44,43 +45,17 @@ fn hazy(height: usize, width: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Where the sample at `index` of a line of `len` comes from, found by folding the index back into the line one bounce at a
-/// time. (The core finds it by modular arithmetic.)
-fn source(rule: Edge, mut index: isize, len: isize) -> usize {
-    let inside = |index: isize| (0..len).contains(&index);
-    match rule {
-        Edge::Nearest => index = index.clamp(0, len - 1),
-        Edge::Wrap => {
-            while !inside(index) {
-                index += if index < 0 { len } else { -len };
-            }
-        }
-        Edge::Reflect => {
-            while !inside(index) {
-                index = if index < 0 { -index - 1 } else { 2 * len - 1 - index };
-            }
-        }
-        Edge::Mirror => {
-            while len > 1 && !inside(index) {
-                index = if index < 0 { -index } else { 2 * (len - 1) - index };
-            }
-            index = index.clamp(0, len - 1);
-        }
-    }
-    index as usize
-}
-
 /// The smallest value in the `patch` x `patch` window around every place (it spans `patch / 2` before the place and the
 /// rest after it), by looking at all of them.
 fn darkest(values: &[f32], height: usize, width: usize, patch: usize, rule: Edge) -> Vec<f32> {
-    let (h, w, p) = (height as isize, width as isize, patch as isize);
+    let (h, w, p) = (height as i64, width as i64, patch as i64);
     let mut out = Vec::new();
     for row in 0..h {
         for column in 0..w {
             let mut smallest = f32::INFINITY;
             for y in row - p / 2..row + p - p / 2 {
                 for x in column - p / 2..column + p - p / 2 {
-                    smallest = smallest.min(values[source(rule, y, h) * width + source(rule, x, w)]);
+                    smallest = smallest.min(values[folded(rule, y, h) * width + folded(rule, x, w)]);
                 }
             }
             out.push(smallest);

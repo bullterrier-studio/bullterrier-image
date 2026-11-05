@@ -4,6 +4,7 @@
 
 pub(crate) mod compare;
 pub(crate) mod convolution;
+pub(crate) mod edge;
 pub(crate) mod files;
 pub(crate) mod gaussian;
 pub(crate) mod guided;

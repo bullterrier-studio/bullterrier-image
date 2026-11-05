@@ -1,9 +1,11 @@
 //! A convolution worked out from its definition, for the effects that are one: every output sample the double sum of the
-//! weights and the samples they fall on, with a different way of finding what lies beyond the edge than the core's.
+//! weights and the samples they fall on, with `common::edge`'s way of finding what lies beyond the edge, not the core's.
 
 use bullterrier_image::params::EffectParams;
 use bullterrier_image::{Edge, Error, Inputs, Picture, apply};
 use serde_json::Value;
+
+use super::edge::folded;
 
 /// What a convolution sees beyond the picture's edge: one of the four rules, or black.
 #[derive(Clone, Copy, Debug)]
@@ -46,33 +48,12 @@ pub(crate) fn impulse(height: usize, width: usize, row: usize, column: usize) ->
     dark
 }
 
-/// Where the sample at `index` of a line of `len` samples comes from, found by folding the index back into the line one
-/// bounce at a time; none for black beyond the line. (The core finds it by modular arithmetic.)
-fn source(beyond: Beyond, mut index: i64, len: i64) -> Option<usize> {
-    let inside = |index: i64| (0..len).contains(&index);
+/// Where the sample at `index` of a line of `len` samples comes from; none for black beyond the line.
+fn source(beyond: Beyond, index: i64, len: i64) -> Option<usize> {
     match beyond {
-        Beyond::Black => inside(index).then_some(index),
-        Beyond::Rule(Edge::Nearest) => Some(index.clamp(0, len - 1)),
-        Beyond::Rule(Edge::Wrap) => {
-            while !inside(index) {
-                index += if index < 0 { len } else { -len };
-            }
-            Some(index)
-        }
-        Beyond::Rule(Edge::Reflect) => {
-            while !inside(index) {
-                index = if index < 0 { -index - 1 } else { 2 * len - 1 - index };
-            }
-            Some(index)
-        }
-        Beyond::Rule(Edge::Mirror) => {
-            while len > 1 && !inside(index) {
-                index = if index < 0 { -index } else { 2 * (len - 1) - index };
-            }
-            Some(if len > 1 { index } else { 0 })
-        }
+        Beyond::Black => (0..len).contains(&index).then(|| folded(Edge::Nearest, index, len)),
+        Beyond::Rule(rule) => Some(folded(rule, index, len)),
     }
-    .and_then(|index| usize::try_from(index).ok())
 }
 
 /// `values` convolved with `taps` as the definition has it: output[y, x] is the sum of weight x sample[y - down, x -
