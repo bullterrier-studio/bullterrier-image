@@ -4,7 +4,6 @@
 #![expect(
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
-    clippy::cast_precision_loss,
     clippy::cast_sign_loss,
     reason = "small picture sizes and kernel reaches, and the f64 reference narrowed to the f32 picture"
 )]
@@ -16,6 +15,7 @@ use proptest::prelude::*;
 
 use crate::common::compare::first_difference_within;
 use crate::common::edge::source;
+use crate::common::gaussian::weights;
 use crate::common::pictures::{impulse, varied};
 use crate::common::pixels::run_picture;
 
@@ -31,22 +31,11 @@ const EDGES: [EdgeOrConstant; 5] = [
     EdgeOrConstant::Wrap,
 ];
 
-/// scipy's weights at distances -reach..=reach: exp(-d^2 / 2 sigma^2), cut off at `int(truncate x sigma + 0.5)`, summing
-/// to 1.
-fn kernel(sigma: f64, truncate: f64) -> Vec<f64> {
-    let reach = (truncate * sigma + 0.5).floor() as i64;
-    let weights: Vec<f64> = (-reach..=reach)
-        .map(|distance| (-((distance * distance) as f64) / (2.0 * sigma * sigma)).exp())
-        .collect();
-    let total: f64 = weights.iter().sum();
-    weights.iter().map(|weight| weight / total).collect()
-}
-
 /// The picture blurred by the definition: every output sample the double sum of the weights and the samples they fall on,
 /// `beyond` where the edge rule says the picture has none.
 fn reference(params: &Params, height: usize, width: usize, values: &[f32]) -> Vec<f32> {
-    let weights = kernel(f64::from(params.radius), f64::from(params.truncate));
-    let reach = (weights.len() / 2) as i64;
+    let (weights, reach) = weights(f64::from(params.radius), f64::from(params.truncate));
+    let reach = reach as i64;
     let (h, w) = (height as i64, width as i64);
     let beyond = f64::from(params.constant_value);
     let mut out = vec![0.0_f32; values.len()];
@@ -140,8 +129,7 @@ fn an_impulse_becomes_the_outer_product_of_the_weights() -> Result<(), Error> {
     // from the formula alone: a short kernel (summed) and one longer than 100 px (the transform); beyond the kernel the
     // black is exact
     for (radius, size) in [(3.0, 61), (40.0, 401)] {
-        let weights = kernel(radius, 4.0);
-        let reach = weights.len() / 2;
+        let (weights, reach) = weights(radius, 4.0);
         let centre = size / 2;
         let params = Params {
             radius: radius as f32,

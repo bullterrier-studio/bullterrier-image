@@ -6,7 +6,8 @@
 //! A sigma can be at most 24 x longest side / 480, a twentieth of the longest side, so a blur is never wider than the map.
 
 use crate::common::Outcome;
-use crate::common::numbers::{float, float_of, total};
+use crate::common::gaussian;
+use crate::common::numbers::{float, total};
 use crate::common::ops::level;
 use bullterrier_image::region::{Grid, Shares};
 use bullterrier_image::{Each, Error, Options, Photo, Picture, Presets, Recipe};
@@ -67,12 +68,8 @@ fn pieces(columns: &[f64], rows: &[f64], height: usize, width: usize) -> (Grid, 
 /// The blur of `indicator` (`height` x `width`) by brute force: every output the sum over `-radius..=radius` of the
 /// normalised `exp(-x^2 / 2 sigma^2)` times the value at the clamped position, along the rows and then down the columns.
 fn gaussian(indicator: &[f64], height: usize, width: usize, sigma: f64) -> Vec<f64> {
-    #[expect(clippy::cast_possible_truncation, reason = "a small radius")]
-    let radius = (4.0 * sigma + 0.5).floor() as i64;
-    let kernel: Vec<f64> = (-radius..=radius)
-        .map(|offset| (-0.5 * (float_of(offset) / sigma).powi(2)).exp())
-        .collect();
-    let norm: f64 = kernel.iter().sum();
+    let (kernel, reach) = gaussian::weights(sigma, 4.0);
+    let radius = i64::try_from(reach).unwrap_or(0);
     let along = |read: &dyn Fn(usize, usize) -> f64, rows: usize, columns: usize| -> Vec<f64> {
         let mut out = Vec::new();
         for row in 0..rows {
@@ -84,7 +81,7 @@ fn gaussian(indicator: &[f64], height: usize, width: usize, sigma: f64) -> Vec<f
                             let last = i64::try_from(columns).unwrap_or(1) - 1;
                             let source = usize::try_from((i64::try_from(column).unwrap_or(0) + offset).clamp(0, last))
                                 .unwrap_or(0);
-                            weight / norm * read(row, source)
+                            weight * read(row, source)
                         })
                         .sum(),
                 );

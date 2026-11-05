@@ -15,6 +15,7 @@ use bullterrier_image::{
 use serde_json::json;
 
 use crate::common::compare::assert_close;
+use crate::common::gaussian::weights;
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 
@@ -134,12 +135,8 @@ fn render(values: &[f32], height: usize, width: usize, recipe: &Recipe, options:
 /// the picture's edge repeated outward, each output the weighted sum over `-radius..=radius` (radius `int(4 sigma +
 /// 0.5)`) of normalised `exp(-x^2 / 2 sigma^2)`. The oracle for the weights of an each step.
 fn blurred_row(chosen: &[bool], sigma: f64) -> Vec<f64> {
-    #[expect(clippy::cast_possible_truncation, reason = "a small radius")]
-    let radius = (4.0 * sigma + 0.5).floor() as i32;
-    let weights: Vec<f64> = (-radius..=radius)
-        .map(|offset| (-0.5 * (f64::from(offset) / sigma).powi(2)).exp())
-        .collect();
-    let total: f64 = weights.iter().sum();
+    let (weights, reach) = weights(sigma, 4.0);
+    let radius = i32::try_from(reach).unwrap_or(0);
     let last = i32::try_from(chosen.len()).unwrap_or(i32::MAX) - 1;
     (0..=last)
         .map(|column| {
@@ -147,7 +144,7 @@ fn blurred_row(chosen: &[bool], sigma: f64) -> Vec<f64> {
                 .zip(&weights)
                 .map(|(offset, weight)| {
                     let source = usize::try_from((column + offset).clamp(0, last)).unwrap_or(0);
-                    weight / total * f64::from(u8::from(chosen[source]))
+                    weight * f64::from(u8::from(chosen[source]))
                 })
                 .sum()
         })

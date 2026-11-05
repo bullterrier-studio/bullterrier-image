@@ -64,7 +64,7 @@ fn a_bump_leaves_its_difference_from_the_blur_around_mid_grey() -> Result<(), Er
     // so the picture minus its blur is h (1 - w0^2) and -h w0 w1, whatever the grey
     let height = 0.2_f32;
     for radius in [1.5_f32, 3.0] {
-        let (weights, middle) = weights(f64::from(radius));
+        let (weights, middle) = weights(f64::from(radius), 4.0);
         let (w0, w1) = (weights[middle], weights[middle + 1]);
         let mut grey = vec![0.3_f32; 41 * 41 * 3];
         grey[(20 * 41 + 20) * 3..][..3]

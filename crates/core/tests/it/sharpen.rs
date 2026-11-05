@@ -111,7 +111,7 @@ fn a_bump_is_raised_by_amount_times_its_height_less_its_own_share_of_the_blur() 
     // the blur at a bump of height h is h w0^2 above the grey, one pixel beside it h w0 w1 (w the 1-D Gaussian weights)
     let (height, base) = (0.1_f32, 0.5_f32);
     for (radius, amount) in [(1.5_f32, 1.0), (2.0, 0.4), (3.0, 2.5)] {
-        let (weights, middle) = weights(f64::from(radius));
+        let (weights, middle) = weights(f64::from(radius), 4.0);
         let (w0, w1) = (weights[middle], weights[middle + 1]);
         let params = sharpen::Params {
             radius,
@@ -257,7 +257,7 @@ fn each_colour_channel_is_sharpened_on_its_own() -> Result<(), Error> {
 fn a_constant_edge_blurs_in_the_given_brightness_beyond_the_picture() -> Result<(), Error> {
     // mid-way down the left edge of a tall grey picture only the row direction sees past the edge: the blur there is
     // grey - (grey - beyond) x (the weights at the offsets left of the pixel)
-    let (weights, middle) = weights(1.5);
+    let (weights, middle) = weights(1.5, 4.0);
     let left: f64 = weights[..middle].iter().sum();
     for beyond in [0.0_f32, 0.2, 0.5] {
         let params = sharpen::Params {

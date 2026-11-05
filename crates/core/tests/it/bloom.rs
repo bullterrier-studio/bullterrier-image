@@ -54,7 +54,7 @@ fn halo(size: usize, radius: f64, octaves: i32, persistence: f64, amount: f64) -
     let total: f64 = shares.iter().sum();
     let mut halo = vec![0.0; size * size];
     for (octave, share) in shares.iter().enumerate() {
-        let (line, reach) = weights(radius / 2.0_f64.powi(octave as i32));
+        let (line, reach) = weights(radius / 2.0_f64.powi(octave as i32), 4.0);
         let middle = size / 2;
         for (row, row_weight) in line.iter().enumerate() {
             for (column, column_weight) in line.iter().enumerate() {
