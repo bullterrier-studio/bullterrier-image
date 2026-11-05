@@ -11,6 +11,7 @@ mod blend;
 mod bloom;
 mod colour;
 mod colour_mix;
+mod compare;
 mod cutout;
 mod cutout_by_hand;
 mod cuts;

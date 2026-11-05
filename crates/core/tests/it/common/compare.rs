@@ -20,15 +20,16 @@ pub(crate) fn first_bit_difference(left: &[f32], right: &[f32]) -> Option<usize>
         .position(|(one, other)| one.to_bits() != other.to_bits())
 }
 
-/// The first index at which `left` and `right` are further apart than `tolerance`, or none; if one is shorter, the
-/// length of the shorter.
+/// The first index at which `left` and `right` are further apart than `tolerance` (a NaN is further apart than any
+/// tolerance), or none; if one is shorter, the length of the shorter.
 pub(crate) fn first_difference_within(left: &[f32], right: &[f32], tolerance: f32) -> Option<usize> {
     if left.len() != right.len() {
         return Some(left.len().min(right.len()));
     }
-    left.iter()
-        .zip(right)
-        .position(|(one, other)| (one - other).abs() > tolerance)
+    left.iter().zip(right).position(|(one, other)| {
+        let gap = (one - other).abs();
+        gap.is_nan() || gap > tolerance
+    })
 }
 
 /// Fails unless `actual` is `expected` to within `tolerance`, value by value, naming the first value that is not and
