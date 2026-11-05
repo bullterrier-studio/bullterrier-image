@@ -22,8 +22,8 @@ use crate::common::pixels::run_picture;
 /// The pictures are compared at this distance: the sums are made in f64 and f32 is 6e-8 at 1.
 const TOLERANCE: f32 = 2e-6;
 
-fn bloomed(params: &Params, size: usize, picture: &[f32]) -> Vec<f32> {
-    run_picture(params, size, size, picture).unwrap_or_default()
+fn bloomed(params: &Params, size: usize, picture: &[f32]) -> Result<Vec<f32>, Error> {
+    run_picture(params, size, size, picture)
 }
 
 /// A `size` x `size` picture of one colour.
@@ -67,7 +67,7 @@ fn halo(size: usize, radius: f64, octaves: i32, persistence: f64, amount: f64) -
 }
 
 #[test]
-fn a_single_bright_pixel_spreads_as_the_weighted_sum_of_octave_gaussians() {
+fn a_single_bright_pixel_spreads_as_the_weighted_sum_of_octave_gaussians() -> Result<(), Error> {
     // the picture is far larger than the widest reach (4 x 8 = 32 px), so the edge rule is not seen
     let size = 81;
     let rows = [
@@ -86,7 +86,7 @@ fn a_single_bright_pixel_spreads_as_the_weighted_sum_of_octave_gaussians() {
             threshold: 0.5,
             ..Params::default()
         };
-        let out = red(&bloomed(&params, size, &spot(size, [1.0; 3])));
+        let out = red(&bloomed(&params, size, &spot(size, [1.0; 3]))?);
         let expected: Vec<f32> = halo(
             size,
             f64::from(radius),
@@ -113,10 +113,11 @@ fn a_single_bright_pixel_spreads_as_the_weighted_sum_of_octave_gaussians() {
             "radius {radius}, {octaves} octaves, persistence {persistence}"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn the_comparison_tells_halos_that_differ_apart() {
+fn the_comparison_tells_halos_that_differ_apart() -> Result<(), Error> {
     let size = 81;
     let params = Params {
         radius: 8.0,
@@ -126,7 +127,7 @@ fn the_comparison_tells_halos_that_differ_apart() {
         threshold: 0.5,
         ..Params::default()
     };
-    let out = red(&bloomed(&params, size, &spot(size, [1.0; 3])));
+    let out = red(&bloomed(&params, size, &spot(size, [1.0; 3]))?);
     for (octaves, persistence) in [(2, 0.5), (3, 0.6), (4, 0.5)] {
         let other = halo(size, 8.0, octaves, persistence, 0.9);
         let other: Vec<f32> = other.into_iter().map(|light| light as f32).collect();
@@ -135,10 +136,11 @@ fn the_comparison_tells_halos_that_differ_apart() {
             "{octaves} {persistence}"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn each_octave_adds_its_share_of_the_spread() {
+fn each_octave_adds_its_share_of_the_spread() -> Result<(), Error> {
     // The mean squared distance of the light from its source is 2 sigma^2 for a 2-D Gaussian, so for the average of the
     // octaves it is 2 x the sum of weight x sigma^2 (the cut-off at 4 sigma takes under 1% of it). The light stays far
     // below 1 so that the screen does not bend it.
@@ -155,7 +157,7 @@ fn each_octave_adds_its_share_of_the_spread() {
             ..Params::default()
         };
         // a source of 0.8 (a highlight of 0.6): the light at its own pixel is read off the screen, light = (out - base) / (1 - base)
-        let mut out = red(&bloomed(&params, size, &spot(size, [0.8; 3])));
+        let mut out = red(&bloomed(&params, size, &spot(size, [0.8; 3]))?);
         let source = size / 2 * size + size / 2;
         out[source] = (out[source] - 0.8) / (1.0 - 0.8);
         let (mut mass, mut moment) = (0.0_f64, 0.0_f64);
@@ -180,10 +182,11 @@ fn each_octave_adds_its_share_of_the_spread() {
             "{octaves} octaves, persistence {persistence}: {spread} against {expected}"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn an_even_picture_is_screened_with_its_own_highlight_whatever_the_octaves() {
+fn an_even_picture_is_screened_with_its_own_highlight_whatever_the_octaves() -> Result<(), Error> {
     // every octave leaves an even picture as it is and the weights add up to 1, so the halo is the highlight
     for (octaves, persistence) in [(1, 0.5), (3, 0.0), (4, 0.5), (6, 1.0)] {
         for (value, amount, threshold) in [(0.8, 0.6, 0.55), (0.9, 3.0, 0.5)] {
@@ -195,7 +198,7 @@ fn an_even_picture_is_screened_with_its_own_highlight_whatever_the_octaves() {
                 threshold,
                 ..Params::default()
             };
-            let out = bloomed(&params, 16, &even(16, [value; 3]));
+            let out = bloomed(&params, 16, &even(16, [value; 3]))?;
             let highlight = (value - threshold) / (1.0 - threshold);
             let expected = vec![screen(value, amount * highlight); 16 * 16 * 3];
             assert_eq!(
@@ -205,10 +208,11 @@ fn an_even_picture_is_screened_with_its_own_highlight_whatever_the_octaves() {
             );
         }
     }
+    Ok(())
 }
 
 #[test]
-fn a_colour_tints_the_light_of_the_brightest_channel() {
+fn a_colour_tints_the_light_of_the_brightest_channel() -> Result<(), Error> {
     // on an even picture the halo is the highlight of the brightest channel, and the light that times the colour
     let rows = [
         ([0.9, 0.3, 0.1], [1.0, 0.5, 0.0], 1.0, 0.5),
@@ -224,7 +228,7 @@ fn a_colour_tints_the_light_of_the_brightest_channel() {
             color: Some(Color(color)),
             ..Params::default()
         };
-        let out = bloomed(&params, 32, &even(32, pixel));
+        let out = bloomed(&params, 32, &even(32, pixel))?;
         let brightest = pixel[0].max(pixel[1]).max(pixel[2]);
         let highlight = ((brightest - threshold) / (1.0 - threshold)).max(0.0);
         let expected: Vec<f32> = (0..32 * 32)
@@ -236,10 +240,11 @@ fn a_colour_tints_the_light_of_the_brightest_channel() {
             "{pixel:?} tinted {color:?}"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn without_a_colour_each_channel_blooms_on_its_own_and_a_colour_makes_the_light_its_hue() {
+fn without_a_colour_each_channel_blooms_on_its_own_and_a_colour_makes_the_light_its_hue() -> Result<(), Error> {
     let size = 41;
     let picture = spot(size, [1.0, 0.0, 0.0]);
     let at = (size / 2 * size + size / 2 + 7) * 3; // seven px to the right of the red spot
@@ -251,7 +256,7 @@ fn without_a_colour_each_channel_blooms_on_its_own_and_a_colour_makes_the_light_
         },
         size,
         &picture,
-    );
+    )?;
     assert!(own[at] > 5e-4, "the red spills beyond the spot");
     assert_eq!((own[at + 1], own[at + 2]), (0.0, 0.0), "and nothing else does");
     // a colour makes the light that colour whatever the highlight's own: the added light lies along the colour
@@ -265,15 +270,16 @@ fn without_a_colour_each_channel_blooms_on_its_own_and_a_colour_makes_the_light_
         },
         size,
         &picture,
-    );
+    )?;
     let strength = tinted[at] / color[0];
     assert!(strength > 5e-4, "{strength}");
     assert!((tinted[at + 1] - strength * color[1]).abs() < 1e-6);
     assert!((tinted[at + 2] - strength * color[2]).abs() < 1e-6);
+    Ok(())
 }
 
 #[test]
-fn a_black_colour_gives_no_light_and_black_stays_black() {
+fn a_black_colour_gives_no_light_and_black_stays_black() -> Result<(), Error> {
     let picture = varied(12, 12);
     let black = Params {
         color: Some(Color([0.0; 3])),
@@ -281,18 +287,19 @@ fn a_black_colour_gives_no_light_and_black_stays_black() {
         ..Params::default()
     };
     assert_eq!(
-        first_difference_within(&bloomed(&black, 12, &picture), &picture, 0.0),
+        first_difference_within(&bloomed(&black, 12, &picture)?, &picture, 0.0),
         None
     );
     let dark = even(12, [0.0; 3]);
     assert_eq!(
-        first_difference_within(&bloomed(&Params::default(), 12, &dark), &dark, 0.0),
+        first_difference_within(&bloomed(&Params::default(), 12, &dark)?, &dark, 0.0),
         None
     );
+    Ok(())
 }
 
 #[test]
-fn nothing_above_the_threshold_and_an_amount_of_nothing_leave_the_picture_as_it_is() {
+fn nothing_above_the_threshold_and_an_amount_of_nothing_leave_the_picture_as_it_is() -> Result<(), Error> {
     let dim: Vec<f32> = varied(12, 12).iter().map(|value| value * 0.5).collect();
     let none_above = Params {
         threshold: 0.5,
@@ -300,7 +307,7 @@ fn nothing_above_the_threshold_and_an_amount_of_nothing_leave_the_picture_as_it_
         ..Params::default()
     };
     assert_eq!(
-        first_difference_within(&bloomed(&none_above, 12, &dim), &dim, 0.0),
+        first_difference_within(&bloomed(&none_above, 12, &dim)?, &dim, 0.0),
         None
     );
     let bright = varied(12, 12);
@@ -310,13 +317,14 @@ fn nothing_above_the_threshold_and_an_amount_of_nothing_leave_the_picture_as_it_
         ..Params::default()
     };
     assert_eq!(
-        first_difference_within(&bloomed(&no_amount, 12, &bright), &bright, 0.0),
+        first_difference_within(&bloomed(&no_amount, 12, &bright)?, &bright, 0.0),
         None
     );
+    Ok(())
 }
 
 #[test]
-fn a_radius_of_nothing_keeps_the_light_on_the_highlights_themselves() {
+fn a_radius_of_nothing_keeps_the_light_on_the_highlights_themselves() -> Result<(), Error> {
     // with nothing to blur the light of a pixel is its own highlight, screened over it
     let picture = varied(10, 10);
     let params = Params {
@@ -330,17 +338,18 @@ fn a_radius_of_nothing_keeps_the_light_on_the_highlights_themselves() {
         .map(|&value| screen(value, 0.8 * ((value - 0.4) / 0.6).clamp(0.0, 1.0)))
         .collect();
     assert_eq!(
-        first_difference_within(&bloomed(&params, 10, &picture), &expected, 1e-6),
+        first_difference_within(&bloomed(&params, 10, &picture)?, &expected, 1e-6),
         None
     );
+    Ok(())
 }
 
 #[test]
-fn truncate_sets_where_each_octave_is_cut_off() {
+fn truncate_sets_where_each_octave_is_cut_off() -> Result<(), Error> {
     let size = 81;
     let picture = spot(size, [1.0; 3]);
     let six_px_right = (size / 2 * size + size / 2 + 6) * 3; // 3 sigma out for the widest octave at radius 2
-    let at = |truncate: f32| {
+    let at = |truncate: f32| -> Result<f32, Error> {
         let params = Params {
             radius: 2.0,
             octaves: 1,
@@ -348,38 +357,40 @@ fn truncate_sets_where_each_octave_is_cut_off() {
             truncate,
             ..Params::default()
         };
-        bloomed(&params, size, &picture)[six_px_right]
+        Ok(bloomed(&params, size, &picture)?[six_px_right])
     };
-    assert!(at(4.0) > 0.0);
-    assert_eq!(at(2.0), 0.0);
+    assert!(at(4.0)? > 0.0);
+    assert_eq!(at(2.0)?, 0.0);
+    Ok(())
 }
 
 #[test]
-fn the_edge_sets_what_the_blur_sees_beyond_it() {
+fn the_edge_sets_what_the_blur_sees_beyond_it() -> Result<(), Error> {
     let size = 41;
     let mut picture = vec![0.0; size * size * 3];
     let left_edge = (size / 2 * size) * 3;
     picture[left_edge..left_edge + 3].fill(1.0); // a bright pixel on the left edge
     let far_side = (size / 2 * size + size - 1) * 3; // the right edge of the same row, one px away round the back
-    let on = |edge| {
+    let on = |edge| -> Result<f32, Error> {
         let params = Params {
             radius: 3.0,
             threshold: 0.5,
             edge,
             ..Params::default()
         };
-        bloomed(&params, size, &picture)[far_side]
+        Ok(bloomed(&params, size, &picture)?[far_side])
     };
-    assert!(on(EdgeOrConstant::Wrap) > 0.01);
-    assert_eq!(on(EdgeOrConstant::Reflect), 0.0);
+    assert!(on(EdgeOrConstant::Wrap)? > 0.01);
+    assert_eq!(on(EdgeOrConstant::Reflect)?, 0.0);
+    Ok(())
 }
 
 #[test]
-fn constant_value_is_the_highlight_assumed_beyond_the_edge() {
+fn constant_value_is_the_highlight_assumed_beyond_the_edge() -> Result<(), Error> {
     // beyond the edge the picture is a flat highlight of `constant_value`; far from the edge it does not matter
     let size = 81;
     let picture = even(size, [0.0; 3]);
-    let with = |constant_value| {
+    let with = |constant_value| -> Result<Vec<f32>, Error> {
         let params = Params {
             radius: 2.0,
             octaves: 1,
@@ -389,14 +400,15 @@ fn constant_value_is_the_highlight_assumed_beyond_the_edge() {
         };
         bloomed(&params, size, &picture)
     };
-    let lit = with(1.0);
+    let lit = with(1.0)?;
     assert!(
         lit[0] > 0.4,
         "in the corner 3/4 of the blur's weight is beyond the edge: {}",
         lit[0]
     );
     assert!(lit[(size / 2 * size + size / 2) * 3].abs() < 1e-6);
-    assert!(with(0.0).iter().all(|value| *value == 0.0));
+    assert!(with(0.0)?.iter().all(|value| *value == 0.0));
+    Ok(())
 }
 
 fn parameters() -> impl Strategy<Value = Params> {

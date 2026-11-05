@@ -8,8 +8,8 @@
     reason = "small picture sizes and kernel reaches"
 )]
 
-use bullterrier_image::Edge;
 use bullterrier_image::effects::lens_blur::Params;
+use bullterrier_image::{Edge, Error};
 use proptest::prelude::*;
 
 use crate::common::compare::first_difference_within;
@@ -39,7 +39,14 @@ fn disc(radius: f64) -> Vec<Tap> {
         .collect()
 }
 
-fn blur(radius: f32, highlights: f32, edge: Edge, height: usize, width: usize, picture: &[f32]) -> Vec<f32> {
+fn blur(
+    radius: f32,
+    highlights: f32,
+    edge: Edge,
+    height: usize,
+    width: usize,
+    picture: &[f32],
+) -> Result<Vec<f32>, Error> {
     run_picture(
         &Params {
             radius,
@@ -50,7 +57,6 @@ fn blur(radius: f32, highlights: f32, edge: Edge, height: usize, width: usize, p
         width,
         picture,
     )
-    .unwrap_or_default()
 }
 
 /// The picture blurred over the disc with each pixel counting 1 + `highlights` x its brightness times: the sum of the
@@ -80,7 +86,7 @@ fn favouring_bright(
 }
 
 #[test]
-fn the_blur_is_the_picture_averaged_over_the_disc_whatever_lies_beyond_the_edge() {
+fn the_blur_is_the_picture_averaged_over_the_disc_whatever_lies_beyond_the_edge() -> Result<(), Error> {
     // Discs of 1.5, 2, 2.6, 5 and 5.7 px are summed tap by tap (9, 21, 29, 97 and 121 weights above 0), those of 6, 9.5 and
     // 13 px (137, 305 and 577) are filtered by the Fourier transform; a radius with a fraction over a half reaches a pixel
     // further than the radius rounded down. The pictures are from one pixel to a few, smaller and larger than the discs.
@@ -92,7 +98,7 @@ fn the_blur_is_the_picture_averaged_over_the_disc_whatever_lies_beyond_the_edge(
                 let picture = varied(height, width);
                 let expected = convolved(&taps, Beyond::Rule(edge), height, width, &picture);
                 let at =
-                    first_difference_within(&blur(radius, 0.0, edge, height, width, &picture), &expected, TOLERANCE);
+                    first_difference_within(&blur(radius, 0.0, edge, height, width, &picture)?, &expected, TOLERANCE);
                 assert_eq!(
                     at, None,
                     "radius {radius}, {edge:?}, {height} x {width}: first differs at {at:?}"
@@ -100,10 +106,11 @@ fn the_blur_is_the_picture_averaged_over_the_disc_whatever_lies_beyond_the_edge(
             }
         }
     }
+    Ok(())
 }
 
 #[test]
-fn with_highlights_each_pixel_counts_by_its_brightness_in_the_average() {
+fn with_highlights_each_pixel_counts_by_its_brightness_in_the_average() -> Result<(), Error> {
     for radius in [1.5, 5.7, 6.0, 9.5] {
         let taps = disc(f64::from(radius));
         for highlights in [0.7, 6.0, 50.0] {
@@ -112,7 +119,7 @@ fn with_highlights_each_pixel_counts_by_its_brightness_in_the_average() {
                     let picture = varied(height, width);
                     let expected = favouring_bright(&taps, highlights, edge, height, width, &picture);
                     let at = first_difference_within(
-                        &blur(radius, highlights, edge, height, width, &picture),
+                        &blur(radius, highlights, edge, height, width, &picture)?,
                         &expected,
                         TOLERANCE,
                     );
@@ -124,13 +131,14 @@ fn with_highlights_each_pixel_counts_by_its_brightness_in_the_average() {
             }
         }
     }
+    Ok(())
 }
 
 #[test]
-fn the_comparisons_tell_a_blur_that_differs_apart() {
+fn the_comparisons_tell_a_blur_that_differs_apart() -> Result<(), Error> {
     // the known-bad rows: another radius, another edge rule, and no highlights are not the blur with them
     let picture = varied(23, 31);
-    let ours = blur(5.0, 6.0, Edge::Reflect, 23, 31, &picture);
+    let ours = blur(5.0, 6.0, Edge::Reflect, 23, 31, &picture)?;
     let favoured = |radius, highlights, edge| favouring_bright(&disc(radius), highlights, edge, 23, 31, &picture);
     for other in [
         favoured(4.0, 6.0, Edge::Reflect),
@@ -139,10 +147,11 @@ fn the_comparisons_tell_a_blur_that_differs_apart() {
     ] {
         assert!(first_difference_within(&ours, &other, TOLERANCE).is_some());
     }
+    Ok(())
 }
 
 #[test]
-fn a_point_of_light_becomes_a_disc_whose_rim_pixels_weigh_their_share() {
+fn a_point_of_light_becomes_a_disc_whose_rim_pixels_weigh_their_share() -> Result<(), Error> {
     // by hand: a pixel wholly inside the disc has the weight of the middle one, one at the radius half of it, one half a
     // pixel beyond the radius none; the weights sum to 1 (a white point keeps all its light)
     for radius in [3.0, 6.0, 10.0] {
@@ -154,7 +163,7 @@ fn a_point_of_light_becomes_a_disc_whose_rim_pixels_weigh_their_share() {
             size,
             size,
             &impulse(size, size, middle, middle),
-        );
+        )?;
         let red = |down: usize, right: usize| f64::from(out[((middle + down) * size + middle + right) * 3]);
         let centre = red(0, 0);
         let radius_steps = radius as usize;
@@ -174,18 +183,19 @@ fn a_point_of_light_becomes_a_disc_whose_rim_pixels_weigh_their_share() {
         let all: f64 = out.iter().step_by(3).map(|value| f64::from(*value)).sum();
         assert!((all - 1.0).abs() < 1e-4, "radius {radius}: {all}");
     }
+    Ok(())
 }
 
 #[test]
-fn highlights_make_a_light_pixel_count_more_in_the_average_around_it() {
+fn highlights_make_a_light_pixel_count_more_in_the_average_around_it() -> Result<(), Error> {
     // a lone white pixel on black counts 1 + g times a black one: at a pixel with the plain disc's share k of it, the
     // light reaches k (1 + g) of a total weight of 1 + k g (every other neighbour weighs 1)
     let (size, middle) = (41, 20);
     let picture = impulse(size, size, middle, middle);
     let at = (middle * size + middle + 2) * 3;
-    let plain = f64::from(blur(6.0, 0.0, Edge::Nearest, size, size, &picture)[at]);
+    let plain = f64::from(blur(6.0, 0.0, Edge::Nearest, size, size, &picture)?[at]);
     for highlights in [2.0, 9.0] {
-        let out = f64::from(blur(6.0, highlights, Edge::Nearest, size, size, &picture)[at]);
+        let out = f64::from(blur(6.0, highlights, Edge::Nearest, size, size, &picture)?[at]);
         let gain = f64::from(highlights);
         let expected = plain * (1.0 + gain) / (1.0 + plain * gain);
         assert!(
@@ -193,16 +203,17 @@ fn highlights_make_a_light_pixel_count_more_in_the_average_around_it() {
             "highlights {highlights}: {out} against {expected}"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn a_flat_picture_stays_exactly_as_flat_with_and_without_highlights() {
+fn a_flat_picture_stays_exactly_as_flat_with_and_without_highlights() -> Result<(), Error> {
     // 0.7 is not a sum of weights in f32: the result is held to the picture's range, which is the one value
     for (height, width) in [(1, 1), (1, 40), (40, 1), (9, 13), (30, 41)] {
         let flat = vec![0.7_f32; height * width * 3];
         for edge in EDGES {
             for (radius, highlights) in [(0.0, 0.0), (1.5, 0.0), (9.0, 0.0), (1.5, 50.0), (9.0, 50.0)] {
-                let out = blur(radius, highlights, edge, height, width, &flat);
+                let out = blur(radius, highlights, edge, height, width, &flat)?;
                 assert_eq!(
                     first_difference_within(&out, &flat, 0.0),
                     None,
@@ -211,23 +222,25 @@ fn a_flat_picture_stays_exactly_as_flat_with_and_without_highlights() {
             }
         }
     }
+    Ok(())
 }
 
 #[test]
-fn radius_zero_and_a_disc_of_one_pixel_leave_the_picture_as_it_is() {
+fn radius_zero_and_a_disc_of_one_pixel_leave_the_picture_as_it_is() -> Result<(), Error> {
     let picture = varied(6, 5);
     for (radius, highlights) in [(0.0, 0.0), (0.0, 4.0), (0.3, 0.0)] {
-        let out = blur(radius, highlights, Edge::Reflect, 6, 5, &picture);
+        let out = blur(radius, highlights, Edge::Reflect, 6, 5, &picture)?;
         assert_eq!(
             first_difference_within(&out, &picture, 0.0),
             None,
             "radius {radius}, highlights {highlights}"
         );
     }
+    Ok(())
 }
 
 #[test]
-fn a_wrapped_blur_without_highlights_keeps_the_mean_of_every_channel() {
+fn a_wrapped_blur_without_highlights_keeps_the_mean_of_every_channel() -> Result<(), Error> {
     let (height, width) = (23, 31);
     let picture = varied(height, width);
     let mean = |values: &[f32], channel: usize| {
@@ -240,7 +253,7 @@ fn a_wrapped_blur_without_highlights_keeps_the_mean_of_every_channel() {
             / (height * width) as f64
     };
     for radius in [2.0, 9.5] {
-        let out = blur(radius, 0.0, Edge::Wrap, height, width, &picture);
+        let out = blur(radius, 0.0, Edge::Wrap, height, width, &picture)?;
         for channel in 0..3 {
             let (before, after) = (mean(&picture, channel), mean(&out, channel));
             assert!(
@@ -253,6 +266,7 @@ fn a_wrapped_blur_without_highlights_keeps_the_mean_of_every_channel() {
             "{radius} blurs"
         );
     }
+    Ok(())
 }
 
 proptest! {
@@ -266,7 +280,7 @@ proptest! {
         edge in 0_usize..4,
     ) {
         let flat = vec![level; 7 * 9 * 3];
-        let out = blur(radius, highlights, EDGES[edge], 7, 9, &flat);
+        let out = blur(radius, highlights, EDGES[edge], 7, 9, &flat)?;
         prop_assert!(out.iter().all(|&value| value.to_bits() == level.to_bits()), "level {level}");
     }
 
@@ -281,7 +295,7 @@ proptest! {
     ) {
         let picture = &picture[..height * width * 3];
         let (low, high) = picture.iter().fold((f32::MAX, f32::MIN), |(l, h), &v| (l.min(v), h.max(v)));
-        let out = blur(radius, highlights, EDGES[edge], height, width, picture);
+        let out = blur(radius, highlights, EDGES[edge], height, width, picture)?;
         prop_assert_eq!(out.len(), picture.len());
         prop_assert!(out.iter().all(|&value| (low..=high).contains(&value)), "outside {low}..{high}");
     }

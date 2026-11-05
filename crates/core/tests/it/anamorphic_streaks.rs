@@ -7,6 +7,7 @@
     reason = "small picture sizes"
 )]
 
+use bullterrier_image::Error;
 use bullterrier_image::effects::anamorphic_streaks::Params;
 use bullterrier_image::params::Color;
 use proptest::prelude::*;
@@ -19,8 +20,8 @@ use crate::common::pixels::run_picture;
 /// The pictures are compared at this distance: sums in f32 or by the transform, and the reference in f64.
 const TOLERANCE: f32 = 1e-4;
 
-fn streaks(params: &Params, height: usize, width: usize, picture: &[f32]) -> Vec<f32> {
-    run_picture(params, height, width, picture).unwrap_or_default()
+fn streaks(params: &Params, height: usize, width: usize, picture: &[f32]) -> Result<Vec<f32>, Error> {
+    run_picture(params, height, width, picture)
 }
 
 /// The weights of a streak along a row of `width` pixels: exp(-|distance| / length) to the farthest two columns of a row
@@ -56,7 +57,7 @@ fn by_definition(params: &Params, height: usize, width: usize, picture: &[f32]) 
 }
 
 #[test]
-fn the_picture_is_what_a_pixel_by_pixel_computation_from_the_definition_gives() {
+fn the_picture_is_what_a_pixel_by_pixel_computation_from_the_definition_gives() -> Result<(), Error> {
     // widths up to 16 are summed row by row, wider ones filtered by the Fourier transform; lengths from a pixel to far
     // more than the width (the tail then runs on to the edge)
     let shapes = [(1, 1), (1, 9), (9, 1), (5, 7), (6, 37), (3, 100)];
@@ -75,17 +76,18 @@ fn the_picture_is_what_a_pixel_by_pixel_computation_from_the_definition_gives() 
         for (height, width) in shapes {
             let picture = varied(height, width);
             let at = first_difference_within(
-                &streaks(&params, height, width, &picture),
+                &streaks(&params, height, width, &picture)?,
                 &by_definition(&params, height, width, &picture),
                 TOLERANCE,
             );
             assert_eq!(at, None, "length {length}, {height} x {width}: first differs at {at:?}");
         }
     }
+    Ok(())
 }
 
 #[test]
-fn the_comparison_tells_streaks_that_differ_apart() {
+fn the_comparison_tells_streaks_that_differ_apart() -> Result<(), Error> {
     // the known-bad rows: another length, another threshold and another colour are not these streaks; and the light does
     // not saturate, so the differences show
     let picture = varied(6, 37);
@@ -95,7 +97,7 @@ fn the_comparison_tells_streaks_that_differ_apart() {
         amount: 0.8,
         color: Color([1.0, 0.5, 0.25]),
     };
-    let ours = streaks(&params, 6, 37, &picture);
+    let ours = streaks(&params, 6, 37, &picture)?;
     let unsaturated = ours
         .iter()
         .zip(&picture)
@@ -118,10 +120,11 @@ fn the_comparison_tells_streaks_that_differ_apart() {
     ] {
         assert!(first_difference_within(&ours, &by_definition(&other, 6, 37, &picture), TOLERANCE).is_some());
     }
+    Ok(())
 }
 
 #[test]
-fn a_single_bright_pixel_spreads_along_its_row_only_and_nothing_enters_from_beyond_the_edge() {
+fn a_single_bright_pixel_spreads_along_its_row_only_and_nothing_enters_from_beyond_the_edge() -> Result<(), Error> {
     let (height, width) = (9, 40);
     let params = Params {
         length: 8.0,
@@ -129,7 +132,7 @@ fn a_single_bright_pixel_spreads_along_its_row_only_and_nothing_enters_from_beyo
         amount: 3.0,
         color: Color([1.0, 0.5, 0.25]),
     };
-    let out = streaks(&params, height, width, &impulse(height, width, 4, 12));
+    let out = streaks(&params, height, width, &impulse(height, width, 4, 12))?;
     assert!(out[(4 * width + 30) * 3] > 0.0, "far along the row");
     for row in (0..height).filter(|row| *row != 4) {
         assert!(
@@ -150,36 +153,38 @@ fn a_single_bright_pixel_spreads_along_its_row_only_and_nothing_enters_from_beyo
         height,
         width,
         &impulse(height, width, 4, 0),
-    );
+    )?;
     assert!(edge[(4 * width + 1) * 3] > 0.1);
     assert!(edge[(4 * width + 39) * 3] < 1e-6);
     assert!((edge[4 * width * 3] - 1.0).abs() < 1e-6);
+    Ok(())
 }
 
 #[test]
-fn a_longer_streak_reaches_further_and_lights_less_close_by() {
+fn a_longer_streak_reaches_further_and_lights_less_close_by() -> Result<(), Error> {
     let (height, width) = (5, 81);
     let picture = impulse(height, width, 2, 40);
-    let row = |length: f32| {
+    let row = |length: f32| -> Result<Vec<f32>, Error> {
         let params = Params {
             length,
             threshold: 0.5,
             amount: 1.0,
             ..Params::default()
         };
-        streaks(&params, height, width, &picture)[2 * width * 3..3 * width * 3]
+        Ok(streaks(&params, height, width, &picture)?[2 * width * 3..3 * width * 3]
             .iter()
             .step_by(3)
             .copied()
-            .collect::<Vec<_>>()
+            .collect())
     };
-    let (short, long) = (row(4.0), row(32.0));
+    let (short, long) = (row(4.0)?, row(32.0)?);
     assert!(long[70] > short[70], "30 px away the long streak is brighter");
     assert!(long[41] < short[41], "next to the source the short one is");
+    Ok(())
 }
 
 #[test]
-fn white_keeps_the_colour_of_the_light_and_a_colour_tints_it() {
+fn white_keeps_the_colour_of_the_light_and_a_colour_tints_it() -> Result<(), Error> {
     let (height, width) = (9, 40);
     let mut red = vec![0.0_f32; height * width * 3];
     red[(4 * width + 12) * 3] = 1.0;
@@ -189,7 +194,7 @@ fn white_keeps_the_colour_of_the_light_and_a_colour_tints_it() {
         amount: 3.0,
         color: Color([1.0, 1.0, 1.0]),
     };
-    let out = streaks(&params, height, width, &red);
+    let out = streaks(&params, height, width, &red)?;
     assert!(out[(4 * width + 20) * 3] > 0.01);
     assert!(
         out.iter()
@@ -207,18 +212,19 @@ fn white_keeps_the_colour_of_the_light_and_a_colour_tints_it() {
         height,
         width,
         &spot,
-    );
+    )?;
     let at = (4 * width + 20) * 3;
     let (r, g, b) = (out[at], out[at + 1], out[at + 2]);
     assert!(b > g && g > r && r > 0.0);
     assert!((g / b - 0.5).abs() < 1e-4 && (r / b - 0.2).abs() < 1e-4);
+    Ok(())
 }
 
 #[test]
-fn black_no_amount_and_a_threshold_above_every_value_leave_the_picture_as_it_is() {
+fn black_no_amount_and_a_threshold_above_every_value_leave_the_picture_as_it_is() -> Result<(), Error> {
     let black = vec![0.0_f32; 9 * 40 * 3];
     assert_eq!(
-        first_difference_within(&streaks(&Params::default(), 9, 40, &black), &black, 0.0),
+        first_difference_within(&streaks(&Params::default(), 9, 40, &black)?, &black, 0.0),
         None
     );
     let dim: Vec<f32> = varied(9, 40).iter().map(|value| value * 0.5).collect();
@@ -227,13 +233,14 @@ fn black_no_amount_and_a_threshold_above_every_value_leave_the_picture_as_it_is(
         amount: 10.0,
         ..Params::default()
     };
-    assert_eq!(first_difference_within(&streaks(&high, 9, 40, &dim), &dim, 1e-6), None);
+    assert_eq!(first_difference_within(&streaks(&high, 9, 40, &dim)?, &dim, 1e-6), None);
     let off = Params {
         amount: 0.0,
         threshold: 0.0,
         ..Params::default()
     };
-    assert_eq!(first_difference_within(&streaks(&off, 9, 40, &dim), &dim, 0.0), None);
+    assert_eq!(first_difference_within(&streaks(&off, 9, 40, &dim)?, &dim, 0.0), None);
+    Ok(())
 }
 
 proptest! {
@@ -250,7 +257,7 @@ proptest! {
     ) {
         let picture = &picture[..height * width * 3];
         let params = Params { length, threshold, amount, ..Params::default() };
-        let out = streaks(&params, height, width, picture);
+        let out = streaks(&params, height, width, picture)?;
         prop_assert_eq!(out.len(), picture.len());
         prop_assert!(out.iter().zip(picture).all(|(out, base)| out >= base && *out <= 1.0), "brighter, at most white");
     }
