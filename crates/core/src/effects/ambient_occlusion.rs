@@ -55,7 +55,8 @@ pub struct Params {
 
 /// The picture times one grey factor, 1 - clip(gain x (the field's Gaussian mean - the field), 0, 1).
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    // the runner hands an effect every field it declares; without one the picture is as it is
+    // `Inputs::declared_by` refuses an offer that lacks a declared field, so this branch is out of reach: `render` cannot
+    // return an error, and a field cannot be read without an Option
     let Some(field) = inputs.field("field") else {
         return Image::from_pixels(picture.height(), picture.width(), picture.pixels().to_vec());
     };

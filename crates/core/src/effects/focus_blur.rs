@@ -67,7 +67,8 @@ pub struct Params {
 /// The picture blurred by w x `radius` at each pixel, w the distance of its field from the sharp band.
 #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "levels is from 1 to 16")]
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    // the runner hands an effect every field it declares; without one the picture is as it is
+    // `Inputs::declared_by` refuses an offer that lacks a declared field, so this branch is out of reach: `render` cannot
+    // return an error, and a field cannot be read without an Option
     let Some(field) = inputs.field("field") else {
         return Image::from_pixels(picture.height(), picture.width(), picture.pixels().to_vec());
     };

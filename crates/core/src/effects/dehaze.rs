@@ -72,10 +72,9 @@ pub struct Params {
     pub airlight_fraction: f32,
     /// What the darkest-value search sees beyond the picture's edge, which sets the haze estimate along the border
     /// (dehaze filters by local darkest values rather than warping, so the default is 'nearest', not 'reflect'):
-    /// 'nearest' (the edge pixel repeated) and 'reflect' (mirrored, edge pixel repeated) look only at pixels of the
-    /// patch inside the picture and give the same result; 'mirror' (mirrored about the edge pixel) also looks at pixels
-    /// up to half a patch from the border; 'wrap' (the opposite edge) lets the far side's darkest values set the haze
-    /// at the border.
+    /// 'nearest' (the edge pixel repeated), 'reflect' (mirrored, edge pixel repeated) and 'mirror' (mirrored about the
+    /// edge pixel) look only at pixels of the patch inside the picture, and for an odd patch give the same result;
+    /// 'wrap' (the opposite edge) lets the far side's darkest values set the haze at the border.
     #[param(default = Nearest, advanced)]
     pub edge: Edge,
 }
