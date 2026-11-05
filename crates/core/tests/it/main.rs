@@ -39,6 +39,7 @@ mod inputs;
 mod lens_blur;
 mod lens_flare;
 mod light_leak;
+mod light_rays;
 mod limits;
 mod lut;
 mod lut_cube;
