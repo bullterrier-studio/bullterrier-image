@@ -11,7 +11,7 @@ Edge = Literal["reflect", "constant", "nearest", "mirror", "wrap"]
 _FFT_FROM_RADIUS = 32
 # The one table of the edge rules: scipy's names under numpy's for the same extension (scipy 'reflect' repeats the edge
 # pixel, as numpy's 'symmetric' does; scipy 'mirror' does not, as numpy's 'reflect' does not).
-# `bullterrier_image.ops.convolve` reads it too, so the two modules cannot disagree about what an edge rule means.
+# `bullterrier_image.ops.edges` and `relief` read it too, so the modules cannot disagree about what an edge rule means.
 NUMPY_PAD: dict[Edge, Literal["symmetric", "reflect", "edge", "wrap", "constant"]] = {
     "reflect": "symmetric",
     "mirror": "reflect",

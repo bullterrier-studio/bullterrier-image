@@ -167,6 +167,14 @@ ROWS = [
     pytest.param("starburst", {"threshold": 1.0}, False, id="starburst: threshold above the highest"),
     pytest.param("starburst", {"seed": 2147483648}, False, id="starburst: seed above the highest"),
     pytest.param("starburst", {"color": "nope"}, False, id="starburst: text that is no colour"),
+    pytest.param(
+        "anamorphic_streaks",
+        {"length": 480, "threshold": 0.99, "amount": 10},
+        True,
+        id="anamorphic_streaks: highest settings",
+    ),
+    pytest.param("anamorphic_streaks", {"length": 0.4}, False, id="anamorphic_streaks: length below the lowest"),
+    pytest.param("anamorphic_streaks", {"color": [0, 0, 2]}, False, id="anamorphic_streaks: a channel above 1"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),

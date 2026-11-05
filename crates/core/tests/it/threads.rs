@@ -186,7 +186,7 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
-            "blurs and spikes by a line, a disc and rays, summed tap by tap, row by row and by the Fourier transform",
+            "blurs, spikes and streaks, summed tap by tap, row by row and by the Fourier transform",
             Recipe::new([
                 Step::new("motion_blur")
                     .param("angle", 20)
@@ -213,6 +213,10 @@ fn cases() -> Vec<Case> {
                     .param("spacing", 3)
                     .param("variation", 0.4)
                     .param("seed", 3),
+                Step::new("anamorphic_streaks")
+                    .param("length", 40)
+                    .param("threshold", 0.4)
+                    .param("amount", 1),
             ]),
             // (lengths are in design px: 6 times them on the thin pictures, under half of them on the squarish ones)
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
