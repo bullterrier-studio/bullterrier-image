@@ -27,6 +27,8 @@ pub(crate) struct Kernel {
     reach: (usize, usize),
     /// The weights row after row, `2 reach.0 + 1` rows of `2 reach.1 + 1`, summing to 1.
     weights: Vec<f64>,
+    /// What the weights summed to before they were scaled to 1.
+    total: f64,
 }
 
 impl Kernel {
@@ -52,7 +54,17 @@ impl Kernel {
                 weights[row * cols + col] / total
             })
             .collect();
-        Self { reach: far, weights }
+        Self {
+            reach: far,
+            weights,
+            total,
+        }
+    }
+
+    /// What the weights given to [`Kernel::from_fn`] summed to, before they were scaled to 1: the factor that turns a
+    /// mean back into the sum of the weighted samples.
+    pub(crate) const fn total(&self) -> f64 {
+        self.total
     }
 
     /// The weights at distance 0, 1, ... from the middle of the one row of a kernel that has one and is the same on

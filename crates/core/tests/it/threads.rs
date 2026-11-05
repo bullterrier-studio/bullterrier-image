@@ -186,7 +186,7 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
-            "blurs by a line and a disc, summed tap by tap, row by row and by the Fourier transform",
+            "blurs and spikes by a line, a disc and rays, summed tap by tap, row by row and by the Fourier transform",
             Recipe::new([
                 Step::new("motion_blur")
                     .param("angle", 20)
@@ -205,6 +205,14 @@ fn cases() -> Vec<Case> {
                     .param("highlights", 5)
                     .param("edge", "wrap"),
                 Step::new("lens_blur").param("radius", 12).param("edge", "nearest"),
+                Step::new("starburst")
+                    .param("rays", 5)
+                    .param("length", 30)
+                    .param("threshold", 0.5)
+                    .param("limit", 0.3)
+                    .param("spacing", 3)
+                    .param("variation", 0.4)
+                    .param("seed", 3),
             ]),
             // (lengths are in design px: 6 times them on the thin pictures, under half of them on the squarish ones)
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],

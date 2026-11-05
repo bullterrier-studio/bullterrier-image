@@ -412,18 +412,22 @@ def _register_core_effects() -> None:
 def _core_runner(name: str, fields: tuple[str, ...]) -> Callable[..., np.ndarray]:
     """The function of the core effect `name`: it hands the validated parameters to the core, a `Lut` parameter as
     the core's table, which the effect finds in its inputs under the parameter's name (the value is then none), and the
-    array of each field parameter in `fields` (keyword-only, as the registry asks of every effect) the same way."""
+    array of each field parameter in `fields` (keyword-only, as the registry asks of every effect) the same way. An
+    effect that declares `size_ratio` takes it as a keyword, 1 outside a recipe."""
+    sized = "size_ratio" in native.effect(name)["inputs"]
 
     def run(rgb: np.ndarray, params: Any, **arrays: np.ndarray) -> np.ndarray:
+        size_ratio = arrays.pop("size_ratio", 1.0)
         values = params.model_dump()
         luts = {field: core_table(values[field]) for field in lut_fields(type(params))}
-        return _core.apply(name, rgb, values | dict.fromkeys(luts), luts=luts, fields=arrays)
+        return _core.apply(name, rgb, values | dict.fromkeys(luts), size_ratio=size_ratio, luts=luts, fields=arrays)
 
     run.__signature__ = inspect.Signature(  # type: ignore[attr-defined]  # what `_check_shape` reads, in place of `**arrays`
         [
             inspect.Parameter("rgb", inspect.Parameter.POSITIONAL_OR_KEYWORD),
             inspect.Parameter("params", inspect.Parameter.POSITIONAL_OR_KEYWORD),
             *(inspect.Parameter(field, inspect.Parameter.KEYWORD_ONLY) for field in fields),
+            *([inspect.Parameter("size_ratio", inspect.Parameter.KEYWORD_ONLY, default=1.0)] if sized else []),
         ]
     )
     run.__name__ = run.__qualname__ = name

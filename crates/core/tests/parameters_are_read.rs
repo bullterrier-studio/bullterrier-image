@@ -162,6 +162,12 @@ fn conditional() -> Vec<Conditional> {
             field: "edge",
             with: vec![("patch", json!(3))],
         },
+        // the seed draws the points of a bright area and their brightness, which the defaults leave all alike
+        Conditional {
+            effect: "starburst",
+            field: "seed",
+            with: vec![("spacing", json!(3.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

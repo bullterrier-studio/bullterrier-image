@@ -160,6 +160,13 @@ ROWS = [
     ),
     pytest.param("lens_blur", {"radius": 100.5}, False, id="lens_blur: radius above the highest"),
     pytest.param("lens_blur", {"edge": "constant"}, False, id="lens_blur: constant is not one of its four edges"),
+    pytest.param(
+        "starburst", {"rays": 32, "length": 600, "limit": 0, "seed": 2147483647}, True, id="starburst: highest settings"
+    ),
+    pytest.param("starburst", {"rays": 0}, False, id="starburst: rays below the lowest"),
+    pytest.param("starburst", {"threshold": 1.0}, False, id="starburst: threshold above the highest"),
+    pytest.param("starburst", {"seed": 2147483648}, False, id="starburst: seed above the highest"),
+    pytest.param("starburst", {"color": "nope"}, False, id="starburst: text that is no colour"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),

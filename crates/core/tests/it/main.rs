@@ -80,6 +80,7 @@ mod shards;
 mod shards_sites;
 mod sharpen;
 mod spatial;
+mod starburst;
 mod svg;
 mod svg_drawing;
 mod threads;

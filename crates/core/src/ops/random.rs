@@ -21,11 +21,15 @@ fn splitmix(state: &mut u64) -> u64 {
     word ^ (word >> 31) // constant: SplitMix64 final shift
 }
 
-/// A hash of `seed` and `words` (a position in a lattice, say): one `SplitMix64` step, which is a bijection of the 64 bits,
-/// for each word xored into the state. The same arguments give the same word on every platform; it keeps no state, so
-/// the value at a position never depends on which others were asked for.
+/// A hash of `seed` and `words` (a position in a lattice, say): the seed is scrambled by one `SplitMix64` step, which is a
+/// bijection of the 64 bits, and then each word is xored into the state and scrambled the same. The same arguments give
+/// the same word on every platform; it keeps no state, so the value at a position never depends on which others were
+/// asked for. The seed is scrambled before any word meets it, so that a seed and a position never cancel (with the seed
+/// xored into the first word, seed 1 at position 0 would draw what seed 0 draws at position 1).
 pub(crate) fn mix(seed: u32, words: &[u64]) -> u64 {
-    words.iter().fold(u64::from(seed), |state, word| {
+    let mut state = u64::from(seed);
+    let start = splitmix(&mut state);
+    words.iter().fold(start, |state, word| {
         let mut moved = state ^ word;
         splitmix(&mut moved)
     })
