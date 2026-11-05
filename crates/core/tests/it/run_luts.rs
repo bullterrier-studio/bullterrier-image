@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::common::compare::assert_close;
 use crate::common::files::Scratch;
+use crate::common::pictures::counted;
 use crate::common::run::{Registered, unique};
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
 use bullterrier_image::region::{Grid, Shares};
@@ -63,11 +64,6 @@ impl Effect for Tablet {
     }
 }
 
-/// The values of a 4 x 6 picture, a different one in every channel (up to 71 / 80).
-fn values() -> Vec<f32> {
-    (0_u8..72).map(|index| f32::from(index) / 80.0).collect()
-}
-
 /// The table of two entries per axis whose every entry is `1 - input`: the negative.
 fn negative() -> Result<Lut, Error> {
     let entries = (0..8_usize)
@@ -88,7 +84,7 @@ fn render(photo: &Photo<'_>, recipe: &Recipe) -> Result<Vec<f32>, Error> {
 #[test]
 fn a_table_given_to_the_photo_reaches_the_step_that_names_it() -> Result<(), Error> {
     let tablet = Registered::new(Tablet::new())?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?).with_lut("negative", Arc::new(negative()?));
     let made = render(
         &photo,
@@ -102,7 +98,7 @@ fn a_table_given_to_the_photo_reaches_the_step_that_names_it() -> Result<(), Err
 #[test]
 fn a_step_that_names_no_table_gets_none_and_the_effect_sees_the_identity() -> Result<(), Error> {
     let tablet = Registered::new(Tablet::new())?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?).with_lut("negative", Arc::new(negative()?));
     for step in [
         Step::new(tablet.name()),
@@ -116,7 +112,7 @@ fn a_step_that_names_no_table_gets_none_and_the_effect_sees_the_identity() -> Re
 #[test]
 fn each_step_gets_the_table_of_its_own_name() -> Result<(), Error> {
     let tablet = Registered::new(Tablet::new())?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?)
         .with_lut("negative", Arc::new(negative()?))
         .with_lut("quarter", Arc::new(flat(0.25)?));
@@ -178,7 +174,7 @@ fn a_cube_file_named_by_a_step_is_read_and_a_given_table_of_that_name_wins() -> 
     let rows = "0.5 0.5 0.5\n".repeat(8);
     let path = folder.write("half.cube", format!("LUT_3D_SIZE 2\n{rows}"))?;
     let named = path.display().to_string();
-    let values = values();
+    let values = counted();
     let recipe = Recipe::new([Step::new(tablet.name()).param("file", named.as_str())]);
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     assert_close(&render(&photo, &recipe)?, &vec![0.5; 72], 1e-5, "read from the file");
@@ -191,7 +187,7 @@ fn a_cube_file_named_by_a_step_is_read_and_a_given_table_of_that_name_wins() -> 
 #[test]
 fn a_name_that_is_no_table_and_no_file_is_refused_naming_the_step_the_parameter_and_the_name() -> Result<(), Error> {
     let tablet = Registered::new(Tablet::new())?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     let recipe = Recipe::new([
         Step::new(tablet.name()),
@@ -230,7 +226,7 @@ fn a_value_that_is_not_a_name_is_refused_when_the_recipe_is_checked() -> Result<
 #[test]
 fn a_table_offered_to_apply_reaches_the_effect_under_its_parameter() -> Result<(), Error> {
     let tablet = Registered::new(Tablet::new())?;
-    let values = values();
+    let values = counted();
     let picture = Picture::new(4, 6, &values)?;
     let table = negative()?;
     let inputs = Inputs::default().with_lut("file", &table);

@@ -48,3 +48,9 @@ pub(crate) fn step(height: usize, width: usize, low: f32, high: f32) -> Vec<f32>
         .map(|index| if index / 3 % width < width / 2 { low } else { high })
         .collect()
 }
+
+/// The values of a 4 x 6 picture counted up through its channels: value `i` is `i / 80`, a different one in every
+/// channel (up to 71 / 80).
+pub(crate) fn counted() -> Vec<f32> {
+    (0_u8..72).map(|index| f32::from(index) / 80.0).collect()
+}

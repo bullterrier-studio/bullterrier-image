@@ -5,14 +5,10 @@
 use std::sync::Arc;
 
 use crate::common::Outcome;
+use crate::common::pictures::counted;
 use crate::common::run::{Finds, Paint, Recorder, Registered, Shrinks, probe_table};
 use bullterrier_image::region::Given;
 use bullterrier_image::{Drive, Error, ErrorKind, Layer, Options, Photo, Picture, Presets, Recipe, Step};
-
-/// The values of a 4 x 6 picture, a different one in every channel.
-fn values() -> Vec<f32> {
-    (0_u8..72).map(|index| f32::from(index) / 80.0).collect()
-}
 
 /// A map of the 4 x 6 picture whose every value is `level`.
 fn flat(level: f32) -> Result<Layer, Error> {
@@ -23,7 +19,7 @@ fn flat(level: f32) -> Result<Layer, Error> {
 fn a_recipe_that_breaks_a_rule_of_a_look_is_refused_before_anything_runs() -> Outcome {
     let recorder = Registered::new(Recorder::new(&[], &[]).with_table(probe_table()))?;
     let name = recorder.name();
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     // the first step is fine; the second names no effect, a value out of range or a mask that is no region
     for (recipe, said) in [
@@ -51,7 +47,7 @@ fn a_recipe_that_breaks_a_rule_of_a_look_is_refused_before_anything_runs() -> Ou
 #[test]
 fn a_field_parameter_receives_the_map_its_step_names_or_the_effects_default() -> Outcome {
     let recorder = Registered::new(Recorder::new(&[], &["near", "far"]))?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?)
         .with_map("subject", flat(0.25)?)?
         .with_map("NEAR", flat(0.75)?)?
@@ -95,7 +91,7 @@ fn subject_received(recorder: &Registered<Recorder>, photo: &Photo<'_>) -> Resul
 #[test]
 fn a_map_given_again_under_the_same_name_replaces_the_first() -> Outcome {
     let recorder = Registered::new(Recorder::new(&[], &["near"]))?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?)
         .with_map("subject", flat(0.25)?)?
         .with_map("subject", flat(0.75)?)?;
@@ -106,7 +102,7 @@ fn a_map_given_again_under_the_same_name_replaces_the_first() -> Outcome {
 #[test]
 fn a_finder_given_again_under_the_same_name_replaces_the_first() -> Outcome {
     let recorder = Registered::new(Recorder::new(&[], &["near"]))?;
-    let values = values();
+    let values = counted();
     let (first, second) = (Arc::new(Finds::flat(0.25)), Arc::new(Finds::flat(0.75)));
     let photo = Photo::new(Picture::new(4, 6, &values)?)
         .with_finder("subject", first.clone())
@@ -120,7 +116,7 @@ fn a_finder_given_again_under_the_same_name_replaces_the_first() -> Outcome {
 fn a_drive_the_photo_has_no_map_for_or_that_breaks_a_rule_refuses_the_render_and_nothing_runs() -> Outcome {
     let recorder = Registered::new(Recorder::new(&[], &[]))?;
     let drive = |by: &str| Drive::new(by, 0.0, 1.0);
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     for (step, said) in [
         (Step::new(recorder.name()).param("x", drive("depth")), "'depth'"),
@@ -154,7 +150,7 @@ fn a_drive_the_photo_has_no_map_for_or_that_breaks_a_rule_refuses_the_render_and
 #[test]
 fn an_effect_that_changes_the_pictures_shape_fails_naming_it() -> Outcome {
     let shrinks = Registered::new(Shrinks::new())?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     let result = photo.render(
         &Recipe::new([Step::new(shrinks.name())]),
@@ -177,11 +173,11 @@ fn each_step_runs_on_the_output_of_the_one_before_and_the_photo_is_left_as_it_wa
         Step::new(paint.name()).param("level", 0.75).opacity(1.0),
         Step::new(recorder.name()),
     ]);
-    let before = values();
+    let before = counted();
     let photo = Photo::new(Picture::new(4, 6, &before)?);
     let image = photo.render(&recipe, &Presets::new(), Options::default())?;
     assert_eq!(image.into_values(), vec![0.75; 72]);
-    assert_eq!(before, values());
+    assert_eq!(before, counted());
     // what the second step was handed is the first one's picture, not the photo
     assert_eq!(recorder.received()[0].picture, vec![0.75; 72]);
     Ok(())

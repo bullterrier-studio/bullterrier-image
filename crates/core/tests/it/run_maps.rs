@@ -5,14 +5,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::common::Outcome;
+use crate::common::pictures::counted;
 use crate::common::run::{Finds, Paint, Recorder, Registered};
 use bullterrier_image::region::{Given, Svg};
 use bullterrier_image::{Each, Error, ErrorKind, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
-
-/// The values of a 4 x 6 picture, a different one in every channel (up to 71 / 80).
-fn values() -> Vec<f32> {
-    (0_u8..72).map(|index| f32::from(index) / 80.0).collect()
-}
 
 /// A map of the 4 x 6 picture whose every value is `level`.
 fn flat(level: f32) -> Result<Layer, Error> {
@@ -85,7 +81,7 @@ const NAMES: [(&str, ErrorKind); 3] = [
 #[test]
 fn a_finder_is_asked_once_for_a_map_however_many_steps_and_renders_use_it() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let finder = Arc::new(Finds::flat(0.25));
     let photo = Photo::new(Picture::new(4, 6, &values)?).with_finder("subject", finder.clone());
     let twice = recipe([rig.uses("subject"), rig.uses("subject").mask("subject")], &[]);
@@ -102,7 +98,7 @@ fn a_finder_is_asked_once_for_a_map_however_many_steps_and_renders_use_it() -> O
 #[test]
 fn a_map_handed_in_is_used_and_its_finder_is_never_asked() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let finder = Arc::new(Finds::flat(0.25));
     let photo = Photo::new(Picture::new(4, 6, &values)?)
         .with_finder("subject", finder.clone())
@@ -116,7 +112,7 @@ fn a_map_handed_in_is_used_and_its_finder_is_never_asked() -> Outcome {
 #[test]
 fn a_finder_is_not_asked_for_a_map_that_no_step_uses() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let (subject, depth) = (Arc::new(Finds::flat(0.25)), Arc::new(Finds::flat(0.75)));
     let photo = Photo::new(Picture::new(4, 6, &values)?)
         .with_finder("subject", subject.clone())
@@ -131,7 +127,7 @@ fn a_finder_is_not_asked_for_a_map_that_no_step_uses() -> Outcome {
 #[test]
 fn every_map_a_recipe_needs_is_found_before_its_first_step_runs() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     // the finder notes how many steps had run when it was asked
     let (recorder, ran) = (rig.recorder.shared(), Arc::new(AtomicUsize::new(usize::MAX)));
     let noted = ran.clone();
@@ -148,7 +144,7 @@ fn every_map_a_recipe_needs_is_found_before_its_first_step_runs() -> Outcome {
 #[test]
 fn a_finder_is_given_the_photo_as_it_is_and_its_map_is_what_the_steps_get() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     // the map is the photo's red channel
     let finder = Finds::new(|picture| {
         let red = picture.values().chunks(3).map(|pixel| pixel[0]).collect();
@@ -173,7 +169,7 @@ fn a_finder_is_given_the_photo_as_it_is_and_its_map_is_what_the_steps_get() -> O
 #[test]
 fn a_photo_shared_between_threads_still_asks_its_finder_once() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     // the finder lingers, giving any thread that was let in beside it time to ask too
     let inside = Arc::new(AtomicUsize::new(0));
     let entered = inside.clone();
@@ -203,7 +199,7 @@ fn a_photo_shared_between_threads_still_asks_its_finder_once() -> Outcome {
 #[test]
 fn the_background_is_one_minus_the_subject() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     // quarters, exact in f32: a subject of 0, 1/4, 1/2, 3/4, 1 and 1/4 again, repeated
     let subject: Vec<f32> = (0..24)
         .map(|index| [0.0, 0.25, 0.5, 0.75, 1.0, 0.25][index % 6])
@@ -262,7 +258,7 @@ fn a_picture_that_is_no_picture_has_no_light() -> Outcome {
 #[test]
 fn a_map_nobody_gave_is_refused_as_that_maps_error_naming_the_recipe_and_nothing_runs() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     // (what the step works from, the map that is missing, the error the package raises it as)
     let rows = [
@@ -285,7 +281,7 @@ fn a_map_nobody_gave_is_refused_as_that_maps_error_naming_the_recipe_and_nothing
 
 #[test]
 fn a_map_of_another_size_than_the_picture_is_refused_when_it_is_handed_in_used_or_not() -> Outcome {
-    let values = values();
+    let values = counted();
     for (name, kind) in NAMES {
         // too small, and the picture turned on its side
         for (height, width) in [(2, 2), (6, 4), (4, 3)] {
@@ -307,7 +303,7 @@ fn a_map_of_another_size_than_the_picture_is_refused_when_it_is_handed_in_used_o
 #[test]
 fn a_finder_answering_a_map_of_another_size_than_the_picture_is_refused_and_nothing_runs() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     for (name, kind) in NAMES {
         for (height, width) in [(2, 2), (6, 4), (4, 3)] {
             let finder = Finds::new(move |_| Layer::new(height, width, vec![0.5; height * width]));
@@ -328,7 +324,7 @@ fn a_finder_answering_a_map_of_another_size_than_the_picture_is_refused_and_noth
 #[test]
 fn what_a_finder_fails_with_is_the_renders_error_and_a_failure_is_not_remembered() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let finder = Arc::new(Finds::new(|_| {
         Err(Error::map_not_found("subject", "nothing stands out"))
     }));
@@ -358,7 +354,7 @@ fn what_a_finder_fails_with_is_the_renders_error_and_a_failure_is_not_remembered
 #[test]
 fn a_name_that_is_no_map_of_the_recipe_is_refused_listing_the_names_there_are() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let picture = Picture::new(4, 6, &values)?;
     // the recipe uses no map at all: the names given are checked all the same
     let look = recipe([rig.paint()], &["star"]);
@@ -392,7 +388,7 @@ fn a_name_that_is_no_map_of_the_recipe_is_refused_listing_the_names_there_are() 
 #[test]
 fn a_region_that_cannot_be_made_is_refused_by_name_when_a_step_uses_it_and_costs_nothing_unused() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let mut look = Recipe::new([rig.paint()]);
     look.steps.push(Each::new("cut", [None]).into());
     // an svg region with no file

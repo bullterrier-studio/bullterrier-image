@@ -3,18 +3,14 @@
 
 use crate::common::Outcome;
 use crate::common::compare::assert_close;
+use crate::common::pictures::counted;
 use crate::common::run::{Paint, Recorder, Registered, length_table, probe_table};
 use bullterrier_image::{Drive, Error, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 use serde_json::{Value, json};
 
-/// The values of a 4 x 6 picture, a different one in every channel.
-fn values() -> Vec<f32> {
-    (0_u8..72).map(|index| f32::from(index) / 80.0).collect()
-}
-
 /// `recipe` rendered on the 4 x 6 picture.
 fn rendered(recipe: &Recipe, presets: &Presets) -> Result<Image, Error> {
-    let values = values();
+    let values = counted();
     Photo::new(Picture::new(4, 6, &values)?).render(recipe, presets, Options::default())
 }
 
@@ -56,10 +52,10 @@ fn a_step_that_sets_no_opacity_has_the_opacity_its_effect_declares() -> Outcome 
     let paint = || Step::new(painter.name()).param("level", 0.5);
     // `paint` declares an opacity of 0.25: a quarter of the way from the photo (value v) to 0.5 is v + 0.25 (0.5 - v)
     let default = rendered(&Recipe::new([paint()]), &Presets::new())?;
-    let expected: Vec<f32> = values().iter().map(|v| v + 0.25 * (0.5 - v)).collect();
+    let expected: Vec<f32> = counted().iter().map(|v| v + 0.25 * (0.5 - v)).collect();
     assert_close(&default.into_values(), &expected, 1e-6, "the step");
     let own = rendered(&Recipe::new([paint().opacity(0.5)]), &Presets::new())?;
-    let expected: Vec<f32> = values().iter().map(|v| v + 0.5 * (0.5 - v)).collect();
+    let expected: Vec<f32> = counted().iter().map(|v| v + 0.5 * (0.5 - v)).collect();
     assert_close(&own.into_values(), &expected, 1e-6, "the step");
     let full = rendered(&Recipe::new([paint().opacity(1.0)]), &Presets::new())?;
     assert_eq!(full.into_values(), vec![0.5; 72]);

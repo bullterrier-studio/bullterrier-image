@@ -5,13 +5,9 @@
 use std::sync::Arc;
 
 use crate::common::Outcome;
+use crate::common::pictures::counted;
 use crate::common::run::{Finds, Paint, Recorder, Registered};
 use bullterrier_image::{BlendMode, Drive, Error, Image, Layer, Options, Photo, Picture, Presets, Recipe, Stage, Step};
-
-/// The values of a 4 x 6 picture, a different one in every channel.
-fn values() -> Vec<f32> {
-    (0_u8..72).map(|index| f32::from(index) / 80.0).collect()
-}
 
 /// A 4 x 6 map whose values step through `pattern`, repeated.
 fn map(pattern: [f32; 4]) -> Result<Layer, Error> {
@@ -96,7 +92,7 @@ fn traced(photo: &Photo<'_>, recipe: &Recipe) -> Result<Vec<Stage>, Error> {
 #[test]
 fn the_last_stage_of_a_trace_is_exactly_what_render_returns() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let photo = photo(&values)?;
     for (name, recipe) in rig.recipes() {
         let stages = traced(&photo, &recipe)?;
@@ -113,7 +109,7 @@ fn the_last_stage_of_a_trace_is_exactly_what_render_returns() -> Outcome {
 #[test]
 fn the_picture_after_each_step_is_what_the_recipe_cut_off_after_that_step_renders() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let photo = photo(&values)?;
     for (name, recipe) in rig.recipes() {
         let stages = traced(&photo, &recipe)?;
@@ -143,7 +139,7 @@ fn the_picture_after_each_step_is_what_the_recipe_cut_off_after_that_step_render
 #[test]
 fn the_stages_are_the_input_the_maps_the_recipe_uses_and_one_picture_per_step() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let photo = photo(&values)?;
     // (the recipe, the stages it makes)
     let rows = [
@@ -181,7 +177,7 @@ fn the_stages_are_the_input_the_maps_the_recipe_uses_and_one_picture_per_step() 
 #[test]
 fn a_trace_finds_its_maps_like_a_render_does_and_fails_where_it_would() -> Outcome {
     let rig = rig()?;
-    let values = values();
+    let values = counted();
     let finder = Arc::new(Finds::flat(0.5));
     let photo = Photo::new(Picture::new(4, 6, &values)?).with_finder("subject", finder.clone());
     let uses_subject = Recipe::new([rig.near("subject")]);
