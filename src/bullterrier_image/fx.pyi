@@ -20,14 +20,7 @@ def _effect[**P](function: collections.abc.Callable[P, Step]) -> _Effect[P]: ...
 
 @_effect
 def ambient_occlusion(*, field: str = 'depth', radius: float = 10.0, gain: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer.
-
-Screen-space, from the depth alone: a pixel's cavity is the depth averaged by a Gaussian of sigma `radius` minus
-its own depth, positive where it lies farther than its surroundings. It is darkened by clip(gain x cavity, 0, 1),
-one grey factor on every channel, so the colour ratios are kept and nothing is brightened. Flat and evenly sloping
-depths are left as they are. A depth step at a subject's outline darkens its farther side (a contact shadow) and
-leaves the nearer side alone; raising `radius` widens that shadow. The step's `opacity` sets how much is mixed in.
-`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1, 1 = nearest.
+    """An ambient occlusion: each pixel darkened by `gain` times how much farther it lies than the depth around it, within `radius`.  Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer. Screen-space, from the depth alone: a pixel's cavity is the depth averaged by a Gaussian of sigma `radius` minus its own depth, positive where it lies farther than its surroundings. It is darkened by clip(gain x cavity, 0, 1), one grey factor on every channel, so the colour ratios are kept and nothing is brightened. Flat and evenly sloping depths are left as they are. A depth step at a subject's outline darkens its farther side (a contact shadow) and leaves the nearer side alone; raising `radius` widens that shadow. The step's `opacity` sets how much is mixed in.
 
 Parameters
 ----------
@@ -62,13 +55,7 @@ Step opacity
 
 @_effect
 def anamorphic_streaks(*, length: float = 168.0, threshold: float = 0.7, amount: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and
-screened over the picture by `amount`.
-
-The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` px, scaled to add
-up to 1: a sharp bright core with long tails, which is what a streak looks like (a Gaussian would not carry far
-enough). It runs along the rows only, so nothing leaks up or down, and no light comes in from beyond the picture's
-edge. The picture only ever gets brighter, and black stays black.
+    """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened over the picture by `amount`.  The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` px, scaled to add up to 1: a sharp bright core with long tails, which is what a streak looks like (a Gaussian would not carry far enough). It runs along the rows only, so nothing leaks up or down, and no light comes in from beyond the picture's edge. The picture only ever gets brighter, and black stays black.
 
 Parameters
 ----------
@@ -207,11 +194,7 @@ lacunarity : number, ratio, 1 to 4, default 2.0
 
 @_effect
 def auto_levels(*, clip: float = 0.005, mode: Literal['linked', 'per_channel'] = 'per_channel', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end.
-
-The black and white points are read from the picture itself: the `clip` share of the darkest values and of the
-brightest values (counted per channel, or over all channels together when `mode` is 'linked') end up saturated,
-and the rest is spread linearly between. A channel with no range (every value equal) is left as it is.
+    """Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end.  The black and white points are read from the picture itself: the `clip` share of the darkest values and of the brightest values (counted per channel, or over all channels together when `mode` is `linked`) end up saturated, and the rest is spread linearly between. A channel with no range (every value equal) is left as it is.
 
 Parameters
 ----------
@@ -221,9 +204,9 @@ clip : number, fraction, 0 to 0.45, default 0.005
     value. Raising it gives more contrast and ignores stray dark or bright pixels, at
     the cost of detail in the extremes.
 mode : one of 'linked', 'per_channel', default 'per_channel'
-    What is stretched: 'per_channel' stretches red, green and blue separately, which
+    What is stretched: `per_channel` stretches red, green and blue separately, which
     also removes a colour cast but shifts colours (Photoshop's Enhance Per Channel
-    Contrast); 'linked' finds one black and one white point over all channels together
+    Contrast); `linked` finds one black and one white point over all channels together
     and stretches them alike, so colours keep their relationships (Enhance Monochromatic
     Contrast)."""
     ...
@@ -278,14 +261,7 @@ overlay : An overlay: a logo or sticker in the bottom right corner, a fifth of t
 
 @_effect
 def bloom(*, radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, color: str | list[float] | tuple[float, float, float] | None = None, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['soft_focus', 'halation', 'glow'] | None = None) -> Step:
-    """Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at
-`octaves` scales and screened over the picture.
-
-The highlights are blurred with sigma `radius`, `radius / 2`, `radius / 4`... (`octaves` of them), weighted by
-`persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens and
-leaves black black. Each channel blooms on its own, so the light keeps its colour; with `color` the brightest
-channel sets the strength and the halo takes that colour instead, as film halation does: light that bounces back
-through the film base exposes one layer whatever the colour of the highlight.
+    """Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.  The highlights are blurred with sigma `radius`, `radius` / 2, `radius` / 4... (`octaves` of them), weighted by `persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens and leaves black black. Each channel blooms on its own, so the light keeps its colour; with `color` the brightest channel sets the strength and the halo takes that colour instead, as film halation does: light that bounces back through the film base exposes one layer whatever the colour of the highlight.
 
 Parameters
 ----------
@@ -307,8 +283,8 @@ color : colour or none, default None
     the red-orange of film halation, white a neutral glow.
 octaves : whole number, count, 1 to 8, default 4
     How many scales the halo is built from: octave 1 has the sigma `radius`, each next
-    one half of the one before (radius / 2, radius / 4...). 1 = a single Gaussian; more
-    adds a tighter, brighter core around the highlights.
+    one half of the one before (`radius` / 2, `radius` / 4...). 1 = a single Gaussian;
+    more adds a tighter, brighter core around the highlights.
 persistence : number, ratio, 0 to 1, default 0.5
     How much weight each octave gets relative to the wider one before it (the weights
     are persistence^0, persistence^1... scaled to add up to 1): 0 = the widest octave
@@ -323,10 +299,10 @@ truncate : number, ratio, 1 to 10, default 4.0
 edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge) or 'constant' (constant_value, so the bloom
+    repeated), 'wrap' (the opposite edge) or 'constant' (`constant_value`, so the bloom
     fades toward the edge when it is 0).
 constant_value : number, fraction, 0 to 1, default 0.0
-    The highlight (0..1) assumed beyond the edge when edge is 'constant'; ignored
+    The highlight (0..1) assumed beyond the edge when `edge` is 'constant'; ignored
     otherwise.
 
 Presets
@@ -338,42 +314,37 @@ glow : A glow: the bright parts blurred into one soft halo and screened over the
 
 @_effect
 def channel_mixer(*, red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared', 'black_and_white'] | None = None) -> Step:
-    """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights:
-black and white, infrared, colour swaps.
-
-The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light. Row i of the
-matrix (the `<output>_from_<input>` weights) is output channel i, so
-`out[..., i] = sum_j matrix[i][j] * in[..., j]`. The result is clipped to 0..1.
+    """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights: black and white, infrared, colour swaps.  The weights are named `<output>_from_<input>`, so a row of the matrix is one output channel: each output is the sum of the three input channels, each times its weight in that row. The defaults are the identity matrix. A row summing to 1 keeps greys at their brightness in that channel. The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light, and the result is clipped to 0..1.
 
 Parameters
 ----------
 red_from_red : number, ratio, -3 to 3, default 1.0
-    Weight of input red in output red, -3..3: 1 keeps it as it is (default), 0 removes
-    it, above 1 amplifies it, a negative weight inverts it.
+    Weight of input red in output red (-3..3): 1 keeps it as it is (the default), 0
+    removes it, above 1 amplifies it, a negative weight inverts it.
 red_from_green : number, ratio, -3 to 3, default 0.0
-    Weight of input green in output red, -3..3: 1 passes it through, 0 leaves it out, a
+    Weight of input green in output red (-3..3): 1 passes it through, 0 leaves it out, a
     negative weight subtracts it.
 red_from_blue : number, ratio, -3 to 3, default 0.0
-    Weight of input blue in output red, -3..3: 1 passes it through, 0 leaves it out, a
+    Weight of input blue in output red (-3..3): 1 passes it through, 0 leaves it out, a
     negative weight subtracts it.
 green_from_red : number, ratio, -3 to 3, default 0.0
-    Weight of input red in output green, -3..3: 1 passes it through, 0 leaves it out, a
+    Weight of input red in output green (-3..3): 1 passes it through, 0 leaves it out, a
     negative weight subtracts it.
 green_from_green : number, ratio, -3 to 3, default 1.0
-    Weight of input green in output green, -3..3: 1 keeps it as it is (default), 0
+    Weight of input green in output green (-3..3): 1 keeps it as it is (the default), 0
     removes it, above 1 amplifies it, a negative weight inverts it.
 green_from_blue : number, ratio, -3 to 3, default 0.0
-    Weight of input blue in output green, -3..3: 1 passes it through, 0 leaves it out, a
-    negative weight subtracts it.
+    Weight of input blue in output green (-3..3): 1 passes it through, 0 leaves it out,
+    a negative weight subtracts it.
 blue_from_red : number, ratio, -3 to 3, default 0.0
-    Weight of input red in output blue, -3..3: 1 passes it through, 0 leaves it out, a
+    Weight of input red in output blue (-3..3): 1 passes it through, 0 leaves it out, a
     negative weight subtracts it.
 blue_from_green : number, ratio, -3 to 3, default 0.0
-    Weight of input green in output blue, -3..3: 1 passes it through, 0 leaves it out, a
-    negative weight subtracts it.
+    Weight of input green in output blue (-3..3): 1 passes it through, 0 leaves it out,
+    a negative weight subtracts it.
 blue_from_blue : number, ratio, -3 to 3, default 1.0
-    Weight of input blue in output blue, -3..3: 1 keeps it as it is (default), 0 removes
-    it, above 1 amplifies it, a negative weight inverts it.
+    Weight of input blue in output blue (-3..3): 1 keeps it as it is (the default), 0
+    removes it, above 1 amplifies it, a negative weight inverts it.
 
 Presets
 -------
@@ -434,15 +405,7 @@ prism : Rainbow dispersion: seven copies of the picture fan out into a smooth sp
 
 @_effect
 def color_balance(*, shadows: str | list[float] | tuple[float, float, float] = '#3a1bff', midtones: str | list[float] | tuple[float, float, float] = '#808080', highlights: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float | Drive = 0.3, balance: float | Drive = 0.5, softness: float = 1.0, preserve_luminosity: bool = True, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['teal_orange', 'split_tone', 'color_balance'] | None = None) -> Step:
-    """Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading.
-
-A pixel's tone is its Rec. 709 luma L of the sRGB-encoded picture. The shadow/midtone and midtone/highlight
-hand-overs are centred on `balance` / 2 and (1 + `balance`) / 2, each `softness` / 2 wide, and run along
-the smoothstep s(x) = 3x^2 - 2x^3 of their argument held to 0..1. Its weights are shadows 1 - lower, midtones
-lower - upper and highlights upper, so black is all shadows, mid grey (at the defaults) all midtones, white
-all highlights, and the three always add up to 1. Each channel moves by `amount` times the sum, over the three
-ranges, of the weight times (the range's colour - 0.5); the result is held to 0..1. With `preserve_luminosity`
-the luma the pushes changed is then restored by adding the same amount to every channel (before the hold).
+    """Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading.  Three colour pushes, one for the dark, middle and bright tones, that by default leave brightness alone.  A pixel's tone is its Rec. 709 luma L of the sRGB-encoded picture. The shadow/midtone and midtone/highlight hand-overs are centred on `balance` / 2 and (1 + `balance`) / 2, each `softness` / 2 wide, and run along the smoothstep s(x) = 3x^2 - 2x^3 of their argument held to 0..1. Its weights are shadows 1 - lower, midtones lower - upper and highlights upper, so black is all shadows, mid grey (at the defaults) all midtones, white all highlights, and the three always add up to 1. Each channel moves by `amount` times the sum, over the three ranges, of the weight times (the range's colour - 0.5); the result is held to 0..1. With `preserve_luminosity` the luma the pushes changed is then restored by adding the same amount to every channel (before the hold).
 
 Parameters
 ----------
@@ -486,13 +449,7 @@ color_balance : A starting point for colour balancing: cool shadows, untouched m
 
 @_effect
 def curves(*, black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize'] | None = None) -> Step:
-    """Bend tones along smooth curves through control points: a master curve, then one per colour channel
-(cross process, solarize).
-
-The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`,
-`white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed
-black and white. A curve passes exactly through its points and is a monotone cubic (PCHIP): it never overshoots
-its neighbouring points, so rising points never darken a brighter tone. The defaults are the straight line.
+    """Bend tones along smooth curves through control points: a master curve, then one per colour channel (cross process, solarize).  The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`, `white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed black and white. A curve passes exactly through its points and is a monotone cubic (PCHIP): it never overshoots its neighbouring points, so rising points never darken a brighter tone. The defaults are the straight line.
 
 Parameters
 ----------
@@ -593,19 +550,7 @@ seed : whole number, count, 0 to 4294967295, default 0
 
 @_effect
 def dehaze(*, amount: float = 0.9, patch: int = 15, radius: float = 30.0, edge_threshold: float = 0.03, transmission_floor: float = 0.1, airlight_fraction: float = 0.001, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009).
-
-The dark channel of a haze-free outdoor picture is nearly 0: in any patch of `patch` x `patch` px some pixel has a
-channel near black. Haze lifts it, so the dark channel of I / A measures 1 - t, the haze at that place. The
-steps are
-- the airlight A: the `airlight_fraction` of pixels with the highest dark channel (the haziest) are looked at,
-  and the colour of the brightest of them (largest red + green + blue) is A, a per channel colour;
-- the transmission t = 1 - `amount` x dark channel of I / A, refined by a guided filter (`radius`,
-  `edge_threshold`), guided by the picture's luma, so it follows the edges of the picture, then held between
-  `transmission_floor` and 1;
-- the scene J = (I - A) / t + A, held to 0..1.
-A picture without haze (a dark channel of 0) comes out as it went in. `edge` says what the patch search sees beyond
-the picture's border. Colours are those of the sRGB-encoded picture.
+    """Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009).  The dark channel of a haze-free outdoor picture is nearly 0: in any patch of `patch` x `patch` px some pixel has a channel near black. Haze lifts it, so the dark channel of I / A measures 1 - t, the haze at that place. The steps are - the airlight A: the `airlight_fraction` of pixels with the highest dark channel (the haziest) are looked at, and   the colour of the brightest of them (largest red + green + blue) is A, a per channel colour; - the transmission t = 1 - `amount` x dark channel of I / A, refined by a guided filter (`radius`,   `edge_threshold`), guided by the picture's luma, so it follows the edges of the picture, then held between   `transmission_floor` and 1; - the scene J = (I - A) / t + A, held to 0..1.  A picture without haze (a dark channel of 0) comes out as it went in. `edge` says what the patch search sees beyond the picture's border. Colours are those of the sRGB-encoded picture.
 
 Parameters
 ----------
@@ -638,17 +583,17 @@ edge_threshold : number, fraction, 0.001 to 1, default 0.03
     lowering it follows ever smaller edges.
 transmission_floor : number, fraction, 0.01 to 1, default 0.1
     The lowest transmission (He, Sun and Tang's t0), the share of a pixel's light that
-    reaches the camera: colours are stretched by at most 1 / transmission_floor, so a
+    reaches the camera: colours are stretched by at most 1 / `transmission_floor`, so a
     low floor clears thick haze but amplifies noise and clips; 1 allows no stretch at
     all.
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What the darkest-value search sees beyond the picture's edge, which sets the haze
     estimate along the border (dehaze filters by local darkest values rather than
     warping, so the default is 'nearest', not 'reflect'): 'nearest' (the edge pixel
-    repeated) and 'reflect' (mirrored, edge pixel repeated) look only at pixels of the
-    patch inside the picture and give the same result; 'mirror' (mirrored about the edge
-    pixel) also looks at pixels up to half a patch from the border; 'wrap' (the opposite
-    edge) lets the far side's darkest values set the haze at the border."""
+    repeated), 'reflect' (mirrored, edge pixel repeated) and 'mirror' (mirrored about
+    the edge pixel) look only at pixels of the patch inside the picture, and for an odd
+    patch give the same result; 'wrap' (the opposite edge) lets the far side's darkest
+    values set the haze at the border."""
     ...
 
 @_effect
@@ -1204,16 +1149,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def equalize(*, tiles: int = 8, limit: float = 3.0, bins: int = 256, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour.
-
-The brightness is the value V = max(R, G, B) of the sRGB-encoded picture (the V of HSV). Every pixel's red, green
-and blue are multiplied by new V / old V, so hue and HSV saturation are unchanged and no channel can leave 0..1;
-black stays black. Each of the `tiles` x `tiles` regions gets a histogram of V in `bins` bins, clipped so no bin
-is taller than `limit` times the flat height (the clipped counts are spread evenly over all bins, repeatedly,
-until none exceeds it), and its mapping is the cumulative histogram: a pixel in bin k goes to the share of the
-tile's pixels in bins 0..k. A pixel takes the bilinear blend of the mappings of the four tiles whose centres
-surround it (the nearest tiles at the borders), so there are no seams. With one tile and a limit of `bins` or more
-this is classic histogram equalisation.
+    """Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour.  The brightness is the value V = max(R, G, B) of the sRGB-encoded picture (the V of HSV). Every pixel's red, green and blue are multiplied by new V / old V, so hue and HSV saturation are unchanged and no channel can leave 0..1; black stays black. Each of the `tiles` x `tiles` regions gets a histogram of V in `bins` bins, clipped so no bin is taller than `limit` times the flat height (the clipped counts are spread evenly over all bins, repeatedly, until none exceeds it), and its mapping is the cumulative histogram: a pixel in bin k goes to the share of the tile's pixels in bins 0..k. A pixel takes the bilinear blend of the mappings of the four tiles whose centres surround it (the nearest tiles at the borders), so there are no seams. With one tile and a limit of `bins` or more this is classic histogram equalisation.
 
 Parameters
 ----------
@@ -1355,14 +1291,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def focus_blur(*, field: str = 'depth', focus: float = 0.8, width: float = 0.15, feather: float = 0.4, radius: float = 10.0, levels: int = 6, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A shallow depth of field, or a tilt-shift miniature: each pixel is blurred by w x `radius`,
-w = clip((|field - focus| - width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of
-`focus` are returned exactly as they are.
-
-The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the
-sharp picture being copy 0) either side of w x `levels`. `field` is the selection the recipe names (`depth`, a
-linear gradient...), float32 (h, w), 0..1: `depth` gives a lens focused in the scene, a linear gradient a sharp
-band across the picture.
+    """A shallow depth of field, or a tilt-shift miniature: pixels whose `field` value lies near `focus` stay sharp, and the farther a value lies from it, higher or lower, the more the pixel is blurred, up to `radius`.  Each pixel is blurred by w x `radius`, w = clip((|field - focus| - width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of `focus` are returned exactly as they are. The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the sharp picture being copy 0) either side of w x `levels`. `field` is the selection the recipe names (`depth`, a linear gradient...), 0..1: `depth` gives a lens focused in the scene, a linear gradient a sharp band across the picture.
 
 Parameters
 ----------
@@ -1497,13 +1426,7 @@ smoke : Rising smoke or steam: soft plumes that thicken toward the bottom and cu
 
 @_effect
 def fractal(*, kind: Literal['mandelbrot', 'julia'] = 'julia', zoom: float = 1.0, x: float = 0.0, y: float = 0.0, c_real: float = -0.8, c_imag: float = 0.156, iterations: int = 64, period: float = 24.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a'), interior: str | list[float] | tuple[float, float, float] = '#000000', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes.
-
-A generated background: the input is used only for its height and width, its content is ignored. A point
-escapes when |z| exceeds 256 after n steps of z -> z^2 + c; its colour is then `colors` at the smooth escape count
-n + 1 - log2(log|z| / log 256) over `period` (a continuous count, so no steps between bands), and a point that has
-not escaped after `iterations` steps takes `interior`. Only the unescaped points are iterated, in single
-precision.
+    """Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes.  An escape-time fractal: the plane's points z (or c) iterated through z -> z^2 + c until they run away. A generated background: the input is used only for its height and width. A point escapes when |z| exceeds 256 after n steps; its colour is then `colors` at the smooth escape count n + 1 - log2(log|z| / log 256) over `period` (a continuous count, so no steps between bands), and a point that has not escaped after `iterations` steps takes `interior`. The orbits are iterated in single precision.
 
 Parameters
 ----------
@@ -1546,9 +1469,7 @@ interior : colour, default '#000000'
 
 @_effect
 def gaussian_blur(*, radius: float | Drive = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Soften the picture with a Gaussian blur of standard deviation `radius` px.
-
-Each colour channel is blurred on its own. The blur keeps flat areas flat and never leaves the picture's range.
+    """Soften the picture with a Gaussian blur of standard deviation `radius` px.  Each colour channel is blurred on its own. Every pixel becomes a weighted average of its neighbours, the weights a bell curve: the blur keeps flat areas flat and never leaves the picture's range.
 
 Parameters
 ----------
@@ -1564,31 +1485,16 @@ truncate : number, ratio, 1 to 10, default 4.0
 edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the edge fades
-    toward it).
+    repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`, so the edge
+    fades toward it).
 constant_value : number, fraction, 0 to 1, default 0.0
-    The brightness (0..1, every channel) assumed beyond the edge when edge is
+    The brightness (0..1, every channel) assumed beyond the edge when `edge` is
     'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
     ...
 
 @_effect
 def grade(*, temperature: float | Drive = 0.0, tint: float | Drive = 0.0, exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, vibrance: float | Drive = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['white_balance'] | None = None) -> Step:
-    """White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first.
-
-Order: colour balance, `exposure`, `contrast` around `pivot`, `saturation`, `vibrance`.
-
-The colour balance is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel
-is multiplied by a gain, and it is encoded again. The gains are red 2**(temperature/2), green 2**-tint and blue
-2**(-temperature/2), divided by the largest of the three, so the balance never brightens or clips and white keeps
-one full channel instead of turning into a cast. Temperature and tint at 0 leave the picture as it was.
-
-The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation), after the
-saturation (before the vibrance) and at the end.
-
-`vibrance` works on HSV saturation s = (max - min) / max of the gamma-encoded values. Each colour's saturation
-becomes s + vibrance * s * (1 - s), which never exceeds 1. The strongest channel (HSV value) is kept and every
-other channel moves away from it by the same factor, so the hue is the input's (up to float rounding) and a grey,
-whose saturation is 0, is unchanged.
+    """White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first.  Order: colour balance, `exposure`, `contrast` around `pivot`, `saturation`, `vibrance`.  The colour balance is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel is multiplied by a gain, and it is encoded again. The gains are red 2**(temperature/2), green 2**-tint and blue 2**(-temperature/2), divided by the largest of the three, so the balance never brightens or clips and white keeps one full channel instead of turning into a cast. Temperature and tint at 0 leave the picture as it was.  The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation), after the saturation (before the vibrance) and at the end.  `vibrance` works on HSV saturation s = (max - min) / max of the gamma-encoded values. Each colour's saturation becomes s + vibrance * s * (1 - s), which never exceeds 1. The strongest channel (HSV value) is kept and every other channel moves away from it by the same factor, so the hue is the input's (up to float rounding) and a grey, whose saturation is 0, is unchanged.
 
 Parameters
 ----------
@@ -1625,12 +1531,7 @@ white_balance : White balance: corrects a warm (orange) cast and a slight magent
 
 @_effect
 def gradient(*, kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['fill'] | None = None) -> Step:
-    """Replace the picture with a gradient (linear, radial or conic), or with a flat colour fill (preset `fill`: black;
-set colors for another); to replace the background: mask = "background".
-
-A generated background: the input is used only for its height and width, its content is ignored. Sizes in
-fractions of the picture, so the look does not depend on its resolution. For example `colors` = ["#12002b",
-"#ff2bd6"] with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill.
+    """Replace the picture with a gradient (linear, radial or conic), or with a flat colour fill (preset `fill`: black; set colors for another); to replace the background: mask = "background".  A generated background: the input is used only for its height and width, its content is ignored. A gradient through a list of colours, laid out as a straight band, rings round a centre or a sweep round it. Sizes are fractions of the picture, so the look does not depend on its resolution. For example `colors` = "#12002b" and "#ff2bd6" with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill.
 
 Parameters
 ----------
@@ -1674,11 +1575,7 @@ fill : Flat colour fill (black; set colors for another). To replace the backgrou
 
 @_effect
 def gradient_map(*, stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray'] | None = None) -> Step:
-    """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.
-
-Two stops make a duotone, three a tritone; e.g. stops = ["#0b0020", "#ff2bd6", "#00f0ff"] is a neon scheme.
-The picture is first stretched to use its full tonal range (cutting `shadow_clip` and `highlight_clip` off its
-ends), so the whole gradient is always visible.
+    """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.  A gradient that brightness is mapped onto, after an automatic contrast stretch. Two stops make a duotone, three a tritone; for example the stops "#0b0020", "#ff2bd6" and "#00f0ff" make a neon scheme. The picture is first stretched to use its full tonal range (cutting `shadow_clip` and `highlight_clip` off its ends), so the whole gradient is always visible.
 
 Parameters
 ----------
@@ -1696,11 +1593,11 @@ Advanced parameters
 -------------------
 quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased', default 'linear'
     How the stretch's clip points are read from the picture's brightness (numpy's
-    quantile methods): 'linear' interpolates between the two nearest pixels; 'lower',
-    'higher', 'nearest' and 'midpoint' take the darker, the brighter, the nearer pixel
-    or their mean; 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation',
-    'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and
-    'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan).
+    quantile methods): `linear` interpolates between the two nearest pixels; `lower`,
+    `higher`, `nearest` and `midpoint` take the darker, the brighter, the nearer pixel
+    or their mean; `inverted_cdf`, `averaged_inverted_cdf`, `closest_observation`,
+    `interpolated_inverted_cdf`, `hazen`, `weibull`, `median_unbiased` and
+    `normal_unbiased` are the textbook sample-quantile definitions (Hyndman and Fan).
     Only visible on small or flat pictures.
 
 Presets
@@ -1825,10 +1722,7 @@ constant_value : number, fraction, 0 to 1, default 0.0
 
 @_effect
 def highpass(*, radius: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Keep only the detail finer than `radius` px: the picture minus its Gaussian blur, centred on mid-grey.
-
-A flat area becomes mid-grey, an edge a dark line on its dark side and a bright one on its bright side. Each
-colour channel is filtered on its own and the result is kept within 0..1.
+    """A high-pass filter: the picture minus a blurred copy of it, shown around mid-grey.  Keep only the detail finer than `radius` px: the picture minus its Gaussian blur, centred on mid-grey. A flat area becomes mid-grey, an edge a dark line on its dark side and a bright one on its bright side. Each colour channel is filtered on its own and the result is kept within 0..1.
 
 Parameters
 ----------
@@ -1993,11 +1887,7 @@ mirror : A mirror: the left half copied, reflected, onto the right (a symmetric 
 
 @_effect
 def lens_blur(*, radius: float = 8.0, highlights: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels.
-
-Every pixel becomes the average of the pixels within `radius` px of it (one on the rim counts for the share of it
-inside the disc, a linear ramp one pixel wide), each weighted by 1 + `highlights` x its brightness. Flat areas
-stay flat and the result never leaves the picture's own range. The cost hardly grows with the radius.
+    """Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels.  Every pixel becomes the average of the pixels within `radius` px of it (one on the rim counts for the share of it inside the disc, a linear ramp one pixel wide), each weighted by 1 + `highlights` x its brightness. Flat areas stay flat and the result never leaves the picture's own range. The cost hardly grows with the radius.
 
 Parameters
 ----------
@@ -2148,13 +2038,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def lens_flare(*, x: float = 0.75, y: float = 0.25, ghosts: int = 5, spacing: float = 0.45, size: float = 30.0, halo: float = 120.0, ring: float = 72.0, ring_width: float = 12.0, amount: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#ffe2b8', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A lens flare: a halo and a ring round the light at (`x`, `y`) and `ghosts` discs along the line through the
-picture's centre, tinted `color` and screened over the picture by `amount`.
-
-Every feature is a smooth bump of brightness, 1 where it is strongest and falling (1 - t^2)^2 to nothing at its
-radius (`halo`, `size`) or half-width (`ring_width`), in px, drawn straight from its formula with no blur or warp.
-Ghost i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) /
-ghosts. The picture only ever gets brighter.
+    """Add a halo and a ring round the light at (`x`, `y`) and `ghosts` soft discs along the line from it through the picture's centre, tinted `color` and screened over the picture by `amount`.  Every feature is a smooth bump of brightness, 1 where it is strongest and falling (1 - t^2)^2 to nothing at its radius (`halo`, `size`) or half-width (`ring_width`), in px, drawn straight from its formula with no blur or warp. Ghost i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) / ghosts. The picture only ever gets brighter.
 
 Parameters
 ----------
@@ -2233,11 +2117,7 @@ edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'nearest'
 
 @_effect
 def levels(*, black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float | Drive = 0.0, output_white: float = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['invert', 'fade'] | None = None) -> Step:
-    """Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch,
-faded blacks, or the negative (invert).
-
-Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed
-between `output_black` and `output_white`. The defaults change nothing.
+    """Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch, faded blacks, or the negative (invert).  Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed between `output_black` and `output_white`. The defaults change nothing.
 
 Parameters
 ----------
@@ -2267,13 +2147,7 @@ fade : A faded, matte look: black lifted to a 12% grey, white kept, so shadows t
 
 @_effect
 def light_leak(*, color: str | list[float] | tuple[float, float, float] = '#ff8a3d', amount: float = 0.8, size: float = 150.0, angle: float = 0.0, blobs: int = 3, seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Warm washes of light coming in from the side `angle` points to: `blobs` seeded patches, tinted `color` and
-screened over the picture by `amount`.
-
-Each patch is a Gaussian bump, centred a random depth (up to `size` px) in from that side and a random
-place along it, with a random width of half to all of `size` px, stretched along the edge by up to
-twice and weighted by half to all. The patches add up and are squashed smoothly into 0..1 (1 - exp(-sum)), so
-overlaps never clip into flat plateaus. The picture only ever gets brighter.
+    """Add `blobs` seeded patches of warm light coming in from the side `angle` points to, tinted `color` and screened over the picture by `amount`.  Each patch is a Gaussian bump, centred a random depth (up to `size` px) in from that side and a random place along it, with a random width of half to all of `size` px, stretched along the edge by up to twice and weighted by half to all. The patches add up and are squashed smoothly into 0..1 (1 - exp(-sum)), so overlaps never clip into flat plateaus. The picture only ever gets brighter.
 
 Parameters
 ----------
@@ -2296,20 +2170,14 @@ blobs : whole number, count, 1 to 16, default 3
     How many patches of light there are, at random places along that side (each brighter
     or fainter and stretched along the edge by chance). Overlapping patches merge into
     one wash; raising it gives a more even, wider leak.
-seed : whole number, count, 0 to 4294967295, default 0
+seed : whole number, count, 0 to 2147483647, default 0
     Random seed: the same seed always gives the same leak (the same patches in the same
     places), another seed a different one."""
     ...
 
 @_effect
 def light_rays(*, x: float = 0.5, y: float = 0.3, length: float = 0.5, threshold: float = 0.7, amount: float = 2.5, samples: int = 8, decay: float = 0.9, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by
-`amount`.
-
-Every pixel gathers the highlights from `samples` points on the line between itself and the light, from itself
-to `length` of the way there, each reading `decay` times as strong as the one before and the weights adding up to
-1. A highlight streaks outward from the light, up to 1 / (1 - length) times its distance from it. The picture
-only ever gets brighter, and black stays black.
+    """God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by `amount`.  Every pixel gathers the highlights from `samples` points on the line between itself and the light, from itself to `length` of the way there, each reading `decay` times as strong as the one before and the weights adding up to 1. A highlight streaks outward from the light, up to 1 / (1 - length) times its distance from it. The picture only ever gets brighter, and black stays black.
 
 Parameters
 ----------
@@ -2348,14 +2216,15 @@ samples : whole number, count, 1 to 256, default 8
 interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, but steps and ghosts show), 'bilinear' blends the four pixels around
-    it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring
-    pixels (sharpest, a little slower).
+    it (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels
+    (sharpest, a little slower).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a reading sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
     repeated), 'wrap' (the opposite edge). The readings lie between a pixel and the
-    light, so they leave the picture only when the light itself is outside it; this rule
-    then matters at the border for 'bicubic' only, whose spline fit reads it."""
+    light, inside the picture; this rule matters only to 'bicubic', whose cubic fit
+    looks one pixel past the point it reads, and then only beside a light that sits on
+    the border."""
     ...
 
 @_effect
@@ -2406,17 +2275,15 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def lut(*, file: Lut | os.PathLike[str] | str | numpy.ndarray = Lut.identity(2), amount: float | Drive = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`.
-
-Each pixel's colour is looked up in the table, interpolating trilinearly between the eight nearest entries; values
-outside the table's domain take its edge entry, and the result is kept in 0..1.
+    """Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`.  Each pixel's colour is looked up in the table, interpolating trilinearly between the eight nearest entries; values outside the table's domain take its edge entry, and the result is kept in 0..1.
 
 Parameters
 ----------
 file : lookup table, default Lut.identity(2)
     The 3D colour lookup table: the path of a `.cube` file (Adobe/Resolve format; 1D
     tables are refused) in a recipe file (relative to the file) or in `fx`, or, in
-    Python, a Lut or an (n, n, n, 3) array. The default table changes nothing. Colours
+    Python, a Lut or an (n, n, n, 3) array; in Rust, the name of a table the photo was
+    given or the path of a `.cube` file. The default table changes nothing. Colours
     between the table's entries are interpolated trilinearly.
 amount : number (drivable), fraction, 0 to 1, default 1.0
     How much of the table's grade shows: 0 leaves the picture unchanged, 0.5 is the
@@ -2463,10 +2330,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
 
 @_effect
 def motion_blur(*, angle: float = 0.0, length: float | Drive = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.
-
-Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay
-flat, the mean is kept and the result never leaves the picture's own range. The cost hardly grows with the length.
+    """Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.  Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay flat, the mean is kept and the result never leaves the picture's own range. The cost hardly grows with the length.
 
 Parameters
 ----------
@@ -2794,11 +2658,7 @@ starfield : Small crisp stars of several sizes and brightnesses. Put a dark one-
 
 @_effect
 def pattern(*, kind: Literal['stripes', 'checks', 'dots', 'grid'] = 'grid', cell: float = 32.0, angle: float = 0.0, foreground: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#101018', thickness: float = 0.2, radius: float = 0.3, feather: float = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours.
-
-A generated background: the input is used only for its height and width, its content is ignored. The pattern is
-anchored at the top-left corner, so it does not shift when the picture is resized. Every shape is drawn from
-its signed distance in px to its border, so edges have the same softness at every angle.
+    """Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours.  A generated background: the input is used only for its height and width, its content is ignored. The pattern is anchored at the top-left corner, so it does not shift when the picture is resized. Every shape is drawn from its signed distance in px to its border, so edges have the same softness at every angle.
 
 Parameters
 ----------
@@ -2944,13 +2804,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def pixel_grid(*, cell: int = 4, gap: float = 0.15, amount: float = 0.4, keep_brightness: bool = False, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between.
-
-A stripe is a third of the cell wide and lights only its own channel, in a rectangle that leaves half the gap
-free on each side (the gap's width is `gap` x the stripe's, horizontally and vertically alike). A pixel on a
-stripe's edge is lit in proportion to the area it shares with it. The result is the picture mixed with that
-pattern by `amount`, so it never brightens the picture; with `keep_brightness` the gains are divided by their mean
-over a whole cell (the same at every picture size), which brightens a lit stripe above the picture (clipped at 1).
+    """The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between.  A stripe is a third of the cell wide and lights only its own channel, in a rectangle that leaves half the gap free on each side (the gap's width is `gap` x the stripe's, horizontally and vertically alike). A pixel on a stripe's edge is lit in proportion to the area it shares with it. The result is the picture mixed with that pattern by `amount`, so it never brightens the picture; with `keep_brightness` the gains are divided by their mean over a whole cell (the same at every picture size), which brightens a lit stripe above the picture (clipped at 1).
 
 Parameters
 ----------
@@ -3088,11 +2942,7 @@ rounding : number, fraction, 0 to 1, default 0.0
 
 @_effect
 def radial_blur(*, mode: Literal['spin', 'zoom'] = 'zoom', amount: float = 0.1, x: float = 0.5, y: float = 0.5, samples: int = 8, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.
-
-Every pixel becomes the average of `samples` points spread evenly along the arc or ray through it (centred on the
-pixel), each read by `interpolation`, each colour channel on its own. The centre stays sharp, flat areas
-stay flat and the result never leaves the picture's own range.
+    """Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.  Every pixel becomes the average of `samples` points spread evenly along the arc or ray through it (centred on the pixel), each read by `interpolation`, each colour channel on its own. The centre stays sharp, flat areas stay flat and the result never leaves the picture's own range.
 
 Parameters
 ----------
@@ -3443,11 +3293,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def scanlines(*, spacing: float = 3.0, thickness: float = 0.5, darkness: float = 0.35, offset: float = 0.0, softness: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`.
-
-The lines start at row `offset` and repeat every `spacing` px. A pixel row is multiplied by 1 - `darkness` x the
-share of the row a line covers, so whole rows under a line are exactly 1 - `darkness` times the picture and rows
-no line touches are unchanged; the same gain applies to every column and channel.
+    """Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`.  The lines start at row `offset` and repeat every `spacing` px. A pixel row is multiplied by 1 - `darkness` x the share of the row a line covers, so whole rows under a line are exactly 1 - `darkness` times the picture and rows no line touches are unchanged; the same gain applies to every column and channel.
 
 Parameters
 ----------
@@ -3500,15 +3346,7 @@ color : colour, default '#ffffff'
 
 @_effect
 def selective_color(*, hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float | Drive = 0.0, saturation: float = 1.0, lightness: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['hue_shift'] | None = None) -> Step:
-    """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a
-range as wide as the wheel is a hue shift.
-
-Works in HSV on the gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the
-`hue` centre, falling linearly to 0 over `feather` degrees; the wheel wraps round) times its HSV saturation, so a
-grey, which has no hue, is never selected and a pale colour is changed less than a vivid one. Pixels of weight 0
-come back bit for bit. A selected pixel moves by weight times each change: `hue_shift` degrees, saturation times
-`saturation` and value toward black or full by `lightness`. Saturation and value stay inside 0..1 by
-construction, so the result needs no clipping.
+    """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a range as wide as the wheel is a hue shift.  A range of hues (a centre, a width and a feather) and the changes made to the colours inside it. Works in HSV on the gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the `hue` centre, falling linearly to 0 over `feather` degrees; the wheel wraps round) times its HSV saturation, so a grey, which has no hue, is never selected and a pale colour is changed less than a vivid one. Pixels of weight 0 come back bit for bit. A selected pixel moves by weight times each change: `hue_shift` degrees, saturation times `saturation` and value toward black or full by `lightness`. Saturation and value stay inside 0..1 by construction, so the result needs no clipping.
 
 Parameters
 ----------
@@ -3541,14 +3379,7 @@ hue_shift : Every colour turned 150 degrees round the wheel (vivid colours fully
 
 @_effect
 def sharpen(*, radius: float = 2.0, amount: float | Drive = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['clarity'] | None = None) -> Step:
-    """Sharpen, or add clarity, with an unsharp mask: add `amount` times the detail that a `radius` px Gaussian blur
-removes.
-
-Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is
-kept within 0..1. A small `radius` brings out fine texture; a large one (preset `clarity`: 30 px) is local
-contrast, which exaggerates how each area differs from its surroundings so features stand out even when the
-whole face sits in a narrow band of brightness. Put that before effects that turn tone into marks (ascii,
-halftone), which are blind to small tonal differences.
+    """An unsharp mask: the difference between the picture and a blurred copy is added back, scaled by `amount`.  Sharpen, or add clarity: add `amount` times the detail that a `radius` px Gaussian blur removes. Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is kept within 0..1. A small `radius` brings out fine texture; a large one (preset `clarity`: 30 px) is local contrast, which exaggerates how each area differs from its surroundings so features stand out even when the whole face sits in a narrow band of brightness. Put that before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
 
 Parameters
 ----------
@@ -3572,10 +3403,10 @@ truncate : number, ratio, 1 to 10, default 4.0
 edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
     repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-    repeated), 'wrap' (the opposite edge), 'constant' (constant_value, so the border
+    repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`, so the border
     stands out from it).
 constant_value : number, fraction, 0 to 1, default 0.0
-    The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
+    The brightness (0..1) assumed beyond the edge when `edge` is 'constant'; ignored
     otherwise.
 
 Presets
@@ -3697,18 +3528,7 @@ glitch : A corrupted video frame: seven bands at random rows slide sideways, the
 
 @_effect
 def starburst(*, rays: int = 4, length: float = 60.0, width: float = 1.0, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, spacing: float = 0.0, variation: float = 0.0, seed: int = 0, color: str | list[float] | tuple[float, float, float] = '#ffffff', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sparkle'] | None = None) -> Step:
-    """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light,
-tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `spacing`
-thins them to a random few, `variation` dims each by a random amount (both from `seed`).
-
-Each spike is `width` px wide, starts at the point at full brightness and fades linearly to nothing at `length` px;
-they leave the point at equal angles, the first at `angle`. Each point's light is scaled by 0 or 1 (`spacing`)
-and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the picture's size only, so a
-point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so
-nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.
-
-`size_ratio` (injected: working px per design px, 1 outside a recipe) keeps the light of a bright area, and the
-number of glints, the same at any resolution.
+    """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `spacing` thins them to a random few, `variation` dims each by a random amount (both from `seed`).  Each spike is `width` px wide, starts at the point at full brightness and fades linearly to nothing at `length` px; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by 0 or 1 (`spacing`) and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the picture's size only, so a point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.  A recipe's size keeps the light of a bright area, and the number of glints, the same at any resolution.
 
 Parameters
 ----------
@@ -3760,7 +3580,7 @@ variation : number, fraction, 0 to 1, default 0.0
     How much the points differ in brightness, and so in how far their spikes show: each
     one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1
     = from full down to nothing.
-seed : whole number, count, 0 to 4294967295, default 0
+seed : whole number, count, 0 to 2147483647, default 0
     Random seed for `spacing` and `variation`: the same seed picks the same points of
     the same picture, another seed others.
 
@@ -3879,18 +3699,7 @@ scan_roll : A rolling scan: the picture slides down a quarter and wraps around, 
 
 @_effect
 def tone_map(*, contrast: float = 0.5, amount: float = 0.5, pivot: float = 0.0, radius: float = 30.0, edge_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['shadows_highlights'] | None = None) -> Step:
-    """HDR tone mapping, shadows and highlights recovery, lifted shadows.
-
-Compresses the broad brightness differences of the picture and keeps (or boosts) its fine detail.
-
-Brightness is the base 2 logarithm L of the Rec. 709 luma Y of the sRGB-encoded picture (Y floored at 1e-4), in
-stops below white. A guided filter (He, Sun and Tang 2010, guided by L itself) over a window of 2 x `radius` + 1 px,
-edge-preserving by `edge_threshold` stops, splits it into a base B and detail D = L - B (Durand and Dorsey 2002).
-The new log brightness is `contrast` x (B + `pivot`) - `pivot` + (1 + `amount`) x D, and every pixel's red, green
-and blue are multiplied by 2^(new - L) = 2^((`contrast` - 1) (B + `pivot`) + `amount` D), so hue and saturation
-stay and the result is held to 0..1. An even area of luma Y comes out as Y (Y 2^`pivot`)^(`contrast` - 1), which
-is Y^`contrast` for `pivot` 0. B is an average of values of L, so it never leaves their range: with `amount` 0
-and `pivot` 0 lowering `contrast` only ever brightens; areas brighter than 2^-`pivot` are darkened.
+    """HDR tone mapping, shadows and highlights recovery, lifted shadows.  Compresses the broad brightness differences of the picture and keeps (or boosts) its fine detail.  Brightness is the base 2 logarithm L of the Rec. 709 luma Y of the sRGB-encoded picture (Y floored at 1e-4), in stops below white. A guided filter (He, Sun and Tang 2010, guided by L itself) over a window of 2 x `radius` + 1 px, edge-preserving by `edge_threshold` stops, splits it into a base B and detail D = L - B (Durand and Dorsey 2002). The new log brightness is `contrast` x (B + `pivot`) - `pivot` + (1 + `amount`) x D, and every pixel's red, green and blue are multiplied by 2^(new - L) = 2^((`contrast` - 1) (B + `pivot`) + `amount` D), so hue and saturation stay and the result is held to 0..1. An even area of luma Y comes out as Y (Y 2^`pivot`)^(`contrast` - 1), which is Y^`contrast` for `pivot` 0. B is an average of values of L, so it never leaves their range: with `amount` 0 and `pivot` 0 lowering `contrast` only ever brightens; areas brighter than 2^-`pivot` are darkened.
 
 Parameters
 ----------
@@ -4095,11 +3904,7 @@ signal_noise : A bad analog signal: a clean picture crossed by solid bands of st
 
 @_effect
 def vignette(*, amount: float | Drive = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Fade the picture toward `color` from `radius` out to its corners, the centre untouched.
-
-A pixel's distance from the centre is 0 in the middle and 1 at a corner; the contours of equal distance are
-superellipses through the corners (`roundness` 1: an ellipse, 0: a rectangle). From `radius` the pixel is mixed
-toward `color`, rising over `feather` along a smoothstep to `amount`.
+    """Fade the picture toward `color` from `radius` out to its corners, the centre untouched.  A pixel's distance from the centre is 0 in the middle and 1 at a corner; the contours of equal distance are superellipses through the corners (`roundness` 1: an ellipse, 0: a rectangle). From `radius` the pixel is mixed toward `color`, rising over `feather` along a smoothstep to `amount`.
 
 Parameters
 ----------

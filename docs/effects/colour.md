@@ -22,21 +22,21 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `clip` | number | fraction | 0 to 0.45 | `0.005` | The share of values (0..0.45) that end up saturated at each end, pure black and pure white: 0.005 is 0.5 percent, 0 stretches exactly from the darkest to the brightest value. Raising it gives more contrast and ignores stray dark or bright pixels, at the cost of detail in the extremes. |
-| `mode` | one of 'linked', 'per_channel' |  |  | `'per_channel'` | What is stretched: 'per_channel' stretches red, green and blue separately, which also removes a colour cast but shifts colours (Photoshop's Enhance Per Channel Contrast); 'linked' finds one black and one white point over all channels together and stretches them alike, so colours keep their relationships (Enhance Monochromatic Contrast). |
+| `mode` | one of 'linked', 'per_channel' |  |  | `'per_channel'` | What is stretched: `per_channel` stretches red, green and blue separately, which also removes a colour cast but shifts colours (Photoshop's Enhance Per Channel Contrast); `linked` finds one black and one white point over all channels together and stretches them alike, so colours keep their relationships (Enhance Monochromatic Contrast). |
 
 ### `channel_mixer`
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `red_from_red` | number | ratio | -3 to 3 | `1.0` | Weight of input red in output red, -3..3: 1 keeps it as it is (default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
-| `red_from_green` | number | ratio | -3 to 3 | `0.0` | Weight of input green in output red, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
-| `red_from_blue` | number | ratio | -3 to 3 | `0.0` | Weight of input blue in output red, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
-| `green_from_red` | number | ratio | -3 to 3 | `0.0` | Weight of input red in output green, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
-| `green_from_green` | number | ratio | -3 to 3 | `1.0` | Weight of input green in output green, -3..3: 1 keeps it as it is (default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
-| `green_from_blue` | number | ratio | -3 to 3 | `0.0` | Weight of input blue in output green, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
-| `blue_from_red` | number | ratio | -3 to 3 | `0.0` | Weight of input red in output blue, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
-| `blue_from_green` | number | ratio | -3 to 3 | `0.0` | Weight of input green in output blue, -3..3: 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
-| `blue_from_blue` | number | ratio | -3 to 3 | `1.0` | Weight of input blue in output blue, -3..3: 1 keeps it as it is (default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
+| `red_from_red` | number | ratio | -3 to 3 | `1.0` | Weight of input red in output red (-3..3): 1 keeps it as it is (the default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
+| `red_from_green` | number | ratio | -3 to 3 | `0.0` | Weight of input green in output red (-3..3): 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
+| `red_from_blue` | number | ratio | -3 to 3 | `0.0` | Weight of input blue in output red (-3..3): 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
+| `green_from_red` | number | ratio | -3 to 3 | `0.0` | Weight of input red in output green (-3..3): 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
+| `green_from_green` | number | ratio | -3 to 3 | `1.0` | Weight of input green in output green (-3..3): 1 keeps it as it is (the default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
+| `green_from_blue` | number | ratio | -3 to 3 | `0.0` | Weight of input blue in output green (-3..3): 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
+| `blue_from_red` | number | ratio | -3 to 3 | `0.0` | Weight of input red in output blue (-3..3): 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
+| `blue_from_green` | number | ratio | -3 to 3 | `0.0` | Weight of input green in output blue (-3..3): 1 passes it through, 0 leaves it out, a negative weight subtracts it. |
+| `blue_from_blue` | number | ratio | -3 to 3 | `1.0` | Weight of input blue in output blue (-3..3): 1 keeps it as it is (the default), 0 removes it, above 1 amplifies it, a negative weight inverts it. |
 
 Presets (`preset="name"` in a recipe step or `fx`):
 
@@ -143,7 +143,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `quantile_method` | one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased' |  |  | `'linear'` | How the stretch's clip points are read from the picture's brightness (numpy's quantile methods): 'linear' interpolates between the two nearest pixels; 'lower', 'higher', 'nearest' and 'midpoint' take the darker, the brighter, the nearer pixel or their mean; 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased' and 'normal_unbiased' are the textbook sample-quantile definitions (Hyndman and Fan). Only visible on small or flat pictures. |
+| `quantile_method` | one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased' |  |  | `'linear'` | How the stretch's clip points are read from the picture's brightness (numpy's quantile methods): `linear` interpolates between the two nearest pixels; `lower`, `higher`, `nearest` and `midpoint` take the darker, the brighter, the nearer pixel or their mean; `inverted_cdf`, `averaged_inverted_cdf`, `closest_observation`, `interpolated_inverted_cdf`, `hazen`, `weibull`, `median_unbiased` and `normal_unbiased` are the textbook sample-quantile definitions (Hyndman and Fan). Only visible on small or flat pictures. |
 
 </details>
 
@@ -178,7 +178,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `file` | lookup table |  |  | `Lut.identity(2)` | The 3D colour lookup table: the path of a `.cube` file (Adobe/Resolve format; 1D tables are refused) in a recipe file (relative to the file) or in `fx`, or, in Python, a Lut or an (n, n, n, 3) array. The default table changes nothing. Colours between the table's entries are interpolated trilinearly. |
+| `file` | lookup table |  |  | `Lut.identity(2)` | The 3D colour lookup table: the path of a `.cube` file (Adobe/Resolve format; 1D tables are refused) in a recipe file (relative to the file) or in `fx`, or, in Python, a Lut or an (n, n, n, 3) array; in Rust, the name of a table the photo was given or the path of a `.cube` file. The default table changes nothing. Colours between the table's entries are interpolated trilinearly. |
 | `amount` | number (drivable) | fraction | 0 to 1 | `1.0` | How much of the table's grade shows: 0 leaves the picture unchanged, 0.5 is the midway between the picture and the graded one, 1 is the table as written. |
 
 ### `selective_color`
