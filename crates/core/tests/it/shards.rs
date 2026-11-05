@@ -1,70 +1,15 @@
-//! `shards` regions, seen the way an effect sees them: through the public API alone, with an effect of the test's own that
-//! logs the partition it is handed; and the presets a shard region can be read with.
+//! `shards` regions, seen the way an effect sees them: through the public API alone, by the partition an effect is handed
+//! (`common::ops`); and the presets a shard region can be read with.
 
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
 
 use bullterrier_image::region::{Edge, EdgeStyle, Shards};
-use bullterrier_image::{
-    Category, Effect, Error, Image, Input, Inputs, Options, Photo, Picture, Presets, Recipe, Region, Step,
-    region_presets, register,
-};
+use bullterrier_image::{Error, Presets, Recipe, Region, Step, region_presets};
 use serde_json::{Value, json};
 
 use crate::common::compare::first_difference;
-
-/// The partition a [`Spy`] was handed: its labels and number of pieces.
-type Pieces = (Vec<i32>, usize);
-
-/// An effect that logs the partition it is handed and returns the picture as it is.
-struct Spy {
-    name: String,
-    log: Mutex<Vec<Pieces>>,
-}
-
-impl Effect for Spy {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn category(&self) -> Category {
-        Category::Utilities
-    }
-
-    fn inputs(&self) -> &[Input] {
-        &[Input::Partition]
-    }
-
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
-        if let Some(labels) = inputs.partition() {
-            self.log
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push((labels.values().to_vec(), labels.pieces()));
-        }
-        Ok(picture.map(|pixel| pixel))
-    }
-}
-
-/// The labels and number of pieces of the shards `region` on a grey photo of `height` x `width` pixels.
-fn pieces(height: usize, width: usize, region: impl Into<Region>) -> Result<Pieces, Error> {
-    static SPIES: AtomicUsize = AtomicUsize::new(0);
-    let spy = Arc::new(Spy {
-        name: format!("shards_spy_{}", SPIES.fetch_add(1, Ordering::Relaxed)),
-        log: Mutex::new(Vec::new()),
-    });
-    register(spy.clone())?;
-    let pixels = vec![0.5; height * width * 3];
-    let photo = Photo::new(Picture::new(height, width, &pixels)?);
-    let mut step = Step::new(&spy.name);
-    step.partition = Some("s".to_owned());
-    let recipe = Recipe::new([step]).with_region("s", region);
-    photo.render(&recipe, &Presets::new(), Options::default())?;
-    let mut seen = spy.log.lock().unwrap_or_else(PoisonError::into_inner);
-    seen.pop()
-        .ok_or_else(|| Error::Recipe("the spy was handed no partition".to_owned()))
-}
+use crate::common::ops::partition;
+use crate::common::pieces::numbered_by_first_pixel;
 
 fn shards(count: u32, jitter: f64, seed: u32) -> Shards {
     Shards {
@@ -75,27 +20,9 @@ fn shards(count: u32, jitter: f64, seed: u32) -> Shards {
     }
 }
 
-/// A number of pieces as a label bound, saturating.
-fn bound(count: usize) -> i32 {
-    i32::try_from(count).unwrap_or(i32::MAX)
-}
-
-/// Whether the labels are the pieces' numbers in reading order: each label first appears right after the greatest before it,
-/// and all `count` appear.
-fn numbered_by_first_pixel(labels: &[i32], count: usize) -> bool {
-    let mut greatest = -1;
-    for &label in labels {
-        if label > greatest + 1 || !(0..bound(count)).contains(&label) {
-            return false;
-        }
-        greatest = greatest.max(label);
-    }
-    greatest + 1 == bound(count)
-}
-
 #[test]
 fn one_shard_is_the_whole_picture() -> Result<(), Error> {
-    let (labels, count) = pieces(48, 64, shards(1, 0.5, 0))?;
+    let (labels, count) = partition((48, 64), None, shards(1, 0.5, 0))?;
     assert_eq!((count, labels.iter().all(|&label| label == 0)), (1, true));
     Ok(())
 }
@@ -103,7 +30,7 @@ fn one_shard_is_the_whole_picture() -> Result<(), Error> {
 #[test]
 fn a_regular_honeycomb_on_a_big_picture_has_one_piece_for_each_seed() -> Result<(), Error> {
     for count in [2, 12, 70, 500] {
-        let (_, pieces) = pieces(240, 320, shards(count, 0.0, 3))?;
+        let (_, pieces) = partition((240, 320), None, shards(count, 0.0, 3))?;
         assert_eq!(pieces, usize::try_from(count).unwrap_or(0), "{count} seeds");
     }
     Ok(())
@@ -111,11 +38,11 @@ fn a_regular_honeycomb_on_a_big_picture_has_one_piece_for_each_seed() -> Result<
 
 #[test]
 fn a_picture_too_small_to_give_each_seed_a_pixel_has_fewer_pieces() -> Result<(), Error> {
-    let (labels, count) = pieces(2, 3, shards(50, 0.5, 1))?;
+    let (labels, count) = partition((2, 3), None, shards(50, 0.5, 1))?;
     assert!((1..=6).contains(&count), "{count}");
     assert!(numbered_by_first_pixel(&labels, count));
     // the largest count on a modest picture
-    assert!((1..=500).contains(&pieces(48, 64, shards(500, 1.0, 1))?.1));
+    assert!((1..=500).contains(&partition((48, 64), None, shards(500, 1.0, 1))?.1));
     Ok(())
 }
 
@@ -142,7 +69,7 @@ fn the_pieces_partition_the_picture_and_are_numbered_by_first_pixel() -> Result<
             ..Shards::default()
         },
     ] {
-        let (labels, count) = pieces(96, 128, region)?;
+        let (labels, count) = partition((96, 128), None, region)?;
         assert_eq!(labels.len(), 96 * 128);
         assert!(numbered_by_first_pixel(&labels, count));
     }
@@ -151,9 +78,9 @@ fn the_pieces_partition_the_picture_and_are_numbered_by_first_pixel() -> Result<
 
 #[test]
 fn the_same_seed_cuts_the_same_shards_and_another_seed_other_ones() -> Result<(), Error> {
-    let first = pieces(96, 128, shards(12, 0.5, 1))?;
-    let again = pieces(96, 128, shards(12, 0.5, 1))?;
-    let other = pieces(96, 128, shards(12, 0.5, 2))?;
+    let first = partition((96, 128), None, shards(12, 0.5, 1))?;
+    let again = partition((96, 128), None, shards(12, 0.5, 1))?;
+    let other = partition((96, 128), None, shards(12, 0.5, 2))?;
     assert_eq!(first_difference(&first.0, &again.0), None);
     assert!(first_difference(&first.0, &other.0).is_some());
     Ok(())
@@ -172,11 +99,11 @@ fn torn_shards_are_the_straight_ones_bent_by_the_seed() -> Result<(), Error> {
         },
         ..shards(6, 0.7, 4)
     };
-    let straight = pieces(96, 128, shards(6, 0.7, 4))?;
-    let nothing = pieces(96, 128, torn(1, 0.0))?;
-    let first = pieces(96, 128, torn(1, 12.0))?;
-    let again = pieces(96, 128, torn(1, 12.0))?;
-    let other = pieces(96, 128, torn(2, 12.0))?;
+    let straight = partition((96, 128), None, shards(6, 0.7, 4))?;
+    let nothing = partition((96, 128), None, torn(1, 0.0))?;
+    let first = partition((96, 128), None, torn(1, 12.0))?;
+    let again = partition((96, 128), None, torn(1, 12.0))?;
+    let other = partition((96, 128), None, torn(2, 12.0))?;
     assert_eq!(first_difference(&straight.0, &nothing.0), None);
     assert_eq!(first_difference(&first.0, &again.0), None);
     assert!(first_difference(&straight.0, &first.0).is_some());
@@ -335,7 +262,7 @@ fn the_values_of_a_preset_are_checked_like_any_others() {
 fn a_preset_cuts_the_shards_of_its_values() -> Result<(), String> {
     // mosaic: 70 tiles of nearly even size on a picture big enough for each, glass: crowded round the middle
     let tiles = read(&json!({"preset": "mosaic"}))?;
-    let (_, count) = pieces(240, 320, tiles).map_err(|error| error.to_string())?;
+    let (_, count) = partition((240, 320), None, tiles).map_err(|error| error.to_string())?;
     assert!((60..=70).contains(&count), "{count}");
     Ok(())
 }

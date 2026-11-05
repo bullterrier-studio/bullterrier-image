@@ -12,6 +12,7 @@ pub(crate) mod icc;
 pub(crate) mod numbers;
 pub(crate) mod ops;
 pub(crate) mod pictures;
+pub(crate) mod pieces;
 pub(crate) mod pixels;
 pub(crate) mod recipe;
 pub(crate) mod run;

@@ -26,6 +26,18 @@ impl Folder {
         Ok(Self(path))
     }
 
+    /// The path of the file `name` in this folder, whether it is there or not.
+    pub(crate) fn path(&self, name: &str) -> String {
+        self.0.join(name).to_string_lossy().into_owned()
+    }
+
+    /// A folder inside this one, named `a-folder`, and its path.
+    pub(crate) fn directory(&self) -> std::io::Result<String> {
+        let path = self.0.join("a-folder");
+        std::fs::create_dir_all(&path)?;
+        Ok(path.to_string_lossy().into_owned())
+    }
+
     /// Writes `content` to the file `name` and gives its path.
     pub(crate) fn write(&self, name: &str, content: impl AsRef<[u8]>) -> std::io::Result<String> {
         let path = self.0.join(name);

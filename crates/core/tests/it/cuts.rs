@@ -1,78 +1,23 @@
-//! `cuts` regions, seen the way an effect sees them: through the public API alone, with an effect of the test's own that
-//! logs the partition it is handed.
-
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, PoisonError};
+//! `cuts` regions, seen the way an effect sees them: through the public API alone, by the partition an effect is handed
+//! (`common::ops`).
 
 use bullterrier_image::region::{Curve, Cuts, Edge, EdgeStyle, Line};
-use bullterrier_image::{
-    Category, Effect, Error, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, register,
-};
+use bullterrier_image::{Error, Options};
 
 use crate::common::compare::first_difference;
-
-/// The partition a [`Spy`] was handed: its labels and number of pieces.
-type Pieces = (Vec<i32>, usize);
-
-/// An effect that logs the partition it is handed and returns the picture as it is.
-struct Spy {
-    name: String,
-    log: Mutex<Vec<Pieces>>,
-}
-
-impl Effect for Spy {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn category(&self) -> Category {
-        Category::Utilities
-    }
-
-    fn inputs(&self) -> &[Input] {
-        &[Input::Partition]
-    }
-
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
-        if let Some(labels) = inputs.partition() {
-            self.log
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push((labels.values().to_vec(), labels.pieces()));
-        }
-        Ok(picture.map(|pixel| pixel))
-    }
-}
+use crate::common::ops::probe;
+use crate::common::pieces::{drawn, numbered_by_first_pixel};
 
 /// The labels and number of pieces of `cuts` on a grey photo of `height` x `width` pixels, with the map `subject` if given.
-fn pieces(height: usize, width: usize, subject: Option<Vec<f32>>, cuts: Cuts) -> Result<Pieces, Error> {
-    static SPIES: AtomicUsize = AtomicUsize::new(0);
-    let spy = Arc::new(Spy {
-        name: format!("cuts_spy_{}", SPIES.fetch_add(1, Ordering::Relaxed)),
-        log: Mutex::new(Vec::new()),
-    });
-    register(spy.clone())?;
-    let pixels = vec![0.5; height * width * 3];
-    let mut photo = Photo::new(Picture::new(height, width, &pixels)?);
-    if let Some(values) = subject {
-        photo = photo.with_map("subject", Layer::new(height, width, values)?)?;
-    }
-    let mut step = Step::new(&spy.name);
-    step.partition = Some("c".to_owned());
-    let recipe = Recipe::new([step]).with_region("c", cuts);
-    photo.render(&recipe, &Presets::new(), Options::default())?;
-    let mut seen = spy.log.lock().unwrap_or_else(PoisonError::into_inner);
-    seen.pop()
-        .ok_or_else(|| Error::Recipe("the spy was handed no partition".to_owned()))
-}
-
-/// The pieces of a picture as one line of digits for each row, rows joined by `/`: labels below 10 only.
-fn drawn(labels: &[i32], width: usize) -> String {
-    labels
-        .chunks_exact(width)
-        .map(|row| row.iter().map(ToString::to_string).collect::<String>())
-        .collect::<Vec<_>>()
-        .join("/")
+fn pieces(height: usize, width: usize, subject: Option<Vec<f32>>, cuts: Cuts) -> Result<(Vec<i32>, usize), Error> {
+    let seen = probe(
+        (height, width),
+        subject,
+        Options::default(),
+        vec![("c", cuts.into())],
+        (Some("c"), None),
+    )?;
+    Ok((seen.labels, seen.pieces))
 }
 
 fn line(x: f64, y: f64, angle: f64) -> Line {
@@ -91,24 +36,6 @@ fn curve(path: &str) -> Cuts {
         lines: vec![Curve { path: path.to_owned() }.into()],
         ..Cuts::default()
     }
-}
-
-/// A number of pieces as a label bound, saturating.
-fn bound(count: usize) -> i32 {
-    i32::try_from(count).unwrap_or(i32::MAX)
-}
-
-/// Whether the labels are the pieces' numbers in reading order: each label first appears right after the greatest before it,
-/// and all `count` appear.
-fn numbered_by_first_pixel(labels: &[i32], count: usize) -> bool {
-    let mut greatest = -1;
-    for &label in labels {
-        if label > greatest + 1 || !(0..bound(count)).contains(&label) {
-            return false;
-        }
-        greatest = greatest.max(label);
-    }
-    greatest + 1 == bound(count)
 }
 
 #[test]
