@@ -78,12 +78,11 @@ fn a_render_holds_a_few_pictures_however_many_steps_it_has() -> Result<(), Error
     Ok(())
 }
 
-/// The most bytes, beyond the photo's own, that a render of one `gaussian_blur` step of design radius `radius` on
-/// `threads` threads holds at once.
-fn blur_peak(radius: f64, threads: usize) -> Result<usize, Error> {
+/// The most bytes, beyond the photo's own, that a render of the one step `step` on `threads` threads holds at once.
+fn step_peak(step: Step, threads: usize) -> Result<usize, Error> {
     let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
     let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
-    let recipe = Recipe::new([Step::new("gaussian_blur").param("radius", radius)]);
+    let recipe = Recipe::new([step]);
     let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?);
     let before = HEAP.current_usage();
     HEAP.reset_peak_usage();
@@ -91,6 +90,12 @@ fn blur_peak(radius: f64, threads: usize) -> Result<usize, Error> {
     let peak = HEAP.peak_usage() - before;
     drop(result);
     Ok(peak)
+}
+
+/// The most bytes, beyond the photo's own, that a render of one `gaussian_blur` step of design radius `radius` on
+/// `threads` threads holds at once.
+fn blur_peak(radius: f64, threads: usize) -> Result<usize, Error> {
+    step_peak(Step::new("gaussian_blur").param("radius", radius), threads)
 }
 
 #[test]
@@ -109,6 +114,67 @@ fn a_blur_holds_its_picture_and_a_channels_working_space_on_any_threads() -> Res
         assert!(
             peak >= 2 * IMAGE,
             "the blur held {peak} bytes: less than the picture and the channel's planes"
+        );
+    }
+    Ok(())
+}
+
+/// The smallest length of the form 2^k or 3 x 2^k that holds `samples`: the lengths the Fourier transform runs at.
+fn transform_length(samples: usize) -> usize {
+    (0..40)
+        .flat_map(|power| [1_usize << power, 3_usize << power])
+        .filter(|length| *length >= samples)
+        .min()
+        .unwrap_or(usize::MAX)
+}
+
+#[test]
+fn a_disc_blur_by_the_2d_transform_holds_three_spectra_and_a_few_planes_on_any_threads() -> Result<(), Error> {
+    // A disc of design radius 16 is 20 px on this 600-wide photo (a design px is 600 / 480 = 1.25 px) and reaches 20 px each
+    // side (a pixel within half a pixel of the rim still weighs): 1257 weights, far past the 128 that are summed tap by tap.
+    // The planes are extended by the reach, to 440 x 640, and filtered at the lengths the transform runs at, 512 x 768. The
+    // transform holds three arrays of that size at once (the plane being filtered, its turned copy and the kernel's
+    // spectrum), each sample two f32. Beside them, at the most: the three channel planes, the two finished channels of the
+    // first pair, and the extended plane of the third. A line's scratch is a few kilobytes a thread.
+    let spectrum = transform_length(HEIGHT + 2 * 20) * transform_length(WIDTH + 2 * 20) * 2 * size_of::<f32>();
+    assert_eq!(spectrum, 512 * 768 * 8);
+    let plane = HEIGHT * WIDTH * size_of::<f32>();
+    let extended = (HEIGHT + 2 * 20) * (WIDTH + 2 * 20) * size_of::<f32>();
+    let planes = 3 * plane + 2 * plane + extended;
+    for threads in [1, 10] {
+        let blur = Step::new("lens_blur").param("radius", 16.0).param("highlights", 0.0);
+        let peak = step_peak(blur, threads)?;
+        assert!(
+            peak >= 3 * spectrum,
+            "on {threads} threads the blur held {peak} bytes: less than its three spectra, {}",
+            3 * spectrum
+        );
+        assert!(
+            peak <= 3 * spectrum + planes + IMAGE / 10,
+            "on {threads} threads the blur held {peak} bytes, three spectra and the planes being {}",
+            3 * spectrum + planes
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_guided_filter_holds_five_maps_of_f64_and_a_map_of_f32_on_any_threads() -> Result<(), Error> {
+    // The filter keeps the means of the guide, the source, their product and the guide's square, and while it makes the
+    // last it turns the map it is averaging: five maps of f64 (8 B a pixel) beside the log-luminance map of f32 that is
+    // its guide and its source (4 B a pixel). The edge-aware tone map is the step that runs it on a picture.
+    let (map, luma) = (HEIGHT * WIDTH * size_of::<f64>(), HEIGHT * WIDTH * size_of::<f32>());
+    for threads in [1, 10] {
+        let peak = step_peak(Step::new("tone_map"), threads)?;
+        assert!(
+            peak >= 5 * map,
+            "on {threads} threads the filter held {peak} bytes: less than its five maps, {}",
+            5 * map
+        );
+        assert!(
+            peak <= 5 * map + luma + IMAGE / 10,
+            "on {threads} threads the filter held {peak} bytes, {} maps",
+            peak / map
         );
     }
     Ok(())
