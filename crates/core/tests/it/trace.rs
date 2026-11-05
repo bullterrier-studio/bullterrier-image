@@ -1,45 +1,11 @@
 //! The region stages of a trace, through the public API alone: which regions a trace shows, in which order, and that what
 //! it shows is what the steps worked with.
 
-use std::sync::Arc;
-
 use bullterrier_image::region::{Band, Combine, CombineOp, Given, Grid, LinearGradient, RadialGradient, Shares};
-use bullterrier_image::{
-    Category, Each, Effect, Entry, Error, Image, Inputs, Labels, Layer, Options, Photo, Picture, Presets, Recipe,
-    Stage, Step, register,
-};
+use bullterrier_image::{Each, Entry, Error, Image, Labels, Layer, Options, Photo, Picture, Presets, Recipe, Stage};
 
-type Outcome = Result<(), Box<dyn std::error::Error>>;
-
-/// An effect that paints the whole picture with one grey level.
-struct Paint {
-    name: String,
-    level: f32,
-}
-
-impl Paint {
-    fn register(name: &str, level: f32) -> Result<Step, Error> {
-        register(Arc::new(Self {
-            name: name.to_owned(),
-            level,
-        }))?;
-        Ok(Step::new(name).opacity(1.0))
-    }
-}
-
-impl Effect for Paint {
-    fn name(&self) -> &str {
-        &self.name
-    }
-
-    fn category(&self) -> Category {
-        Category::Utilities
-    }
-
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
-        Ok(picture.map(|_| [self.level; 3]))
-    }
-}
+use crate::common::Outcome;
+use crate::common::ops::level;
 
 const HEIGHT: usize = 4;
 const WIDTH: usize = 9;
@@ -103,12 +69,11 @@ fn step_image(stages: &[Stage], wanted: usize) -> Option<&Image> {
 /// The recipe of the tests. The regions are declared in an order no sorting gives: `zeta` (a band of the depth), `mid`
 /// (a grid of three columns), `alpha` (a gradient), `both` (alpha and zeta multiplied) and `unused`, which no step
 /// uses. Step 1 paints through `both`, step 2 gives each of the three columns of `mid` a look.
-fn recipe(prefix: &str) -> Result<Recipe, Error> {
-    let paint = Paint::register(&format!("{prefix}_paint"), 0.95)?;
+fn recipe() -> Result<Recipe, Error> {
+    let paint = level(0.95)?;
     let looks = [0.2, 0.5, 0.8]
-        .iter()
-        .enumerate()
-        .map(|(index, level)| Paint::register(&format!("{prefix}_look{index}"), *level).map(Some))
+        .map(|grey| level(grey).map(Some))
+        .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
     let mut each = Each::new("mid", looks);
     each.feather = 0.0;
@@ -148,7 +113,7 @@ fn trace(values: &[f32], recipe: &Recipe) -> Result<Vec<Stage>, Error> {
 
 #[test]
 fn the_regions_the_steps_use_are_shown_in_the_order_they_are_declared_after_the_maps_and_before_the_steps() -> Outcome {
-    let stages = trace(&ramp(), &recipe("trace_order")?)?;
+    let stages = trace(&ramp(), &recipe()?)?;
     // `zeta` and `alpha` are used only through `both`, `unused` by no step; depth is used through `zeta`, the subject by none
     assert_eq!(
         kinds(&stages),
@@ -169,7 +134,7 @@ fn the_regions_the_steps_use_are_shown_in_the_order_they_are_declared_after_the_
 #[test]
 fn a_selection_stage_is_where_the_steps_masked_by_it_change_the_picture() -> Outcome {
     let values = ramp();
-    let stages = trace(&values, &recipe("trace_mask")?)?;
+    let stages = trace(&values, &recipe()?)?;
     let both = selection(&stages, "both").ok_or(Error::Recipe("no stage".to_owned()))?;
     let (zeta, alpha) = (
         selection(&stages, "zeta").ok_or(Error::Recipe("no stage".to_owned()))?,
@@ -209,7 +174,7 @@ fn a_selection_stage_is_where_the_steps_masked_by_it_change_the_picture() -> Out
 
 #[test]
 fn a_partition_stage_numbers_the_pieces_the_looks_were_given_to() -> Outcome {
-    let stages = trace(&ramp(), &recipe("trace_pieces")?)?;
+    let stages = trace(&ramp(), &recipe()?)?;
     let mid = partition(&stages, "mid").ok_or(Error::Recipe("no stage".to_owned()))?;
     assert_eq!((mid.height(), mid.width(), mid.pieces()), (HEIGHT, WIDTH, 3));
     // step 2 gave the pieces, in turn, 0.2, 0.5, 0.8 (hard borders): a pixel's level is the one its label says
@@ -230,7 +195,7 @@ fn a_partition_stage_numbers_the_pieces_the_looks_were_given_to() -> Outcome {
 #[test]
 fn the_last_stage_is_what_render_returns_for_a_recipe_with_regions_and_an_each() -> Outcome {
     let values = ramp();
-    let recipe = recipe("trace_last")?;
+    let recipe = recipe()?;
     let stages = trace(&values, &recipe)?;
     let rendered = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?)
         .with_map("depth", depth()?)?
@@ -241,7 +206,7 @@ fn the_last_stage_is_what_render_returns_for_a_recipe_with_regions_and_an_each()
 
 #[test]
 fn a_given_region_is_shown_as_it_was_handed_in_and_a_declared_one_no_step_uses_is_not() -> Outcome {
-    let paint = Paint::register("trace_given_paint", 0.9)?;
+    let paint = level(0.9)?;
     let recipe = Recipe::new([paint.mask("sky")])
         .with_region("sky", Given::default())
         .with_region("spare", Given::default());
@@ -257,7 +222,7 @@ fn a_given_region_is_shown_as_it_was_handed_in_and_a_declared_one_no_step_uses_i
 #[test]
 fn a_trace_fails_where_render_fails_for_a_region_that_cannot_be_made() -> Outcome {
     // a grid laid over a selection that chooses nothing (depth 0 everywhere, a band of the nearest tenth) has no frame
-    let look = Paint::register("trace_fails_paint", 0.9)?;
+    let look = level(0.9)?;
     let recipe = Recipe::new([Each::new("cells", [Some(look)])])
         .with_region(
             "none",
