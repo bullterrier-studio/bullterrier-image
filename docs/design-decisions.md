@@ -818,6 +818,31 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *Why `Inputs`, not `Params`.* An effect declares a table only by its field of the kind `lut`; `parameters_are_read` offers
     a table of its own to any effect given a name, so a lookup table parameter that is never looked up still fails.
 
+- **Blur, convolution and light run on one FFT and one edge rule (E2).** Decisions:
+  - *One `Extension` for what lies beyond the edge* (`ops/edge.rs`: reflect, mirror, nearest, wrap, constant), used by every
+    kernel (blur, convolution, rank and radial reading). A `Choice` cannot be a subset of another, so the parameter side has two
+    small enums, `Edge` (four rules) and `EdgeOrConstant` (five, with `constant_value`), each converting to `Extension`.
+    *Rejected:* one five-rule enum (eight effects have no `constant_value`; the rule would be a hidden tunable there).
+  - *`rustfft` for every cost that must not grow with the kernel* (`ops/fft.rs`): big Gaussians, 2-D convolution of discs,
+    stars and lines. Pure Rust, MIT/Apache. Transform lengths are 2^k or 3 x 2^k (measured faster than any other length). A
+    Gaussian or kernel row is summed tap by tap below a measured break-even (reach 16 for a Gaussian, 128 non-zero weights for a
+    2-D kernel), by FFT above. *Rejected:* a recursive or box Gaussian for the effects (it cannot honour `truncate` and the edge
+    rules exactly); the Kovesi box Gaussian in `ops/blur.rs` stays for `each` feather only.
+  - *Bicubic is Catmull-Rom* (Keys, a = -1/2), read locally, with no prefilter, where scipy's spline is prefiltered over the
+    whole image. Radial blur and light rays differ slightly from the old Python at `bicubic`; a halfway point of `nearest`
+    rounds up. `ops/sample.rs` takes all five rules, so warps (E3) can use it.
+  - *Guided and minimum filters are O(1) per pixel in the radius* (`ops/guided.rs`: cumulative sums in f64; `ops/rank.rs`: van
+    Herk/Gil-Werman, window aligned as scipy's), threaded by row, turn, row, turn: no row carries anything to the next.
+  - *A core effect with a field parameter gets its arrays through the registry runner's signature*, which lists each field as a
+    keyword-only argument (and `size_ratio` when declared); the registry's one shape check stays for Python effects. A map is
+    blurred by `gaussian_filter_plane`, the same kernels as a picture. `Inputs::declared_by` refuses an offer without a declared
+    field, so `render` meets a missing field never; its `Option` answer is a type matter (`render` cannot fail).
+  - *The core's random streams are its own* (`ops/random.rs`, hashed from seed and place), never NumPy's: `light_leak` and
+    `starburst` draw other patches than they did. The hash scrambles the seed first (a seed xored into the place made seed s at
+    place p equal seed s' at place p ^ s ^ s'; fixed for every user, `torn` edges included).
+  - *Seeds are `i32` in the core* (no `u32` kind): `light_leak.seed` and `starburst.seed` stop at 2147483647. A `u32` kind is E4's
+    first job (every noise effect is seeded).
+
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*
