@@ -93,6 +93,11 @@ fn conditional() -> Vec<Conditional> {
             with: vec![("edge", json!("constant"))],
         },
         Conditional {
+            effect: "bloom",
+            field: "constant_value",
+            with: vec![("edge", json!("constant"))],
+        },
+        Conditional {
             effect: "sharpen",
             field: "constant_value",
             with: vec![("edge", json!("constant"))],

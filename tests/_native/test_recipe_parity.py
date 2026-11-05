@@ -175,6 +175,16 @@ ROWS = [
     ),
     pytest.param("anamorphic_streaks", {"length": 0.4}, False, id="anamorphic_streaks: length below the lowest"),
     pytest.param("anamorphic_streaks", {"color": [0, 0, 2]}, False, id="anamorphic_streaks: a channel above 1"),
+    # an optional colour: none, which is also the default, and any spelling of a colour; nothing else
+    pytest.param("bloom", {"color": None}, True, id="bloom: no colour"),
+    pytest.param("bloom", {"color": "#ff4a14"}, True, id="bloom: a hex colour"),
+    pytest.param("bloom", {"color": "#f40"}, True, id="bloom: a short hex colour"),
+    pytest.param("bloom", {"color": [1, 0.5, 0]}, True, id="bloom: three numbers"),
+    pytest.param("bloom", {"color": "nope"}, False, id="bloom: text that is no colour"),
+    pytest.param("bloom", {"color": [0, 0, 2]}, False, id="bloom: a channel above 1"),
+    pytest.param("bloom", {"octaves": 8, "radius": 500, "threshold": 0.99, "amount": 10}, True, id="bloom: highest"),
+    pytest.param("bloom", {"octaves": 9}, False, id="bloom: octaves above the highest"),
+    pytest.param("bloom", {"threshold": 1.0}, False, id="bloom: threshold above the highest"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),

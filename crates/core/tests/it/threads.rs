@@ -157,6 +157,17 @@ fn cases() -> Vec<Case> {
                     .param("radius", 14)
                     .param("edge", "constant")
                     .param("constant_value", 0.3),
+                Step::new("bloom")
+                    .param("radius", 3)
+                    .param("threshold", 0.3)
+                    .param("octaves", 3)
+                    .param("edge", "wrap"),
+                Step::new("bloom")
+                    .param("radius", 14)
+                    .param("threshold", 0.3)
+                    .param("color", "#ff4a14")
+                    .param("edge", "constant")
+                    .param("constant_value", 0.3),
                 Step::new("highpass").param("radius", 3).param("edge", "mirror"),
                 Step::new("highpass").param("radius", 14).param("edge", "nearest"),
                 Step::new("focus_blur")

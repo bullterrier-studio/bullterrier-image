@@ -55,6 +55,7 @@ def test_a_value_the_effect_cannot_read_is_refused_naming_its_kind(value, kind):
 # --- params: what an effect's Rust struct declares -----------------------------------------------------------------
 
 FIELD_KEYS = {"name", "kind", "meaning", "default", "unit", "min", "max", "cyclic", "choices", "drivable", "advanced"}
+OPTIONAL_KEYS = {"nullable"}  # written only for a parameter that may be left out (an optional colour)
 LIST_KEYS = {"min_length", "max_length"}  # written for a list of colours only; `max_length` only when it has a ceiling
 KINDS = {"float", "int", "bool", "choice", "color", "colors", "lut", "field"}
 
@@ -66,8 +67,9 @@ def test_the_parameters_of_every_effect_are_a_doc_and_fields_of_a_known_kind_wit
     assert table["doc"].strip()
     assert table["fields"]
     for field in table["fields"]:
-        listed = {key for key in LIST_KEYS if key in field}
+        listed = {key for key in LIST_KEYS | OPTIONAL_KEYS if key in field}
         assert set(field) == FIELD_KEYS | listed
+        assert field.get("nullable", True) is True  # written only when true
         assert (field["kind"] == "colors") == ("min_length" in field)  # a list has a floor; nothing else has lengths
         assert field["kind"] in KINDS
         assert field["meaning"].strip()
