@@ -16,5 +16,6 @@ pub(crate) mod pieces;
 pub(crate) mod pixels;
 pub(crate) mod recipe;
 pub(crate) mod run;
+pub(crate) mod sampling;
 
 pub(crate) type Outcome = Result<(), Box<dyn std::error::Error>>;

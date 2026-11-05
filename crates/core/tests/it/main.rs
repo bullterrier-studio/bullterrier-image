@@ -55,6 +55,7 @@ mod paths;
 mod picture;
 mod pieces;
 mod presets;
+mod radial_blur;
 mod random;
 mod recipe_check;
 mod recipe_drive;
