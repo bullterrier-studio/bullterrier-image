@@ -3,7 +3,8 @@
 //! where the border lies in each row (or column) reads the noise at the border's place to the pixel.
 
 use crate::common::compare::first_difference;
-use crate::common::ops::{float, partition};
+use crate::common::numbers::float;
+use crate::common::ops::partition;
 use bullterrier_image::Error;
 use bullterrier_image::region::{Edge, EdgeStyle, Grid, Shares};
 

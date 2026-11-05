@@ -4,7 +4,8 @@
 
 use crate::common::Outcome;
 use crate::common::compare::first_difference;
-use crate::common::ops::{float, partition, probe};
+use crate::common::numbers::float;
+use crate::common::ops::{partition, probe};
 use bullterrier_image::region::Shards;
 use bullterrier_image::{Error, Options, Region};
 

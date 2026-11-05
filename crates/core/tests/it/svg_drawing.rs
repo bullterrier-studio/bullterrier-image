@@ -7,7 +7,8 @@
 use std::collections::BTreeSet;
 
 use crate::common::Outcome;
-use crate::common::ops::{Folder, float, probe, total};
+use crate::common::numbers::{float, total};
+use crate::common::ops::{Folder, probe};
 use bullterrier_image::region::{Pick, Svg};
 use bullterrier_image::{Error, Options, Region};
 

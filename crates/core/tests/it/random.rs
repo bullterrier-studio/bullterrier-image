@@ -3,6 +3,7 @@
 //! generators (`SplitMix64` and xoshiro256++ of prng.di.unimi.it, with Lemire's bounded draw) written outside this crate.
 
 use crate::common::Outcome;
+use crate::common::numbers::float;
 use crate::common::ops::level;
 use bullterrier_image::region::{Grid, Shares};
 use bullterrier_image::{Assign, Each, Error, Options, Photo, Picture, Presets, Recipe};
@@ -46,12 +47,6 @@ fn drawn(seed: u32, looks: usize, pieces: usize) -> Result<Vec<usize>, Error> {
 /// A small count as an f32.
 fn small(count: usize) -> f32 {
     f32::from(u8::try_from(count).unwrap_or(u8::MAX))
-}
-
-/// `count` as a float: a count here is far below 2^53.
-#[expect(clippy::cast_precision_loss, reason = "a count here is far below 2^53")]
-const fn float(count: usize) -> f64 {
-    count as f64
 }
 
 /// A small whole number held in a float.

@@ -11,6 +11,7 @@ use bullterrier_image::{
 };
 
 use crate::common::compare::first_bit_difference;
+use crate::common::numbers::total;
 
 /// An effect that logs the selection `near` it is handed and returns the picture as it is.
 struct Spy {
@@ -70,11 +71,6 @@ fn path(d: &str) -> Path {
         d: d.to_owned(),
         ..Path::default()
     }
-}
-
-/// The sum of `values` in double precision.
-fn total(values: &[f32]) -> f64 {
-    values.iter().map(|&value| f64::from(value)).sum()
 }
 
 #[test]

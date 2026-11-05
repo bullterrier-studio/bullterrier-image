@@ -164,17 +164,6 @@ pub(crate) fn selection(
         .ok_or_else(|| Error::Recipe("the spy was handed no selection".to_owned()))
 }
 
-/// `count` as a float: a pixel count is far below 2^53.
-#[expect(clippy::cast_precision_loss, reason = "a pixel count is far below 2^53")]
-pub(crate) const fn float(count: usize) -> f64 {
-    count as f64
-}
-
-/// The sum of `values` in double precision.
-pub(crate) fn total(values: &[f32]) -> f64 {
-    values.iter().map(|&value| f64::from(value)).sum()
-}
-
 /// An effect that paints the whole picture with one grey level.
 struct Level {
     name: String,

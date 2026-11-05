@@ -2,7 +2,8 @@
 //! or by numeric integration, the coverage of a pixel by a rectangle, and a dense point-by-point winding-number test. The
 //! path data is in shares of the picture, so a picture of known size turns a share into a known number of pixels.
 
-use crate::common::ops::{float, selection, total};
+use crate::common::numbers::{float, float_of, total};
+use crate::common::ops::selection;
 use bullterrier_image::Error;
 use bullterrier_image::region::Path;
 use proptest::prelude::*;
@@ -378,11 +379,6 @@ fn data(outlines: &[Vec<[i64; 2]>]) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
-}
-
-/// A small whole number as a float.
-fn float_of(number: i64) -> f64 {
-    f64::from(i32::try_from(number).unwrap_or(0))
 }
 
 proptest! {

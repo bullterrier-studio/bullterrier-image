@@ -6,7 +6,8 @@
 //! A sigma can be at most 24 x longest side / 480, a twentieth of the longest side, so a blur is never wider than the map.
 
 use crate::common::Outcome;
-use crate::common::ops::{float, level, total};
+use crate::common::numbers::{float, float_of, total};
+use crate::common::ops::level;
 use bullterrier_image::region::{Grid, Shares};
 use bullterrier_image::{Each, Error, Options, Photo, Picture, Presets, Recipe};
 
@@ -97,11 +98,6 @@ fn gaussian(indicator: &[f64], height: usize, width: usize, sigma: f64) -> Vec<f
     (0..height * width)
         .map(|index| flipped[(index % width) * height + index / width])
         .collect()
-}
-
-/// A small whole number as a float.
-fn float_of(number: i64) -> f64 {
-    f64::from(i32::try_from(number).unwrap_or(0))
 }
 
 /// The most the weights differ from the brute-force Gaussian of the indicator of the pieces, at a sigma in px.
