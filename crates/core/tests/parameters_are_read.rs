@@ -173,6 +173,13 @@ fn conditional() -> Vec<Conditional> {
             field: "seed",
             with: vec![("spacing", json!(3.0))],
         },
+        // a bilinear reading between a pixel and the light stays inside the picture; the cubic looks a pixel past the point
+        // it reads, beyond the edge for the readings within a pixel of the border
+        Conditional {
+            effect: "light_rays",
+            field: "edge",
+            with: vec![("interpolation", json!("bicubic"))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

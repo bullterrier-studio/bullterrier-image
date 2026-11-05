@@ -154,6 +154,18 @@ ROWS = [
     pytest.param(
         "radial_blur", {"edge": "constant"}, False, id="radial_blur: constant is not one of its four edge rules"
     ),
+    pytest.param(
+        "light_rays",
+        {"threshold": 0.99, "amount": 10, "samples": 256, "decay": 0, "interpolation": "bicubic", "edge": "wrap"},
+        True,
+        id="light_rays: highest threshold, amount and samples, no decay",
+    ),
+    pytest.param("light_rays", {"threshold": 1.0}, False, id="light_rays: threshold above the highest"),
+    pytest.param("light_rays", {"amount": 10.5}, False, id="light_rays: amount above the highest"),
+    pytest.param("light_rays", {"samples": 0}, False, id="light_rays: samples below the fewest"),
+    pytest.param(
+        "light_rays", {"edge": "constant"}, False, id="light_rays: constant is not one of its four edge rules"
+    ),
     pytest.param("dehaze", {"patch": 201, "edge": "wrap"}, True, id="dehaze: widest patch, wrap"),
     pytest.param("dehaze", {"patch": 202}, False, id="dehaze: patch above the widest"),
     pytest.param("dehaze", {"patch": 0}, False, id="dehaze: patch below the narrowest"),

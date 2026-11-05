@@ -248,6 +248,19 @@ fn cases() -> Vec<Case> {
                     .param("interpolation", "nearest")
                     .param("edge", "mirror"),
                 Step::new("radial_blur").param("mode", "spin").param("amount", 0.6),
+                Step::new("light_rays")
+                    .param("x", 0.7)
+                    .param("y", 0.2)
+                    .param("threshold", 0.4)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "mirror"),
+                Step::new("light_rays")
+                    .param("x", 1.0)
+                    .param("y", 0.5)
+                    .param("length", 0.9)
+                    .param("samples", 6)
+                    .param("decay", 0.5)
+                    .param("edge", "wrap"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1), (5, 2_003)],
         ),

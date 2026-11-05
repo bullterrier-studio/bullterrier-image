@@ -8,9 +8,8 @@ from scipy import ndimage
 
 # The one table of the edge rules for scipy's interpolating functions (`map_coordinates`, `affine_transform`), in their
 # own spelling: for interpolation scipy's 'wrap' does not repeat the picture but 'grid-wrap' does.
-# `bullterrier_image.ops.radial` reads it too, so the two modules cannot disagree about what an edge rule means.
 SCIPY_EDGE = {"reflect": "reflect", "mirror": "mirror", "nearest": "nearest", "wrap": "grid-wrap"}
-# The one table of the spline orders, read by `bullterrier_image.ops.radial` too.
+# The one table of the spline orders.
 # constant: scipy's spline order for each documented interpolation choice (0 nearest pixel, 1 linear, 3 cubic)
 SPLINE_ORDER = {"nearest": 0, "bilinear": 1, "bicubic": 3}
 # constant: columns copied from the far side when columns wrap; a cubic spline's end effect falls by a factor of

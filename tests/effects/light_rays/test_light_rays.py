@@ -169,12 +169,15 @@ def test_nearest_reads_whole_pixels_where_bilinear_and_bicubic_blend_them() -> N
 @pytest.mark.parametrize(
     ("interpolation", "edge_matters"),
     [("nearest", False), ("bilinear", False), ("bicubic", True)],
-    ids=["nearest never reads beyond the edge", "bilinear neither", "bicubic's spline fit does"],
+    ids=["nearest never reads beyond the edge", "bilinear neither", "bicubic's cubic fit does"],
 )
-def test_the_edge_rule_only_matters_to_the_spline_fit_of_bicubic_reading(
+def test_the_edge_rule_only_matters_to_the_cubic_reading_beside_a_light_at_the_border(
     interpolation: str, edge_matters: bool
 ) -> None:
+    """The readings lie between a pixel and the light, inside the picture; the cubic fit looks one pixel past the point
+    it reads, which is beyond the edge only where a reading falls within a pixel of the border: next to a light that
+    sits on it."""
     noise = np.random.default_rng(4).random((40, 60, 3), dtype=np.float32)
-    settings = {"interpolation": interpolation, "threshold": 0.3, "length": 0.6, "samples": 8}
+    settings = {"interpolation": interpolation, "threshold": 0.3, "length": 0.6, "samples": 8, "x": 0.0, "y": 0.0}
     mirrored, wrapped = (shine(noise, edge=edge, **settings) for edge in ("mirror", "wrap"))
     assert bool(np.abs(mirrored - wrapped).max() > 1e-4) is edge_matters
