@@ -6,6 +6,8 @@
 use bullterrier_image::{Error, ErrorKind, Lut};
 use proptest::prelude::*;
 
+use crate::common::compare::assert_close;
+
 const TOLERANCE: f32 = 1e-4;
 
 /// `index` of `top` steps, as a share 0..1.
@@ -28,13 +30,6 @@ fn sampled(size: usize, low: [f32; 3], high: [f32; 3], map: impl Fn([f32; 3]) ->
     Lut::new(size, low, high, entries)
 }
 
-fn assert_close(actual: [f32; 3], expected: [f32; 3], context: &str) {
-    assert!(
-        actual.iter().zip(expected).all(|(a, e)| (a - e).abs() <= TOLERANCE),
-        "{context}: {actual:?}, not {expected:?}"
-    );
-}
-
 /// An affine map `x -> matrix x + shift`, written out channel by channel.
 fn affine(matrix: [[f32; 3]; 3], shift: [f32; 3]) -> impl Fn([f32; 3]) -> [f32; 3] {
     move |x| [0, 1, 2].map(|row| matrix[row][0] * x[0] + matrix[row][1] * x[1] + matrix[row][2] * x[2] + shift[row])
@@ -46,7 +41,7 @@ proptest! {
     #[test]
     fn an_identity_table_returns_every_colour_as_it_is(size in 2_usize..=33, color in prop::array::uniform3(0.0_f32..=1.0)) {
         let identity = Lut::identity(size)?;
-        assert_close(identity.lookup(color), color, &format!("identity of {size}"));
+        assert_close(&identity.lookup(color), &color, TOLERANCE, &format!("identity of {size}"));
     }
 
     #[test]
@@ -58,7 +53,7 @@ proptest! {
     ) {
         let map = affine(matrix, shift);
         let table = sampled(size, [0.0; 3], [1.0; 3], &map)?;
-        assert_close(table.lookup(color), map(color), &format!("{size} entries per axis"));
+        assert_close(&table.lookup(color), &map(color), TOLERANCE, &format!("{size} entries per axis"));
     }
 
     #[test]
@@ -73,7 +68,7 @@ proptest! {
         let color = [0, 1, 2].map(|axis| low[axis] + span[axis] * place[axis]);
         let map = affine([[0.5, -0.25, 0.0], [0.0, 1.0, 0.5], [-1.0, 0.0, 0.75]], [0.1, 0.2, 0.3]);
         let table = sampled(size, low, high, &map)?;
-        assert_close(table.lookup(color), map(color), &format!("domain {low:?} .. {high:?}"));
+        assert_close(&table.lookup(color), &map(color), TOLERANCE, &format!("domain {low:?} .. {high:?}"));
     }
 }
 
@@ -89,7 +84,12 @@ fn a_table_returns_its_entries_at_its_nodes() -> Result<(), Error> {
             for red in 0..size {
                 let node = [share(red, 3), share(green, 3), share(blue, 3)];
                 let expected = [node[0] * node[1], node[2] * node[2], 1.0 - node[0] * node[2]];
-                assert_close(table.lookup(node), expected, &format!("node {red} {green} {blue}"));
+                assert_close(
+                    &table.lookup(node),
+                    &expected,
+                    TOLERANCE,
+                    &format!("node {red} {green} {blue}"),
+                );
             }
         }
     }
@@ -103,7 +103,12 @@ fn a_colour_between_the_entries_is_a_trilinear_mix_of_the_eight_around_it() -> R
     let table = sampled(2, [0.0; 3], [1.0; 3], |x| {
         [x[0] * x[1], x[2] * (1.0 - x[0]), (x[0] + x[1] + x[2]) / 3.0]
     })?;
-    assert_close(table.lookup([0.25, 0.5, 0.75]), [0.125, 0.5625, 0.5], "multilinear");
+    assert_close(
+        &table.lookup([0.25, 0.5, 0.75]),
+        &[0.125, 0.5625, 0.5],
+        TOLERANCE,
+        "multilinear",
+    );
     Ok(())
 }
 
@@ -111,7 +116,12 @@ fn a_colour_between_the_entries_is_a_trilinear_mix_of_the_eight_around_it() -> R
 fn between_two_entries_of_a_curve_the_result_is_their_mean() -> Result<(), Error> {
     // three entries per axis sample the square at 0, 0.5 and 1 (0, 0.25, 1): halfway between the first two is 0.125
     let table = sampled(3, [0.0; 3], [1.0; 3], |x| x.map(|value| value * value))?;
-    assert_close(table.lookup([0.25; 3]), [0.125; 3], "the mean of 0 and 0.25");
+    assert_close(
+        &table.lookup([0.25; 3]),
+        &[0.125; 3],
+        TOLERANCE,
+        "the mean of 0 and 0.25",
+    );
     Ok(())
 }
 
@@ -126,7 +136,12 @@ fn entries_are_listed_red_fastest_then_green_then_blue() -> Result<(), Error> {
         ([0.0, 0.0, 1.0], 4.0),
         ([1.0, 1.0, 1.0], 7.0),
     ] {
-        assert_close(table.lookup(corner), [row, 10.0, 20.0], &format!("{corner:?}"));
+        assert_close(
+            &table.lookup(corner),
+            &[row, 10.0, 20.0],
+            TOLERANCE,
+            &format!("{corner:?}"),
+        );
     }
     Ok(())
 }
@@ -142,10 +157,11 @@ fn colours_beyond_the_domain_take_the_edge_of_the_table() -> Result<(), Error> {
         .collect();
     let table = Lut::new(2, [0.25; 3], [0.75; 3], entries)?;
     // red 0 lies below the domain (the first entry, 0.5), green 1 above it (the last, 0.5), blue 0.375 a quarter along
-    assert_close(table.lookup([0.0, 1.0, 0.375]), [0.5, 0.5, 0.25], "edges");
+    assert_close(&table.lookup([0.0, 1.0, 0.375]), &[0.5, 0.5, 0.25], TOLERANCE, "edges");
     assert_close(
-        table.lookup([-9.0, 9.0, 0.375]),
-        [0.5, 0.5, 0.25],
+        &table.lookup([-9.0, 9.0, 0.375]),
+        &[0.5, 0.5, 0.25],
+        TOLERANCE,
         "far beyond the edges",
     );
     Ok(())
@@ -155,8 +171,9 @@ fn colours_beyond_the_domain_take_the_edge_of_the_table() -> Result<(), Error> {
 fn a_table_that_leaves_the_range_is_looked_up_as_it_is() -> Result<(), Error> {
     let table = Lut::new(2, [0.0; 3], [1.0; 3], vec![[1.4, -0.2, 0.5]; 8])?;
     assert_close(
-        table.lookup([0.3, 0.6, 0.9]),
-        [1.4, -0.2, 0.5],
+        &table.lookup([0.3, 0.6, 0.9]),
+        &[1.4, -0.2, 0.5],
+        TOLERANCE,
         "the clamp is the effect's, not the table's",
     );
     Ok(())
@@ -238,6 +255,11 @@ fn a_table_that_is_none_is_refused_naming_the_rule() {
 fn the_smallest_and_the_largest_size_are_tables() -> Result<(), Error> {
     assert_eq!(Lut::identity(Lut::MIN_SIZE)?.size(), 2);
     let largest = Lut::new(Lut::MAX_SIZE, [0.0; 3], [1.0; 3], entries(Lut::MAX_SIZE))?;
-    assert_close(largest.lookup([0.3, 0.6, 0.9]), [0.5; 3], "256 entries per axis");
+    assert_close(
+        &largest.lookup([0.3, 0.6, 0.9]),
+        &[0.5; 3],
+        TOLERANCE,
+        "256 entries per axis",
+    );
     Ok(())
 }

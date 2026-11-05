@@ -6,6 +6,7 @@ use bullterrier_image::effects::gradient::{self, Kind};
 use bullterrier_image::params::Color;
 use proptest::prelude::*;
 
+use crate::common::compare::assert_close;
 use crate::common::pixels::run_sized;
 
 const TOLERANCE: f32 = 1e-5;
@@ -23,13 +24,6 @@ fn red_to_blue(kind: Kind) -> gradient::Params {
 /// The colour a share `t` of the way from red to blue.
 fn mix(t: f32) -> [f32; 3] {
     [1.0 - t, 0.0, t]
-}
-
-fn assert_close(actual: [f32; 3], expected: [f32; 3], context: &str) {
-    assert!(
-        actual.iter().zip(expected).all(|(a, e)| (a - e).abs() <= TOLERANCE),
-        "{context}: {actual:?}, not {expected:?}"
-    );
 }
 
 #[test]
@@ -55,16 +49,18 @@ fn a_conic_gradient_turns_clockwise_from_its_start_angle_and_is_at_its_start_on_
         (270.0, 0, 50, 0.0),
     ] {
         assert_close(
-            at(angle, 0.5, 0.5, row, column)?,
-            mix(turn),
+            &at(angle, 0.5, 0.5, row, column)?,
+            &mix(turn),
+            TOLERANCE,
             &format!("angle {angle} at ({row}, {column})"),
         );
     }
     // the centre moves with x and y: at (0.25, 0.75) of 101 px it is at (25.25, 75.75), and the pixel centre (40.5, 75.5)
     // is 15.25 right and 0.25 above it, a turn of atan(0.25 / 15.25) / (2 pi) = 0.002608 short of the start ray
     assert_close(
-        at(0.0, 0.25, 0.75, 75, 40)?,
-        mix(1.0 - 0.002_608),
+        &at(0.0, 0.25, 0.75, 75, 40)?,
+        &mix(1.0 - 0.002_608),
+        TOLERANCE,
         "centre at (0.25, 0.75)",
     );
     Ok(())
@@ -105,7 +101,12 @@ fn repeat_fits_the_colours_in_again_and_reflect_runs_every_second_repeat_backwar
         let expected: Vec<[f32; 3]> = shares(repeat, reflect).into_iter().map(mix).collect();
         let actual = row(i32::from(repeat), reflect)?;
         for (column, (a, e)) in actual.iter().zip(&expected).enumerate() {
-            assert_close(*a, *e, &format!("repeat {repeat} reflect {reflect} column {column}"));
+            assert_close(
+                a,
+                e,
+                TOLERANCE,
+                &format!("repeat {repeat} reflect {reflect} column {column}"),
+            );
         }
     }
     Ok(())
@@ -121,7 +122,7 @@ fn a_radial_gradient_beyond_its_radius_stays_on_the_last_colour_however_often_it
             ..red_to_blue(Kind::Radial)
         };
         let corner = run_sized(&params, 11, 11, 0.0)?[0];
-        assert_close(corner, BLUE, &format!("repeat {repeat}"));
+        assert_close(&corner, &BLUE, TOLERANCE, &format!("repeat {repeat}"));
     }
     Ok(())
 }

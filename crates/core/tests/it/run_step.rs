@@ -2,6 +2,7 @@
 //! defaults for the rest, the effect's own opacity, and a parameter driven by a map mixing the runs at its levels.
 
 use crate::common::Outcome;
+use crate::common::compare::assert_close;
 use crate::common::run::{Paint, Recorder, Registered, length_table, probe_table};
 use bullterrier_image::{Drive, Error, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 use serde_json::{Value, json};
@@ -15,14 +16,6 @@ fn values() -> Vec<f32> {
 fn rendered(recipe: &Recipe, presets: &Presets) -> Result<Image, Error> {
     let values = values();
     Photo::new(Picture::new(4, 6, &values)?).render(recipe, presets, Options::default())
-}
-
-/// `actual` is `expected` to within what an f32 sum loses.
-fn assert_close(actual: &[f32], expected: &[f32]) {
-    assert_eq!(actual.len(), expected.len());
-    for (index, (a, e)) in actual.iter().zip(expected).enumerate() {
-        assert!((a - e).abs() < 1e-6, "value {index}: {a} is not {e}");
-    }
 }
 
 #[test]
@@ -64,10 +57,10 @@ fn a_step_that_sets_no_opacity_has_the_opacity_its_effect_declares() -> Outcome 
     // `paint` declares an opacity of 0.25: a quarter of the way from the photo (value v) to 0.5 is v + 0.25 (0.5 - v)
     let default = rendered(&Recipe::new([paint()]), &Presets::new())?;
     let expected: Vec<f32> = values().iter().map(|v| v + 0.25 * (0.5 - v)).collect();
-    assert_close(&default.into_values(), &expected);
+    assert_close(&default.into_values(), &expected, 1e-6, "the step");
     let own = rendered(&Recipe::new([paint().opacity(0.5)]), &Presets::new())?;
     let expected: Vec<f32> = values().iter().map(|v| v + 0.5 * (0.5 - v)).collect();
-    assert_close(&own.into_values(), &expected);
+    assert_close(&own.into_values(), &expected, 1e-6, "the step");
     let full = rendered(&Recipe::new([paint().opacity(1.0)]), &Presets::new())?;
     assert_eq!(full.into_values(), vec![0.5; 72]);
     Ok(())
@@ -100,7 +93,7 @@ fn a_driven_parameter_mixes_the_runs_either_side_of_the_maps_value() -> Outcome 
         .iter()
         .flat_map(|level| [*level; 3])
         .collect();
-    assert_close(&drawn, &expected);
+    assert_close(&drawn, &expected, 1e-6, "the step");
     Ok(())
 }
 
@@ -121,7 +114,7 @@ fn a_driven_effect_with_the_map_on_a_level_is_the_plain_effect_at_that_levels_va
         .zip(&above)
         .map(|(low, high)| 0.5 * low + 0.5 * high)
         .collect();
-    assert_close(&rendered_with(driven, 0.375)?, &halfway);
+    assert_close(&rendered_with(driven, 0.375)?, &halfway, 1e-6, "the step");
     Ok(())
 }
 
@@ -189,7 +182,7 @@ fn a_linear_effect_driven_by_a_map_is_its_parameter_at_the_maps_value_whatever_t
             .param("level", Drive::new("subject", 0.2, 0.8).levels(levels))
             .opacity(1.0);
         let drawn = driven_by(step, &field)?.into_values();
-        assert_close(&drawn, &expected);
+        assert_close(&drawn, &expected, 1e-6, "the step");
     }
     Ok(())
 }

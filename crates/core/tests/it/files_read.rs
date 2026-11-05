@@ -6,8 +6,9 @@
 use std::io::Cursor;
 
 use crate::common::Outcome;
+use crate::common::compare::assert_close;
 use crate::common::files::{Png, Scratch, chunk, cmyk_jpeg, exif, progressive_jpeg, tiff_wide};
-use bullterrier_image::{Error, ErrorKind, Image, Layer, read, read_map};
+use bullterrier_image::{Error, ErrorKind, Image, read, read_map};
 use image::codecs::gif::GifEncoder;
 use image::codecs::jpeg::JpegEncoder;
 use image::{DynamicImage, ExtendedColorType, ImageBuffer, ImageFormat};
@@ -440,7 +441,7 @@ fn a_map_is_upright_too_so_it_lines_up_with_its_photo() -> Outcome {
     assert_eq!((map.height(), map.width()), (2, 3));
     // displayed(r, c) = stored[2 - c][r]
     let wanted = [120., 60., 0., 150., 90., 30.].map(|level| level / 255.);
-    assert_close(&map, &wanted, LEVEL);
+    assert_close(map.values(), &wanted, LEVEL, "map");
     Ok(())
 }
 
@@ -692,7 +693,7 @@ fn tiffs_of_32_bit_levels_read_as_the_levels_worked_out_by_hand() -> Outcome {
 fn a_map_of_32_bit_integer_levels_within_16_bits_reads_as_16_bit_grey_does() -> Outcome {
     let samples = [0_i32, 26214].map(i32::to_le_bytes);
     let (_folder, path) = written("map.tif", &tiff_wide(2, 1, 2, None, &samples))?;
-    assert_close(&read_map(&path)?, &[0., 0.4], LEVEL);
+    assert_close(read_map(&path)?.values(), &[0., 0.4], LEVEL, "map");
     Ok(())
 }
 
@@ -764,17 +765,6 @@ fn the_same_file_read_twice_is_the_same_image() -> Outcome {
 }
 
 // ---- maps -----------------------------------------------------------------------------------------------------------
-
-fn assert_close(map: &Layer, expected: &[f32], tolerance: f32) {
-    let values = map.values();
-    assert_eq!(values.len(), expected.len());
-    for (index, (value, wanted)) in values.iter().zip(expected).enumerate() {
-        assert!(
-            (value - wanted).abs() <= tolerance,
-            "value {index} is {value}, not {wanted}"
-        );
-    }
-}
 
 /// Files and the map each must read as (one value per pixel), with the width of the file.
 fn map_cases() -> Vec<(&'static str, Vec<u8>, usize, Vec<f32>)> {
@@ -853,7 +843,7 @@ fn a_map_file_gives_its_value_per_pixel() -> Outcome {
         let (_folder, path) = written("map.png", &file)?;
         let map = read_map(&path)?;
         assert_eq!((map.height(), map.width()), (1, width), "{id}");
-        assert_close(&map, &expected, LEVEL);
+        assert_close(map.values(), &expected, LEVEL, "map");
     }
     Ok(())
 }

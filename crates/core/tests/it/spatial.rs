@@ -6,6 +6,7 @@ use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
 use serde_json::Value;
 
+use crate::common::compare::assert_close;
 use crate::common::pixels::run;
 
 const TOLERANCE: f32 = 1e-5;
@@ -27,13 +28,6 @@ fn grid<P: EffectParams>(params: &P, height: usize, width: usize, grey: f32) -> 
     grid_of(params, height, width, &vec![grey; height * width])
 }
 
-fn assert_close(actual: &[f32], expected: &[f32], context: &str) {
-    assert!(
-        actual.len() == expected.len() && actual.iter().zip(expected).all(|(a, e)| (a - e).abs() <= TOLERANCE),
-        "{context}: {actual:?}, not {expected:?}"
-    );
-}
-
 // --- vignette ----------------------------------------------------------------------------------------------------
 
 /// Black fading to white from 0.5 out over 0.5, so a pixel's value is its smoothstep share.
@@ -51,7 +45,7 @@ fn to_white(roundness: f32) -> vignette::Params {
 fn a_rectangle_fades_by_the_larger_offset_along_a_smoothstep() -> Result<(), Error> {
     // one row of 4 pixels: offsets 0.75, 0.25, 0.25, 0.75; 0.75 is halfway through the fade (smoothstep 0.5), 0.25 before it
     let out = grid(&to_white(0.0), 1, 4, 0.0)?;
-    assert_close(&out, &[0.5, 0.0, 0.0, 0.5], "a rectangle, one row");
+    assert_close(&out, &[0.5, 0.0, 0.0, 0.5], TOLERANCE, "a rectangle, one row");
     Ok(())
 }
 
@@ -59,7 +53,12 @@ fn a_rectangle_fades_by_the_larger_offset_along_a_smoothstep() -> Result<(), Err
 fn an_ellipse_reaches_a_corner_less_far_than_a_rectangle() -> Result<(), Error> {
     // distance 0.75 x sqrt(1/2) = 0.53033 (offset 0.75 across, 0 down), so t = 0.06066 and 3t^2 - 2t^3 = 0.0105926
     let out = grid(&to_white(1.0), 1, 4, 0.0)?;
-    assert_close(&out, &[0.010_592_55, 0.0, 0.0, 0.010_592_55], "an ellipse, one row");
+    assert_close(
+        &out,
+        &[0.010_592_55, 0.0, 0.0, 0.010_592_55],
+        TOLERANCE,
+        "an ellipse, one row",
+    );
     Ok(())
 }
 
@@ -68,7 +67,12 @@ fn a_rounded_rectangle_takes_the_norm_with_exponent_two_over_roundness() -> Resu
     // 2 rows of 4: the corner pixel is 0.5 down and 0.75 across; exponent 4: 0.75 x ((0.5 / 0.75)^4 + 1)^(1/4) / 2^(1/4)
     // = 0.65974, so t = 0.31949 and the share is 0.240996
     let out = grid(&to_white(0.5), 2, 4, 0.0)?;
-    assert_close(&out[..1], &[0.240_995_8], "the corner of a rounded rectangle");
+    assert_close(
+        &out[..1],
+        &[0.240_995_8],
+        TOLERANCE,
+        "the corner of a rounded rectangle",
+    );
     Ok(())
 }
 
@@ -82,8 +86,8 @@ fn the_middle_pixel_of_an_odd_picture_is_left_alone_even_with_a_hard_edge_at_rad
     };
     let out = grid(&params, 3, 3, 0.7)?;
     assert!(out.iter().all(|value| value.is_finite()), "{out:?}");
-    assert_close(&out[4..5], &[0.7], "the middle of 3 x 3");
-    assert_close(&out[..1], &[0.0], "a corner, fully faded to black");
+    assert_close(&out[4..5], &[0.7], TOLERANCE, "the middle of 3 x 3");
+    assert_close(&out[..1], &[0.0], TOLERANCE, "a corner, fully faded to black");
     Ok(())
 }
 
@@ -116,10 +120,20 @@ fn lines(spacing: f32, thickness: f32, offset: f32, softness: f32) -> scanlines:
 fn a_hard_line_blackens_the_rows_it_covers_and_a_row_it_half_covers_by_half() -> Result<(), Error> {
     // lines [1, 3) and [5, 7) of a period of 4
     let whole = grid(&lines(4.0, 0.5, 1.0, 0.0), 8, 1, 1.0)?;
-    assert_close(&whole, &[1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0], "whole rows");
+    assert_close(
+        &whole,
+        &[1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0],
+        TOLERANCE,
+        "whole rows",
+    );
     // lines [0.5, 2.5) and [4.5, 6.5)
     let half = grid(&lines(4.0, 0.5, 0.5, 0.0), 8, 1, 1.0)?;
-    assert_close(&half, &[0.5, 0.0, 0.5, 1.0, 0.5, 0.0, 0.5, 1.0], "rows half covered");
+    assert_close(
+        &half,
+        &[0.5, 0.0, 0.5, 1.0, 0.5, 0.0, 0.5, 1.0],
+        TOLERANCE,
+        "rows half covered",
+    );
     Ok(())
 }
 
@@ -129,23 +143,33 @@ fn a_fully_soft_line_swells_along_sin_squared_and_the_rows_add_up_to_the_hard_on
     let swell = 0.5 + std::f32::consts::FRAC_1_PI;
     let dip = 0.5 - std::f32::consts::FRAC_1_PI;
     let out = grid(&lines(4.0, 0.5, 0.0, 1.0), 4, 1, 1.0)?;
-    assert_close(&out, &[1.0 - swell, 1.0 - swell, 1.0 - dip, 1.0 - dip], "a soft line");
+    assert_close(
+        &out,
+        &[1.0 - swell, 1.0 - swell, 1.0 - dip, 1.0 - dip],
+        TOLERANCE,
+        "a soft line",
+    );
     Ok(())
 }
 
 #[test]
 fn a_zero_thickness_or_darkness_changes_nothing_and_a_full_one_darkens_everything_alike() -> Result<(), Error> {
-    assert_close(&grid(&lines(3.0, 0.0, 0.7, 0.4), 6, 1, 0.8)?, &[0.8; 6], "no line");
+    assert_close(
+        &grid(&lines(3.0, 0.0, 0.7, 0.4), 6, 1, 0.8)?,
+        &[0.8; 6],
+        TOLERANCE,
+        "no line",
+    );
     let none = scanlines::Params {
         darkness: 0.0,
         ..lines(3.0, 0.5, 0.0, 0.0)
     };
-    assert_close(&grid(&none, 6, 1, 0.8)?, &[0.8; 6], "no darkness");
+    assert_close(&grid(&none, 6, 1, 0.8)?, &[0.8; 6], TOLERANCE, "no darkness");
     let touching = scanlines::Params {
         darkness: 0.5,
         ..lines(2.5, 1.0, 0.3, 0.7)
     };
-    assert_close(&grid(&touching, 6, 1, 0.8)?, &[0.4; 6], "lines that touch");
+    assert_close(&grid(&touching, 6, 1, 0.8)?, &[0.4; 6], TOLERANCE, "lines that touch");
     Ok(())
 }
 
@@ -180,6 +204,7 @@ fn one_unclipped_tile_maps_a_pixel_to_the_share_of_pixels_at_or_below_its_bin() 
     assert_close(
         &out.iter().map(|pixel| pixel[0]).collect::<Vec<_>>(),
         &[0.5, 0.5, 0.75, 1.0],
+        TOLERANCE,
         "classic equalisation",
     );
     Ok(())
@@ -197,6 +222,7 @@ fn a_limit_of_one_flattens_the_histogram_so_the_mapping_is_the_uniform_ramp() ->
     assert_close(
         &out.iter().map(|pixel| pixel[0]).collect::<Vec<_>>(),
         &[0.25, 0.25, 0.75, 1.0],
+        TOLERANCE,
         "a flat histogram",
     );
     Ok(())
@@ -237,7 +263,12 @@ fn neighbouring_tiles_blend_by_the_distance_to_their_centres() -> Result<(), Err
                 _ => 1.0,
             })
             .collect();
-        assert_close(&out, &expected, &format!("turned {turned}, dark first {dark_first}"));
+        assert_close(
+            &out,
+            &expected,
+            TOLERANCE,
+            &format!("turned {turned}, dark first {dark_first}"),
+        );
     }
     Ok(())
 }

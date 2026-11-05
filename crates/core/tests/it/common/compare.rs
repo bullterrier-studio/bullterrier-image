@@ -30,3 +30,16 @@ pub(crate) fn first_difference_within(left: &[f32], right: &[f32], tolerance: f3
         .zip(right)
         .position(|(one, other)| (one - other).abs() > tolerance)
 }
+
+/// Fails unless `actual` is `expected` to within `tolerance`, value by value, naming the first value that is not and
+/// `context`.
+pub(crate) fn assert_close(actual: &[f32], expected: &[f32], tolerance: f32, context: &str) {
+    assert_eq!(actual.len(), expected.len(), "{context}");
+    let at = first_difference_within(actual, expected, tolerance);
+    assert!(
+        at.is_none(),
+        "{context}: value {at:?} is {:?}, not {:?}",
+        at.map(|index| actual[index]),
+        at.map(|index| expected[index])
+    );
+}

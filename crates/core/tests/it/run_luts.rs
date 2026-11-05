@@ -5,6 +5,7 @@
 
 use std::sync::Arc;
 
+use crate::common::compare::assert_close;
 use crate::common::files::Scratch;
 use crate::common::run::{Registered, unique};
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
@@ -84,13 +85,6 @@ fn render(photo: &Photo<'_>, recipe: &Recipe) -> Result<Vec<f32>, Error> {
     Ok(photo.render(recipe, &Presets::new(), Options::default())?.into_values())
 }
 
-fn assert_close(actual: &[f32], expected: &[f32], context: &str) {
-    assert_eq!(actual.len(), expected.len(), "{context}");
-    for (index, (a, e)) in actual.iter().zip(expected).enumerate() {
-        assert!((a - e).abs() <= 1e-5, "{context}: value {index} is {a}, not {e}");
-    }
-}
-
 #[test]
 fn a_table_given_to_the_photo_reaches_the_step_that_names_it() -> Result<(), Error> {
     let tablet = Registered::new(Tablet::new())?;
@@ -101,7 +95,7 @@ fn a_table_given_to_the_photo_reaches_the_step_that_names_it() -> Result<(), Err
         &Recipe::new([Step::new(tablet.name()).param("file", "negative")]),
     )?;
     let expected: Vec<f32> = values.iter().map(|value| 1.0 - value).collect();
-    assert_close(&made, &expected, "the negative");
+    assert_close(&made, &expected, 1e-5, "the negative");
     Ok(())
 }
 
@@ -114,7 +108,7 @@ fn a_step_that_names_no_table_gets_none_and_the_effect_sees_the_identity() -> Re
         Step::new(tablet.name()),
         Step::new(tablet.name()).param("file", Value::Null),
     ] {
-        assert_close(&render(&photo, &Recipe::new([step]))?, &values, "no table");
+        assert_close(&render(&photo, &Recipe::new([step]))?, &values, 1e-5, "no table");
     }
     Ok(())
 }
@@ -133,7 +127,12 @@ fn each_step_gets_the_table_of_its_own_name() -> Result<(), Error> {
         Step::new(name).param("file", "quarter"),
         Step::new(name).param("file", "negative"),
     ]);
-    assert_close(&render(&photo, &recipe)?, &vec![0.75; 72], "three steps, two tables");
+    assert_close(
+        &render(&photo, &recipe)?,
+        &vec![0.75; 72],
+        1e-5,
+        "three steps, two tables",
+    );
     Ok(())
 }
 
@@ -165,6 +164,7 @@ fn the_looks_of_an_each_step_find_their_tables_too() -> Result<(), Error> {
     assert_close(
         &[at(0), at(2), at(3), at(5)],
         &[0.125, 0.125, 0.875, 0.875],
+        1e-5,
         "left and right",
     );
     Ok(())
@@ -181,10 +181,10 @@ fn a_cube_file_named_by_a_step_is_read_and_a_given_table_of_that_name_wins() -> 
     let values = values();
     let recipe = Recipe::new([Step::new(tablet.name()).param("file", named.as_str())]);
     let photo = Photo::new(Picture::new(4, 6, &values)?);
-    assert_close(&render(&photo, &recipe)?, &vec![0.5; 72], "read from the file");
+    assert_close(&render(&photo, &recipe)?, &vec![0.5; 72], 1e-5, "read from the file");
     // a table the photo is given under the path's name is used instead of the file
     let given = photo.with_lut(named, Arc::new(flat(0.25)?));
-    assert_close(&render(&given, &recipe)?, &vec![0.25; 72], "the given table wins");
+    assert_close(&render(&given, &recipe)?, &vec![0.25; 72], 1e-5, "the given table wins");
     Ok(())
 }
 
@@ -236,6 +236,6 @@ fn a_table_offered_to_apply_reaches_the_effect_under_its_parameter() -> Result<(
     let inputs = Inputs::default().with_lut("file", &table);
     let made = apply(tablet.name(), &picture, json!({"file": null}), &inputs)?;
     let expected: Vec<f32> = values.iter().map(|value| 1.0 - value).collect();
-    assert_close(&made.into_values(), &expected, "apply with a table");
+    assert_close(&made.into_values(), &expected, 1e-5, "apply with a table");
     Ok(())
 }

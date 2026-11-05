@@ -14,6 +14,8 @@ use bullterrier_image::{
 };
 use serde_json::json;
 
+use crate::common::compare::assert_close;
+
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 
 /// An effect that paints the whole picture with one grey `level` and counts its calls.
@@ -126,14 +128,6 @@ fn render(values: &[f32], height: usize, width: usize, recipe: &Recipe, options:
     Ok(Photo::new(Picture::new(height, width, values)?)
         .render(recipe, &Presets::new(), options)?
         .into_values())
-}
-
-/// `actual` is `expected` to within 1e-6, pixel by pixel.
-fn assert_close(actual: &[f32], expected: &[f32], row: &str) {
-    assert_eq!(actual.len(), expected.len(), "{row}");
-    for (index, (a, e)) in actual.iter().zip(expected).enumerate() {
-        assert!((a - e).abs() <= 1e-6, "{row}: value {index} is {a}, not {e}");
-    }
 }
 
 /// A Gaussian weight row by brute force: the indicator of `chosen` columns of a row of `width`, blurred by `sigma` with
@@ -315,6 +309,7 @@ fn looks_that_paint_one_level_give_that_level_everywhere_whatever_the_feather_an
             assert_close(
                 &out,
                 &vec![0.6; 4 * 48 * 3],
+                1e-6,
                 &format!("feather {feather}, {assign:?}, seed {seed}"),
             );
         }
@@ -494,7 +489,7 @@ fn an_each_over_the_bands_of_a_map_gives_each_band_its_look() -> Outcome {
         .render(&recipe, &Presets::new(), Options::default())?
         .into_values();
     let levels: Vec<f32> = (0..4).map(|column| at(&out, 4, 0, column)).collect();
-    assert_close(&levels, &[0.9, 0.9, 0.3, 0.3], "two bands");
+    assert_close(&levels, &[0.9, 0.9, 0.3, 0.3], 1e-6, "two bands");
     Ok(())
 }
 
@@ -550,6 +545,7 @@ fn the_shape_of_the_pieces_does_not_change_what_a_look_is() -> Outcome {
             at(&out, 2, 1, 1),
         ],
         &levels,
+        1e-6,
         "four pieces",
     );
     Ok(())
@@ -584,7 +580,7 @@ fn a_look_is_run_at_the_working_pictures_size_ratio_and_its_pixel_values_scaled_
         doubled,
     )?;
     let alone = render(&values, 6, 480, &Recipe::new([grid()]), doubled)?;
-    assert_close(&by_each, &alone, "a px look inside an each step and on its own");
+    assert_close(&by_each, &alone, 1e-6, "a px look inside an each step and on its own");
     Ok(())
 }
 

@@ -9,6 +9,8 @@ use bullterrier_image::{
     BlendMode, Category, Effect, Error, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, register,
 };
 
+use crate::common::compare::assert_close;
+
 /// A foreign effect that ignores the picture and returns `values` (pixel after pixel, row after row) instead: the source a
 /// blend mode is laid over the photo with.
 struct Replaces {
@@ -80,13 +82,6 @@ fn laid(backdrop: &[f32], source: &[f32], lay: (BlendMode, f64), mask: Option<&[
 /// A blend mode and an opacity.
 const fn source(mode: BlendMode, opacity: f64) -> (BlendMode, f64) {
     (mode, opacity)
-}
-
-fn assert_close(actual: &[f32], expected: &[f32], said: &str) {
-    assert_eq!(actual.len(), expected.len(), "{said}");
-    for (index, (a, e)) in actual.iter().zip(expected).enumerate() {
-        assert!((a - e).abs() < 1e-6, "{said}: value {index} is {a}, not {e}");
-    }
 }
 
 #[test]
@@ -184,7 +179,7 @@ fn each_mode_gives_the_value_the_w3c_formula_gives_for_known_pixels() -> Result<
     assert_eq!(rows.map(|(mode, _)| mode), BlendMode::ALL);
     for (mode, expected) in rows {
         let out = laid(BACKDROP.as_flattened(), SOURCE.as_flattened(), source(mode, 1.0), None)?;
-        assert_close(&out, expected.as_flattened(), mode.name());
+        assert_close(&out, expected.as_flattened(), 1e-6, mode.name());
     }
     Ok(())
 }
@@ -203,11 +198,13 @@ fn opacity_mixes_the_blend_in_from_nothing_at_0_to_all_of_it_at_1() -> Result<()
     assert_close(
         &laid(&backdrop, &solid, source(BlendMode::Normal, 0.25), None)?,
         &[0.3; 3],
+        1e-6,
         "normal 0.25",
     );
     assert_close(
         &laid(&backdrop, &solid, source(BlendMode::Multiply, 0.5), None)?,
         &[0.16; 3],
+        1e-6,
         "multiply 0.5",
     );
     Ok(())
@@ -220,14 +217,19 @@ fn a_mask_limits_the_step_to_where_it_is_above_0_and_weights_it_by_its_value() -
     // alpha = opacity x mask; Co = 0.2 + alpha x 0.4
     let normal = laid(&backdrop, &solid, source(BlendMode::Normal, 1.0), Some(&mask))?;
     let channels = |pixels: [f32; 4]| pixels.iter().flat_map(|pixel| [*pixel; 3]).collect::<Vec<f32>>();
-    assert_close(&normal, &channels([0.2, 0.6, 0.4, 0.3]), "mask");
+    assert_close(&normal, &channels([0.2, 0.6, 0.4, 0.3]), 1e-6, "mask");
     // outside the mask (value 0) the pixel is the backdrop's exactly
     assert_eq!(normal[..3], backdrop[..3]);
     let half = laid(&backdrop, &solid, source(BlendMode::Normal, 0.5), Some(&mask))?;
-    assert_close(&half, &channels([0.2, 0.4, 0.3, 0.25]), "mask at 0.5");
+    assert_close(&half, &channels([0.2, 0.4, 0.3, 0.25]), 1e-6, "mask at 0.5");
     // multiply: B = 0.12; Co = 0.2 - alpha x 0.08
     let multiplied = laid(&backdrop, &solid, source(BlendMode::Multiply, 1.0), Some(&mask))?;
-    assert_close(&multiplied, &channels([0.2, 0.12, 0.16, 0.18]), "mask with multiply");
+    assert_close(
+        &multiplied,
+        &channels([0.2, 0.12, 0.16, 0.18]),
+        1e-6,
+        "mask with multiply",
+    );
     Ok(())
 }
 

@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use crate::common::Outcome;
+use crate::common::compare::assert_close;
 use crate::common::run::{Finds, Paint, Recorder, Registered, regions};
 use bullterrier_image::frame::Flip;
 use bullterrier_image::{Each, Error, ErrorKind, Frame, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
@@ -74,14 +75,6 @@ fn made(
     render(&photo, &rig.asking(&[name], declared), Options::default())?;
     let mut seen = rig.seen();
     Ok(seen.remove(0))
-}
-
-/// `actual` is `expected` to within `by`.
-fn assert_close(actual: &[f32], expected: &[f32], by: f32, row: &str) {
-    assert_eq!(actual.len(), expected.len(), "{row}");
-    for (index, (a, e)) in actual.iter().zip(expected).enumerate() {
-        assert!((a - e).abs() <= by, "{row}: value {index} is {a}, not {e}");
-    }
 }
 
 #[test]

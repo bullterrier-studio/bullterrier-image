@@ -5,6 +5,7 @@ use bullterrier_image::Error;
 use bullterrier_image::effects::{auto_levels, curves, levels};
 use proptest::prelude::*;
 
+use crate::common::compare::assert_close;
 use crate::common::pixels::run;
 
 const TOLERANCE: f32 = 1e-6;
@@ -17,16 +18,6 @@ fn greys(values: &[f32]) -> Vec<[f32; 3]> {
 /// The red channel of `pixels`.
 fn reds(pixels: &[[f32; 3]]) -> Vec<f32> {
     pixels.iter().map(|pixel| pixel[0]).collect()
-}
-
-fn assert_close(actual: &[f32], expected: &[f32], context: &str) {
-    assert_eq!(actual.len(), expected.len(), "{context}");
-    for (index, (actual, expected)) in actual.iter().zip(expected).enumerate() {
-        assert!(
-            (actual - expected).abs() <= TOLERANCE,
-            "{context}: value {index} is {actual}, not {expected}"
-        );
-    }
 }
 
 /// The master curve through the heights `heights` at the inputs 0, 0.25, 0.5, 0.75 and 1, read at `values`; the colour
@@ -64,6 +55,7 @@ fn levels_land_on_the_output_points_at_and_beyond_the_input_points_and_are_linea
     assert_close(
         &out,
         &[0.1, 0.1, 0.5, 0.9, 0.9],
+        TOLERANCE,
         "input points 0.2/0.8, output points 0.1/0.9",
     );
     Ok(())
@@ -79,6 +71,7 @@ fn a_midtone_gamma_is_a_power_of_one_over_gamma_that_keeps_black_and_white() -> 
     assert_close(
         &levelled(&brighter, &[0.0, 0.25, 0.81, 1.0])?,
         &[0.0, 0.5, 0.9, 1.0],
+        TOLERANCE,
         "gamma 2",
     );
     let darker = levels::Params {
@@ -88,6 +81,7 @@ fn a_midtone_gamma_is_a_power_of_one_over_gamma_that_keeps_black_and_white() -> 
     assert_close(
         &levelled(&darker, &[0.0, 0.5, 0.9, 1.0])?,
         &[0.0, 0.25, 0.81, 1.0],
+        TOLERANCE,
         "gamma 0.5",
     );
     Ok(())
@@ -102,7 +96,7 @@ fn output_points_in_reverse_make_the_negative() -> Result<(), Error> {
     };
     let values = [0.0, 0.1, 0.35, 0.6, 1.0];
     let expected: Vec<f32> = values.iter().map(|value| 1.0 - value).collect();
-    assert_close(&levelled(&negative, &values)?, &expected, "the negative");
+    assert_close(&levelled(&negative, &values)?, &expected, TOLERANCE, "the negative");
     Ok(())
 }
 
@@ -115,7 +109,12 @@ fn input_points_that_are_equal_or_crossed_cut_the_picture_at_the_black_point() -
             ..levels::Params::default()
         };
         let out = levelled(&cut, &[0.0, 0.4, 0.7, 1.0])?;
-        assert_close(&out, &[0.0, 0.0, 1.0, 1.0], &format!("black {black}, white {white}"));
+        assert_close(
+            &out,
+            &[0.0, 0.0, 1.0, 1.0],
+            TOLERANCE,
+            &format!("black {black}, white {white}"),
+        );
     }
     Ok(())
 }
@@ -149,7 +148,7 @@ fn the_darkest_and_brightest_values_go_to_black_and_white_and_the_rest_between()
     };
     // the range is 0.2..0.9, so out = (v - 0.2) / 0.7
     let out = reds(&run(&stretch, &greys(&[0.2, 0.3, 0.5, 0.7, 0.9]))?);
-    assert_close(&out, &[0.0, 1.0 / 7.0, 3.0 / 7.0, 5.0 / 7.0, 1.0], "clip 0");
+    assert_close(&out, &[0.0, 1.0 / 7.0, 3.0 / 7.0, 5.0 / 7.0, 1.0], TOLERANCE, "clip 0");
     Ok(())
 }
 
@@ -161,7 +160,7 @@ fn the_clipped_share_at_each_end_is_saturated() -> Result<(), Error> {
         ..auto_levels::Params::default()
     };
     let out = reds(&run(&stretch, &greys(&[0.9, 0.3, 0.5, 0.7, 0.2]))?);
-    assert_close(&out, &[1.0, 0.0, 0.5, 1.0, 0.0], "clip 0.2");
+    assert_close(&out, &[1.0, 0.0, 0.5, 1.0, 0.0], TOLERANCE, "clip 0.2");
     Ok(())
 }
 
@@ -173,7 +172,12 @@ fn a_clip_that_leaves_no_range_leaves_the_values_as_they_are() -> Result<(), Err
         ..auto_levels::Params::default()
     };
     let values = [0.2, 0.5, 0.9];
-    assert_close(&reds(&run(&stretch, &greys(&values))?), &values, "clip 0.4 of 3 values");
+    assert_close(
+        &reds(&run(&stretch, &greys(&values))?),
+        &values,
+        TOLERANCE,
+        "clip 0.4 of 3 values",
+    );
     Ok(())
 }
 
@@ -187,11 +191,12 @@ fn per_channel_stretches_each_channel_alone_and_linked_all_alike() -> Result<(),
     };
     let out = run(&alone, &pixels)?;
     let channel = |index: usize| out.iter().map(|pixel| pixel[index]).collect::<Vec<_>>();
-    assert_close(&channel(0), &[0.0, 0.5, 1.0], "red alone");
-    assert_close(&channel(1), &[0.0, 0.5, 1.0], "green alone");
+    assert_close(&channel(0), &[0.0, 0.5, 1.0], TOLERANCE, "red alone");
+    assert_close(&channel(1), &[0.0, 0.5, 1.0], TOLERANCE, "green alone");
     assert_close(
         &channel(2),
         &[0.3, 0.3, 0.3],
+        TOLERANCE,
         "a channel with no range is left as it is",
     );
     // one range 0.1..0.8 for all: out = (v - 0.1) / 0.7
@@ -206,7 +211,7 @@ fn per_channel_stretches_each_channel_alone_and_linked_all_alike() -> Result<(),
         [4.0 / 7.0, 1.0, 2.0 / 7.0],
     ];
     for (pixel, expected) in out.iter().zip(expected) {
-        assert_close(pixel, &expected, "linked");
+        assert_close(pixel, &expected, TOLERANCE, "linked");
     }
     Ok(())
 }
@@ -219,6 +224,7 @@ fn the_defaults_are_the_straight_line() -> Result<(), Error> {
     assert_close(
         &reds(&run(&curves::Params::default(), &greys(&values))?),
         &values,
+        TOLERANCE,
         "defaults",
     );
     Ok(())
@@ -259,7 +265,12 @@ fn a_curve_gives_the_values_worked_out_by_hand_between_its_points() -> Result<()
     for (heights, readings) in BY_HAND {
         let inputs = readings.map(|(input, _)| input);
         let expected = readings.map(|(_, output)| output);
-        assert_close(&master(heights, &inputs)?, &expected, &format!("heights {heights:?}"));
+        assert_close(
+            &master(heights, &inputs)?,
+            &expected,
+            TOLERANCE,
+            &format!("heights {heights:?}"),
+        );
     }
     Ok(())
 }
@@ -270,6 +281,7 @@ fn a_curve_passes_through_every_point_even_when_it_is_not_monotone() -> Result<(
     assert_close(
         &master(heights, &[0.0, 0.25, 0.5, 0.75, 1.0])?,
         &heights,
+        TOLERANCE,
         "the control points",
     );
     Ok(())
@@ -282,6 +294,7 @@ fn a_curve_is_held_at_its_end_points_beyond_them() -> Result<(), Error> {
     assert_close(
         &master(heights, &[-0.3, 1.4, 7.0])?,
         &[0.1, 0.5, 0.5],
+        TOLERANCE,
         "beyond the ends",
     );
     Ok(())

@@ -6,6 +6,7 @@ use bullterrier_image::effects::gradient_map::{self, QuantileMethod};
 use bullterrier_image::params::Color;
 use proptest::prelude::*;
 
+use crate::common::compare::assert_close;
 use crate::common::pixels::run;
 
 const TOLERANCE: f32 = 1e-5;
@@ -28,17 +29,6 @@ fn black_to_white(shadow_clip: f32, highlight_clip: f32, method: QuantileMethod)
     }
 }
 
-fn assert_close(actual: &[[f32; 3]], expected: &[[f32; 3]], context: &str) {
-    assert!(
-        actual.len() == expected.len()
-            && actual
-                .iter()
-                .zip(expected)
-                .all(|(a, e)| a.iter().zip(e).all(|(a, e)| (a - e).abs() <= TOLERANCE)),
-        "{context}: {actual:?}, not {expected:?}"
-    );
-}
-
 #[test]
 fn stops_sit_evenly_spaced_and_the_colour_between_two_is_their_linear_mix() -> Result<(), Error> {
     // five brightnesses a quarter apart over the whole range: positions 0, 1/4, 1/2, 3/4, 1 on the ramp
@@ -51,15 +41,17 @@ fn stops_sit_evenly_spaced_and_the_colour_between_two_is_their_linear_mix() -> R
     };
     // three stops at 0, 1/2 and 1: the quarter points are halfway between neighbours
     assert_close(
-        &run(&stops(&[RED, GREEN, BLUE]), &picture)?,
-        &[RED, [0.5, 0.5, 0.0], GREEN, [0.0, 0.5, 0.5], BLUE],
+        run(&stops(&[RED, GREEN, BLUE]), &picture)?.as_flattened(),
+        [RED, [0.5, 0.5, 0.0], GREEN, [0.0, 0.5, 0.5], BLUE].as_flattened(),
+        TOLERANCE,
         "three stops",
     );
     // four stops at 0, 1/3, 2/3 and 1: a quarter is three quarters of the way from the first stop to the second
     let white = [1.0; 3];
     assert_close(
-        &run(&stops(&[RED, GREEN, BLUE, white]), &picture)?,
-        &[RED, [0.25, 0.75, 0.0], [0.0, 0.5, 0.5], [0.25, 0.25, 1.0], white],
+        run(&stops(&[RED, GREEN, BLUE, white]), &picture)?.as_flattened(),
+        [RED, [0.25, 0.75, 0.0], [0.0, 0.5, 0.5], [0.25, 0.25, 1.0], white].as_flattened(),
+        TOLERANCE,
         "four stops",
     );
     Ok(())
@@ -177,7 +169,12 @@ fn every_quantile_method_cuts_the_stretch_where_numpy_finds_the_clip_points() ->
                 .map(|&grey| [((grey - dark) / (bright - dark)).clamp(0.0, 1.0); 3])
                 .collect();
             let out = run(&black_to_white(shadow_clip, highlight_clip, method), &greys(values))?;
-            assert_close(&out, &expected, &format!("{method:?} over {values:?}"));
+            assert_close(
+                out.as_flattened(),
+                expected.as_flattened(),
+                TOLERANCE,
+                &format!("{method:?} over {values:?}"),
+            );
         }
     }
     Ok(())
