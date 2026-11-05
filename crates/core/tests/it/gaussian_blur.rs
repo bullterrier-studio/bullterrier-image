@@ -15,6 +15,8 @@ use bullterrier_image::{Edge, EdgeOrConstant, Error, Inputs, Picture, apply};
 use proptest::prelude::*;
 use serde_json::Value;
 
+use crate::common::compare::first_difference_within;
+
 /// The pictures are compared at this distance: the sums are made in f64 and f32 is 6e-8 at 1.
 const TOLERANCE: f32 = 1e-5;
 
@@ -121,13 +123,6 @@ fn reference(params: &Params, height: usize, width: usize, values: &[f32]) -> Ve
     out
 }
 
-/// The first value where `a` and `b` are further apart than `TOLERANCE`, or none; a mismatch is reported by this, not printed.
-fn first_difference(a: &[f32], b: &[f32]) -> Option<usize> {
-    (a.len() != b.len())
-        .then(|| a.len().min(b.len()))
-        .or_else(|| a.iter().zip(b).position(|(a, b)| (a - b).abs() > TOLERANCE))
-}
-
 #[test]
 fn the_blur_is_the_gaussian_of_the_definition_whatever_lies_beyond_the_edge() -> Result<(), Error> {
     // Pictures from one pixel to a few, with kernels shorter and longer than they are. A kernel reaches 12, 15, 7 (the
@@ -153,9 +148,10 @@ fn the_blur_is_the_gaussian_of_the_definition_whatever_lies_beyond_the_edge() ->
                     constant_value: 0.7,
                 };
                 let picture = values(height, width);
-                let at = first_difference(
+                let at = first_difference_within(
                     &blurred(&params, height, width, &picture)?,
                     &reference(&params, height, width, &picture),
+                    TOLERANCE,
                 );
                 assert_eq!(
                     at, None,
@@ -187,7 +183,7 @@ fn the_comparison_tells_a_blur_that_differs_apart() -> Result<(), Error> {
             ..params.clone()
         },
     ] {
-        assert!(first_difference(&blur, &reference(&other, 5, 4, &picture)).is_some());
+        assert!(first_difference_within(&blur, &reference(&other, 5, 4, &picture), TOLERANCE).is_some());
     }
     Ok(())
 }
@@ -284,7 +280,11 @@ fn a_constant_picture_stays_as_it_is_whatever_lies_beyond_its_edge() -> Result<(
                 ..Params::default()
             };
             let out = blurred(&params, 21, 34, &grey)?;
-            assert_eq!(first_difference(&out, &grey), None, "radius {radius}, {edge:?}");
+            assert_eq!(
+                first_difference_within(&out, &grey, TOLERANCE),
+                None,
+                "radius {radius}, {edge:?}"
+            );
         }
     }
     Ok(())

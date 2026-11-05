@@ -9,6 +9,8 @@ use bullterrier_image::{
     Category, Effect, Error, Image, Input, Inputs, Options, Photo, Picture, Presets, Recipe, Step, register,
 };
 
+use crate::common::compare::first_difference;
+
 /// The partition a [`Spy`] was handed: its labels and number of pieces.
 type Pieces = (Vec<i32>, usize);
 
@@ -94,14 +96,6 @@ const fn float(count: usize) -> f64 {
 /// A number of pieces as a label bound, saturating.
 fn bound(count: usize) -> i32 {
     i32::try_from(count).unwrap_or(i32::MAX)
-}
-
-/// The first index at which the labels differ, if they do (a mismatch of a whole picture is never printed).
-fn first_difference(left: &[i32], right: &[i32]) -> Option<usize> {
-    if left.len() != right.len() {
-        return Some(left.len().min(right.len()));
-    }
-    left.iter().zip(right).position(|(one, other)| one != other)
 }
 
 /// For each row of a two-column grid of `width` px, how many pixels are in the piece of its first pixel: where the border

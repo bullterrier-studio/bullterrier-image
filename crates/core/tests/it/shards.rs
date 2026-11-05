@@ -12,6 +12,8 @@ use bullterrier_image::{
 };
 use serde_json::{Value, json};
 
+use crate::common::compare::first_difference;
+
 /// The partition a [`Spy`] was handed: its labels and number of pieces.
 type Pieces = (Vec<i32>, usize);
 
@@ -89,14 +91,6 @@ fn numbered_by_first_pixel(labels: &[i32], count: usize) -> bool {
         greatest = greatest.max(label);
     }
     greatest + 1 == bound(count)
-}
-
-/// The first index at which the labels differ, if they do (a mismatch of a whole picture is never printed).
-fn first_difference(left: &[i32], right: &[i32]) -> Option<usize> {
-    if left.len() != right.len() {
-        return Some(left.len().min(right.len()));
-    }
-    left.iter().zip(right).position(|(one, other)| one != other)
 }
 
 #[test]

@@ -14,6 +14,7 @@ use bullterrier_image::params::{Declared, EffectParams};
 use bullterrier_image::{Edge, Error, Inputs, Picture, apply};
 use serde_json::Value;
 
+use crate::common::compare::first_difference_within;
 use crate::common::guided::guided_filter;
 
 /// The pictures are compared at this distance: the reference is made in f64 where the effect makes it in f32, and the
@@ -149,13 +150,6 @@ fn reference(params: &Params, height: usize, width: usize, values: &[f32]) -> Ve
         .collect()
 }
 
-/// The first value where `a` and `b` are further apart than `TOLERANCE`, or none; a mismatch is reported by this, not printed.
-fn first_difference(a: &[f32], b: &[f32]) -> Option<usize> {
-    (a.len() != b.len())
-        .then(|| a.len().min(b.len()))
-        .or_else(|| a.iter().zip(b).position(|(a, b)| (a - b).abs() > TOLERANCE))
-}
-
 #[test]
 fn the_picture_is_the_dehazed_picture_of_the_definition_whatever_lies_beyond_the_edge() -> Result<(), Error> {
     // pictures from one pixel to a few; patches of 1, odd and even, smaller and larger than the picture; a guided filter
@@ -181,9 +175,10 @@ fn the_picture_is_the_dehazed_picture_of_the_definition_whatever_lies_beyond_the
             };
             for (height, width) in shapes {
                 let picture = hazy(height, width);
-                let at = first_difference(
+                let at = first_difference_within(
                     &dehazed(&params, height, width, &picture)?,
                     &reference(&params, height, width, &picture),
+                    TOLERANCE,
                 );
                 assert_eq!(at, None, "{params:?}, {height} x {width}: first differs at {at:?}");
             }
@@ -203,7 +198,10 @@ fn the_comparison_tells_another_look_apart() -> Result<(), Error> {
         ..Params::default()
     };
     let found = dehazed(&params, 13, 11, &picture)?;
-    assert_eq!(first_difference(&found, &reference(&params, 13, 11, &picture)), None);
+    assert_eq!(
+        first_difference_within(&found, &reference(&params, 13, 11, &picture), TOLERANCE),
+        None
+    );
     for other in [
         Params {
             patch: 9,
@@ -218,7 +216,7 @@ fn the_comparison_tells_another_look_apart() -> Result<(), Error> {
             ..params.clone()
         },
     ] {
-        assert!(first_difference(&found, &reference(&other, 13, 11, &picture)).is_some());
+        assert!(first_difference_within(&found, &reference(&other, 13, 11, &picture), TOLERANCE).is_some());
     }
     Ok(())
 }
@@ -239,7 +237,11 @@ fn a_picture_with_no_haze_and_an_amount_of_0_come_out_as_they_went_in() -> Resul
                 ..Params::default()
             };
             let found = dehazed(&params, 12, 14, &clear)?;
-            assert_eq!(first_difference(&found, &clear), None, "{edge:?}, patch {patch}");
+            assert_eq!(
+                first_difference_within(&found, &clear, TOLERANCE),
+                None,
+                "{edge:?}, patch {patch}"
+            );
         }
     }
     let veiled = hazy(12, 14);
@@ -252,7 +254,7 @@ fn a_picture_with_no_haze_and_an_amount_of_0_come_out_as_they_went_in() -> Resul
         14,
         &veiled,
     )?;
-    assert_eq!(first_difference(&off, &veiled), None);
+    assert_eq!(first_difference_within(&off, &veiled, TOLERANCE), None);
     Ok(())
 }
 
@@ -284,7 +286,10 @@ fn nearest_and_reflect_give_the_same_picture_and_the_other_rules_do_not() -> Res
             .all(|(a, b)| a.to_bits() == b.to_bits())
     );
     for other in [Edge::Mirror, Edge::Wrap] {
-        assert!(first_difference(&run(other)?, &nearest).is_some(), "{other:?}");
+        assert!(
+            first_difference_within(&run(other)?, &nearest, TOLERANCE).is_some(),
+            "{other:?}"
+        );
     }
     Ok(())
 }

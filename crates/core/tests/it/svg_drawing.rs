@@ -485,7 +485,7 @@ fn a_used_shape_is_drawn_where_it_is_used_and_not_where_it_is_defined() -> Outco
             ))
         })
         .collect();
-    assert_eq!(crate::common::ops::first_difference(&chosen, &expected), None);
+    assert_eq!(crate::common::compare::first_difference(&chosen, &expected), None);
     assert_eq!(ids_of(&text)?, ["r"]);
     Ok(())
 }

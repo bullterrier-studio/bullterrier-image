@@ -10,6 +10,8 @@ use bullterrier_image::{
     Step, register,
 };
 
+use crate::common::compare::first_bit_difference;
+
 /// An effect that logs the selection `near` it is handed and returns the picture as it is.
 struct Spy {
     name: String,
@@ -70,16 +72,6 @@ fn path(d: &str) -> Path {
     }
 }
 
-/// The first index at which the values differ, if they do (a mismatch of a whole picture is never printed).
-fn first_difference(left: &[f32], right: &[f32]) -> Option<usize> {
-    if left.len() != right.len() {
-        return Some(left.len().min(right.len()));
-    }
-    left.iter()
-        .zip(right)
-        .position(|(one, other)| one.to_bits() != other.to_bits())
-}
-
 /// The sum of `values` in double precision.
 fn total(values: &[f32]) -> f64 {
     values.iter().map(|&value| f64::from(value)).sum()
@@ -92,7 +84,7 @@ fn a_path_selects_what_is_inside_it_fully_and_what_is_outside_not_at_all() -> Re
     let expected: Vec<f32> = (0..48 * 64)
         .map(|at| f32::from(u8::from((12..36).contains(&(at / 64)) && (16..48).contains(&(at % 64)))))
         .collect();
-    assert_eq!(first_difference(&values, &expected), None);
+    assert_eq!(first_bit_difference(&values, &expected), None);
     Ok(())
 }
 
@@ -107,7 +99,7 @@ fn a_path_is_laid_over_the_frame_of_its_fit_not_the_picture() -> Result<(), Erro
         ..Path::default()
     };
     let values = selected(48, 64, Some(subject.clone()), framed)?;
-    assert_eq!(first_difference(&values, &subject), None);
+    assert_eq!(first_bit_difference(&values, &subject), None);
     // and a path of the left half of that frame selects columns 8..24
     let half = Path {
         fit: Some("subject".to_owned()),
@@ -118,7 +110,7 @@ fn a_path_is_laid_over_the_frame_of_its_fit_not_the_picture() -> Result<(), Erro
     let expected: Vec<f32> = (0..48 * 64)
         .map(|at| f32::from(u8::from((6..30).contains(&(at / 64)) && (8..24).contains(&(at % 64)))))
         .collect();
-    assert_eq!(first_difference(&values, &expected), None);
+    assert_eq!(first_bit_difference(&values, &expected), None);
     Ok(())
 }
 
@@ -165,11 +157,14 @@ fn a_torn_path_is_the_same_for_a_seed_and_differs_for_another_and_a_tear_of_noth
     };
     let straight = selected(96, 128, None, path("M 0.2 0.2 H 0.8 V 0.8 H 0.2 Z"))?;
     let first = selected(96, 128, None, torn(8.0, 1))?;
-    assert_eq!(first_difference(&first, &selected(96, 128, None, torn(8.0, 1))?), None);
-    assert!(first_difference(&first, &selected(96, 128, None, torn(8.0, 2))?).is_some());
-    assert!(first_difference(&first, &straight).is_some());
     assert_eq!(
-        first_difference(&straight, &selected(96, 128, None, torn(0.0, 1))?),
+        first_bit_difference(&first, &selected(96, 128, None, torn(8.0, 1))?),
+        None
+    );
+    assert!(first_bit_difference(&first, &selected(96, 128, None, torn(8.0, 2))?).is_some());
+    assert!(first_bit_difference(&first, &straight).is_some());
+    assert_eq!(
+        first_bit_difference(&straight, &selected(96, 128, None, torn(0.0, 1))?),
         None
     );
     // read between the pixels, the coverage stays a coverage

@@ -13,6 +13,7 @@ use bullterrier_image::params::{Declared, EffectParams};
 use bullterrier_image::{Error, Inputs, Picture, apply};
 use serde_json::Value;
 
+use crate::common::compare::first_difference_within;
 use crate::common::guided::guided_filter;
 
 /// The pictures are compared at this distance: the reference is made in f64, the effect in f32, and a gain of 2^15 at most
@@ -74,13 +75,6 @@ fn reference(params: &Params, height: usize, width: usize, values: &[f32]) -> Ve
         .collect()
 }
 
-/// The first value where `a` and `b` are further apart than `TOLERANCE`, or none; a mismatch is reported by this, not printed.
-fn first_difference(a: &[f32], b: &[f32]) -> Option<usize> {
-    (a.len() != b.len())
-        .then(|| a.len().min(b.len()))
-        .or_else(|| a.iter().zip(b).position(|(a, b)| (a - b).abs() > TOLERANCE))
-}
-
 fn with(contrast: f32, amount: f32, pivot: f32, radius: f32, edge_threshold: f32) -> Params {
     Params {
         contrast,
@@ -107,9 +101,10 @@ fn the_picture_is_the_tone_map_of_the_definition() -> Result<(), Error> {
     for params in looks {
         for (height, width) in shapes {
             let picture = values(height, width);
-            let at = first_difference(
+            let at = first_difference_within(
                 &tone_mapped(&params, height, width, &picture)?,
                 &reference(&params, height, width, &picture),
+                TOLERANCE,
             );
             assert_eq!(at, None, "{params:?}, {height} x {width}: first differs at {at:?}");
         }
@@ -123,7 +118,10 @@ fn the_comparison_tells_another_look_apart() -> Result<(), Error> {
     let picture = values(9, 11);
     let params = with(0.4, 1.0, 1.0, 2.0, 0.2);
     let found = tone_mapped(&params, 9, 11, &picture)?;
-    assert_eq!(first_difference(&found, &reference(&params, 9, 11, &picture)), None);
+    assert_eq!(
+        first_difference_within(&found, &reference(&params, 9, 11, &picture), TOLERANCE),
+        None
+    );
     for other in [
         Params {
             radius: 3.0,
@@ -134,7 +132,7 @@ fn the_comparison_tells_another_look_apart() -> Result<(), Error> {
             ..params.clone()
         },
     ] {
-        assert!(first_difference(&found, &reference(&other, 9, 11, &picture)).is_some());
+        assert!(first_difference_within(&found, &reference(&other, 9, 11, &picture), TOLERANCE).is_some());
     }
     Ok(())
 }
@@ -177,6 +175,6 @@ fn radius_0_is_a_global_curve_and_contrast_1_amount_0_leaves_the_picture_alone()
     }
     let picture = values(7, 5);
     let same = tone_mapped(&with(1.0, 0.0, 3.0, 4.0, 0.5), 7, 5, &picture)?;
-    assert_eq!(first_difference(&same, &picture), None);
+    assert_eq!(first_difference_within(&same, &picture, TOLERANCE), None);
     Ok(())
 }

@@ -13,6 +13,7 @@ use bullterrier_image::params::Color;
 use bullterrier_image::{EdgeOrConstant, Error};
 use proptest::prelude::*;
 
+use crate::common::compare::first_difference_within;
 use crate::common::gaussian::{run_picture, varied, weights};
 
 /// The pictures are compared at this distance: the sums are made in f64 and f32 is 6e-8 at 1.
@@ -43,12 +44,6 @@ fn red(picture: &[f32]) -> Vec<f32> {
 /// The screen blend mode from its definition.
 fn screen(base: f32, light: f32) -> f32 {
     1.0 - (1.0 - base) * (1.0 - light.clamp(0.0, 1.0))
-}
-
-/// The first value where `a` and `b` differ by more than `tolerance`.
-fn first_difference(a: &[f32], b: &[f32], tolerance: f32) -> Option<usize> {
-    assert_eq!(a.len(), b.len());
-    a.iter().zip(b).position(|(a, b)| (a - b).abs() > tolerance)
 }
 
 /// The halo of a lone highlight of 1 at the middle of a `size` x `size` picture, `amount` times the average of the
@@ -113,7 +108,7 @@ fn a_single_bright_pixel_spreads_as_the_weighted_sum_of_octave_gaussians() {
         out[middle] = 0.0;
         expected[middle] = 0.0;
         assert_eq!(
-            first_difference(&out, &expected, TOLERANCE),
+            first_difference_within(&out, &expected, TOLERANCE),
             None,
             "radius {radius}, {octaves} octaves, persistence {persistence}"
         );
@@ -136,7 +131,7 @@ fn the_comparison_tells_halos_that_differ_apart() {
         let other = halo(size, 8.0, octaves, persistence, 0.9);
         let other: Vec<f32> = other.into_iter().map(|light| light as f32).collect();
         assert!(
-            first_difference(&out, &other, TOLERANCE).is_some(),
+            first_difference_within(&out, &other, TOLERANCE).is_some(),
             "{octaves} {persistence}"
         );
     }
@@ -204,7 +199,7 @@ fn an_even_picture_is_screened_with_its_own_highlight_whatever_the_octaves() {
             let highlight = (value - threshold) / (1.0 - threshold);
             let expected = vec![screen(value, amount * highlight); 16 * 16 * 3];
             assert_eq!(
-                first_difference(&out, &expected, 1e-5),
+                first_difference_within(&out, &expected, 1e-5),
                 None,
                 "{octaves} octaves, persistence {persistence}, value {value}"
             );
@@ -236,7 +231,7 @@ fn a_colour_tints_the_light_of_the_brightest_channel() {
             .flat_map(|_| [0, 1, 2].map(|channel| screen(pixel[channel], amount * highlight * color[channel])))
             .collect();
         assert_eq!(
-            first_difference(&out, &expected, 1e-5),
+            first_difference_within(&out, &expected, 1e-5),
             None,
             "{pixel:?} tinted {color:?}"
         );
@@ -285,10 +280,13 @@ fn a_black_colour_gives_no_light_and_black_stays_black() {
         threshold: 0.0,
         ..Params::default()
     };
-    assert_eq!(first_difference(&bloomed(&black, 12, &picture), &picture, 0.0), None);
+    assert_eq!(
+        first_difference_within(&bloomed(&black, 12, &picture), &picture, 0.0),
+        None
+    );
     let dark = even(12, [0.0; 3]);
     assert_eq!(
-        first_difference(&bloomed(&Params::default(), 12, &dark), &dark, 0.0),
+        first_difference_within(&bloomed(&Params::default(), 12, &dark), &dark, 0.0),
         None
     );
 }
@@ -301,14 +299,20 @@ fn nothing_above_the_threshold_and_an_amount_of_nothing_leave_the_picture_as_it_
         amount: 10.0,
         ..Params::default()
     };
-    assert_eq!(first_difference(&bloomed(&none_above, 12, &dim), &dim, 0.0), None);
+    assert_eq!(
+        first_difference_within(&bloomed(&none_above, 12, &dim), &dim, 0.0),
+        None
+    );
     let bright = varied(12, 12);
     let no_amount = Params {
         threshold: 0.0,
         amount: 0.0,
         ..Params::default()
     };
-    assert_eq!(first_difference(&bloomed(&no_amount, 12, &bright), &bright, 0.0), None);
+    assert_eq!(
+        first_difference_within(&bloomed(&no_amount, 12, &bright), &bright, 0.0),
+        None
+    );
 }
 
 #[test]
@@ -325,7 +329,10 @@ fn a_radius_of_nothing_keeps_the_light_on_the_highlights_themselves() {
         .iter()
         .map(|&value| screen(value, 0.8 * ((value - 0.4) / 0.6).clamp(0.0, 1.0)))
         .collect();
-    assert_eq!(first_difference(&bloomed(&params, 10, &picture), &expected, 1e-6), None);
+    assert_eq!(
+        first_difference_within(&bloomed(&params, 10, &picture), &expected, 1e-6),
+        None
+    );
 }
 
 #[test]

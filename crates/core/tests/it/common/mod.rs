@@ -2,6 +2,7 @@
 //! a binary of its own, includes this module by path.)
 #![allow(dead_code, reason = "each test module uses a different part")]
 
+pub(crate) mod compare;
 pub(crate) mod convolution;
 pub(crate) mod files;
 pub(crate) mod gaussian;

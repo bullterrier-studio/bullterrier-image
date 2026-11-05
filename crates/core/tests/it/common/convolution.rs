@@ -102,11 +102,3 @@ pub(crate) fn convolved(taps: &[Tap], beyond: Beyond, height: usize, width: usiz
     }
     out
 }
-
-/// The first value where `a` and `b` are further apart than `tolerance`, or none; a mismatch is reported by this, not
-/// printed (lesson L1: no whole pictures in a failure message).
-pub(crate) fn first_difference(a: &[f32], b: &[f32], tolerance: f32) -> Option<usize> {
-    (a.len() != b.len())
-        .then(|| a.len().min(b.len()))
-        .or_else(|| a.iter().zip(b).position(|(a, b)| (a - b).abs() > tolerance))
-}

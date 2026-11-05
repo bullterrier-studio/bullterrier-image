@@ -12,7 +12,8 @@ use bullterrier_image::Edge;
 use bullterrier_image::effects::lens_blur::Params;
 use proptest::prelude::*;
 
-use crate::common::convolution::{Beyond, Tap, convolved, first_difference, impulse, render, values};
+use crate::common::compare::first_difference_within;
+use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and the reference in f64.
 const TOLERANCE: f32 = 1e-4;
@@ -88,7 +89,8 @@ fn the_blur_is_the_picture_averaged_over_the_disc_whatever_lies_beyond_the_edge(
             for (height, width) in shapes {
                 let picture = values(height, width);
                 let expected = convolved(&taps, Beyond::Rule(edge), height, width, &picture);
-                let at = first_difference(&blur(radius, 0.0, edge, height, width, &picture), &expected, TOLERANCE);
+                let at =
+                    first_difference_within(&blur(radius, 0.0, edge, height, width, &picture), &expected, TOLERANCE);
                 assert_eq!(
                     at, None,
                     "radius {radius}, {edge:?}, {height} x {width}: first differs at {at:?}"
@@ -107,7 +109,7 @@ fn with_highlights_each_pixel_counts_by_its_brightness_in_the_average() {
                 for (height, width) in [(1, 1), (1, 9), (9, 1), (5, 7), (23, 31)] {
                     let picture = values(height, width);
                     let expected = favouring_bright(&taps, highlights, edge, height, width, &picture);
-                    let at = first_difference(
+                    let at = first_difference_within(
                         &blur(radius, highlights, edge, height, width, &picture),
                         &expected,
                         TOLERANCE,
@@ -133,7 +135,7 @@ fn the_comparisons_tell_a_blur_that_differs_apart() {
         favoured(5.0, 6.0, Edge::Wrap),
         favoured(5.0, 0.0, Edge::Reflect),
     ] {
-        assert!(first_difference(&ours, &other, TOLERANCE).is_some());
+        assert!(first_difference_within(&ours, &other, TOLERANCE).is_some());
     }
 }
 
@@ -200,7 +202,7 @@ fn a_flat_picture_stays_exactly_as_flat_with_and_without_highlights() {
             for (radius, highlights) in [(0.0, 0.0), (1.5, 0.0), (9.0, 0.0), (1.5, 50.0), (9.0, 50.0)] {
                 let out = blur(radius, highlights, edge, height, width, &flat);
                 assert_eq!(
-                    first_difference(&out, &flat, 0.0),
+                    first_difference_within(&out, &flat, 0.0),
                     None,
                     "{height} x {width}, {edge:?}, radius {radius}, highlights {highlights}"
                 );
@@ -215,7 +217,7 @@ fn radius_zero_and_a_disc_of_one_pixel_leave_the_picture_as_it_is() {
     for (radius, highlights) in [(0.0, 0.0), (0.0, 4.0), (0.3, 0.0)] {
         let out = blur(radius, highlights, Edge::Reflect, 6, 5, &picture);
         assert_eq!(
-            first_difference(&out, &picture, 0.0),
+            first_difference_within(&out, &picture, 0.0),
             None,
             "radius {radius}, highlights {highlights}"
         );
@@ -244,7 +246,10 @@ fn a_wrapped_blur_without_highlights_keeps_the_mean_of_every_channel() {
                 "{radius}, channel {channel}: {before}, {after}"
             );
         }
-        assert!(first_difference(&out, &picture, 1e-3).is_some(), "{radius} blurs");
+        assert!(
+            first_difference_within(&out, &picture, 1e-3).is_some(),
+            "{radius} blurs"
+        );
     }
 }
 

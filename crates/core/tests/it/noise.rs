@@ -2,7 +2,8 @@
 //! x axis, one row border as that of the y axis. The shift of a border at a place is the noise there times `amount`, so
 //! where the border lies in each row (or column) reads the noise at the border's place to the pixel.
 
-use crate::common::ops::{first_difference, float, partition};
+use crate::common::compare::first_difference;
+use crate::common::ops::{float, partition};
 use bullterrier_image::Error;
 use bullterrier_image::region::{Edge, EdgeStyle, Grid, Shares};
 

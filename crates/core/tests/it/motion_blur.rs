@@ -13,7 +13,8 @@ use bullterrier_image::Edge;
 use bullterrier_image::effects::motion_blur::Params;
 use proptest::prelude::*;
 
-use crate::common::convolution::{Beyond, Tap, convolved, first_difference, impulse, render, values};
+use crate::common::compare::first_difference_within;
+use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and a line sampled finely.
 const TOLERANCE: f32 = 1e-4;
@@ -59,7 +60,7 @@ fn the_blur_is_the_picture_averaged_along_the_line_whatever_lies_beyond_the_edge
                 for (height, width) in shapes {
                     let picture = values(height, width);
                     let expected = convolved(&taps, Beyond::Rule(edge), height, width, &picture);
-                    let at = first_difference(
+                    let at = first_difference_within(
                         &blur(angle, length, edge, height, width, &picture),
                         &expected,
                         TOLERANCE,
@@ -86,7 +87,7 @@ fn the_comparison_tells_a_blur_that_differs_apart() {
     ] {
         let other = convolved(&line(angle, length), Beyond::Rule(edge), 23, 31, &picture);
         assert!(
-            first_difference(&ours, &other, TOLERANCE).is_some(),
+            first_difference_within(&ours, &other, TOLERANCE).is_some(),
             "{angle} {length} {edge:?}"
         );
     }
@@ -125,7 +126,7 @@ fn a_point_of_light_becomes_the_length_of_line_inside_each_pixel() {
             expected[at..at + 3].fill(*weight);
         }
         assert_eq!(
-            first_difference(&out, &expected, 1e-6),
+            first_difference_within(&out, &expected, 1e-6),
             None,
             "angle {angle}, length {length}"
         );
@@ -140,7 +141,7 @@ fn opposite_directions_give_the_same_blur() {
             blur(30.0, length, Edge::Mirror, 11, 13, &picture),
             blur(210.0, length, Edge::Mirror, 11, 13, &picture),
         );
-        assert_eq!(first_difference(&there, &back, 1e-5), None, "length {length}");
+        assert_eq!(first_difference_within(&there, &back, 1e-5), None, "length {length}");
     }
 }
 
@@ -150,7 +151,7 @@ fn a_line_under_a_pixel_and_no_line_leave_the_picture_as_it_is() {
     for (angle, length) in [(0.0, 0.0), (30.0, 0.0), (30.0, 0.5), (200.0, 0.9)] {
         let out = blur(angle, length, Edge::Reflect, 6, 5, &picture);
         assert_eq!(
-            first_difference(&out, &picture, 0.0),
+            first_difference_within(&out, &picture, 0.0),
             None,
             "angle {angle}, length {length}"
         );
@@ -166,7 +167,7 @@ fn a_flat_picture_stays_exactly_as_flat_for_every_edge_rule_and_every_way_of_fil
             for (angle, length) in [(0.0, 5.0), (0.0, 61.0), (90.0, 61.0), (33.0, 6.5), (33.0, 61.0)] {
                 let out = blur(angle, length, edge, height, width, &flat);
                 assert_eq!(
-                    first_difference(&out, &flat, 0.0),
+                    first_difference_within(&out, &flat, 0.0),
                     None,
                     "{height} x {width}, {edge:?}, {angle}, {length}"
                 );
@@ -199,7 +200,7 @@ fn a_wrapped_blur_keeps_the_mean_of_every_channel() {
             );
         }
         assert!(
-            first_difference(&out, &picture, 1e-3).is_some(),
+            first_difference_within(&out, &picture, 1e-3).is_some(),
             "{angle}, {length} blurs"
         );
     }

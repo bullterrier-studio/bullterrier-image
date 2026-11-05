@@ -15,7 +15,8 @@ use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
 use serde_json::Value;
 
-use crate::common::convolution::{Beyond, Tap, convolved, first_difference, impulse, render, values};
+use crate::common::compare::first_difference_within;
+use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and the reference in f64.
 const TOLERANCE: f32 = 1e-4;
@@ -74,7 +75,7 @@ fn a_spike_leaves_the_point_in_the_direction_of_the_angle_and_fades_linearly() {
             );
             expected[(row * size + column) * 3..][..3].fill(*light);
         }
-        assert_eq!(first_difference(&out, &expected, 1e-6), None, "angle {angle}");
+        assert_eq!(first_difference_within(&out, &expected, 1e-6), None, "angle {angle}");
     }
 }
 
@@ -130,7 +131,7 @@ fn the_spikes_are_what_the_definition_says_whatever_lies_beyond_the_edge_which_i
         for (height, width) in shapes {
             let picture = values(height, width);
             let out = spikes(&params, height, width, &picture);
-            let at = first_difference(&out, &screened(&params, &taps, height, width, &picture), TOLERANCE);
+            let at = first_difference_within(&out, &screened(&params, &taps, height, width, &picture), TOLERANCE);
             assert_eq!(
                 at, None,
                 "{rays} rays, angle {angle}, length {length}, {height} x {width}: first differs at {at:?}"
@@ -224,7 +225,7 @@ fn the_comparison_tells_spikes_that_differ_apart() {
         },
     ] {
         let expected = screened(&other, &spike_taps(&other), 23, 31, &picture);
-        assert!(first_difference(&ours, &expected, TOLERANCE).is_some());
+        assert!(first_difference_within(&ours, &expected, TOLERANCE).is_some());
     }
 }
 
@@ -295,11 +296,11 @@ fn no_amount_no_limit_and_black_leave_the_picture_as_it_is() {
             *value *= 0.9;
         }
         let out = spikes(&params, 9, 11, &dim);
-        assert_eq!(first_difference(&out, &dim, 0.0), None, "{params:?}");
+        assert_eq!(first_difference_within(&out, &dim, 0.0), None, "{params:?}");
     }
     let black = vec![0.0_f32; 9 * 11 * 3];
     assert_eq!(
-        first_difference(&spikes(&Params::default(), 9, 11, &black), &black, 0.0),
+        first_difference_within(&spikes(&Params::default(), 9, 11, &black), &black, 0.0),
         None
     );
 }

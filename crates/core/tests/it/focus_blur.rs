@@ -12,6 +12,7 @@
 use bullterrier_image::effects::{focus_blur, gaussian_blur};
 use bullterrier_image::{Edge, EdgeOrConstant, Error};
 
+use crate::common::compare::first_difference_within;
 use crate::common::gaussian::{run_picture, run_with_field, varied};
 
 const EDGES: [Edge; 4] = [Edge::Reflect, Edge::Nearest, Edge::Mirror, Edge::Wrap];
@@ -54,12 +55,6 @@ fn gaussian(radius: f32, edge: EdgeOrConstant, truncate: f32, picture: &[f32]) -
     run_picture(&params, HEIGHT, WIDTH, picture)
 }
 
-/// The first value where `a` and `b` differ by more than `tolerance`.
-fn first_difference(a: &[f32], b: &[f32], tolerance: f32) -> Option<usize> {
-    assert_eq!(a.len(), b.len());
-    a.iter().zip(b).position(|(a, b)| (a - b).abs() > tolerance)
-}
-
 /// The pixels of columns `from..to` as one list of channel values.
 fn columns(picture: &[f32], from: usize, to: usize) -> Vec<f32> {
     (0..HEIGHT)
@@ -91,7 +86,7 @@ fn pixels_within_the_sharp_band_are_returned_exactly_and_the_rest_is_blurred() -
             "left {left}, focus {focus}, width {width}"
         );
         assert!(
-            first_difference(
+            first_difference_within(
                 &columns(&out, WIDTH / 2, WIDTH),
                 &columns(&picture, WIDTH / 2, WIDTH),
                 0.05
@@ -126,7 +121,7 @@ fn a_field_a_full_feather_beyond_the_band_gives_the_gaussian_at_the_radius() -> 
             let out = run(&params, &flat(0.1), &picture)?;
             let expected = gaussian(radius, blur_edge, truncate, &picture)?;
             assert_eq!(
-                first_difference(&out, &expected, 2e-6),
+                first_difference_within(&out, &expected, 2e-6),
                 None,
                 "radius {radius}, {levels} levels, truncate {truncate}, {edge:?}"
             );
@@ -178,7 +173,7 @@ fn between_the_levels_a_pixel_mixes_the_two_copies_either_side_of_its_weight() -
             .map(|(below, above)| (1.0 - t) * below + t * above)
             .collect();
         assert_eq!(
-            first_difference(&out, &expected, 3e-5),
+            first_difference_within(&out, &expected, 3e-5),
             None,
             "{levels} levels, weight {weight}, feather {feather}"
         );
@@ -201,7 +196,7 @@ fn the_field_decides_which_pixels_are_blurred() -> Result<(), Error> {
         columns(&picture, WIDTH / 2, WIDTH)
     );
     assert!(
-        first_difference(
+        first_difference_within(
             &columns(&left_sharp, WIDTH / 2, WIDTH),
             &columns(&picture, WIDTH / 2, WIDTH),
             0.05
@@ -209,7 +204,7 @@ fn the_field_decides_which_pixels_are_blurred() -> Result<(), Error> {
         .is_some()
     );
     assert!(
-        first_difference(
+        first_difference_within(
             &columns(&right_sharp, 0, WIDTH / 2),
             &columns(&picture, 0, WIDTH / 2),
             0.05

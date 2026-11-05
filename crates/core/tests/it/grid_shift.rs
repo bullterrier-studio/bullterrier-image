@@ -1,7 +1,8 @@
 //! A torn grid that tears by nothing is the straight grid, whatever the shares and the size: the shift of the pixel centres
 //! the noise makes is `amount` times the noise, and none at all when the amount is 0.
 
-use crate::common::ops::{first_difference, partition};
+use crate::common::compare::first_difference;
+use crate::common::ops::partition;
 use bullterrier_image::region::{Edge, EdgeStyle, Grid, Shares};
 use proptest::prelude::*;
 

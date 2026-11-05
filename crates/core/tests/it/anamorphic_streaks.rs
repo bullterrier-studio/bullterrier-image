@@ -11,7 +11,8 @@ use bullterrier_image::effects::anamorphic_streaks::Params;
 use bullterrier_image::params::Color;
 use proptest::prelude::*;
 
-use crate::common::convolution::{Beyond, Tap, convolved, first_difference, impulse, render, values};
+use crate::common::compare::first_difference_within;
+use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and the reference in f64.
 const TOLERANCE: f32 = 1e-4;
@@ -71,7 +72,7 @@ fn the_picture_is_what_a_pixel_by_pixel_computation_from_the_definition_gives() 
         };
         for (height, width) in shapes {
             let picture = values(height, width);
-            let at = first_difference(
+            let at = first_difference_within(
                 &streaks(&params, height, width, &picture),
                 &by_definition(&params, height, width, &picture),
                 TOLERANCE,
@@ -113,7 +114,7 @@ fn the_comparison_tells_streaks_that_differ_apart() {
             ..params.clone()
         },
     ] {
-        assert!(first_difference(&ours, &by_definition(&other, 6, 37, &picture), TOLERANCE).is_some());
+        assert!(first_difference_within(&ours, &by_definition(&other, 6, 37, &picture), TOLERANCE).is_some());
     }
 }
 
@@ -215,7 +216,7 @@ fn white_keeps_the_colour_of_the_light_and_a_colour_tints_it() {
 fn black_no_amount_and_a_threshold_above_every_value_leave_the_picture_as_it_is() {
     let black = vec![0.0_f32; 9 * 40 * 3];
     assert_eq!(
-        first_difference(&streaks(&Params::default(), 9, 40, &black), &black, 0.0),
+        first_difference_within(&streaks(&Params::default(), 9, 40, &black), &black, 0.0),
         None
     );
     let dim: Vec<f32> = values(9, 40).iter().map(|value| value * 0.5).collect();
@@ -224,13 +225,13 @@ fn black_no_amount_and_a_threshold_above_every_value_leave_the_picture_as_it_is(
         amount: 10.0,
         ..Params::default()
     };
-    assert_eq!(first_difference(&streaks(&high, 9, 40, &dim), &dim, 1e-6), None);
+    assert_eq!(first_difference_within(&streaks(&high, 9, 40, &dim), &dim, 1e-6), None);
     let off = Params {
         amount: 0.0,
         threshold: 0.0,
         ..Params::default()
     };
-    assert_eq!(first_difference(&streaks(&off, 9, 40, &dim), &dim, 0.0), None);
+    assert_eq!(first_difference_within(&streaks(&off, 9, 40, &dim), &dim, 0.0), None);
 }
 
 proptest! {

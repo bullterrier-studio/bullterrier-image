@@ -164,14 +164,6 @@ pub(crate) fn selection(
         .ok_or_else(|| Error::Recipe("the spy was handed no selection".to_owned()))
 }
 
-/// The first index at which the two differ, if they do (a mismatch of a whole picture is never printed).
-pub(crate) fn first_difference<T: PartialEq>(left: &[T], right: &[T]) -> Option<usize> {
-    if left.len() != right.len() {
-        return Some(left.len().min(right.len()));
-    }
-    left.iter().zip(right).position(|(one, other)| one != other)
-}
-
 /// `count` as a float: a pixel count is far below 2^53.
 #[expect(clippy::cast_precision_loss, reason = "a pixel count is far below 2^53")]
 pub(crate) const fn float(count: usize) -> f64 {

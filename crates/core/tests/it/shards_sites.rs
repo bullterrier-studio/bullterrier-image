@@ -3,7 +3,8 @@
 //! hand, and the effects of jitter, focus and the count are checked as properties of the pieces.
 
 use crate::common::Outcome;
-use crate::common::ops::{first_difference, float, partition, probe};
+use crate::common::compare::first_difference;
+use crate::common::ops::{float, partition, probe};
 use bullterrier_image::region::Shards;
 use bullterrier_image::{Error, Options, Region};
 

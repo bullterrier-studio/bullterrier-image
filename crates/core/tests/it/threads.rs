@@ -12,6 +12,8 @@ use bullterrier_image::{
 };
 use serde_json::json;
 
+use crate::common::compare::first_bit_difference;
+
 /// The thread counts a render is compared at: the default, a few, an odd one, more than rows, and every core.
 const THREADS: [usize; 6] = [1, 2, 3, 10, 37, 0];
 
@@ -40,15 +42,6 @@ fn render(height: usize, width: usize, seed: usize, recipe: &Recipe, threads: us
     Photo::new(Picture::new(height, width, &values)?)
         .with_lut("film", Arc::new(film()?))
         .render(recipe, &Presets::new(), Options::default().with_threads(threads))
-}
-
-/// The index of the first value where `a` and `b` differ in a single bit, or that of the shorter one's end if they differ
-/// in length; none if they are the same. (A mismatch of whole pictures is reported by this, not printed.)
-fn first_difference(a: &[f32], b: &[f32]) -> Option<usize> {
-    a.iter()
-        .zip(b)
-        .position(|(a, b)| a.to_bits() != b.to_bits())
-        .or_else(|| (a.len() != b.len()).then(|| a.len().min(b.len())))
 }
 
 fn grade(exposure: f64) -> Step {
@@ -322,7 +315,7 @@ fn a_render_gives_the_same_picture_at_any_number_of_threads() -> Result<(), Erro
                     (alone.height(), alone.width()),
                     "{look}, {height} x {width}, {threads} threads"
                 );
-                let at = first_difference(&alone_values, &image.into_values());
+                let at = first_bit_difference(&alone_values, &image.into_values());
                 assert_eq!(
                     at, None,
                     "{look}, {height} x {width}, {threads} threads: first differs at {at:?}"
@@ -341,8 +334,8 @@ fn the_comparison_tells_renders_that_differ_apart() -> Result<(), Error> {
         render(201, 199, 1, &a, 1)?.into_values(),
         render(201, 199, 1, &b, 1)?.into_values(),
     );
-    assert!(first_difference(&a, &b).is_some());
-    assert!(first_difference(&a, &a[..a.len() - 1]).is_some());
+    assert!(first_bit_difference(&a, &b).is_some());
+    assert!(first_bit_difference(&a, &a[..a.len() - 1]).is_some());
     Ok(())
 }
 
@@ -424,8 +417,11 @@ fn several_photos_rendered_at_once_with_one_recipe_each_give_what_they_give_alon
             .collect::<Result<Vec<_>, _>>()
     })?;
     for (seed, (alone, together)) in alone.iter().zip(&together).enumerate() {
-        assert_eq!(first_difference(alone, together), None, "photo {seed}");
+        assert_eq!(first_bit_difference(alone, together), None, "photo {seed}");
     }
-    assert!(first_difference(&alone[0], &alone[1]).is_some(), "the photos differ");
+    assert!(
+        first_bit_difference(&alone[0], &alone[1]).is_some(),
+        "the photos differ"
+    );
     Ok(())
 }
