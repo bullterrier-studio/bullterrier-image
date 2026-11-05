@@ -2,10 +2,10 @@
 //! is handed (`common::ops`).
 
 use bullterrier_image::Error;
-use bullterrier_image::region::{Edge, EdgeStyle, Grid, Shares};
+use bullterrier_image::region::{Edge, EdgeStyle};
 
 use crate::common::compare::first_difference;
-use crate::common::ops::partition;
+use crate::common::ops::{cells, partition};
 use crate::common::pieces::numbered_by_first_pixel;
 
 /// A torn edge of `amount` px, spaced `scale` px, seeded `seed`, one octave, the rest of it as a recipe writes it.
@@ -17,16 +17,6 @@ fn torn(amount: f64, scale: f64, seed: u32) -> Edge {
         seed,
         octaves: 1,
         ..Edge::default()
-    }
-}
-
-/// A grid of `columns` x `rows` equal cells with `edge`.
-fn cells(columns: usize, rows: usize, edge: Edge) -> Grid {
-    Grid {
-        edge,
-        columns: Shares::equal(columns),
-        rows: Shares::equal(rows),
-        ..Grid::default()
     }
 }
 

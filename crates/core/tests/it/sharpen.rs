@@ -6,7 +6,7 @@ use bullterrier_image::effects::{gaussian_blur, sharpen};
 use bullterrier_image::{EdgeOrConstant, Error};
 
 use crate::common::gaussian::weights;
-use crate::common::pictures::varied;
+use crate::common::pictures::{bump, step, varied};
 use crate::common::pixels::run_picture;
 use proptest::prelude::*;
 
@@ -17,21 +17,6 @@ const EDGES: [EdgeOrConstant; 5] = [
     EdgeOrConstant::Mirror,
     EdgeOrConstant::Wrap,
 ];
-
-/// A `size` x `size` grey picture with one pixel `height` above it in the middle (all channels).
-fn bump(size: usize, base: f32, height: f32) -> Vec<f32> {
-    let mut grey = vec![base; size * size * 3];
-    let centre = (size / 2 * size + size / 2) * 3;
-    grey[centre..centre + 3].iter_mut().for_each(|value| *value += height);
-    grey
-}
-
-/// A vertical step edge, `low` on the left half of 24 x 48 and `high` on the right.
-fn step(low: f32, high: f32) -> Vec<f32> {
-    (0..24 * 48 * 3)
-        .map(|index| if index / 3 % 48 < 24 { low } else { high })
-        .collect()
-}
 
 #[test]
 fn amount_zero_and_radius_zero_leave_the_picture_as_it_is() -> Result<(), Error> {
@@ -162,7 +147,7 @@ fn detail_below_the_threshold_is_left_alone_and_detail_at_or_above_it_is_run_pic
 #[test]
 fn the_threshold_decides_pixel_by_pixel_not_for_the_picture() -> Result<(), Error> {
     // a bold edge and a faint ripple in one picture: only the edge is sharpened
-    let mut both = step(0.2, 0.8);
+    let mut both = step(24, 48, 0.2, 0.8);
     for row in 0..24 {
         for column in (2..24).step_by(2) {
             both[(row * 48 + column) * 3..][..3]
@@ -194,7 +179,7 @@ fn an_edge_overshoots_on_both_sides_and_beyond_the_blurs_reach_nothing_changes()
         amount: 1.0,
         ..Default::default()
     };
-    let out = run_picture(&params, 24, 48, &step(0.3, 0.7))?;
+    let out = run_picture(&params, 24, 48, &step(24, 48, 0.3, 0.7))?;
     let row = |column: usize| out[(12 * 48 + column) * 3];
     assert!(row(23) < 0.29 && row(24) > 0.71);
     assert!((0..8).all(|column| (row(column) - 0.3).abs() < 1e-6));
@@ -238,7 +223,7 @@ fn a_strong_sharpen_is_cut_off_at_black_and_white() -> Result<(), Error> {
 
 #[test]
 fn each_colour_channel_is_sharpened_on_its_own() -> Result<(), Error> {
-    let mut red_edge = step(0.3, 0.7);
+    let mut red_edge = step(24, 48, 0.3, 0.7);
     red_edge.chunks_mut(3).for_each(|pixel| pixel[1..].fill(0.5));
     let params = sharpen::Params {
         amount: 1.0,

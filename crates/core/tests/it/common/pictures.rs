@@ -33,3 +33,18 @@ pub(crate) fn spot(height: usize, width: usize, row: usize, column: usize, pixel
 pub(crate) fn impulse(height: usize, width: usize, row: usize, column: usize) -> Vec<f32> {
     spot(height, width, row, column, [1.0; 3])
 }
+
+/// A grey picture of `base` with a pixel `height` lighter in the middle of a `size` x `size` one.
+pub(crate) fn bump(size: usize, base: f32, height: f32) -> Vec<f32> {
+    let mut grey = vec![base; size * size * 3];
+    let centre = (size / 2 * size + size / 2) * 3;
+    grey[centre..centre + 3].iter_mut().for_each(|value| *value += height);
+    grey
+}
+
+/// A vertical step edge in the middle: `low` on the left half, `high` on the right.
+pub(crate) fn step(height: usize, width: usize, low: f32, high: f32) -> Vec<f32> {
+    (0..height * width * 3)
+        .map(|index| if index / 3 % width < width / 2 { low } else { high })
+        .collect()
+}

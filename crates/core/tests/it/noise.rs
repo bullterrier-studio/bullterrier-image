@@ -4,9 +4,9 @@
 
 use crate::common::compare::first_difference;
 use crate::common::numbers::float;
-use crate::common::ops::partition;
+use crate::common::ops::{cells, partition};
 use bullterrier_image::Error;
-use bullterrier_image::region::{Edge, EdgeStyle, Grid, Shares};
+use bullterrier_image::region::{Edge, EdgeStyle};
 
 /// A torn edge of `amount` px at the design size, spaced `scale` px at the design size, seeded `seed`.
 fn torn(amount: f64, scale: f64, octaves: u32, persistence: f64, seed: u32) -> Edge {
@@ -17,16 +17,6 @@ fn torn(amount: f64, scale: f64, octaves: u32, persistence: f64, seed: u32) -> E
         seed,
         octaves,
         persistence,
-    }
-}
-
-/// A grid of `columns` x `rows` equal cells with `edge`.
-fn cells(columns: usize, rows: usize, edge: Edge) -> Grid {
-    Grid {
-        edge,
-        columns: Shares::equal(columns),
-        rows: Shares::equal(rows),
-        ..Grid::default()
     }
 }
 

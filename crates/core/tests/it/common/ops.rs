@@ -1,10 +1,11 @@
 //! What the integration tests of the ops area share: a folder for files, an effect that logs the partition and the
-//! selection it is handed, and the functions that render a region and give back what the effect saw.
+//! selection it is handed, the functions that render a region and give back what the effect saw, and a grid to lay out.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use bullterrier_image::region::{Edge, Grid, Shares};
 use bullterrier_image::{
     Category, Effect, Error, FieldParam, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Region,
     Step, register,
@@ -208,4 +209,14 @@ pub(crate) fn level(level: f32) -> Result<Step, Error> {
         level,
     }))?;
     Ok(Step::new(name).opacity(1.0))
+}
+
+/// A grid of `columns` x `rows` equal cells with `edge`.
+pub(crate) fn cells(columns: usize, rows: usize, edge: Edge) -> Grid {
+    Grid {
+        edge,
+        columns: Shares::equal(columns),
+        rows: Shares::equal(rows),
+        ..Grid::default()
+    }
 }

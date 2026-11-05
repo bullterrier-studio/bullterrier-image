@@ -7,7 +7,7 @@ use bullterrier_image::params::Declared;
 use bullterrier_image::{Edge, EdgeOrConstant, Error};
 
 use crate::common::gaussian::weights;
-use crate::common::pictures::{ramp, varied};
+use crate::common::pictures::{bump, ramp, step, varied};
 use crate::common::pixels::run_picture;
 use serde_json::json;
 
@@ -20,13 +20,6 @@ const BLUR_EDGES: [EdgeOrConstant; 4] = [
     EdgeOrConstant::Mirror,
     EdgeOrConstant::Wrap,
 ];
-
-/// A 16 x 64 vertical step edge in the middle: `low` on the left, `high` on the right.
-fn step(low: f32, high: f32) -> Vec<f32> {
-    (0..16 * 64 * 3)
-        .map(|index| if index / 3 % 64 < 32 { low } else { high })
-        .collect()
-}
 
 #[test]
 fn a_constant_picture_becomes_mid_grey_whatever_lies_beyond_its_edge() -> Result<(), Error> {
@@ -66,10 +59,7 @@ fn a_bump_leaves_its_difference_from_the_blur_around_mid_grey() -> Result<(), Er
     for radius in [1.5_f32, 3.0] {
         let (weights, middle) = weights(f64::from(radius), 4.0);
         let (w0, w1) = (weights[middle], weights[middle + 1]);
-        let mut grey = vec![0.3_f32; 41 * 41 * 3];
-        grey[(20 * 41 + 20) * 3..][..3]
-            .iter_mut()
-            .for_each(|value| *value += height);
+        let grey = bump(41, 0.3, height);
         let params = highpass::Params {
             radius,
             ..Default::default()
@@ -123,8 +113,8 @@ fn an_edge_is_odd_about_mid_grey_and_far_from_it_the_picture_is_mid_grey() -> Re
         ..Default::default()
     };
     for (low, high) in [(0.3, 0.7), (0.1, 0.4)] {
-        let rising = run_picture(&params, 16, 64, &step(low, high))?;
-        let falling = run_picture(&params, 16, 64, &step(high, low))?;
+        let rising = run_picture(&params, 16, 64, &step(16, 64, low, high))?;
+        let falling = run_picture(&params, 16, 64, &step(16, 64, high, low))?;
         let at = |column: usize| (8 * 64 + column) * 3;
         for column in 0..64 {
             let (up, down) = (rising[at(column)], falling[at(column)]);
