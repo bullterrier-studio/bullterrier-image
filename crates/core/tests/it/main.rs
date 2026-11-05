@@ -3,6 +3,7 @@
 
 mod common;
 
+mod ambient_occlusion;
 mod apply;
 mod bands_narrowing;
 mod blend;

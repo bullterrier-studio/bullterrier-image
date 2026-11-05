@@ -140,16 +140,46 @@ pub(crate) fn gaussian_filter(picture: &Picture<'_>, sigma: f64, truncate: f64, 
     let (along, down) = (Smoothing::new(&half, width), Smoothing::new(&half, height));
     let mut blurred = vec![[0.0; 3]; pixels.len()];
     for channel in 0..3 {
-        let mut plane: Vec<f32> = pixels.iter().map(|pixel| pixel[channel]).collect();
-        along.smooth(&mut plane, width, edge);
-        let mut turned = transposed(&plane, height, width); // `width` rows of `height`
-        down.smooth(&mut turned, height, edge);
-        plane = transposed(&turned, width, height);
-        for (pixel, value) in blurred.iter_mut().zip(plane) {
+        let plane: Vec<f32> = pixels.iter().map(|pixel| pixel[channel]).collect();
+        for (pixel, value) in blurred
+            .iter_mut()
+            .zip(blur_plane(plane, (height, width), (&along, &down), edge))
+        {
             pixel[channel] = value;
         }
     }
     blurred
+}
+
+/// The `height` x `width` map `values` (row after row) blurred as one channel of [`gaussian_filter`] is, with the same
+/// promises: a Gaussian of `sigma` px cut off at `truncate` sigmas, `edge` beyond the map, every value kept within the
+/// range of the map's, a sigma under about `0.5 / truncate` px a copy.
+pub(crate) fn gaussian_filter_plane(
+    values: &[f32],
+    (height, width): (usize, usize),
+    sigma: f64,
+    truncate: f64,
+    edge: Extension,
+) -> Vec<f32> {
+    let half = weights(sigma, truncate);
+    if half.len() == 1 {
+        return values.to_vec();
+    }
+    let smoothing = (Smoothing::new(&half, width), Smoothing::new(&half, height));
+    blur_plane(values.to_vec(), (height, width), (&smoothing.0, &smoothing.1), edge)
+}
+
+/// `plane` (`height` x `width`) blurred along its rows by `along`, then down its columns by `down`.
+fn blur_plane(
+    mut plane: Vec<f32>,
+    (height, width): (usize, usize),
+    (along, down): (&Smoothing, &Smoothing),
+    edge: Extension,
+) -> Vec<f32> {
+    along.smooth(&mut plane, width, edge);
+    let mut turned = transposed(&plane, height, width); // `width` rows of `height`
+    down.smooth(&mut turned, height, edge);
+    transposed(&turned, width, height)
 }
 
 /// `picture` blurred to a different amount at every pixel: `weight` (one value, 0..1, for each pixel, row after row) is a

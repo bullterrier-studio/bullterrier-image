@@ -272,7 +272,8 @@ fn render(
             .map(|entry| [entry % 2, entry / 2 % 2, entry / 4].map(|corner| if corner == 1 { 0.0 } else { 1.0 }))
             .collect(),
     )?;
-    // a field named `ramp` is a ramp across the picture, any other name a flat selection
+    // a field named `ramp` is a ramp across the picture, any other name a bumpy selection (hollows and heights, so that an
+    // effect that reads where the selection departs from its surroundings sees some)
     let selections = table
         .fields
         .iter()
@@ -281,12 +282,12 @@ fn render(
             let side = usize::from(SIDE);
             let ramp = params[field.name] == "ramp";
             let values: Vec<f32> = (0..SIDE)
-                .flat_map(|_| {
+                .flat_map(|row| {
                     (0..SIDE).map(move |column| {
                         if ramp {
                             f32::from(column) / f32::from(SIDE - 1)
                         } else {
-                            0.5
+                            f32::from((row * 5 + column * 3) % 7) / 6.0
                         }
                     })
                 })
