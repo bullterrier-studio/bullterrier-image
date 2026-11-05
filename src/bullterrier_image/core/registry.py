@@ -416,8 +416,7 @@ def _core_runner(name: str, fields: tuple[str, ...]) -> Callable[..., np.ndarray
     effect that declares `size_ratio` takes it as a keyword, 1 outside a recipe."""
     sized = "size_ratio" in native.effect(name)["inputs"]
 
-    def run(rgb: np.ndarray, params: Any, **arrays: np.ndarray) -> np.ndarray:
-        size_ratio = arrays.pop("size_ratio", 1.0)
+    def run(rgb: np.ndarray, params: Any, *, size_ratio: float = 1.0, **arrays: np.ndarray) -> np.ndarray:
         values = params.model_dump()
         luts = {field: core_table(values[field]) for field in lut_fields(type(params))}
         return _core.apply(name, rgb, values | dict.fromkeys(luts), size_ratio=size_ratio, luts=luts, fields=arrays)
