@@ -59,6 +59,8 @@ pub use files::{read, read_map, write, write_with_quality};
 pub use inputs::{Inputs, Labels, Layer};
 pub use lut::Lut;
 pub use ops::edge::{Edge, EdgeOrConstant};
+pub use ops::radial::Motion;
+pub use ops::sample::Interpolation;
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
 pub use recipe::region::presets::region_presets;

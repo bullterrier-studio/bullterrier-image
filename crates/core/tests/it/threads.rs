@@ -233,6 +233,25 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "a picture read again about a centre, by each reading and edge rule",
+            Recipe::new([
+                Step::new("radial_blur")
+                    .param("amount", 0.4)
+                    .param("x", 0.3)
+                    .param("y", 0.8)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap"),
+                Step::new("radial_blur")
+                    .param("mode", "spin")
+                    .param("amount", 0.2)
+                    .param("samples", 5)
+                    .param("interpolation", "nearest")
+                    .param("edge", "mirror"),
+                Step::new("radial_blur").param("mode", "spin").param("amount", 0.6),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1), (5, 2_003)],
+        ),
+        case(
             "effects that read the whole picture before they work pixel by pixel",
             Recipe::new([
                 Step::new("auto_levels").param("clip", 0.02),

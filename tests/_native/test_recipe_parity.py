@@ -142,6 +142,18 @@ ROWS = [
     pytest.param("light_leak", {"blobs": 16, "seed": 2147483647}, True, id="light_leak: highest blobs and seed"),
     pytest.param("light_leak", {"blobs": 0}, False, id="light_leak: blobs below the lowest"),
     pytest.param("light_leak", {"seed": 2147483648}, False, id="light_leak: seed above the highest"),
+    pytest.param(
+        "radial_blur",
+        {"mode": "spin", "samples": 256, "interpolation": "bicubic", "edge": "wrap"},
+        True,
+        id="radial_blur: most samples, bicubic, wrap",
+    ),
+    pytest.param("radial_blur", {"samples": 257}, False, id="radial_blur: samples above the most"),
+    pytest.param("radial_blur", {"samples": 0}, False, id="radial_blur: samples below the fewest"),
+    pytest.param("radial_blur", {"mode": "shake"}, False, id="radial_blur: mode that is no motion"),
+    pytest.param(
+        "radial_blur", {"edge": "constant"}, False, id="radial_blur: constant is not one of its four edge rules"
+    ),
     pytest.param("dehaze", {"patch": 201, "edge": "wrap"}, True, id="dehaze: widest patch, wrap"),
     pytest.param("dehaze", {"patch": 202}, False, id="dehaze: patch above the widest"),
     pytest.param("dehaze", {"patch": 0}, False, id="dehaze: patch below the narrowest"),
