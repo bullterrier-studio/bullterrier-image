@@ -22,6 +22,7 @@ mod error;
 mod files_icc;
 mod files_read;
 mod files_write;
+mod focus_blur;
 mod fractal;
 mod gaussian_blur;
 mod gradient;

@@ -159,6 +159,18 @@ fn cases() -> Vec<Case> {
                     .param("constant_value", 0.3),
                 Step::new("highpass").param("radius", 3).param("edge", "mirror"),
                 Step::new("highpass").param("radius", 14).param("edge", "nearest"),
+                Step::new("focus_blur")
+                    .param("field", "light")
+                    .param("focus", 0.3)
+                    .param("radius", 3)
+                    .param("levels", 3)
+                    .param("edge", "wrap"),
+                Step::new("focus_blur")
+                    .param("field", "light")
+                    .param("focus", 0.6)
+                    .param("width", 0.1)
+                    .param("radius", 14)
+                    .param("edge", "nearest"),
             ]),
             // (a radius is in design px, 480 to the longest side: sigma is 1.3 and 5.9 px on the squarish pictures, so only the
             // second is filtered by the transform there, and 6 times that on the thin ones. The transform is slow in a debug

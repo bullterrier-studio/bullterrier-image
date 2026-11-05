@@ -404,20 +404,28 @@ def _register_core_effects() -> None:
         if name in _EFFECTS:
             continue
         model = types.new_class(f"{name.title().replace('_', '')}Params", (EffectParams,), {"core": name})
-        run = _core_runner(name)
+        run = _core_runner(name, field_name_fields(model))
         run.__doc__ = model.__doc__
         _register(run, None, model, None)
 
 
-def _core_runner(name: str) -> Callable[[np.ndarray, Any], np.ndarray]:
-    """The function of the core effect `name`: it hands the validated parameters to the core, and a `Lut` parameter as
-    the core's table, which the effect finds in its inputs under the parameter's name (the value is then none)."""
+def _core_runner(name: str, fields: tuple[str, ...]) -> Callable[..., np.ndarray]:
+    """The function of the core effect `name`: it hands the validated parameters to the core, a `Lut` parameter as
+    the core's table, which the effect finds in its inputs under the parameter's name (the value is then none), and the
+    array of each field parameter in `fields` (keyword-only, as the registry asks of every effect) the same way."""
 
-    def run(rgb: np.ndarray, params: Any) -> np.ndarray:
+    def run(rgb: np.ndarray, params: Any, **arrays: np.ndarray) -> np.ndarray:
         values = params.model_dump()
         luts = {field: core_table(values[field]) for field in lut_fields(type(params))}
-        return _core.apply(name, rgb, values | dict.fromkeys(luts), luts=luts)
+        return _core.apply(name, rgb, values | dict.fromkeys(luts), luts=luts, fields=arrays)
 
+    run.__signature__ = inspect.Signature(  # type: ignore[attr-defined]  # what `_check_shape` reads, in place of `**arrays`
+        [
+            inspect.Parameter("rgb", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+            inspect.Parameter("params", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+            *(inspect.Parameter(field, inspect.Parameter.KEYWORD_ONLY) for field in fields),
+        ]
+    )
     run.__name__ = run.__qualname__ = name
     return run
 

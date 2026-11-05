@@ -6,6 +6,7 @@
 use super::edge::Extension;
 use super::fft::LineFilter;
 use super::length::float;
+use super::levels;
 use super::par;
 use crate::Picture;
 
@@ -149,6 +150,51 @@ pub(crate) fn gaussian_filter(picture: &Picture<'_>, sigma: f64, truncate: f64, 
         }
     }
     blurred
+}
+
+/// `picture` blurred to a different amount at every pixel: `weight` (one value, 0..1, for each pixel, row after row) is a
+/// pixel's share of the full blur, a Gaussian of sigma `radius` px; 0 is the pixel as it is.
+///
+/// The blur is `levels` copies of the picture, copy `k` blurred to sigma `radius * k / levels` ([`gaussian_filter`] with
+/// `truncate` and `edge`), the sharp picture being copy 0. A pixel of weight `w` mixes the two copies either side of
+/// `w * levels` by their closeness to it ([`levels::weight`]), so a pixel of weight 0 is returned exactly and one of weight
+/// 1 is the full blur. A copy no pixel uses is never made, and only one copy is held at a time. A radius of 0 returns the
+/// picture. Every value stays within the range of the picture. `levels` is at least 1.
+pub(crate) fn graded_blur(
+    picture: &Picture<'_>,
+    weight: &[f32],
+    radius: f64,
+    levels: u8,
+    truncate: f64,
+    edge: Extension,
+) -> Vec<[f32; 3]> {
+    let pixels = picture.pixels();
+    if radius == 0.0 {
+        return pixels.to_vec();
+    }
+    let positions: Vec<f32> = weight.iter().map(|weight| weight * f32::from(levels)).collect();
+    let mut mixed = vec![[0.0_f32; 3]; pixels.len()];
+    for level in 0..=levels {
+        let shares: Vec<f32> = positions
+            .iter()
+            .map(|&position| levels::weight(position, level))
+            .collect();
+        if shares.iter().all(|&share| share <= 0.0) {
+            continue;
+        }
+        let blurred;
+        let copy = if level == 0 {
+            pixels
+        } else {
+            let sigma = radius * f64::from(level) / f64::from(levels);
+            blurred = gaussian_filter(picture, sigma, truncate, edge);
+            &blurred
+        };
+        for ((out, pixel), share) in mixed.iter_mut().zip(copy).zip(&shares) {
+            *out = std::array::from_fn(|channel| out[channel] + share * pixel[channel]);
+        }
+    }
+    mixed
 }
 
 /// The weights of the Gaussian kernel at distance 0, 1, ... from a sample, to its reach, summing to 1 when the other

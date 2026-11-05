@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from bullterrier_image import recipe
+from bullterrier_image import fx, recipe
 from bullterrier_image.core import registry
 
 NAME = "focus_blur"
@@ -195,3 +195,14 @@ def test_a_driven_grade_adds_colour_only_where_the_picture_is_blurred() -> None:
     out = recipe.render(flat, miniature)
     np.testing.assert_allclose(out[-1, 5], [0.9647, 0.3647, 0.0647], atol=1e-4)
     np.testing.assert_allclose(out[0], flat[0], atol=1e-6)
+
+
+@pytest.mark.parametrize("named", ["subject", "depth"])
+def test_a_step_follows_the_map_the_photo_is_given_under_the_name_it_names(noise: np.ndarray, named: str) -> None:
+    """The map falls from 1 at the left to 0 at the right: focus 0.5 and a band of 0.2 keep the columns where it lies
+    within 0.1 of 0.5 as they are, and the farthest columns are blurred."""
+    out = fx.focus_blur(field=named, focus=0.5, width=0.2, radius=40.0).apply(noise, maps={named: RAMP})
+    in_focus = np.abs(RAMP[0] - 0.5) <= 0.1
+    np.testing.assert_array_equal(out[:, in_focus], noise[:, in_focus])
+    assert np.abs(out[:, 0] - noise[:, 0]).max() > 0.05
+    assert np.abs(out[:, -1] - noise[:, -1]).max() > 0.05
