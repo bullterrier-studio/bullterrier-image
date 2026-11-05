@@ -12,13 +12,15 @@ use bullterrier_image::params::Color;
 use proptest::prelude::*;
 
 use crate::common::compare::first_difference_within;
-use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
+use crate::common::convolution::{Beyond, Tap, convolved};
+use crate::common::pictures::{impulse, varied};
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and the reference in f64.
 const TOLERANCE: f32 = 1e-4;
 
 fn streaks(params: &Params, height: usize, width: usize, picture: &[f32]) -> Vec<f32> {
-    render(params, height, width, picture).unwrap_or_default()
+    run_picture(params, height, width, picture).unwrap_or_default()
 }
 
 /// The weights of a streak along a row of `width` pixels: exp(-|distance| / length) to the farthest two columns of a row
@@ -71,7 +73,7 @@ fn the_picture_is_what_a_pixel_by_pixel_computation_from_the_definition_gives() 
             color,
         };
         for (height, width) in shapes {
-            let picture = values(height, width);
+            let picture = varied(height, width);
             let at = first_difference_within(
                 &streaks(&params, height, width, &picture),
                 &by_definition(&params, height, width, &picture),
@@ -86,7 +88,7 @@ fn the_picture_is_what_a_pixel_by_pixel_computation_from_the_definition_gives() 
 fn the_comparison_tells_streaks_that_differ_apart() {
     // the known-bad rows: another length, another threshold and another colour are not these streaks; and the light does
     // not saturate, so the differences show
-    let picture = values(6, 37);
+    let picture = varied(6, 37);
     let params = Params {
         length: 9.0,
         threshold: 0.85,
@@ -219,7 +221,7 @@ fn black_no_amount_and_a_threshold_above_every_value_leave_the_picture_as_it_is(
         first_difference_within(&streaks(&Params::default(), 9, 40, &black), &black, 0.0),
         None
     );
-    let dim: Vec<f32> = values(9, 40).iter().map(|value| value * 0.5).collect();
+    let dim: Vec<f32> = varied(9, 40).iter().map(|value| value * 0.5).collect();
     let high = Params {
         threshold: 0.5,
         amount: 10.0,

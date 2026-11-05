@@ -10,13 +10,14 @@
 )]
 
 use bullterrier_image::effects::gaussian_blur::Params;
-use bullterrier_image::params::{Choice, Declared, EffectParams};
-use bullterrier_image::{Edge, EdgeOrConstant, Error, Inputs, Picture, apply};
+use bullterrier_image::params::Choice;
+use bullterrier_image::{Edge, EdgeOrConstant, Error};
 use proptest::prelude::*;
-use serde_json::Value;
 
 use crate::common::compare::first_difference_within;
 use crate::common::edge::source;
+use crate::common::pictures::{impulse, varied};
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: the sums are made in f64 and f32 is 6e-8 at 1.
 const TOLERANCE: f32 = 1e-5;
@@ -29,32 +30,6 @@ const EDGES: [EdgeOrConstant; 5] = [
     EdgeOrConstant::Mirror,
     EdgeOrConstant::Wrap,
 ];
-
-/// `params` applied to the `height` x `width` picture `values` (row after row, three channels a pixel).
-fn blurred(params: &Params, height: usize, width: usize, values: &[f32]) -> Result<Vec<f32>, Error> {
-    let image = apply(
-        Params::EFFECT,
-        &Picture::new(height, width, values)?,
-        Value::Object(params.values()),
-        &Inputs::default(),
-    )?;
-    Ok(image.into_values())
-}
-
-/// A different value in nearly every channel of every pixel, 0..1.
-fn values(height: usize, width: usize) -> Vec<f32> {
-    (0..height * width * 3)
-        .map(|index| f32::from(u16::try_from((index * 7919 + index / 13) % 1000).unwrap_or(0)) / 1000.0)
-        .collect()
-}
-
-/// A black `size` x `size` picture with a white pixel in the middle.
-fn impulse(size: usize) -> Vec<f32> {
-    let mut dark = vec![0.0; size * size * 3];
-    let centre = (size / 2 * size + size / 2) * 3;
-    dark[centre..centre + 3].fill(1.0);
-    dark
-}
 
 /// scipy's weights at distances -reach..=reach: exp(-d^2 / 2 sigma^2), cut off at `int(truncate x sigma + 0.5)`, summing
 /// to 1.
@@ -119,9 +94,9 @@ fn the_blur_is_the_gaussian_of_the_definition_whatever_lies_beyond_the_edge() ->
                     edge,
                     constant_value: 0.7,
                 };
-                let picture = values(height, width);
+                let picture = varied(height, width);
                 let at = first_difference_within(
-                    &blurred(&params, height, width, &picture)?,
+                    &run_picture(&params, height, width, &picture)?,
                     &reference(&params, height, width, &picture),
                     TOLERANCE,
                 );
@@ -138,13 +113,13 @@ fn the_blur_is_the_gaussian_of_the_definition_whatever_lies_beyond_the_edge() ->
 #[test]
 fn the_comparison_tells_a_blur_that_differs_apart() -> Result<(), Error> {
     // the known-bad pair: the reference of another edge rule, and of a kernel cut off sooner, are not the blur
-    let picture = values(5, 4);
+    let picture = varied(5, 4);
     let params = Params {
         radius: 3.0,
         edge: EdgeOrConstant::Reflect,
         ..Params::default()
     };
-    let blur = blurred(&params, 5, 4, &picture)?;
+    let blur = run_picture(&params, 5, 4, &picture)?;
     for other in [
         Params {
             edge: EdgeOrConstant::Wrap,
@@ -173,7 +148,7 @@ fn an_impulse_becomes_the_outer_product_of_the_weights() -> Result<(), Error> {
             edge: EdgeOrConstant::Constant,
             ..Params::default()
         };
-        let out = blurred(&params, size, size, &impulse(size))?;
+        let out = run_picture(&params, size, size, &impulse(size, size, size / 2, size / 2))?;
         for row in 0..size {
             for column in 0..size {
                 let (dy, dx) = (row.abs_diff(centre), column.abs_diff(centre));
@@ -210,7 +185,7 @@ fn the_kernel_is_cut_off_where_truncate_says() -> Result<(), Error> {
             truncate,
             ..Params::default()
         };
-        let out = blurred(&params, 81, 81, &impulse(81))?;
+        let out = run_picture(&params, 81, 81, &impulse(81, 81, 81 / 2, 81 / 2))?;
         assert_eq!(out[at_six_px] > 0.0, lit, "truncate {truncate}");
     }
     Ok(())
@@ -218,23 +193,23 @@ fn the_kernel_is_cut_off_where_truncate_says() -> Result<(), Error> {
 
 #[test]
 fn radius_zero_and_a_kernel_of_one_tap_leave_the_picture_as_it_is() -> Result<(), Error> {
-    let picture = values(9, 13);
+    let picture = varied(9, 13);
     // 0.1 x 4 + 0.5 rounds down to a reach of 0, as in scipy
     for radius in [0.0, 0.1] {
         let params = Params {
             radius,
             ..Params::default()
         };
-        assert_eq!(blurred(&params, 9, 13, &picture)?, picture, "radius {radius}");
+        assert_eq!(run_picture(&params, 9, 13, &picture)?, picture, "radius {radius}");
     }
     Ok(())
 }
 
 #[test]
 fn each_colour_channel_is_blurred_on_its_own() -> Result<(), Error> {
-    let mut red_dot = impulse(41);
+    let mut red_dot = impulse(41, 41, 41 / 2, 41 / 2);
     red_dot.chunks_mut(3).for_each(|pixel| pixel[1..].fill(0.0));
-    let out = blurred(&Params::default(), 41, 41, &red_dot)?;
+    let out = run_picture(&Params::default(), 41, 41, &red_dot)?;
     assert!(out[(20 * 41 + 24) * 3] > 0.0);
     assert!(out.chunks(3).all(|pixel| pixel[1] == 0.0 && pixel[2] == 0.0));
     Ok(())
@@ -251,7 +226,7 @@ fn a_constant_picture_stays_as_it_is_whatever_lies_beyond_its_edge() -> Result<(
                 constant_value: 0.4,
                 ..Params::default()
             };
-            let out = blurred(&params, 21, 34, &grey)?;
+            let out = run_picture(&params, 21, 34, &grey)?;
             assert_eq!(
                 first_difference_within(&out, &grey, TOLERANCE),
                 None,
@@ -265,7 +240,7 @@ fn a_constant_picture_stays_as_it_is_whatever_lies_beyond_its_edge() -> Result<(
 #[test]
 fn with_wrap_the_blur_keeps_each_channels_mean() -> Result<(), Error> {
     // nothing leaves or enters the picture, and the weights sum to 1
-    let picture = values(23, 31);
+    let picture = varied(23, 31);
     let mean = |values: &[f32], channel: usize| {
         values
             .iter()
@@ -281,7 +256,7 @@ fn with_wrap_the_blur_keeps_each_channels_mean() -> Result<(), Error> {
             edge: EdgeOrConstant::Wrap,
             ..Params::default()
         };
-        let out = blurred(&params, 23, 31, &picture)?;
+        let out = run_picture(&params, 23, 31, &picture)?;
         for channel in 0..3 {
             let (before, after) = (mean(&picture, channel), mean(&out, channel));
             assert!(
@@ -305,9 +280,9 @@ fn a_constant_edge_fades_the_border_toward_the_value_and_a_wide_blur_ends_at_it(
             constant_value: beyond,
             ..Params::default()
         };
-        let out = blurred(&params, 7, 9, &grey)?;
+        let out = run_picture(&params, 7, 9, &grey)?;
         assert!(out.iter().all(|value| (value - beyond).abs() < 0.1), "beyond {beyond}");
-        let inner = blurred(&Params { radius: 1.0, ..params }, 7, 9, &grey)?;
+        let inner = run_picture(&Params { radius: 1.0, ..params }, 7, 9, &grey)?;
         let corner = inner[0];
         assert!(
             (corner - beyond).abs() < (0.5 - beyond).abs(),
@@ -335,7 +310,7 @@ proptest! {
         if EDGES[edge] == EdgeOrConstant::Constant {
             (low, high) = (low.min(constant_value), high.max(constant_value));
         }
-        let out = blurred(&params, height, width, picture).map_err(|error| TestCaseError::fail(error.to_string()))?;
+        let out = run_picture(&params, height, width, picture).map_err(|error| TestCaseError::fail(error.to_string()))?;
         prop_assert!(out.iter().all(|&value| (low..=high).contains(&value)), "outside {low}..{high}");
     }
 }

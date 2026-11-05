@@ -14,7 +14,9 @@ use bullterrier_image::effects::motion_blur::Params;
 use proptest::prelude::*;
 
 use crate::common::compare::first_difference_within;
-use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
+use crate::common::convolution::{Beyond, Tap, convolved};
+use crate::common::pictures::{impulse, varied};
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and a line sampled finely.
 const TOLERANCE: f32 = 1e-4;
@@ -43,7 +45,7 @@ fn line(angle: f64, length: f64) -> Vec<Tap> {
 }
 
 fn blur(angle: f32, length: f32, edge: Edge, height: usize, width: usize, picture: &[f32]) -> Vec<f32> {
-    render(&Params { angle, length, edge }, height, width, picture).unwrap_or_default()
+    run_picture(&Params { angle, length, edge }, height, width, picture).unwrap_or_default()
 }
 
 #[test]
@@ -58,7 +60,7 @@ fn the_blur_is_the_picture_averaged_along_the_line_whatever_lies_beyond_the_edge
             let taps = line(f64::from(angle), f64::from(length));
             for edge in EDGES {
                 for (height, width) in shapes {
-                    let picture = values(height, width);
+                    let picture = varied(height, width);
                     let expected = convolved(&taps, Beyond::Rule(edge), height, width, &picture);
                     let at = first_difference_within(
                         &blur(angle, length, edge, height, width, &picture),
@@ -78,7 +80,7 @@ fn the_blur_is_the_picture_averaged_along_the_line_whatever_lies_beyond_the_edge
 #[test]
 fn the_comparison_tells_a_blur_that_differs_apart() {
     // the known-bad rows: the line at another angle, of another length, and the other edge rule are not the blur
-    let picture = values(23, 31);
+    let picture = varied(23, 31);
     let ours = blur(33.0, 30.0, Edge::Reflect, 23, 31, &picture);
     for (angle, length, edge) in [
         (53.0, 30.0, Edge::Reflect),
@@ -135,7 +137,7 @@ fn a_point_of_light_becomes_the_length_of_line_inside_each_pixel() {
 
 #[test]
 fn opposite_directions_give_the_same_blur() {
-    let picture = values(11, 13);
+    let picture = varied(11, 13);
     for length in [7.0, 40.0] {
         let (there, back) = (
             blur(30.0, length, Edge::Mirror, 11, 13, &picture),
@@ -147,7 +149,7 @@ fn opposite_directions_give_the_same_blur() {
 
 #[test]
 fn a_line_under_a_pixel_and_no_line_leave_the_picture_as_it_is() {
-    let picture = values(6, 5);
+    let picture = varied(6, 5);
     for (angle, length) in [(0.0, 0.0), (30.0, 0.0), (30.0, 0.5), (200.0, 0.9)] {
         let out = blur(angle, length, Edge::Reflect, 6, 5, &picture);
         assert_eq!(
@@ -180,7 +182,7 @@ fn a_flat_picture_stays_exactly_as_flat_for_every_edge_rule_and_every_way_of_fil
 fn a_wrapped_blur_keeps_the_mean_of_every_channel() {
     // the weights sum to 1 and every tap is a shift of the whole picture, so what leaves one side comes in at the other
     let (height, width) = (23, 31);
-    let picture = values(height, width);
+    let picture = varied(height, width);
     let mean = |values: &[f32], channel: usize| {
         values
             .iter()

@@ -16,7 +16,9 @@ use proptest::prelude::*;
 use serde_json::Value;
 
 use crate::common::compare::first_difference_within;
-use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
+use crate::common::convolution::{Beyond, Tap, convolved};
+use crate::common::pictures::{impulse, varied};
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and the reference in f64.
 const TOLERANCE: f32 = 1e-4;
@@ -38,7 +40,7 @@ fn hairlines(rays: i32, angle: f32, length: f32) -> Params {
 }
 
 fn spikes(params: &Params, height: usize, width: usize, picture: &[f32]) -> Vec<f32> {
-    render(params, height, width, picture).unwrap_or_default()
+    run_picture(params, height, width, picture).unwrap_or_default()
 }
 
 /// `params` applied with `size_ratio` working px per design px.
@@ -129,7 +131,7 @@ fn the_spikes_are_what_the_definition_says_whatever_lies_beyond_the_edge_which_i
         };
         let taps = spike_taps(&params);
         for (height, width) in shapes {
-            let picture = values(height, width);
+            let picture = varied(height, width);
             let out = spikes(&params, height, width, &picture);
             let at = first_difference_within(&out, &screened(&params, &taps, height, width, &picture), TOLERANCE);
             assert_eq!(
@@ -190,7 +192,7 @@ fn screened(params: &Params, taps: &[Tap], height: usize, width: usize, picture:
 #[test]
 fn the_comparison_tells_spikes_that_differ_apart() {
     // the known-bad rows: another angle, another length and a wider spike are not these spikes
-    let picture = values(23, 31);
+    let picture = varied(23, 31);
     let params = Params {
         rays: 3,
         angle: 20.0,
@@ -274,7 +276,7 @@ fn amount_scales_the_light_and_color_tints_it() {
 
 #[test]
 fn no_amount_no_limit_and_black_leave_the_picture_as_it_is() {
-    let picture = values(9, 11);
+    let picture = varied(9, 11);
     for params in [
         Params {
             amount: 0.0,

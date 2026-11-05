@@ -5,7 +5,9 @@
 use bullterrier_image::effects::{gaussian_blur, sharpen};
 use bullterrier_image::{EdgeOrConstant, Error};
 
-use crate::common::gaussian::{run_picture, varied, weights};
+use crate::common::gaussian::weights;
+use crate::common::pictures::varied;
+use crate::common::pixels::run_picture;
 use proptest::prelude::*;
 
 const EDGES: [EdgeOrConstant; 5] = [

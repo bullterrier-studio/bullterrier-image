@@ -13,16 +13,10 @@ use bullterrier_image::{
 use serde_json::json;
 
 use crate::common::compare::first_bit_difference;
+use crate::common::pictures::varied_seeded;
 
 /// The thread counts a render is compared at: the default, a few, an odd one, more than rows, and every core.
 const THREADS: [usize; 6] = [1, 2, 3, 10, 37, 0];
-
-/// The values of a `height` x `width` picture, a different one in nearly every channel, kept to 0..1.
-fn values(height: usize, width: usize, seed: usize) -> Vec<f32> {
-    (0..height * width * 3)
-        .map(|index| f32::from(u16::try_from((index * 7919 + index / 13 + seed) % 1000).unwrap_or(0)) / 1000.0)
-        .collect()
-}
 
 /// A lookup table of five entries per axis that bends every channel and mixes red into blue: the table `film`.
 fn film() -> Result<Lut, Error> {
@@ -38,7 +32,7 @@ fn film() -> Result<Lut, Error> {
 
 /// `recipe` rendered on the `height` x `width` picture of `seed` with `threads`, the photo given the table `film`.
 fn render(height: usize, width: usize, seed: usize, recipe: &Recipe, threads: usize) -> Result<Image, Error> {
-    let values = values(height, width, seed);
+    let values = varied_seeded(height, width, seed);
     Photo::new(Picture::new(height, width, &values)?)
         .with_lut("film", Arc::new(film()?))
         .render(recipe, &Presets::new(), Options::default().with_threads(threads))
@@ -342,7 +336,7 @@ fn the_comparison_tells_renders_that_differ_apart() -> Result<(), Error> {
 #[test]
 fn a_trace_gives_the_same_pictures_at_any_number_of_threads() -> Result<(), Error> {
     let recipe = Recipe::new([grade(0.5).blend_mode(BlendMode::Overlay).mask("light"), grade(-0.2)]);
-    let values = values(201, 199, 3);
+    let values = varied_seeded(201, 199, 3);
     let photo = Photo::new(Picture::new(201, 199, &values)?);
     let stages = |threads: usize| photo.trace(&recipe, &Presets::new(), Options::default().with_threads(threads));
     // (a stage's Debug shows its shape only, so the stages are compared as values)
@@ -363,7 +357,7 @@ fn more_threads_than_the_limit_refuse_the_render_naming_the_number_and_the_limit
         matches!(&refused, Err(error) if error.kind() == ErrorKind::Recipe && error.to_string().contains("257")),
         "{refused:?}"
     );
-    let values = values(3, 3, 1);
+    let values = varied_seeded(3, 3, 1);
     let photo = Photo::new(Picture::new(3, 3, &values)?);
     let traced = photo.trace(&recipe, &Presets::new(), Options::default().with_threads(usize::MAX));
     assert!(
@@ -404,7 +398,7 @@ fn several_photos_rendered_at_once_with_one_recipe_each_give_what_they_give_alon
                 let (recipe, presets) = (&recipe, &presets);
                 // each worker also uses two threads for its own rows
                 scope.spawn(move || {
-                    let values = values(131, 257, seed);
+                    let values = varied_seeded(131, 257, seed);
                     Photo::new(Picture::new(131, 257, &values)?)
                         .render(recipe, presets, Options::default().with_threads(2))
                         .map(Image::into_values)

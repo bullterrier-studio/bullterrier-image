@@ -8,37 +8,23 @@
     reason = "small picture sizes, and the f64 reference narrowed to the f32 picture"
 )]
 
+use bullterrier_image::Error;
 use bullterrier_image::effects::tone_map::Params;
-use bullterrier_image::params::{Declared, EffectParams};
-use bullterrier_image::{Error, Inputs, Picture, apply};
-use serde_json::Value;
 
 use crate::common::compare::first_difference_within;
 use crate::common::guided::guided_filter;
+use crate::common::pictures::varied;
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: the reference is made in f64, the effect in f32, and a gain of 2^15 at most
 /// is held to 1.
 const TOLERANCE: f32 = 1e-4;
 
-/// `params` applied to the `height` x `width` picture `values` (row after row, three channels a pixel).
-fn tone_mapped(params: &Params, height: usize, width: usize, values: &[f32]) -> Result<Vec<f32>, Error> {
-    let image = apply(
-        Params::EFFECT,
-        &Picture::new(height, width, values)?,
-        Value::Object(params.values()),
-        &Inputs::default(),
-    )?;
-    Ok(image.into_values())
-}
-
 /// A different value in nearly every channel of every pixel, 0..1, some of them black.
 fn values(height: usize, width: usize) -> Vec<f32> {
-    (0..height * width * 3)
-        .map(|index| {
-            let value = f32::from(u16::try_from((index * 7919 + index / 13) % 1000).unwrap_or(0)) / 1000.0;
-            if index % 29 == 0 { 0.0 } else { value }
-        })
-        .collect()
+    let mut picture = varied(height, width);
+    picture.iter_mut().step_by(29).for_each(|value| *value = 0.0);
+    picture
 }
 
 /// The effect by its definition: the base is the guided filter of the base 2 logarithm of the Rec. 709 luma (floored at
@@ -102,7 +88,7 @@ fn the_picture_is_the_tone_map_of_the_definition() -> Result<(), Error> {
         for (height, width) in shapes {
             let picture = values(height, width);
             let at = first_difference_within(
-                &tone_mapped(&params, height, width, &picture)?,
+                &run_picture(&params, height, width, &picture)?,
                 &reference(&params, height, width, &picture),
                 TOLERANCE,
             );
@@ -117,7 +103,7 @@ fn the_comparison_tells_another_look_apart() -> Result<(), Error> {
     // the known-bad pair: the reference of another radius and of another threshold is not the tone map
     let picture = values(9, 11);
     let params = with(0.4, 1.0, 1.0, 2.0, 0.2);
-    let found = tone_mapped(&params, 9, 11, &picture)?;
+    let found = run_picture(&params, 9, 11, &picture)?;
     assert_eq!(
         first_difference_within(&found, &reference(&params, 9, 11, &picture), TOLERANCE),
         None
@@ -152,7 +138,7 @@ fn an_even_picture_comes_out_with_the_gain_worked_out_by_hand() -> Result<(), Er
     ];
     for (colour, contrast, pivot, expected) in rows {
         let picture: Vec<f32> = colour.repeat(5 * 6);
-        let found = tone_mapped(&with(contrast, 0.7, pivot, 3.0, 0.5), 5, 6, &picture)?;
+        let found = run_picture(&with(contrast, 0.7, pivot, 3.0, 0.5), 5, 6, &picture)?;
         for pixel in found.as_chunks::<3>().0 {
             let near = pixel.iter().zip(expected).all(|(a, b)| (a - b).abs() < 1e-5);
             assert!(
@@ -169,12 +155,12 @@ fn radius_0_is_a_global_curve_and_contrast_1_amount_0_leaves_the_picture_alone()
     // radius 0: every pixel is its own base, so a grey v becomes v^contrast whatever its neighbours (and `amount` has no
     // detail to raise); contrast 1 and amount 0 multiply by 2^0
     let greys: Vec<f32> = (0..7 * 5).flat_map(|at| [0.05 + 0.025 * at as f32; 3]).collect();
-    let curved = tone_mapped(&with(0.6, 3.0, 0.0, 0.0, 0.5), 7, 5, &greys)?;
+    let curved = run_picture(&with(0.6, 3.0, 0.0, 0.0, 0.5), 7, 5, &greys)?;
     for (found, grey) in curved.iter().zip(&greys) {
         assert!((found - grey.powf(0.6)).abs() < 1e-5, "{grey} became {found}");
     }
     let picture = values(7, 5);
-    let same = tone_mapped(&with(1.0, 0.0, 3.0, 4.0, 0.5), 7, 5, &picture)?;
+    let same = run_picture(&with(1.0, 0.0, 3.0, 4.0, 0.5), 7, 5, &picture)?;
     assert_eq!(first_difference_within(&same, &picture, TOLERANCE), None);
     Ok(())
 }

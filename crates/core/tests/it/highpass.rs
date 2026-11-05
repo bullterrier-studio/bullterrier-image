@@ -6,7 +6,9 @@ use bullterrier_image::effects::{gaussian_blur, highpass};
 use bullterrier_image::params::Declared;
 use bullterrier_image::{Edge, EdgeOrConstant, Error};
 
-use crate::common::gaussian::{run_picture, varied, weights};
+use crate::common::gaussian::weights;
+use crate::common::pictures::{ramp, varied};
+use crate::common::pixels::run_picture;
 use serde_json::json;
 
 const MID_GREY: f32 = 0.5;
@@ -18,15 +20,6 @@ const BLUR_EDGES: [EdgeOrConstant; 4] = [
     EdgeOrConstant::Mirror,
     EdgeOrConstant::Wrap,
 ];
-
-/// A picture rising from 0 on its left column to 1 on its right one.
-fn ramp(height: usize, width: usize) -> Vec<f32> {
-    (0..height * width * 3)
-        .map(|index| {
-            f32::from(u8::try_from(index / 3 % width).unwrap_or(0)) / f32::from(u8::try_from(width - 1).unwrap_or(1))
-        })
-        .collect()
-}
 
 /// A 16 x 64 vertical step edge in the middle: `low` on the left, `high` on the right.
 fn step(low: f32, high: f32) -> Vec<f32> {

@@ -14,7 +14,10 @@ use bullterrier_image::{EdgeOrConstant, Error};
 use proptest::prelude::*;
 
 use crate::common::compare::first_difference_within;
-use crate::common::gaussian::{run_picture, varied, weights};
+use crate::common::gaussian::weights;
+use crate::common::pictures;
+use crate::common::pictures::varied;
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: the sums are made in f64 and f32 is 6e-8 at 1.
 const TOLERANCE: f32 = 2e-6;
@@ -30,10 +33,7 @@ fn even(size: usize, pixel: [f32; 3]) -> Vec<f32> {
 
 /// A black `size` x `size` picture with `spot` at its middle pixel.
 fn spot(size: usize, spot: [f32; 3]) -> Vec<f32> {
-    let mut dark = vec![0.0; size * size * 3];
-    let middle = (size / 2 * size + size / 2) * 3;
-    dark[middle..middle + 3].copy_from_slice(&spot);
-    dark
+    pictures::spot(size, size, size / 2, size / 2, spot)
 }
 
 /// The red channel of every pixel.

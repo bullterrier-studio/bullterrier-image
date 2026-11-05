@@ -10,6 +10,7 @@ pub(crate) mod gaussian;
 pub(crate) mod guided;
 pub(crate) mod icc;
 pub(crate) mod ops;
+pub(crate) mod pictures;
 pub(crate) mod pixels;
 pub(crate) mod recipe;
 pub(crate) mod run;

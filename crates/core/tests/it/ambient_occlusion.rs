@@ -12,7 +12,8 @@
 use bullterrier_image::effects::ambient_occlusion;
 use bullterrier_image::{Edge, Error};
 
-use crate::common::gaussian::{run_with_field, varied};
+use crate::common::pictures::varied;
+use crate::common::pixels::run_with_field;
 
 const SIZE: usize = 64;
 const MIDDLE: usize = SIZE / 2;

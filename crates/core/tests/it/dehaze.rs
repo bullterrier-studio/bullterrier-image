@@ -10,13 +10,13 @@
 )]
 
 use bullterrier_image::effects::dehaze::Params;
-use bullterrier_image::params::{Declared, EffectParams};
-use bullterrier_image::{Edge, Error, Inputs, Picture, apply};
-use serde_json::Value;
+use bullterrier_image::{Edge, Error};
 
 use crate::common::compare::first_difference_within;
 use crate::common::edge::folded;
 use crate::common::guided::guided_filter;
+use crate::common::pictures::varied;
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: the reference is made in f64 where the effect makes it in f32, and the
 /// colours are stretched by at most 1 / `transmission_floor`, 100 at the smallest.
@@ -24,25 +24,9 @@ const TOLERANCE: f32 = 1e-4;
 
 const EDGES: [Edge; 4] = [Edge::Reflect, Edge::Nearest, Edge::Mirror, Edge::Wrap];
 
-/// `params` applied to the `height` x `width` picture `values` (row after row, three channels a pixel).
-fn dehazed(params: &Params, height: usize, width: usize, values: &[f32]) -> Result<Vec<f32>, Error> {
-    let image = apply(
-        Params::EFFECT,
-        &Picture::new(height, width, values)?,
-        Value::Object(params.values()),
-        &Inputs::default(),
-    )?;
-    Ok(image.into_values())
-}
-
 /// A different value in nearly every channel of every pixel, lifted toward grey as haze lifts it.
 fn hazy(height: usize, width: usize) -> Vec<f32> {
-    (0..height * width * 3)
-        .map(|index| {
-            let value = f32::from(u16::try_from((index * 7919 + index / 13) % 1000).unwrap_or(0)) / 1000.0;
-            0.55 * value + 0.4
-        })
-        .collect()
+    varied(height, width).iter().map(|value| 0.55 * value + 0.4).collect()
 }
 
 /// The smallest value in the `patch` x `patch` window around every place (it spans `patch / 2` before the place and the
@@ -151,7 +135,7 @@ fn the_picture_is_the_dehazed_picture_of_the_definition_whatever_lies_beyond_the
             for (height, width) in shapes {
                 let picture = hazy(height, width);
                 let at = first_difference_within(
-                    &dehazed(&params, height, width, &picture)?,
+                    &run_picture(&params, height, width, &picture)?,
                     &reference(&params, height, width, &picture),
                     TOLERANCE,
                 );
@@ -172,7 +156,7 @@ fn the_comparison_tells_another_look_apart() -> Result<(), Error> {
         radius: 2.0,
         ..Params::default()
     };
-    let found = dehazed(&params, 13, 11, &picture)?;
+    let found = run_picture(&params, 13, 11, &picture)?;
     assert_eq!(
         first_difference_within(&found, &reference(&params, 13, 11, &picture), TOLERANCE),
         None
@@ -211,7 +195,7 @@ fn a_picture_with_no_haze_and_an_amount_of_0_come_out_as_they_went_in() -> Resul
                 edge,
                 ..Params::default()
             };
-            let found = dehazed(&params, 12, 14, &clear)?;
+            let found = run_picture(&params, 12, 14, &clear)?;
             assert_eq!(
                 first_difference_within(&found, &clear, TOLERANCE),
                 None,
@@ -220,7 +204,7 @@ fn a_picture_with_no_haze_and_an_amount_of_0_come_out_as_they_went_in() -> Resul
         }
     }
     let veiled = hazy(12, 14);
-    let off = dehazed(
+    let off = run_picture(
         &Params {
             amount: 0.0,
             ..Params::default()
@@ -251,7 +235,7 @@ fn nearest_and_reflect_give_the_same_picture_and_the_other_rules_do_not() -> Res
             edge,
             ..Params::default()
         };
-        dehazed(&params, height, width, &picture)
+        run_picture(&params, height, width, &picture)
     };
     let nearest = run(Edge::Nearest)?;
     assert!(
@@ -285,7 +269,7 @@ fn every_value_stays_in_the_range_at_the_extremes_of_the_parameters() -> Result<
             airlight_fraction,
             edge,
         };
-        let found = dehazed(&params, 15, 13, &picture)?;
+        let found = run_picture(&params, 15, 13, &picture)?;
         assert!(found.iter().all(|value| (0.0..=1.0).contains(value)), "{params:?}");
     }
     Ok(())

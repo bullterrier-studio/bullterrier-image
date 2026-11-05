@@ -4,17 +4,9 @@
 use std::sync::{Arc, Mutex};
 
 use crate::common::Outcome;
+use crate::common::pictures::ramp;
 use crate::common::run::{Finds, Recorder, Registered};
 use bullterrier_image::{Error, ErrorKind, Image, Input, Layer, Options, Photo, Picture, Presets, Recipe, Stage, Step};
-
-/// The values of a `height` x `width` grey picture whose grey rises along each row, from 0 to 1.
-fn ramp(height: usize, width: usize) -> Vec<f32> {
-    #[expect(clippy::cast_precision_loss, reason = "a test picture is small")]
-    let across = |column: usize| column as f32 / (width - 1) as f32;
-    (0..height)
-        .flat_map(|_| (0..width).flat_map(move |column| [across(column); 3]))
-        .collect()
-}
 
 /// A recorder that declares the size ratio and one field parameter, `near`.
 fn rig() -> Result<Registered<Recorder>, Error> {

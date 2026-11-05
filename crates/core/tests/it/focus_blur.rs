@@ -13,7 +13,8 @@ use bullterrier_image::effects::{focus_blur, gaussian_blur};
 use bullterrier_image::{Edge, EdgeOrConstant, Error};
 
 use crate::common::compare::first_difference_within;
-use crate::common::gaussian::{run_picture, run_with_field, varied};
+use crate::common::pictures::varied;
+use crate::common::pixels::{run_picture, run_with_field};
 
 const EDGES: [Edge; 4] = [Edge::Reflect, Edge::Nearest, Edge::Mirror, Edge::Wrap];
 /// The same four rules by name, as `gaussian_blur` takes them (written out, not mapped by the code under test).

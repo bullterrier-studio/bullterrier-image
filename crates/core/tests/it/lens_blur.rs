@@ -13,7 +13,9 @@ use bullterrier_image::effects::lens_blur::Params;
 use proptest::prelude::*;
 
 use crate::common::compare::first_difference_within;
-use crate::common::convolution::{Beyond, Tap, convolved, impulse, render, values};
+use crate::common::convolution::{Beyond, Tap, convolved};
+use crate::common::pictures::{impulse, varied};
+use crate::common::pixels::run_picture;
 
 /// The pictures are compared at this distance: sums in f32 or by the transform, and the reference in f64.
 const TOLERANCE: f32 = 1e-4;
@@ -38,7 +40,7 @@ fn disc(radius: f64) -> Vec<Tap> {
 }
 
 fn blur(radius: f32, highlights: f32, edge: Edge, height: usize, width: usize, picture: &[f32]) -> Vec<f32> {
-    render(
+    run_picture(
         &Params {
             radius,
             highlights,
@@ -87,7 +89,7 @@ fn the_blur_is_the_picture_averaged_over_the_disc_whatever_lies_beyond_the_edge(
         let taps = disc(f64::from(radius));
         for edge in EDGES {
             for (height, width) in shapes {
-                let picture = values(height, width);
+                let picture = varied(height, width);
                 let expected = convolved(&taps, Beyond::Rule(edge), height, width, &picture);
                 let at =
                     first_difference_within(&blur(radius, 0.0, edge, height, width, &picture), &expected, TOLERANCE);
@@ -107,7 +109,7 @@ fn with_highlights_each_pixel_counts_by_its_brightness_in_the_average() {
         for highlights in [0.7, 6.0, 50.0] {
             for edge in EDGES {
                 for (height, width) in [(1, 1), (1, 9), (9, 1), (5, 7), (23, 31)] {
-                    let picture = values(height, width);
+                    let picture = varied(height, width);
                     let expected = favouring_bright(&taps, highlights, edge, height, width, &picture);
                     let at = first_difference_within(
                         &blur(radius, highlights, edge, height, width, &picture),
@@ -127,7 +129,7 @@ fn with_highlights_each_pixel_counts_by_its_brightness_in_the_average() {
 #[test]
 fn the_comparisons_tell_a_blur_that_differs_apart() {
     // the known-bad rows: another radius, another edge rule, and no highlights are not the blur with them
-    let picture = values(23, 31);
+    let picture = varied(23, 31);
     let ours = blur(5.0, 6.0, Edge::Reflect, 23, 31, &picture);
     let favoured = |radius, highlights, edge| favouring_bright(&disc(radius), highlights, edge, 23, 31, &picture);
     for other in [
@@ -213,7 +215,7 @@ fn a_flat_picture_stays_exactly_as_flat_with_and_without_highlights() {
 
 #[test]
 fn radius_zero_and_a_disc_of_one_pixel_leave_the_picture_as_it_is() {
-    let picture = values(6, 5);
+    let picture = varied(6, 5);
     for (radius, highlights) in [(0.0, 0.0), (0.0, 4.0), (0.3, 0.0)] {
         let out = blur(radius, highlights, Edge::Reflect, 6, 5, &picture);
         assert_eq!(
@@ -227,7 +229,7 @@ fn radius_zero_and_a_disc_of_one_pixel_leave_the_picture_as_it_is() {
 #[test]
 fn a_wrapped_blur_without_highlights_keeps_the_mean_of_every_channel() {
     let (height, width) = (23, 31);
-    let picture = values(height, width);
+    let picture = varied(height, width);
     let mean = |values: &[f32], channel: usize| {
         values
             .iter()

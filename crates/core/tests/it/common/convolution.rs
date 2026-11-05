@@ -1,9 +1,7 @@
 //! A convolution worked out from its definition, for the effects that are one: every output sample the double sum of the
 //! weights and the samples they fall on, with `common::edge`'s way of finding what lies beyond the edge, not the core's.
 
-use bullterrier_image::params::EffectParams;
-use bullterrier_image::{Edge, Error, Inputs, Picture, apply};
-use serde_json::Value;
+use bullterrier_image::Edge;
 
 use super::edge::folded;
 
@@ -16,37 +14,6 @@ pub(crate) enum Beyond {
 
 /// A weight at (rows below, columns right of) the middle of a kernel.
 pub(crate) type Tap = (i64, i64, f64);
-
-/// `params` applied to the `height` x `width` picture `values` (row after row, three channels a pixel).
-pub(crate) fn render<P: EffectParams>(
-    params: &P,
-    height: usize,
-    width: usize,
-    values: &[f32],
-) -> Result<Vec<f32>, Error> {
-    let image = apply(
-        P::EFFECT,
-        &Picture::new(height, width, values)?,
-        Value::Object(params.values()),
-        &Inputs::default(),
-    )?;
-    Ok(image.into_values())
-}
-
-/// A different value in nearly every channel of every pixel, 0..1.
-pub(crate) fn values(height: usize, width: usize) -> Vec<f32> {
-    (0..height * width * 3)
-        .map(|index| f32::from(u16::try_from((index * 7919 + index / 13) % 1000).unwrap_or(0)) / 1000.0)
-        .collect()
-}
-
-/// A black `height` x `width` picture with a white pixel at (`row`, `column`).
-pub(crate) fn impulse(height: usize, width: usize, row: usize, column: usize) -> Vec<f32> {
-    let mut dark = vec![0.0; height * width * 3];
-    let at = (row * width + column) * 3;
-    dark[at..at + 3].fill(1.0);
-    dark
-}
 
 /// Where the sample at `index` of a line of `len` samples comes from; none for black beyond the line.
 fn source(beyond: Beyond, index: i64, len: i64) -> Option<usize> {
