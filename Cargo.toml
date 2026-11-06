@@ -19,7 +19,7 @@ bullterrier-image = { path = "crates/core" }
 bullterrier-image-derive = { path = "crates/derive" }
 # the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
-moxcms = { version = "0.8", default-features = false, features = ["lut"] }  # the colour profiles of image files, to sRGB (`lut` for the CMYK ones; the `image` crate brings it too, with its default features, so its SIMD paths are on)
+moxcms = { version = "0.9", default-features = false, features = ["lut"] }  # the colour profiles of image files, to sRGB (`lut` for the CMYK ones; the `image` crate brings it too, with its default features, so its SIMD paths are on)
 numpy = "0.30"
 peak_alloc = "0.3"
 proc-macro2 = "1"
