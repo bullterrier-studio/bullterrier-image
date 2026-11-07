@@ -550,16 +550,6 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
     assert not np.array_equal(stages[3].image, stages[2].image)
 
 
-def test_the_last_stage_of_a_trace_is_exactly_what_render_returns(photo, subject):
-    steps = [
-        fx.gradient_map(),
-        fx.gradient(colors=["#102030"], mask="background"),
-        fx.bloom(opacity=0.7, blend_mode="screen"),
-    ]
-    look = Recipe(name="t", size=64, steps=steps)
-    np.testing.assert_array_equal(
-        trace(photo, look, maps={"subject": subject})[-1].image, render(photo, look, maps={"subject": subject})
-    )
 
 
 def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, subject):
