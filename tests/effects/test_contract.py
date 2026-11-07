@@ -681,7 +681,7 @@ def test_the_budget_flags_an_effect_that_holds_more_memory_than_allowed(throwawa
 
 # --- every drivable parameter: a field may vary it pixel by pixel, the effect itself unchanged ------------------------
 
-DRIVABLE = sorted((name, field) for name in ALL for field in drivable_fields(registry.parameters(name)))
+DRIVABLE = sorted((name, field) for name in PYTHON for field in drivable_fields(registry.parameters(name)))
 
 
 def _range(name: str, field: str) -> tuple[float, float]:
@@ -754,7 +754,7 @@ def test_fx_builds_a_driven_step_from_a_drive(name, field):
     assert drives(step) == {field: Drive(by="depth", start=least, end=greatest)}
 
 
-@pytest.mark.parametrize("name", [name for name in ALL if name not in {n for n, _ in DRIVABLE}])
+@pytest.mark.parametrize("name", [name for name in PYTHON if name not in {n for n, _ in DRIVABLE}])
 def test_an_effect_with_no_drivable_parameter_refuses_a_drive_for_every_number_it_has(name):
     fields = registry.parameters(name)
     numbers = [
@@ -870,7 +870,7 @@ def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_pas
     assert np.abs(named - photo).max() > 0.01  # the field darkened something: this is not a comparison of two copies
 
 
-FIELD_EFFECTS = [(name, field) for name in ALL for field in field_name_fields(registry.parameters(name))]
+FIELD_EFFECTS = [(name, field) for name in PYTHON for field in field_name_fields(registry.parameters(name))]
 
 
 @pytest.mark.parametrize(("name", "field"), FIELD_EFFECTS, ids=[f"{n}-{f}" for n, f in FIELD_EFFECTS])
@@ -897,7 +897,7 @@ def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(f
     assert facade.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
 
 
-FIELD_PARAMETERS = [(name, field) for name in ALL for field in field_name_fields(registry.parameters(name))]
+FIELD_PARAMETERS = [(name, field) for name in PYTHON for field in field_name_fields(registry.parameters(name))]
 
 
 @pytest.mark.parametrize(("name", "field"), FIELD_PARAMETERS)
