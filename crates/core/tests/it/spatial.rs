@@ -91,6 +91,21 @@ fn the_middle_pixel_of_an_odd_picture_is_left_alone_even_with_a_hard_edge_at_rad
     Ok(())
 }
 
+#[test]
+fn amount_scales_the_shade_and_the_colour_is_mixed_in_channel_by_channel() -> Result<(), Error> {
+    // the rectangle of the first test: its end pixels are halfway through the fade (shade 0.5), at amount 0.5 a quarter
+    // of the way to the colour: 0.4 x 0.75 + colour x 0.25
+    let params = vignette::Params {
+        amount: 0.5,
+        color: Color([1.0, 0.0, 0.5]),
+        ..to_white(0.0)
+    };
+    let out = run(&params, &[[0.4; 3]; 4])?;
+    assert_close(out[0].as_slice(), &[0.55, 0.3, 0.425], TOLERANCE, "an end pixel");
+    assert_close(out[1].as_slice(), &[0.4; 3], TOLERANCE, "a pixel before the fade");
+    Ok(())
+}
+
 proptest! {
     #[test]
     fn a_pixel_ends_between_its_own_value_and_the_colour(
@@ -170,6 +185,58 @@ fn a_zero_thickness_or_darkness_changes_nothing_and_a_full_one_darkens_everythin
         ..lines(2.5, 1.0, 0.3, 0.7)
     };
     assert_close(&grid(&touching, 6, 1, 0.8)?, &[0.4; 6], TOLERANCE, "lines that touch");
+    Ok(())
+}
+
+/// An independent oracle: the gain of each of 8 rows, the line profile written out as a function of the distance from the
+/// middle of the nearest line (1 inside the hard line shrunk by the fade, a raised cosine falling to 0 across the fade, 0
+/// in the gap), averaged over 4000 samples across each row.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the gain is compared with an f32 picture"
+)]
+fn sampled_gains(params: &scanlines::Params) -> Vec<f32> {
+    let (spacing, offset) = (f64::from(params.spacing), f64::from(params.offset));
+    let half = f64::from(params.thickness) / 2.0; // in periods
+    let reach = f64::from(params.softness) * half.min(0.5 - half);
+    let profile = |x: f64| {
+        let turns = (x - offset) / spacing - half; // periods from the line's middle
+        let away = (turns - turns.round()).abs();
+        let fall = ((away - (half - reach)) / (2.0 * reach)).clamp(0.0, 1.0);
+        f64::midpoint(1.0, (std::f64::consts::PI * fall).cos())
+    };
+    (0..8_u16)
+        .map(|row| {
+            let mean = (0..4000_u16)
+                .map(|sample| profile(f64::from(row) + (f64::from(sample) + 0.5) / 4000.0))
+                .sum::<f64>()
+                / 4000.0;
+            (1.0 - f64::from(params.darkness) * mean) as f32
+        })
+        .collect()
+}
+
+#[test]
+fn a_soft_line_darkens_each_row_by_the_mean_of_its_profile_across_it() -> Result<(), Error> {
+    // (spacing, thickness, softness, offset): half soft, thin lines off the rows, thick lines (the gap limits the fade), a
+    // fade shorter than a row
+    for (spacing, thickness, softness, offset) in [
+        (4.0, 0.5, 0.5, 0.0),
+        (5.5, 0.2, 1.0, 1.3),
+        (5.5, 0.8, 1.0, 1.3),
+        (3.0, 0.3, 0.7, 2.0),
+    ] {
+        let params = scanlines::Params {
+            darkness: 0.6,
+            ..lines(spacing, thickness, offset, softness)
+        };
+        assert_close(
+            &grid(&params, 8, 1, 1.0)?,
+            &sampled_gains(&params),
+            2e-4,
+            &format!("spacing {spacing} thickness {thickness} softness {softness} offset {offset}"),
+        );
+    }
     Ok(())
 }
 

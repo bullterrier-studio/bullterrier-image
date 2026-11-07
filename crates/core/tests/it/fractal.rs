@@ -156,3 +156,16 @@ fn a_point_that_escapes_on_the_last_iteration_it_is_given_is_outside_and_one_few
     assert_eq!(at(4)?[0], RED, "four steps");
     Ok(())
 }
+
+#[test]
+fn a_julia_set_takes_its_constant_as_real_part_then_imaginary_part() -> Result<(), Error> {
+    // from z = 0 a Julia set is the orbit of the Mandelbrot point c: c = 1 escapes (count 5.766877), c = i never does
+    let from_origin = |c_real, c_imag| fractal::Params {
+        c_real,
+        c_imag,
+        ..count_as_grey(Kind::Julia)
+    };
+    assert_grey(run_sized(&from_origin(1.0, 0.0), 1, 1, 0.0)?[0], 5.766_877, "c = 1");
+    assert_eq!(run_sized(&from_origin(0.0, 1.0), 1, 1, 0.0)?[0], RED, "c = i");
+    Ok(())
+}
