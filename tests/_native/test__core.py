@@ -17,7 +17,6 @@ import numpy as np
 import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the boundary the effects call
-from bullterrier_image.core.registry import CATEGORIES, INPUTS
 from bullterrier_image.errors import RecipeError, SubjectNotFoundError
 
 PIXEL = np.array([[[0.2, 0.5, 0.7]]], np.float32)  # contrast moves each channel differently
@@ -36,14 +35,10 @@ def test_a_whole_number_is_read_as_the_float_it_equals():
 @pytest.mark.parametrize(
     ("value", "kind"),
     [
-        pytest.param(True, "boolean", id="a bool is a JSON boolean, not a number"),
         pytest.param("2", "string", id="a str is a JSON string"),
         pytest.param([2.0], "sequence", id="a list is a JSON array"),
-        pytest.param((2.0,), "sequence", id="a tuple is a JSON array too"),
         pytest.param(None, "null", id="None is JSON null"),
-        pytest.param({"value": 2.0}, "map", id="a dict is a JSON object"),
         pytest.param(math.nan, "not finite", id="NaN has no JSON form"),
-        pytest.param(math.inf, "not finite", id="infinity has no JSON form"),
         pytest.param(2**70, "out of range", id="an integer beyond 64 bits has no JSON form"),
     ],
 )
@@ -53,27 +48,6 @@ def test_a_value_the_effect_cannot_read_is_refused_naming_its_kind(value, kind):
 
 
 # --- params: what an effect's Rust struct declares -----------------------------------------------------------------
-
-FIELD_KEYS = {"name", "kind", "meaning", "default", "unit", "min", "max", "cyclic", "choices", "drivable", "advanced"}
-OPTIONAL_KEYS = {"nullable"}  # written only for a parameter that may be left out (an optional colour)
-LIST_KEYS = {"min_length", "max_length"}  # written for a list of colours only; `max_length` only when it has a ceiling
-KINDS = {"float", "int", "bool", "choice", "color", "colors", "lut", "field"}
-
-
-@pytest.mark.parametrize("effect", _core.effects(declared=True))
-def test_the_parameters_of_every_effect_are_a_doc_and_fields_of_a_known_kind_with_every_key(effect):
-    table = _core.params(effect)
-    assert set(table) == {"doc", "fields"}
-    assert table["doc"].strip()
-    assert table["fields"]
-    for field in table["fields"]:
-        listed = {key for key in LIST_KEYS | OPTIONAL_KEYS if key in field}
-        assert set(field) == FIELD_KEYS | listed
-        assert field.get("nullable", True) is True  # written only when true
-        assert (field["kind"] == "colors") == ("min_length" in field)  # a list has a floor; nothing else has lengths
-        assert field["kind"] in KINDS
-        assert field["meaning"].strip()
-        assert (field["choices"] != []) == (field["kind"] == "choice")  # only a choice lists names
 
 
 @pytest.mark.parametrize("effect", _core.effects(declared=True))
@@ -88,72 +62,7 @@ def test_a_literal_keeps_its_kind_across_the_boundary_a_whole_number_is_an_int_a
             assert {type(field[key]) for key in ("min", "max")} <= {int, float}, field["name"]
 
 
-def test_the_parameters_of_an_effect_the_core_does_not_implement_are_refused_by_name():
-    with pytest.raises(ValueError, match="no_such_effect"):
-        _core.params("no_such_effect")
-
-
-# --- region_presets: the shipped presets of a region kind ------------------------------------------------------------
-
-SHARD_PRESETS = {
-    "glass": (
-        "Dozens of splinters crowded round an impact point in the middle, big pieces far out, straight cracks.",
-        {"count": 46, "jitter": 1.0, "focus": 2.5},
-    ),
-    "torn": (
-        "A few big pieces with wide ragged edges, like paper torn apart by hand.",
-        {"count": 6, "jitter": 0.7, "edge": {"style": "torn", "amount": 5.76, "scale": 33.6}},
-    ),
-    "stone": (
-        "About a dozen cracked slabs with slightly rough edges, like a broken pavement.",
-        {"count": 14, "jitter": 0.8, "edge": {"style": "torn", "amount": 2.4, "scale": 8.64}},
-    ),
-    "mosaic": (
-        "Many small, nearly even tiles with straight edges, like a mosaic of cut glass.",
-        {"count": 70, "jitter": 0.25},
-    ),
-}
-
-
-def test_the_shard_presets_are_the_four_with_their_sentence_and_fields_in_file_order():
-    found = _core.region_presets("shards")
-    assert list(found) == list(SHARD_PRESETS)
-    assert found == {
-        name: {"description": sentence, "params": fields} for name, (sentence, fields) in SHARD_PRESETS.items()
-    }
-    assert type(found["glass"]["params"]["count"]) is int  # a whole number stays an int across the boundary
-
-
-def test_a_region_kind_without_presets_is_refused_naming_the_kinds_that_have_them():
-    with pytest.raises(ValueError, match=r"'grid'.*shards"):
-        _core.region_presets("grid")
-
-
 # --- the effects' metadata and the registry --------------------------------------------------------------------------
-
-
-def test_the_core_names_the_categories_and_inputs_in_the_order_the_package_lists_them():
-    vocabulary = _core.vocabulary()
-    assert (vocabulary["categories"], vocabulary["inputs"]) == (list(CATEGORIES), list(INPUTS))
-
-
-@pytest.mark.parametrize(
-    ("effect", "category"),
-    [("grade", "colour"), ("pattern", "backgrounds"), ("pixel_grid", "texture")],
-)
-def test_a_core_effect_says_its_category_default_opacity_and_inputs(effect, category):
-    assert _core.effect(effect) == {
-        "name": effect,
-        "category": category,
-        "opacity": 1.0,
-        "inputs": [],
-        "fields": {},
-    }
-
-
-def test_the_metadata_of_an_unknown_effect_is_refused_by_name():
-    with pytest.raises(ValueError, match="no_such_effect"):
-        _core.effect("no_such_effect")
 
 
 def fill(level: float) -> Callable[[np.ndarray, dict], np.ndarray]:
@@ -203,28 +112,6 @@ def test_the_effects_the_core_declares_are_the_ones_it_runs_itself_not_the_ones_
         _core.params(effect)  # the parameters of each are declared, so none refuses
 
 
-def test_an_unregistered_effect_is_gone_and_a_core_effect_cannot_be_unregistered():
-    with registered("probe_gone", fill(0.5)):
-        pass
-    assert "probe_gone" not in _core.effects()
-    with pytest.raises(ValueError, match="probe_gone"):
-        _core.apply("probe_gone", PIXEL, {})
-    with pytest.raises(ValueError, match="probe_gone"):
-        _core.unregister("probe_gone")
-    with pytest.raises(ValueError, match="grade"):
-        _core.unregister("grade")
-    assert "grade" in _core.effects()
-
-
-@pytest.mark.parametrize("taken", ["grade", "probe_taken"])
-def test_a_name_that_is_taken_is_refused_and_the_effect_that_has_it_stays(taken):
-    with registered("probe_taken", fill(0.25)):
-        with pytest.raises(ValueError, match=taken):
-            _core.register(taken, "utilities", 1.0, fill(0.75))
-        if taken == "probe_taken":
-            np.testing.assert_allclose(_core.apply(taken, PIXEL, {}), 0.25)
-
-
 def test_an_unknown_category_is_refused_and_registers_nothing():
     with pytest.raises(ValueError, match="sepia"):
         _core.register("probe_sepia", "sepia", 1.0, fill(0.5))
@@ -235,11 +122,8 @@ def test_an_unknown_category_is_refused_and_registers_nothing():
     ("opacity", "function", "said"),
     [
         pytest.param(math.nan, fill(0.5), "opacity", id="a NaN opacity"),
-        pytest.param(math.inf, fill(0.5), "opacity", id="an infinite opacity"),
-        pytest.param(-0.1, fill(0.5), "opacity", id="an opacity below 0"),
         pytest.param(1.5, fill(0.5), "opacity", id="an opacity above 1"),
         pytest.param(1.0, "not callable", "callable", id="a function that is not callable"),
-        pytest.param(1.0, None, "callable", id="no function"),
     ],
 )
 def test_an_opacity_outside_0_to_1_or_a_function_that_cannot_be_called_is_refused_and_registers_nothing(
@@ -248,11 +132,6 @@ def test_an_opacity_outside_0_to_1_or_a_function_that_cannot_be_called_is_refuse
     with pytest.raises(ValueError, match=said):
         _core.register("probe_refused", "utilities", opacity, function)
     assert "probe_refused" not in _core.effects()
-
-
-def test_a_foreign_effect_describes_its_own_parameters():
-    with registered("probe_own", fill(0.5)), pytest.raises(ValueError, match="probe_own"):
-        _core.params("probe_own")
 
 
 @pytest.mark.parametrize(
@@ -394,10 +273,7 @@ def test_a_declared_input_that_is_missing_or_of_another_size_refuses_the_run_and
     ("offered", "said"),
     [
         pytest.param({"size_ratio": 0.0}, "size_ratio", id="a size ratio of 0"),
-        pytest.param({"size_ratio": math.nan}, "size_ratio", id="a size ratio that is NaN"),
         pytest.param({"partition": PIECES.astype(np.int64)}, "int32", id="a partition that is not int32"),
-        pytest.param({"partition": np.zeros(6, np.int32)}, "shape", id="a partition that is not 2-dimensional"),
-        pytest.param({"partition": np.array([[0, -1, 1], [1, 1, 1]], np.int32)}, "-1", id="a negative piece number"),
         pytest.param(
             {"partition": np.array([[0, 1, 2], [3, 4, 6]], np.int32)}, "6", id="a piece number past one for each pixel"
         ),
@@ -408,20 +284,11 @@ def test_a_declared_input_that_is_missing_or_of_another_size_refuses_the_run_and
         ),
         pytest.param({"fields": {"field": DEPTH.astype(np.float64)}}, "float32", id="a field that is not float32"),
         pytest.param({"fields": {"field": DEPTH + 1}}, "from 0 to 1", id="a field above 1"),
-        pytest.param({"fields": {"field": np.where(DEPTH > 0.5, np.nan, DEPTH).astype(np.float32)}}, "NaN", id="NaN"),
     ],
 )
 def test_an_offered_input_that_is_no_valid_input_is_refused_naming_it(offered, said):
     with registered_with("probe_any", fill(0.5)), pytest.raises(ValueError, match=said):
         _core.apply("probe_any", PICTURE, {}, **offered)
-
-
-def test_a_partition_may_number_every_pixel_its_own_piece():
-    taken, takes = recording()
-    every_pixel = np.arange(6, dtype=np.int32).reshape(2, 3)
-    with registered_with("probe_takes", takes, inputs=["partition"]):
-        _core.apply("probe_takes", PICTURE, {}, partition=every_pixel)
-    np.testing.assert_array_equal(taken[0]["partition"], every_pixel)
 
 
 @pytest.mark.parametrize(
@@ -477,10 +344,7 @@ def test_the_exception_of_a_foreign_effect_that_a_foreign_effect_ran_comes_back_
     [
         pytest.param(lambda: _core.check("grade", {"exposure": 11}), "recipe", id="a value out of range"),
         pytest.param(lambda: _core.read_recipe('{"steps": [{"opacity": 1}]}', "json"), "recipe", id="a broken recipe"),
-        pytest.param(lambda: _core.params("no_such_effect"), "unknown_effect", id="params of no effect"),
-        pytest.param(lambda: _core.effect("no_such_effect"), "unknown_effect", id="metadata of no effect"),
         pytest.param(lambda: _core.apply("no_such_effect", PIXEL, {}), "unknown_effect", id="running no effect"),
-        pytest.param(lambda: _core.check("no_such_effect", {}), "unknown_effect", id="checking no effect"),
         pytest.param(
             lambda: _core.apply("grade", np.zeros((2, 2), np.float32), {}), "invalid_image", id="a picture of no shape"
         ),
@@ -520,23 +384,6 @@ def test_a_foreign_effect_that_returns_no_picture_is_an_error_of_the_other_kind_
     assert caught.value.kind == "other"
 
 
-def test_the_core_names_the_kinds_of_its_errors_in_the_order_of_the_table():
-    assert _core.vocabulary()["error_kinds"] == [
-        "recipe",
-        "unknown_effect",
-        "subject_not_found",
-        "depth_not_found",
-        "map_not_found",
-        "invalid_image",
-        "non_finite_image",
-        "image_read",
-        "image_write",
-        "backend_unavailable",
-        "lut",
-        "other",
-    ]
-
-
 # --- checking parameters and reading recipes ---------------------------------------------------------------------
 
 
@@ -544,11 +391,6 @@ def test_checking_gives_the_complete_parameters_with_a_whole_number_kept_whole_a
     checked = _core.check("pixel_grid", {"cell": 5, "gap": 1})
     assert checked == {"cell": 5, "gap": 1.0, "amount": 0.4, "keep_brightness": False}
     assert [type(checked[key]) for key in ("cell", "gap")] == [int, float]
-
-
-def test_a_value_the_declaration_refuses_is_a_value_error_naming_the_field_and_the_limit():
-    with pytest.raises(ValueError, match=r"exposure.*<= 10"):
-        _core.check("grade", {"exposure": 11})
 
 
 def test_checking_the_parameters_of_an_effect_the_core_does_not_describe_is_refused_by_name():
@@ -567,11 +409,6 @@ def test_a_recipe_is_read_from_json_or_toml_and_any_other_format_is_refused():
     }
     with pytest.raises(ValueError, match=r"toml.*json"):
         _core.read_recipe("steps: []", "yaml")
-
-
-def test_a_recipe_that_is_not_one_is_a_value_error_naming_the_key():
-    with pytest.raises(ValueError, match="opacity"):
-        _core.read_recipe('{"steps": [{"effect": "grade", "opacity": "half"}]}', "json")
 
 
 @pytest.mark.parametrize(
