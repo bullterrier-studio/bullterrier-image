@@ -277,6 +277,14 @@ fn cases() -> Vec<Case> {
                 Step::new("pinch_bulge")
                     .param("amount", 0.9)
                     .param("interpolation", "nearest"),
+                Step::new("swirl")
+                    .param("angle", -400)
+                    .param("radius", 1.5)
+                    .param("x", 0.8)
+                    .param("y", 0.2)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "mirror"),
+                Step::new("swirl").param("angle", 200).param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

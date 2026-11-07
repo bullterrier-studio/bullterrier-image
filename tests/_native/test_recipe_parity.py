@@ -110,6 +110,9 @@ ROWS = [
     pytest.param("pinch_bulge", {"radius": 2.01}, False, id="pinch_bulge: above the widest radius"),
     pytest.param("pinch_bulge", {"interpolation": "cubic"}, False, id="pinch_bulge: a reading that does not exist"),
     pytest.param("pinch_bulge", {"edge": "constant"}, False, id="pinch_bulge: an edge rule it lacks"),
+    pytest.param("swirl", {"angle": -720, "radius": 2}, True, id="swirl: lowest angle, widest radius"),
+    pytest.param("swirl", {"angle": 720.5}, False, id="swirl: above the highest angle"),
+    pytest.param("swirl", {"x": -0.01}, False, id="swirl: a centre left of the picture"),
 ]
 
 

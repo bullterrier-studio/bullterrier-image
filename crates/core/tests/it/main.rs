@@ -93,6 +93,7 @@ mod spatial;
 mod starburst;
 mod svg;
 mod svg_drawing;
+mod swirl;
 mod threads;
 mod threads_rows;
 mod tone;
