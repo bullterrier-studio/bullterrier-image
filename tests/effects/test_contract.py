@@ -27,6 +27,9 @@ from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import Band, Curve, Edge, Finder, Framing, Given, Grid, Line
 
 ALL = sorted(registry.describe())
+# What the Rust core runs is held to the same rules by `crates/core/tests/effects_contract.rs`; the tests below that
+# run an effect's kernel over its parameters, sizes and choices cover the effects registered from Python only.
+PYTHON = [name for name in ALL if name not in set(_core.effects(declared=True))]
 
 
 def assert_a_picture_like(out: np.ndarray, rgb: np.ndarray) -> None:
@@ -67,7 +70,7 @@ ODD_SIZES = [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)]
 
 
 @pytest.mark.parametrize("size", ODD_SIZES, ids=[f"{h}x{w}" for h, w in ODD_SIZES])
-@pytest.mark.parametrize("name", ALL)
+@pytest.mark.parametrize("name", PYTHON)
 def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, size, photo):
     rgb = np.ascontiguousarray(photo[: size[0], : size[1]])
     before = rgb.copy()
@@ -305,7 +308,7 @@ def _inputs(name: str, photo: np.ndarray) -> dict[str, np.ndarray]:
 def _bounds() -> list[tuple[str, str, str]]:
     """(effect, numeric field, "min" or "max") for every numeric field of every effect."""
     found = []
-    for name in ALL:
+    for name in PYTHON:
         model = registry.parameters(name)
         found += [
             (name, doc.name, side) for doc in model.fields_doc() if doc.minimum is not None for side in ("min", "max")
@@ -317,7 +320,7 @@ def _choices() -> list[tuple[str, str, str]]:
     """(effect, choice field, choice) for every choice of every `Literal` field of every effect."""
     return [
         (name, field, choice)
-        for name in ALL
+        for name in PYTHON
         for field, prop in registry.parameters(name).model_json_schema()["properties"].items()
         for choice in prop.get("enum", ())
     ]
@@ -370,7 +373,7 @@ def _interior_values() -> list[tuple[str, str, float]]:
     """(effect, numeric field, value) for five values evenly inside the range of every int or float field of every
     effect (ints rounded, repeats dropped): the values a caller may set."""
     found = []
-    for name in ALL:
+    for name in PYTHON:
         model = registry.parameters(name)
         for doc in model.fields_doc():
             if doc.minimum is None or doc.maximum is None or not isinstance(doc.default, int | float):
@@ -388,9 +391,9 @@ def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, fie
     assert_a_picture_like(registry.apply(name, small, **_setting(name, field, value), **_inputs(name, small)), small)
 
 
-def _cyclic() -> list[tuple[str, str]]:
+def _cyclic(names: list[str] = PYTHON) -> list[tuple[str, str]]:
     """(effect, field) for every cyclic angle of every effect."""
-    return [(name, doc.name) for name in ALL for doc in registry.parameters(name).fields_doc() if doc.cyclic]
+    return [(name, doc.name) for name in names for doc in registry.parameters(name).fields_doc() if doc.cyclic]
 
 
 @pytest.mark.parametrize(
@@ -417,7 +420,7 @@ def test_a_choice_that_is_not_offered_is_refused(name, field, photo):
         registry.apply(name, small, **{field: "not_a_choice"}, **_inputs(name, small))
 
 
-@pytest.mark.parametrize("name", ALL)
+@pytest.mark.parametrize("name", PYTHON)
 def test_every_effect_refuses_an_unknown_parameter(name, photo):
     small = _small(photo)
     with pytest.raises(ValueError, match="not_a_parameter"):
@@ -445,7 +448,7 @@ def _amount_zero_cases() -> list[tuple[str, dict[str, object]]]:
     """(effect, settings) for every effect whose `amount` can be 0: its defaults, then each choice of each `Literal`
     field (a sampling or edge rule must not change a picture nothing moves in)."""
     found: list[tuple[str, dict[str, object]]] = []
-    for name in ALL:
+    for name in PYTHON:
         if not any(doc.name == "amount" and doc.minimum == 0 for doc in registry.parameters(name).fields_doc()):
             continue
         found += [(name, {})] + [(name, {field: choice}) for n, field, choice in _choices() if n == name]
@@ -479,7 +482,7 @@ def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
     """(effect, choices) for every combination of the choice fields (`mode`, `edge`, `interpolation`...) of the
     effects that read the picture between its pixels (those with an `interpolation` field)."""
     found = []
-    for name in ALL:
+    for name in PYTHON:
         properties = registry.parameters(name).model_json_schema()["properties"]
         if "interpolation" in properties:
             choices = {field: prop["enum"] for field, prop in properties.items() if "enum" in prop}
@@ -521,7 +524,7 @@ def _assert_the_seed_decides_the_picture(name: str, photo: np.ndarray) -> None:
     assert (first != registry.apply(name, photo, seed=2, **settings)).any()
 
 
-@pytest.mark.parametrize("name", [name for name in ALL if "seed" in registry.parameters(name).model_fields])
+@pytest.mark.parametrize("name", [name for name in PYTHON if "seed" in registry.parameters(name).model_fields])
 def test_the_same_seed_gives_the_same_picture_and_another_seed_another(name, photo):
     _assert_the_seed_decides_the_picture(name, photo)
 
@@ -736,7 +739,7 @@ def test_two_levels_mix_the_effect_at_the_least_and_the_greatest_value_by_the_fi
     np.testing.assert_allclose(got, (1 - ramp)[..., None] * at_least + ramp[..., None] * at_greatest, atol=1e-6, rtol=0)
 
 
-@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable not in _cyclic()])
+@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable not in _cyclic(ALL)])
 def test_a_drive_that_leaves_the_parameters_range_is_refused_naming_the_field(name, field):
     least, greatest = _range(name, field)
     for start, end in ((least - 1, greatest), (least, greatest + 1)):
@@ -793,7 +796,7 @@ def test_a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real
     np.testing.assert_array_equal(beyond, inside)
 
 
-@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable in _cyclic()])
+@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable in _cyclic(ALL)])
 def test_a_drive_of_a_cyclic_angle_may_run_past_the_turn_each_level_being_the_plain_effect_at_its_direction(
     name, field, photo
 ):
@@ -1342,7 +1345,7 @@ def _looks_alike(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) ->
     return _mean_drift(name, picture, maps) <= LOOK_TOLERANCE and _change_agrees(name, picture, maps)
 
 
-@pytest.mark.parametrize("name", [name for name in ALL if name not in SIZE_EXCEPTIONS])
+@pytest.mark.parametrize("name", [name for name in PYTHON if name not in SIZE_EXCEPTIONS])
 def test_every_effect_at_its_defaults_looks_the_same_at_its_design_size_and_at_twice_it(name, design_photo):
     assert _mean_drift(name, *design_photo) <= LOOK_TOLERANCE
     assert _change_agrees(name, *design_photo)

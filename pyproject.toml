@@ -206,6 +206,7 @@ cap-mb = 14000
 [tool.rust-tests.own-binaries]
 "crates/core/tests/memory.rs" = "a counting #[global_allocator] measures the whole process's peak heap"
 "crates/core/tests/parameters_are_read.rs" = "it walks every effect in the registry, which other tests fill"
+"crates/core/tests/effects_contract.rs" = "it walks every effect in the registry, which other tests fill"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
