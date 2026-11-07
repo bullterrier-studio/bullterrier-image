@@ -320,6 +320,18 @@ fn cases() -> Vec<Case> {
                 Step::new("kaleidoscope")
                     .param("segments", 2)
                     .param("interpolation", "nearest"),
+                Step::new("lens_distortion")
+                    .param("model", "fisheye")
+                    .param("amount", 1.5)
+                    .param("fit", "centre")
+                    .param("x", 0.3)
+                    .param("y", 0.7)
+                    .param("border", "#204060")
+                    .param("interpolation", "bicubic")
+                    .param("edge", "mirror"),
+                Step::new("lens_distortion")
+                    .param("amount", -0.25)
+                    .param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

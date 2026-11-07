@@ -192,6 +192,18 @@ fn conditional() -> Vec<Conditional> {
             field: "edge",
             with: vec![("radius", json!(2.0)), ("x", json!(0.0))],
         },
+        // the default bend is a barrel that fills the frame and reads only inside the picture: the edge rule and the border
+        // show once the 'centre' fit exposes the corners
+        Conditional {
+            effect: "lens_distortion",
+            field: "edge",
+            with: vec![("fit", json!("centre"))],
+        },
+        Conditional {
+            effect: "lens_distortion",
+            field: "border",
+            with: vec![("fit", json!("centre"))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

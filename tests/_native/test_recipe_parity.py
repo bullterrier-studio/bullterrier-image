@@ -132,6 +132,16 @@ ROWS = [
     pytest.param("kaleidoscope", {"segments": 65}, False, id="kaleidoscope: above the most segments"),
     pytest.param("kaleidoscope", {"segments": 0}, False, id="kaleidoscope: no segments"),
     pytest.param("kaleidoscope", {"angle": 400}, True, id="kaleidoscope: a cyclic angle past its end wraps"),
+    pytest.param(
+        "lens_distortion",
+        {"model": "fisheye", "amount": 3.5, "fit": "centre", "border": "#102030"},
+        True,
+        id="lens_distortion: widest fisheye, a border",
+    ),
+    pytest.param("lens_distortion", {"amount": -0.31}, False, id="lens_distortion: below the lowest amount"),
+    pytest.param("lens_distortion", {"model": "pinhole"}, False, id="lens_distortion: a curve that does not exist"),
+    pytest.param("lens_distortion", {"fit": "fill"}, False, id="lens_distortion: a fit that does not exist"),
+    pytest.param("lens_distortion", {"border": "red"}, False, id="lens_distortion: a border that is not a colour"),
     pytest.param("ripple", {"phase": 181, "angle": 725}, True, id="ripple: cyclic angles past their ends wrap"),
 ]
 

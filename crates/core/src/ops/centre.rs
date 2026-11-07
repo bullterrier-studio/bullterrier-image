@@ -45,12 +45,34 @@ impl Centre {
     /// (row, column), a pixel's centre at whole numbers. Each colour channel is read on its own and held to 0..1 (a
     /// cubic reading can overshoot). `source` must give a finite place; it is called for the pixels in any order and from
     /// the render's threads, so it depends only on its argument. Reading every pixel where it is returns the picture.
+    pub(crate) fn warp(self, sampler: &Sampler<'_>, source: impl Fn(Spot) -> (f64, f64) + Sync) -> Image {
+        self.paint(sampler, None, source)
+    }
+
+    /// [`warp`](Self::warp), where a pixel reads from beyond the picture it shows `border` instead of what the sampler's
+    /// edge rule gives: a place more than a pixel past the first or last pixel (below -1 or above the size) is all
+    /// `border`, and one less than a pixel past it is blended into `border` by how far past it lies, so the picture's
+    /// edge is smooth.
+    pub(crate) fn warp_bordered(
+        self,
+        sampler: &Sampler<'_>,
+        border: [f32; 3],
+        source: impl Fn(Spot) -> (f64, f64) + Sync,
+    ) -> Image {
+        self.paint(sampler, Some(border), source)
+    }
+
     #[expect(
         clippy::cast_precision_loss,
         clippy::cast_possible_truncation,
         reason = "a picture side is far below 2**52; the readings are made in f64 and stored in the f32 image"
     )]
-    pub(crate) fn warp(self, sampler: &Sampler<'_>, source: impl Fn(Spot) -> (f64, f64) + Sync) -> Image {
+    fn paint(
+        self,
+        sampler: &Sampler<'_>,
+        border: Option<[f32; 3]>,
+        source: impl Fn(Spot) -> (f64, f64) + Sync,
+    ) -> Image {
         let (height, width) = (sampler.height(), sampler.width());
         let mut out = vec![[0.0; 3]; height * width];
         par::rows(&mut out, width, |first_row, band| {
@@ -63,9 +85,18 @@ impl Centre {
                     down: row - self.row,
                     across: column - self.column,
                 });
-                *pixel = sampler
-                    .at(read_row, read_column)
-                    .map(|level| level.clamp(0.0, 1.0) as f32);
+                let read = sampler.at(read_row, read_column).map(|level| level.clamp(0.0, 1.0));
+                *pixel = match border {
+                    None => read.map(|level| level as f32),
+                    Some(border) => {
+                        // 1 on the picture, falling to 0 a pixel beyond its first or last pixel
+                        let along = |place: f64, size: usize| (place + 1.0).min(size as f64 - place).clamp(0.0, 1.0);
+                        let inside = along(read_row, height) * along(read_column, width);
+                        let mixed =
+                            |channel: usize| read[channel] * inside + f64::from(border[channel]) * (1.0 - inside);
+                        [0, 1, 2].map(|channel| mixed(channel) as f32)
+                    }
+                };
             }
         });
         Image::from_pixels(height, width, out)
