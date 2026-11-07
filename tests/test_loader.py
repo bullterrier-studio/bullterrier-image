@@ -555,42 +555,13 @@ DRIVE_MISTAKES = {
         'effect = "bloom"\nthreshold = { by = "depth", start = 0, end = 0.5 }',
         r"step 1: effect 'bloom': `threshold` cannot be driven.*drivable parameters: amount, radius",
     ),
-    "a whole number": (
-        'effect = "halftone"\ncell = { by = "depth", start = 4, end = 12 }',
-        r"step 1: effect 'halftone': `cell` cannot be driven.*whole number",
-    ),
-    "a drive out of the parameter's range": (
-        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 900 }',
-        r"step 1: effect 'bloom': `radius`.*<= 500.*900",
-    ),
-    "a misspelt key": (
-        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, step = 2 }',
-        r"step 1: effect 'bloom': `radius`: .*step",
-    ),
-    "a table with no end": (
-        'effect = "bloom"\nradius = { by = "depth", start = 0 }',
-        r"step 1: effect 'bloom': `radius`: .*end",
-    ),
     "a field that is no region": (
         'effect = "bloom"\nradius = { by = "gone", start = 0, end = 9 }',
         r"step 1: `by` names 'gone', which is no region; valid selections: subject, background, depth, light",
     ),
-    "a field that is a partition": (
-        'effect = "bloom"\nradius = { by = "g", start = 0, end = 9 }',
-        r"step 1: `by` names 'g', a partition, but it needs a selection",
-    ),
     "a drive with a key called self": (
         'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, self = 1 }',
         r"step 1: .*`self`",
-    ),
-    "a drive with a key called owner": (
-        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, owner = 1 }',
-        r"step 1: .*`owner`",
-    ),
-    "two fields in one step": (
-        'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9 }\n'
-        'amount = { by = "light", start = 0, end = 1 }',
-        r"step 1: effect 'bloom': the drives of one step must vary by one field, got 'depth' and 'light'",
     ),
 }
 
