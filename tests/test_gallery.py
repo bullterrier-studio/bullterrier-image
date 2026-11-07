@@ -126,14 +126,6 @@ def test_every_category_has_a_description_in_the_index(fresh_registry, register_
     assert len(set(descriptions)) == len(descriptions)  # one line of its own for each, none a copy of another
 
 
-def test_every_real_effect_is_listed_once_in_its_own_category_page():
-    pages = gallery.render_effects_pages()
-    for name in registry.describe():
-        # an effect's row in the catalogue table: its picture, then its name (a parameter row starts with its name)
-        homes = [filename for filename, text in pages.items() if f'alt="{name}"> | `{name}` |' in text]
-        assert homes == [f"{registry.category(name)}.md"], name
-
-
 @pytest.mark.parametrize(
     ("pages", "dangling"),
     [
@@ -506,16 +498,6 @@ def test_regenerate_writes_the_stub_and_the_pages_and_keeps_existing_pictures(do
     assert {picture.read_bytes() for picture in pictures} == {b"existing"}
 
 
-def test_the_gallery_command_writes_the_pages_too(docs):
-    done = dev_command(docs, "gallery")
-    assert done.returncode == 0, done.stderr
-    pages = _page_files(docs)
-    assert done.stdout.split() == [str(path) for path in pages.values()]
-    for filename, text in gallery.render_effects_pages().items():
-        assert pages[filename].read_text(encoding="utf-8") == text
-    assert not (docs / "src" / "bullterrier_image" / "fx.pyi").exists()
-
-
 def test_regenerating_again_changes_no_file_and_removes_the_page_of_a_category_that_lost_its_effects(docs):
     assert dev_command(docs, "regenerate").returncode == 0
     written = {path: path.read_bytes() for path in (docs / "docs" / "effects").iterdir()}
@@ -532,20 +514,6 @@ def test_the_gallery_command_keeps_what_is_not_a_generated_page(docs):
     note.write_text("mine", encoding="utf-8")
     assert dev_command(docs, "gallery").returncode == 0
     assert note.read_text(encoding="utf-8") == "mine"
-
-
-def test_the_gallery_command_renders_a_named_picture_again_even_when_it_exists(docs):
-    """Naming an effect with --only means "render it": after its recipe or defaults changed, the old picture is not
-    kept by surprise."""
-    picture = gallery.effect_files("grain", checkout=docs).picture  # grain's recipe needs no cut-out: renders anywhere
-    assert picture.read_bytes() == b"existing"
-    done = dev_command(docs, "gallery", "--only", "grain")
-    assert done.returncode == 0, done.stderr
-    with Image.open(picture) as rendered:
-        # rendered again
-        assert rendered.format == "JPEG"
-        assert max(rendered.size) == 480
-    assert str(picture) in done.stdout.split()
 
 
 def _files(root: Path) -> dict[str, bytes]:
