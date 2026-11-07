@@ -59,6 +59,7 @@ mod params_scale;
 mod path_coverage;
 mod paths;
 mod pattern;
+mod perspective;
 mod picture;
 mod pieces;
 mod pinch_bulge;

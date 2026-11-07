@@ -142,6 +142,15 @@ ROWS = [
     pytest.param("lens_distortion", {"model": "pinhole"}, False, id="lens_distortion: a curve that does not exist"),
     pytest.param("lens_distortion", {"fit": "fill"}, False, id="lens_distortion: a fit that does not exist"),
     pytest.param("lens_distortion", {"border": "red"}, False, id="lens_distortion: a border that is not a colour"),
+    pytest.param(
+        "perspective",
+        {"vertical": -0.9, "horizontal": 0.9, "shear_x": 2, "shear_y": -2, "rotate": -180, "scale": 4},
+        True,
+        id="perspective: every end of every range",
+    ),
+    pytest.param("perspective", {"vertical": 0.91}, False, id="perspective: a keystone past 0.9"),
+    pytest.param("perspective", {"scale": -0.91}, False, id="perspective: a zoom below -0.9"),
+    pytest.param("perspective", {"shear_y": 2.01}, False, id="perspective: a skew past 2"),
     pytest.param("ripple", {"phase": 181, "angle": 725}, True, id="ripple: cyclic angles past their ends wrap"),
 ]
 

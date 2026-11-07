@@ -332,6 +332,16 @@ fn cases() -> Vec<Case> {
                 Step::new("lens_distortion")
                     .param("amount", -0.25)
                     .param("interpolation", "nearest"),
+                Step::new("perspective")
+                    .param("vertical", -0.4)
+                    .param("horizontal", 0.3)
+                    .param("shear_x", 0.6)
+                    .param("shear_y", -0.4)
+                    .param("rotate", 25)
+                    .param("scale", 0.2)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap"),
+                Step::new("perspective").param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
