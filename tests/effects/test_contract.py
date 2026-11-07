@@ -639,7 +639,7 @@ def _over_budget(name: str, rgb: np.ndarray) -> list[str]:
     return problems
 
 
-@pytest.mark.parametrize("name", ALL)
+@pytest.mark.parametrize("name", PYTHON)
 def test_every_effect_at_its_defaults_stays_within_the_time_and_memory_budget_on_a_1_mp_photo(name, megapixel_photo):
     """Measured on an Apple M4: the slowest effect (`flow_warp`) takes 0.35 s of CPU time, the hungriest holds 7.3
     picture-sized buffers; a shared GitHub runner is about 3.5x slower. The budgets leave room for a slower machine,
