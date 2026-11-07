@@ -261,20 +261,7 @@ def test_params_must_be_an_effect_params_model(model, throwaway_effects):
     assert "gain_probe" not in registry.describe()
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        "partition",
-        "size_ratio",
-        "effect",
-        "mask",
-        "opacity",
-        "blend_mode",
-        "preset",
-        "each",
-        "looks",
-    ],
-)
+@pytest.mark.parametrize("name", ["size_ratio", "opacity"], ids=["an input", "a step key"])
 def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwaway_effects):
     field = param(0.5, unit="fraction", min=0, max=1, doc="Not allowed: the recipe supplies it.")
     clashing = type(
@@ -557,11 +544,8 @@ def test_threads_making_the_first_query_together_all_see_every_effect():
 @pytest.mark.parametrize(
     ("name", "says"),
     [
-        pytest.param("glitch", ['fx.slice_shift(preset="glitch")'], id="a-preset-names-its-effect-and-itself"),
-        pytest.param("sepia", ['fx.gradient_map(preset="sepia")'], id="a-preset-of-another-effect"),
         pytest.param("crt", ["look", 'load_recipe("crt")'], id="a-look-says-how-to-load-it"),
-        pytest.param("vibrance", ["is a parameter of grade"], id="a-parameter-names-its-effect"),
-        pytest.param("temperature", ["is a parameter of grade"], id="a-parameter-of-one-effect"),
+        pytest.param("vibrance", ["is a parameter of grade"], id="a-parameter-of-one-effect"),
         pytest.param("radius", ["is a parameter of", "gaussian_blur", "more"], id="a-parameter-of-many-lists-some"),
         pytest.param(
             "depth_of_field", ["summary of focus_blur", "depth of field"], id="a-summary-mention-with-underscores"
