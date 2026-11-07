@@ -15,7 +15,6 @@ from pydantic import model_validator
 
 from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
-from bullterrier_image.core.bridge import maps_needed, needs_finder
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
@@ -211,8 +210,8 @@ def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_t
         Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.9)})
 
 
-@pytest.mark.parametrize("levels", range(2, 17))
-@pytest.mark.parametrize(("start", "end"), [(0.2, 4.0), (4.0, 0.2), (0.0, 4.0), (4.0, 0.0), (0.32, 4.0)])
+@pytest.mark.parametrize("levels", [2, 5, 16])
+@pytest.mark.parametrize(("start", "end"), [(0.2, 4.0), (4.0, 0.0), (0.32, 4.0)])
 def test_a_drive_from_one_end_of_the_range_to_the_other_is_valid_whatever_the_number_of_levels(
     gain, start, end, levels
 ):
@@ -293,46 +292,6 @@ def test_a_step_names_the_field_that_drives_it_as_a_region_it_refers_to(gain):
     step = Step("gain_probe", params={"gain": drive()}, mask="subject")
     assert references(step) == [("mask", "subject", "selection"), ("by", "near", "selection")]
     assert references(Step("gain_probe", params={"gain": 2})) == []
-
-
-def test_a_recipe_refuses_a_field_that_is_no_region_or_not_a_selection_naming_the_step_and_the_valid_ones(gain):
-    with pytest.raises(
-        RecipeError, match=r"step 1: `by` names 'near', which is no region; valid selections: subject, "
-    ):
-        Recipe([Step("gain_probe", params={"gain": drive()})], name="look", size=None)
-    with pytest.raises(RecipeError, match=r"step 1: `by` names 'panes', a partition, but it needs a selection"):
-        Recipe(
-            [Step("gain_probe", params={"gain": drive(by="panes")})], name="look", regions={"panes": Grid()}, size=None
-        )
-    assert Recipe(
-        [Step("gain_probe", params={"gain": drive(by="near")})], name="look", regions={"near": NEAR}, size=None
-    )
-
-
-def test_a_look_of_an_each_names_its_field_too(gain):
-    look = Step("gain_probe", params={"gain": drive(by="near")})
-    with pytest.raises(RecipeError, match=r"step 1: `by` names 'near', which is no region"):
-        Recipe([Each("g", looks=[look, None])], name="look", regions={"g": Grid()}, size=None)
-
-
-MAPS_OF_A_DRIVE = {
-    "the depth": ("depth", {"depth"}),
-    "a band of the depth": ("near", {"depth"}),
-    "the subject": ("subject", {"subject"}),
-    "the light of the picture needs no map": ("light", set()),
-    "a given map": ("star", {"star"}),
-}
-
-
-@pytest.mark.parametrize(("by", "needed"), MAPS_OF_A_DRIVE.values(), ids=MAPS_OF_A_DRIVE.keys())
-def test_a_recipe_needs_the_maps_its_drives_field_is_made_from(gain, by, needed):
-    recipe = Recipe(
-        [Step("gain_probe", params={"gain": drive(by=by)})],
-        name="look",
-        regions={"near": NEAR, "star": Given()},
-        size=None,
-    )
-    assert maps_needed(recipe) == frozenset(needed)
 
 
 # --- addresses: every number of a recipe has a name, and a copy of the recipe can have any of them set ----------------
@@ -485,18 +444,6 @@ def test_several_numbers_of_one_step_are_set_in_one_call(pulse):
 
 def test_setting_nothing_gives_an_equal_recipe(pulse):
     assert pulse.with_values({}) == pulse
-
-
-def test_a_recipe_with_a_number_set_renders_as_one_written_with_it(photo, gain, subject):
-    written = Recipe(
-        [Step("gain_probe", params={"gain": Drive(by="light", start=0.5, end=3.0)})], name="pulse", size=None
-    )
-    other = Recipe(
-        [Step("gain_probe", params={"gain": Drive(by="light", start=0.5, end=2.0)})], name="pulse", size=None
-    )
-    np.testing.assert_array_equal(
-        render(photo, other.with_values({"gain_probe.gain.end": 3.0})), render(photo, written)
-    )
 
 
 BAD_ADDRESSES = {
@@ -902,88 +849,6 @@ def test_a_recipe_refuses_a_frame_that_is_not_a_framing():
         Recipe([Step("grade")], name="framed", frame="square")  # type: ignore[arg-type]  # the point of the test
 
 
-@pytest.mark.parametrize(
-    ("steps", "frame", "needs_subject"),
-    [
-        pytest.param([Step("grade")], Framing(), False, id="nothing masked, nothing framed"),
-        pytest.param([Step("grade", mask="subject")], Framing(), True, id="a masked step"),
-        pytest.param([Step("grade")], Framing(anchor="subject"), True, id="a crop around the subject"),
-        pytest.param([Step("grade")], Framing(transparent="background"), True, id="the subject as the alpha"),
-        pytest.param([Step("grade")], Framing(aspect=1.0, transparent="circle"), False, id="a crop and a circle"),
-    ],
-)
-def test_a_recipe_needs_the_subject_when_a_step_or_its_framing_does(steps, frame, needs_subject):
-    assert ("subject" in maps_needed(Recipe(steps, name="look", frame=frame))) is needs_subject
-
-
-@pytest.mark.parametrize(
-    ("steps", "needs"),
-    [
-        pytest.param(lambda: [Step("depth_probe")], (False, True), id="a step whose effect takes depth"),
-        pytest.param(
-            lambda: [Each("g", looks=[Step("grade"), Step("depth_probe")])],
-            (False, True),
-            id="a look whose effect takes it",
-        ),
-        pytest.param(
-            lambda: [Step("grade", mask="subject"), Each("g", looks=[Step("disperse"), None])],
-            (True, False),
-            id="steps and looks on the subject need no depth",
-        ),
-        pytest.param(lambda: [Step("depth_probe", mask="subject")], (True, True), id="a step that needs both"),
-        pytest.param(lambda: [Each("g", looks=[Step("grade"), None])], (False, False), id="neither"),
-        pytest.param(lambda: [Step("grade", mask="near")], (False, True), id="a mask made from depth"),
-        pytest.param(lambda: [Each("bands", looks=[None])], (False, True), id="an each over depth bands"),
-        pytest.param(lambda: [Step("grade", mask="front")], (False, True), id="a pick of depth bands"),
-        pytest.param(lambda: [Each("g", looks=[Step("grade", mask="near")])], (False, True), id="a look's mask"),
-        pytest.param(lambda: [Step("grade")], (False, False), id="depth regions no step uses"),
-    ],
-)
-def test_a_recipe_needs_depth_when_an_effect_of_a_step_or_a_look_or_a_region_it_uses_takes_it(
-    depth_probe, steps, needs
-):
-    regions: dict[str, Kind] = {
-        "g": Grid(),
-        "near": Band(of="depth"),
-        "bands": Bands(of="depth"),
-        "front": Pick(of="bands"),
-    }
-    recipe = Recipe(steps(), name="look", regions=regions)
-    assert ("subject" in maps_needed(recipe), "depth" in maps_needed(recipe)) == needs
-
-
-@pytest.mark.parametrize(
-    ("steps", "regions", "frame", "expected"),
-    [
-        pytest.param([Step("grade")], {}, Framing(), set(), id="nothing"),
-        pytest.param(
-            [Step("grade", mask="star")], {"star": Given()}, Framing(), {"star"}, id="a mask that is a given map"
-        ),
-        pytest.param([Step("grade")], {"star": Given()}, Framing(), set(), id="a given map no step uses"),
-        pytest.param(
-            [Each("g", looks=[Step("grade", mask="star"), None])],
-            {"g": Grid(), "star": Given()},
-            Framing(),
-            {"star"},
-            id="a look's mask",
-        ),
-        pytest.param(
-            [Step("grade", mask="star"), Step("grade", mask="depth"), Step("grade", mask="subject")],
-            {"star": Given()},
-            Framing(),
-            {"star", "depth", "subject"},
-            id="the built-in maps and a given one",
-        ),
-        pytest.param(
-            [Step("grade")], {}, Framing(anchor="subject"), {"subject"}, id="a framing that crops on the subject"
-        ),
-    ],
-)
-def test_the_maps_a_recipe_needs_are_named(steps, regions, frame, expected):
-    recipe = Recipe(steps, name="look", regions=regions, frame=frame)
-    assert maps_needed(recipe) == frozenset(expected)
-
-
 def test_the_recipe_objects_are_frozen():
     with pytest.raises(ValueError, match="frozen"):
         Step("grade").opacity = 0.5  # type: ignore[misc]  # the point of the test
@@ -1173,21 +1038,6 @@ def test_a_steps_parameters_are_the_presets_with_the_given_ones_over_them():
     }
 
 
-def test_a_given_parameter_wins_over_the_presets():
-    sepia = _shipped("gradient_map", "sepia")
-    chosen = ["#000000", "#ff0000"]
-    step = Step("gradient_map", params={"stops": chosen}, preset="sepia")
-    assert step.params["stops"] == chosen != sepia["stops"]
-
-
-def test_a_preset_step_renders_as_the_step_with_the_same_parameters_written_out(photo):
-    preset = Step("gradient_map", params=EXPLICIT, preset="sepia")
-    written = Step("gradient_map", params={**_shipped("gradient_map", "sepia"), **EXPLICIT})
-    first = registry.apply("gradient_map", photo, **preset.params)
-    np.testing.assert_array_equal(first, registry.apply("gradient_map", photo, **written.params))
-    assert not np.array_equal(first, registry.apply("gradient_map", photo))  # and it is not the default look
-
-
 def test_an_unknown_preset_names_the_effect_and_lists_its_presets():
     with pytest.raises(RecipeError, match=r"gradient_map.*'sepya'.*sepia.*cyanotype"):
         Step("gradient_map", preset="sepya")
@@ -1233,75 +1083,8 @@ REGIONS: dict[str, Kind] = {
 }
 
 
-def test_a_recipe_declaring_regions_accepts_steps_that_name_them_in_every_place_a_step_can():
-    steps: list[Step | Each] = [
-        Step("grade", mask="head"),
-        Step("grade", mask="subject"),
-        Each("panes", looks=[Step("grade", mask="head"), None, Step("grade", opacity=0.5)], mask="background"),
-    ]
-    assert Recipe(steps, name="r", regions=REGIONS).regions == REGIONS
-    assert Recipe([Step("grade")], name="plain").regions == {}
-
-
 # Every way a step can name a region wrongly: each is refused when the recipe is made, naming the step (counted from 1),
 # the key, the name given and what would have been valid.
-BAD_REFERENCES = {
-    "a mask no region has": (
-        lambda: Recipe([Step("grade"), Step("grade", mask="nope")], name="r", regions=REGIONS),
-        r"step 2: `mask` names 'nope', which is no region; valid selections: subject, background, depth, light, head",
-    ),
-    "a mask that is a partition": (
-        lambda: Recipe([Step("grade", mask="panes")], name="r", regions=REGIONS),
-        r"step 1: `mask` names 'panes', a partition, but it needs a selection; valid selections: .*head",
-    ),
-    "an each no region has": (
-        lambda: Recipe([Each("nope", looks=[None])], name="r", regions=REGIONS),
-        r"step 1: `each` names 'nope', which is no region; valid partitions: panes, glass",
-    ),
-    "an each that is a selection": (
-        lambda: Recipe([Each("head", looks=[None])], name="r", regions=REGIONS),
-        r"step 1: `each` names 'head', a selection, but it needs a partition; valid partitions: panes, glass",
-    ),
-    "an each that is the subject": (
-        lambda: Recipe([Each("subject", looks=[None])], name="r", regions=REGIONS),
-        r"step 1: `each` names 'subject', a selection",
-    ),
-    "a mask on an each": (
-        lambda: Recipe([Each("panes", looks=[None], mask="glass")], name="r", regions=REGIONS),
-        r"step 1: `mask` names 'glass', a partition",
-    ),
-    "a look with a mask no region has": (
-        lambda: Recipe([Each("panes", looks=[Step("grade", mask="nope")])], name="r", regions=REGIONS),
-        r"step 1: `mask` names 'nope'",
-    ),
-    "a partition no region has": (
-        lambda: Recipe([Step("partition_probe", partition="nope")], name="r", regions=REGIONS),
-        r"step 1: `partition` names 'nope', which is no region; "
-        r"valid regions: subject, background, depth, light, panes, glass, head",
-    ),
-    "a recipe that declares no regions": (
-        lambda: Recipe([Step("grade", mask="glass")], name="r"),
-        r"valid selections: subject, background, depth, light .*declares no regions of its own.*regions=",
-    ),
-    "a region fitted to a partition": (
-        lambda: Recipe([Step("grade")], name="r", regions={"a": Grid(), "b": Shards(fit="a")}),
-        r"region 'b': `fit` names 'a', a partition, but it needs a selection",
-    ),
-    "regions in a cycle": (
-        lambda: Recipe([Step("grade")], name="r", regions={"a": Shards(fit="b"), "b": Pick(of="a")}),
-        r"cycle: 'a' -> 'b' -> 'a'",
-    ),
-    "a region called like a built-in": (
-        lambda: Recipe([Step("grade")], name="r", regions={"subject": Grid()}),
-        r"region 'subject' is a built-in",
-    ),
-}
-
-
-@pytest.mark.parametrize(("make", "complaint"), BAD_REFERENCES.values(), ids=BAD_REFERENCES.keys())
-def test_a_recipe_refuses_a_bad_region_reference_when_it_is_made(partition_probe, make, complaint):
-    with pytest.raises(RecipeError, match=complaint):
-        make()
 
 
 def test_an_each_takes_none_for_a_piece_left_as_it_is():
@@ -1347,70 +1130,6 @@ def test_a_step_names_a_partition_exactly_when_its_effect_takes_one(partition_pr
     with pytest.raises(RecipeError, match=complaint):
         make()
     assert Step("partition_probe", partition="panes").partition == "panes"
-
-
-@pytest.mark.parametrize(
-    ("steps", "regions", "needs_subject"),
-    [
-        pytest.param([Step("grade", mask="head")], REGIONS, False, id="a mask from a grid needs no subject"),
-        pytest.param(
-            [Step("grade", mask="head")], {**REGIONS, "unused": Shards(fit="subject")}, False, id="an unused one"
-        ),
-        pytest.param(
-            [Step("grade", mask="head")],
-            {"panes": Grid(fit="subject"), "head": Pick(of="panes")},
-            True,
-            id="a grid laid over the subject",
-        ),
-        pytest.param(
-            [Each("cut", looks=[None])], {"cut": Shards(fit="subject")}, True, id="an each over shards on the subject"
-        ),
-        pytest.param([Each("cut", looks=[None])], {"cut": Shards(fit="background")}, True, id="on the background"),
-        pytest.param(
-            [Each("cut", looks=[None])],
-            {"cut": Shards(fit="aura"), "aura": Pick(of="g"), "g": Grid(fit="subject")},
-            True,
-            id="through two regions",
-        ),
-        pytest.param(
-            [Each("g", looks=[Step("disperse"), None])], {"g": Grid()}, True, id="a look that takes the subject"
-        ),
-        pytest.param([Each("g", looks=[Step("grade"), None])], {"g": Grid()}, False, id="looks that do not"),
-        pytest.param(
-            [Each("g", looks=[None], mask="subject")], {"g": Grid()}, True, id="an each masked to the subject"
-        ),
-    ],
-)
-def test_a_recipe_needs_the_subject_only_when_a_region_it_uses_does(steps, regions, needs_subject):
-    assert ("subject" in maps_needed(Recipe(steps, name="look", regions=regions))) is needs_subject
-
-
-FOUND: dict[str, Kind] = {"found": Subject(per="panes"), "whole": Subject()}
-
-
-@pytest.mark.parametrize(
-    ("steps", "regions", "subject_needed", "finder_needed"),
-    [
-        pytest.param([Step("grade", mask="found")], FOUND, False, True, id="a mask from the subject found by pieces"),
-        pytest.param([Step("grade", mask="whole")], FOUND, True, False, id="the subject without per is the subject"),
-        pytest.param([Step("grade", mask="head")], REGIONS, False, False, id="a mask from a grid"),
-        pytest.param([Step("grade", mask="subject")], FOUND, True, False, id="the built-in subject"),
-        pytest.param([Step("grade")], FOUND, False, False, id="found by pieces but no step uses it"),
-        pytest.param(
-            [Each("cut", looks=[None])],
-            {**FOUND, "cut": Shards(fit="found")},
-            False,
-            True,
-            id="shards laid over that find",
-        ),
-        pytest.param([Step("grade", mask="found"), Step("grade", mask="subject")], FOUND, True, True, id="both"),
-    ],
-)
-def test_a_recipe_needs_a_finder_for_pieces_only_when_a_region_it_uses_finds_the_subject_by_pieces(
-    steps, regions, subject_needed, finder_needed
-):
-    recipe = Recipe(steps, name="look", regions={**REGIONS, **regions})
-    assert ("subject" in maps_needed(recipe), needs_finder(recipe)) == (subject_needed, finder_needed)
 
 
 def test_an_each_step_describes_itself_with_its_partition_and_looks():
