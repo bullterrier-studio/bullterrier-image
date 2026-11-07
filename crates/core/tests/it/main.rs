@@ -9,6 +9,7 @@ mod apply;
 mod bands_narrowing;
 mod blend;
 mod bloom;
+mod chromatic_aberration;
 mod colour;
 mod colour_mix;
 mod compare;

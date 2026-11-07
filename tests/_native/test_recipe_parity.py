@@ -166,6 +166,9 @@ ROWS = [
         "parallax", {"angle": 725, "amount": 48, "field": "subject"}, True, id="parallax: cyclic angle, a field"
     ),
     pytest.param("parallax", {"amount": 48.1}, False, id="parallax: above the largest amount"),
+    pytest.param("chromatic_aberration", {"samples": 32, "amount": 100}, True, id="chromatic_aberration: the largest"),
+    pytest.param("chromatic_aberration", {"samples": 2}, False, id="chromatic_aberration: fewer than three copies"),
+    pytest.param("chromatic_aberration", {"amount": -1}, False, id="chromatic_aberration: a negative amount"),
 ]
 
 

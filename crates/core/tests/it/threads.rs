@@ -364,6 +364,14 @@ fn cases() -> Vec<Case> {
                 Step::new("parallax")
                     .param("field", "light")
                     .param("interpolation", "nearest"),
+                Step::new("chromatic_aberration")
+                    .param("amount", 30)
+                    .param("samples", 7)
+                    .param("x", 0.3)
+                    .param("y", 0.8)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap"),
+                Step::new("chromatic_aberration").param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
