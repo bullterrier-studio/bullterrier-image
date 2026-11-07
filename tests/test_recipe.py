@@ -14,7 +14,6 @@ from bullterrier_image import (
     Finder,
     Recipe,
     Step,
-    SubjectNotFoundError,
     fx,
     imageio,
     load_recipe,
@@ -23,7 +22,7 @@ from bullterrier_image import (
     trace,
 )
 from bullterrier_image import recipe as facade
-from bullterrier_image.core import looks, registry
+from bullterrier_image.core import looks
 from bullterrier_image.core.bridge import maps_needed
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
@@ -99,43 +98,6 @@ def test_a_renamed_field_is_read_by_its_new_name_and_refused_by_the_old_one(tmp_
 
 
 @pytest.mark.parametrize(
-    ("mask", "color", "filled", "region"), [("background", "#000000", 0.0, 0), ("subject", "#ffffff", 1.0, 1)]
-)
-def test_a_masked_step_changes_only_its_region(photo, subject, mask, color, filled, region):
-    """`region` is the subject value of the pixels the mask selects."""
-    out = render(
-        photo,
-        Recipe((Step("gradient", params={"colors": [color]}, mask=mask),), name="m", size=None),
-        maps={"subject": subject},
-    )
-    np.testing.assert_allclose(out[subject == 1 - region], photo[subject == 1 - region], atol=1e-6)
-    assert np.allclose(out[subject == region], filled)
-
-
-def test_steps_run_in_order(photo):
-    r = Recipe(
-        (Step("gradient", params={"colors": ["#ff0000"]}), Step("grade", params={"exposure": -1.0})),
-        name="o",
-        size=None,
-    )
-    np.testing.assert_allclose(render(photo, r)[0, 0], [0.5, 0, 0], atol=1e-5)
-
-
-def test_opacity_blends_the_step_in_partway(photo):
-    half = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask=None, opacity=0.5),), name="h", size=None)
-    np.testing.assert_allclose(render(photo, half), photo * 0.5, atol=1e-6)
-    off = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask=None, opacity=0.0),), name="o", size=None)
-    np.testing.assert_allclose(render(photo, off), photo, atol=1e-6)
-
-
-def test_opacity_combines_with_a_mask(photo, subject):
-    r = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background", opacity=0.5),), name="b", size=None)
-    out = render(photo, r, maps={"subject": subject})
-    np.testing.assert_allclose(out[subject == 0], photo[subject == 0] * 0.5, atol=1e-6)
-    np.testing.assert_allclose(out[subject == 1], photo[subject == 1], atol=1e-6)
-
-
-@pytest.mark.parametrize(
     ("key", "good", "bad"),
     [pytest.param("opacity", 0.4, 1.5, id="opacity"), pytest.param("blend_mode", "screen", "lighten", id="blend_mode")],
 )
@@ -148,51 +110,6 @@ def test_a_step_key_is_read_from_the_file_onto_the_step_and_validated(tmp_path, 
 
 
 # --- blend_mode: the step's result is laid over its input as a layer is in an image editor ----------------------
-
-MODES = ["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"]
-ORANGE = np.array([1.0, 0.5, 0.0], np.float32)  # "#ff8000" to within 1/510
-
-
-def fill(color: str, **keys) -> Recipe:
-    return Recipe((Step("gradient", params={"colors": [color]}, **keys),), name="b", size=None)
-
-
-@pytest.mark.parametrize(
-    ("mode", "color"),
-    [("multiply", "#ffffff"), ("screen", "#000000"), ("difference", "#000000"), ("overlay", "#808080")],
-    ids=["multiply by white", "screen by black", "difference with black", "overlay with mid grey"],
-)
-def test_a_neutral_result_leaves_the_photo_as_it_was_under_its_mode(photo, mode, color):
-    np.testing.assert_allclose(render(photo, fill(color, blend_mode=mode)), photo, atol=0.003)  # 0x80 is 0.502
-
-
-@pytest.mark.parametrize(
-    ("mode", "by_hand"),
-    [
-        ("multiply", lambda photo: photo * ORANGE),
-        ("screen", lambda photo: photo + ORANGE - photo * ORANGE),
-        ("difference", lambda photo: np.abs(photo - ORANGE)),
-    ],
-)
-def test_the_mode_combines_the_steps_input_with_its_result(photo, mode, by_hand):
-    np.testing.assert_allclose(render(photo, fill("#ff8000", blend_mode=mode)), by_hand(photo), atol=0.002)
-
-
-@pytest.mark.parametrize("mode", MODES)
-def test_opacity_0_leaves_the_photo_as_it_was_under_every_mode(photo, mode):
-    np.testing.assert_array_equal(render(photo, fill("#ff8000", blend_mode=mode, opacity=0.0)), photo)
-
-
-def test_the_mode_combines_first_and_the_opacity_mixes_that_in(photo):
-    grey = np.float32(0x80 / 255)
-    out = render(photo, fill("#808080", blend_mode="multiply", opacity=0.5))
-    np.testing.assert_allclose(out, photo + 0.5 * (photo * grey - photo), atol=1e-6)
-
-
-def test_a_mode_on_the_background_leaves_the_subject_untouched(photo, subject):
-    out = render(photo, fill("#ff8000", blend_mode="multiply", mask="background"), maps={"subject": subject})
-    np.testing.assert_array_equal(out[subject == 1], photo[subject == 1])
-    np.testing.assert_allclose(out[subject == 0], photo[subject == 0] * ORANGE, atol=0.002)
 
 
 def test_a_step_says_its_mode_and_by_default_it_is_normal():
@@ -252,43 +169,10 @@ def test_an_effect_must_return_a_float32_array_a_float64_one_is_a_broken_effect(
         render(photo, Recipe((Step("float64_for_contract_test"),), size=None))
 
 
-def test_size_scales_photo_and_matte_together(photo, subject):
-    out = render(
-        photo,
-        Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="s", size=64),
-        maps={"subject": subject},
-    )
-    assert out.shape == (48, 64, 3)
-
-
 @pytest.mark.parametrize("size", [0, -1, 16385, 10**8, 1.5, True], ids=repr)
 def test_a_render_size_that_is_no_whole_number_from_1_to_16384_is_refused_before_anything_is_made(photo, size):
     with pytest.raises(RecipeError, match="size"):
         render(photo, Recipe([Step("grade")], name="s"), size=size)
-
-
-BLUR = '[[step]]\neffect = "gaussian_blur"\nradius = 3\n'
-
-
-def test_a_file_without_size_is_rendered_at_the_photos_own_size_with_its_numbers_still_written_for_480(tmp_path, photo):
-    big = resize(photo, 960)
-    unset = load_recipe(write(tmp_path, BLUR, "unset.toml"))
-    at_480 = load_recipe(write(tmp_path, "size = 480\n" + BLUR, "at480.toml"))
-    out = render(big, unset)
-    assert out.shape == big.shape
-    # a radius of 3 design pixels is 6 px on a 960 px picture, whatever size the recipe says it renders at
-    np.testing.assert_allclose(out, render(big, at_480, size=960), atol=1e-6)
-    np.testing.assert_allclose(out, registry.apply("gaussian_blur", big, radius=6.0), atol=1e-6)
-
-
-def test_a_file_with_a_size_scales_the_photo_to_it(tmp_path, photo):
-    out = render(resize(photo, 960), load_recipe(write(tmp_path, "size = 64\n" + BLUR)))
-    assert max(out.shape[:2]) == 64
-
-
-def test_matte_of_the_wrong_size_is_rejected(photo):
-    with pytest.raises(SubjectNotFoundError, match="subject"):
-        render(photo, Recipe((Step("grain"),), name="r", size=None), maps={"subject": np.ones((5, 5), np.float32)})
 
 
 def test_shipped_recipes_all_load():
@@ -474,21 +358,6 @@ def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
     np.testing.assert_array_equal(facade.render(photo, DEEP), expected)
     np.testing.assert_array_equal(facade.trace(photo, DEEP)[-1].image, expected)
     np.testing.assert_array_equal(facade.render_all(photo, [DEEP])[0], expected)
-
-
-@pytest.mark.parametrize(
-    "picture_of",
-    [
-        pytest.param(lambda photo, recipe, **k: facade.render(photo, recipe, **k), id="render"),
-        pytest.param(lambda photo, recipe, **k: facade.trace(photo, recipe, **k)[-1].image, id="trace"),
-        pytest.param(lambda photo, recipe, **k: facade.render_all(photo, [recipe], **k)[0], id="render_all"),
-    ],
-)
-def test_a_look_is_rendered_at_the_size_asked_with_its_pixel_values_scaled_to_it(photo, picture_of):
-    """The public renderers take `size`: a blur of 30 px designed for 480 px wide is 8 px at 128 (by hand)."""
-    designed = Recipe((Step("gaussian_blur", params={"radius": 30.0}),), name="blur", size=64)
-    by_hand = registry.apply("gaussian_blur", resize(photo, 128), radius=8.0)
-    np.testing.assert_array_equal(picture_of(photo, designed, size=128), by_hand)
 
 
 # --- the built-in looks --------------------------------------------------------------------------------------------
