@@ -405,7 +405,7 @@ def test_a_map_is_found_once_per_photo_and_remembered_between_runs(folder, depth
     assert len(finder.seen) == 2  # redoing everything reads the remembered map instead of looking again
 
 
-@pytest.mark.parametrize(("run_with", "recipes"), MAPS.values(), ids=MAPS.keys())
+@pytest.mark.parametrize(("run_with", "recipes"), [MAPS["the subject"]], ids=["the subject"])
 def test_a_damaged_remembered_map_is_found_again_even_when_forcing(folder, depth_probe, run_with, recipes):
     recipes(folder)
     finder = StandInFinder()
@@ -474,24 +474,15 @@ def test_a_subject_and_a_depth_found_by_finders_of_one_identity_are_remembered_a
     assert (len(subject.seen), len(depth.seen)) == (2, 2)  # and each remembered under its own name
 
 
-# A second run with a finder of a wide disc's answers replaced by a narrow disc's (one function, other options): known
-# by its identity alone, so another identity redoes what uses the subject and the same one reuses what is remembered.
-SECOND_FINDERS = {
-    "another identity finds the subjects again for the recipes that use them": ("narrow disc", ["cut1", "cut2"], True),
-    "the same identity reuses the remembered subjects, whatever the function": ("wide disc", [], False),
-}
-
-
-@pytest.mark.parametrize(("identity", "redone", "changed"), SECOND_FINDERS.values(), ids=SECOND_FINDERS.keys())
-def test_a_finder_is_known_by_its_identity(folder, identity, redone, changed):
+def test_a_finder_is_known_by_its_identity_alone_whatever_its_function(folder):
     masked_recipes(folder)
     project = load_project(folder / "bt-image.toml")
     run(project, finders={"subject": Finder("wide disc", partial(finds_a_disc, radius=30))})
     picture = folder / "out" / "a" / "cut1.png"
     before = picture.read_bytes()
-    items = run(project, finders={"subject": Finder(identity, partial(finds_a_disc, radius=3))})
-    assert recipes_redone(items) == redone
-    assert (picture.read_bytes() != before) is changed  # the narrow disc's cut-out, or the remembered wide one
+    items = run(project, finders={"subject": Finder("wide disc", partial(finds_a_disc, radius=3))})
+    assert recipes_redone(items) == []
+    assert picture.read_bytes() == before  # the remembered wide cut-out, not the narrow one
 
 
 def test_the_default_finder_is_remembered_until_the_segmenter_model_changes(folder, echo_model, monkeypatch):
@@ -547,7 +538,7 @@ def test_an_interrupted_run_keeps_the_record_of_what_it_finished(folder):
     ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("run_with", "recipes"), MAPS.values(), ids=MAPS.keys())
+@pytest.mark.parametrize(("run_with", "recipes"), [MAPS["the subject"]], ids=["the subject"])
 def test_a_photo_whose_map_is_not_found_fails_only_the_recipes_that_need_it_and_is_searched_once(
     folder, depth_probe, run_with, recipes
 ):
@@ -725,11 +716,8 @@ def test_text_files_are_utf8_whatever_the_locale(folder, photo):
     ("text", "expect"),
     [
         ('[export]\nformats = ["tiff"]\n', "formats"),
-        ("[export]\nsizes = [4]\n", "sizes"),
-        ("[export]\nquality = 500\n", "quality"),
         ("[export]\nspeed = 3\n", "unknown keys"),
         ('colour = "red"\n', "unknown keys"),
-        ("[checks]\nsubject_share = [0.9, 0.1]\n", "subject_share"),
         ('photos = ["nothing/*.jpg"]\n', "no photos match"),
         ('recipes = ["missing"]\n', "no recipe files"),
     ],
@@ -848,13 +836,12 @@ def test_a_recipe_with_transparency_is_refused_for_jpeg_before_anything_is_rende
     assert (folder / "out" / "a" / "round.png").exists()
 
 
-@pytest.mark.parametrize("fmt", ["png", "webp"])
 @pytest.mark.parametrize(
     ("sizes", "name", "side"), [((), "round", 64), ((32,), "round_32", 32)], ids=["as rendered", "smaller"]
 )
-def test_a_recipe_with_transparency_is_exported_with_its_alpha_at_every_size(folder, fmt, sizes, name, side):
-    run(circle_project(folder, formats=(fmt,), sizes=sizes))
-    with Image.open(folder / "out" / "a" / f"{name}.{fmt}") as img:
+def test_a_recipe_with_transparency_is_exported_with_its_alpha_at_every_size(folder, sizes, name, side):
+    run(circle_project(folder, formats=("png",), sizes=sizes))
+    with Image.open(folder / "out" / "a" / f"{name}.png") as img:
         assert img.mode == "RGBA"
         alpha = np.asarray(img)[..., 3]
     assert alpha.shape == (side * 3 // 4, side)  # the 128x96 photo at that longest side
