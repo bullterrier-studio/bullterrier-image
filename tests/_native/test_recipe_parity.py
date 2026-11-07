@@ -117,6 +117,9 @@ ROWS = [
         "ripple", {"wavelength": 2, "amplitude": 500}, True, id="ripple: shortest wavelength, largest amplitude"
     ),
     pytest.param("ripple", {"wavelength": 1.99}, False, id="ripple: below the shortest wavelength"),
+    pytest.param("polar", {"mode": "from", "edge": "wrap"}, True, id="polar: the way back, an edge rule"),
+    pytest.param("polar", {"mode": "round"}, False, id="polar: a direction that does not exist"),
+    pytest.param("polar", {"y": 1.01}, False, id="polar: a centre below the picture"),
     pytest.param("ripple", {"phase": 181, "angle": 725}, True, id="ripple: cyclic angles past their ends wrap"),
 ]
 

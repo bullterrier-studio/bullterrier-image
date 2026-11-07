@@ -78,6 +78,11 @@ impl Spot {
         self.down.hypot(self.across)
     }
 
+    /// The place `down` below and `across` right of the centre, as (row, column) (above and left are negative).
+    pub(crate) fn place_at(&self, down: f64, across: f64) -> (f64, f64) {
+        (self.centre.row + down, self.centre.column + across)
+    }
+
     /// The place at the pixel's offset from the centre multiplied by `scale` (2 is twice as far out, 0.5 half as far)
     /// and then turned by `turn` radians, as (row, column). A positive `turn` makes a pixel read the place counter-clockwise
     /// of it as seen with rows running down and columns right (a pixel right of the centre reads above it for a quarter
@@ -86,9 +91,6 @@ impl Spot {
     pub(crate) fn moved(&self, scale: f64, turn: f64) -> (f64, f64) {
         let (down, across) = (self.down * scale, self.across * scale);
         let (sin, cos) = turn.sin_cos();
-        (
-            self.centre.row + down * cos - across * sin,
-            self.centre.column + down * sin + across * cos,
-        )
+        self.place_at(down * cos - across * sin, down * sin + across * cos)
     }
 }

@@ -33,6 +33,7 @@ pub(crate) struct Sampler<'a> {
     width: usize,
     interpolation: Interpolation,
     edge: Extension,
+    column_edge: Extension,
 }
 
 impl<'a> Sampler<'a> {
@@ -51,7 +52,15 @@ impl<'a> Sampler<'a> {
             width,
             interpolation,
             edge,
+            column_edge: edge,
         }
+    }
+
+    /// This reader with the columns wrapping round whatever the rule for the rows: the column after the last is the first,
+    /// as an angle is, and a point at any column, however far, reads modulo the width.
+    pub(crate) const fn wrapping_columns(mut self) -> Self {
+        self.column_edge = Extension::Wrap;
+        self
     }
 
     /// The number of rows of the picture.
@@ -75,7 +84,7 @@ impl<'a> Sampler<'a> {
         // the sources of the columns are the same for every row
         let mut across = [Source::Value(0.0); TAPS];
         for (source, index) in across.iter_mut().zip(first_column..).take(column_weights.len()) {
-            *source = self.edge.locate(self.width, index);
+            *source = self.column_edge.locate(self.width, index);
         }
         let mut sum = [0.0; 3];
         for (&row_weight, row_index) in row_weights.iter().zip(first_row..) {
@@ -286,6 +295,27 @@ mod tests {
         let sampler = Sampler::new(&pixels, 1, 4, Interpolation::Bicubic, Extension::Nearest);
         let expected = (111.0 + 2.0 * 29.0 - 3.0 * 4.0) / 128.0;
         assert!((sampler.at(0.0, 1.25)[0] - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn wrapping_columns_wrap_whatever_the_rule_for_the_rows() {
+        // two rows of 0.1 0.2 0.4 / 0.5 0.6 0.7; rows beyond them are the constant 0.25, columns beyond them the opposite side
+        let pixels: Vec<[f32; 3]> = [0.1, 0.2, 0.4, 0.5, 0.6, 0.7].map(|value| [value; 3]).to_vec();
+        let sampler = Sampler::new(&pixels, 2, 3, Interpolation::Nearest, Extension::Constant(0.25)).wrapping_columns();
+        let at = |row: f64, column: f64| sampler.at(row, column)[0];
+        assert!(
+            (at(1.0, -1.0) - 0.7).abs() < 1e-6,
+            "one before the first column is the last"
+        );
+        assert!((at(0.0, 3.0) - 0.1).abs() < 1e-6, "one after the last is the first");
+        assert!((at(0.0, -7.0) - 0.4).abs() < 1e-6, "however far");
+        assert!((at(-1.0, 1.0) - 0.25).abs() < 1e-6, "rows beyond keep their own rule");
+        // between pixels the seam blends the last column with the first
+        let bilinear = Sampler::new(&pixels, 2, 3, Interpolation::Bilinear, Extension::Nearest).wrapping_columns();
+        assert!(
+            (bilinear.at(0.0, 2.5)[0] - 0.25).abs() < 1e-6,
+            "half way between 0.4 and 0.1"
+        );
     }
 
     #[test]
