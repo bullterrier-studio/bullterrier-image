@@ -104,6 +104,12 @@ ROWS = [
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
     pytest.param("lut", {"amount": 1}, True, id="lut: highest amount, a whole number for a decimal"),
+    # the warps: a signed range with both ends, and the two choices every one of them has
+    pytest.param("pinch_bulge", {"amount": -1, "radius": 2}, True, id="pinch_bulge: lowest amount, widest radius"),
+    pytest.param("pinch_bulge", {"amount": -1.01}, False, id="pinch_bulge: below the lowest amount"),
+    pytest.param("pinch_bulge", {"radius": 2.01}, False, id="pinch_bulge: above the widest radius"),
+    pytest.param("pinch_bulge", {"interpolation": "cubic"}, False, id="pinch_bulge: a reading that does not exist"),
+    pytest.param("pinch_bulge", {"edge": "constant"}, False, id="pinch_bulge: an edge rule it lacks"),
 ]
 
 

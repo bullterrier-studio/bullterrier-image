@@ -180,6 +180,12 @@ fn conditional() -> Vec<Conditional> {
             field: "edge",
             with: vec![("interpolation", json!("bicubic"))],
         },
+        // only a pinch reads from farther out than it shows, and from beyond the edge only when its disc reaches it
+        Conditional {
+            effect: "pinch_bulge",
+            field: "edge",
+            with: vec![("amount", json!(-1.0)), ("radius", json!(2.0)), ("x", json!(0.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

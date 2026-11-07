@@ -58,6 +58,7 @@ mod paths;
 mod pattern;
 mod picture;
 mod pieces;
+mod pinch_bulge;
 mod pixel_grid;
 mod presets;
 mod radial_blur;

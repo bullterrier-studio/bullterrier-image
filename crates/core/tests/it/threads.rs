@@ -265,6 +265,22 @@ fn cases() -> Vec<Case> {
             &thin_and_odd,
         ),
         case(
+            "warps about a centre, by each reading and edge rule",
+            Recipe::new([
+                Step::new("pinch_bulge")
+                    .param("amount", -0.7)
+                    .param("radius", 1.2)
+                    .param("x", 0.3)
+                    .param("y", 0.8)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap"),
+                Step::new("pinch_bulge")
+                    .param("amount", 0.9)
+                    .param("interpolation", "nearest"),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "the guided filter and the minimum filter, on the rows and the columns turned into rows",
             Recipe::new([
                 Step::new("tone_map").param("radius", 5).param("amount", 1.0),

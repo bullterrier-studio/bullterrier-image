@@ -28,7 +28,6 @@ fn along(interpolation: Interpolation, at: f64) -> Vec<(i64, f64)> {
 
 /// The three channels of the `height` x `width` picture `pixels` (row after row, three values a pixel) read at (`row`,
 /// `column`) as `interpolation` says, a point beyond the picture read as `rule` says.
-#[expect(clippy::cast_possible_wrap, reason = "a test picture is small")]
 pub(crate) fn read_at(
     pixels: &[f32],
     height: usize,
@@ -38,14 +37,51 @@ pub(crate) fn read_at(
     row: f64,
     column: f64,
 ) -> [f64; 3] {
+    read_at_ruled(pixels, height, width, interpolation, (rule, rule), row, column)
+}
+
+/// [`read_at`], a point beyond the rows read as `rules.0` says and one beyond the columns as `rules.1` says.
+#[expect(clippy::cast_possible_wrap, reason = "a test picture is small")]
+pub(crate) fn read_at_ruled(
+    pixels: &[f32],
+    height: usize,
+    width: usize,
+    interpolation: Interpolation,
+    rules: (Edge, Edge),
+    row: f64,
+    column: f64,
+) -> [f64; 3] {
     let mut sum = [0.0; 3];
     for (down, row_weight) in along(interpolation, row) {
         for (across, column_weight) in along(interpolation, column) {
-            let at = (folded(rule, down, height as i64) * width + folded(rule, across, width as i64)) * 3;
+            let at = (folded(rules.0, down, height as i64) * width + folded(rules.1, across, width as i64)) * 3;
             for (total, value) in sum.iter_mut().zip(&pixels[at..at + 3]) {
                 *total += row_weight * column_weight * f64::from(*value);
             }
         }
     }
     sum
+}
+
+/// The picture a warp makes, from the definition: pixel (row, column) is the picture read at the place `source` gives for
+/// it as (row, column), held to 0..1. `rules` as for [`read_at_ruled`].
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the f64 reading narrowed to the f32 picture"
+)]
+pub(crate) fn warped(
+    pixels: &[f32],
+    height: usize,
+    width: usize,
+    interpolation: Interpolation,
+    rules: (Edge, Edge),
+    source: impl Fn(usize, usize) -> (f64, f64),
+) -> Vec<f32> {
+    let mut out = Vec::with_capacity(pixels.len());
+    for at in 0..height * width {
+        let (row, column) = source(at / width, at % width);
+        let read = read_at_ruled(pixels, height, width, interpolation, rules, row, column);
+        out.extend(read.map(|level| level.clamp(0.0, 1.0) as f32));
+    }
+    out
 }
