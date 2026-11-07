@@ -54,18 +54,17 @@ def declared_fields() -> dict[str, list[dict[str, object]]]:
 
 
 DECLARED = declared_fields()
-EMITTED = [
-    pytest.param(field, id=f"{effect}.{field['name']}") for effect, fields in DECLARED.items() for field in fields
-]
 
 
-def test_the_walk_reaches_the_effects_declared_in_rust():
-    assert {"grade", "pattern", "pixel_grid"} <= set(DECLARED)
-
-
-@pytest.mark.parametrize("parameter", EMITTED)
-def test_the_schema_accepts_a_parameter_an_effect_declares(parameter):
-    assert [error.message for error in SCHEMA.iter_errors(parameter)] == []
+def test_the_schema_accepts_every_parameter_every_effect_the_core_declares():
+    assert {"grade", "pattern", "pixel_grid"} <= set(DECLARED)  # the walk reaches the effects declared in Rust
+    refused = {
+        f"{effect}.{field['name']}": [error.message for error in SCHEMA.iter_errors(field)]
+        for effect, fields in DECLARED.items()
+        for field in fields
+        if not SCHEMA.is_valid(field)
+    }
+    assert refused == {}
 
 
 @pytest.mark.parametrize(
