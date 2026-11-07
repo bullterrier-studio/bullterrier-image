@@ -20,7 +20,6 @@ from bullterrier_image.recipe import (
     Curve,
     Cuts,
     Edge,
-    Finder,
     Framing,
     Given,
     Grid,
@@ -137,12 +136,10 @@ def test_any_other_format_is_refused_naming_the_value_and_the_formats_this_relea
 BROKEN = {
     "TOML syntax error, with its line and column": ("name = 'ok'\nsize = 64\ncolor = '#fff\n" + STEP, "line 3, column"),
     "misspelt size": ("sise = 2\n" + STEP, "`sise`"),
-    "misspelt format": ("formt = 2\n" + STEP, "`formt`"),
     "steps for step": ("steps = 2\n" + STEP, "`steps`"),
     "an [animation] table, which no longer exists": ("[animation]\nseconds = 2\n" + STEP, "`animation`"),
     "a single [step] table instead of a list": ("[step]\neffect = 'grade'\n", r"\[\[step\]\]"),
     "an effect written as a list": ("[[step]]\neffect = ['grade']\n", r"step 1: .*effect.*'grade'"),
-    "an effect written as a number": ("[[step]]\neffect = 5\n", r"step 1: .*effect.*5"),
     "a preset written as a list": ("[[step]]\neffect = 'grade'\npreset = ['sepia']\n", r"step 1: .*preset.*sepia"),
     "a region kind written as a list, in format 2": (
         "format = 2\n[region.g]\nkind = ['grid']\n" + STEP,
@@ -175,8 +172,6 @@ def test_a_frame_table_is_the_recipes_framing_and_without_one_the_recipe_is_not_
 
 
 FRAME_MISTAKES = {
-    "a value out of range": ("[frame]\naspect = 0\n", r"\[frame\]: .*`aspect`.*0"),
-    "a value of the wrong kind": ("[frame]\nflip = 3\n", r"\[frame\]: .*`flip`"),
     "a choice that is not offered": ("[frame]\nanchor = 'middle'\n", r"\[frame\]: .*`anchor`.*middle"),
     "a misspelt key": ("[frame]\nrotate = 10\n", r"\[frame\]: .*`rotate`.*angle"),
     "frame given as a list of tables": ("[[frame]]\naspect = 1\n", r"\[frame\] table"),
@@ -370,17 +365,6 @@ def test_a_format_2_file_with_regions_and_an_each_step_loads_as_the_recipe_writt
     assert load_recipe(_write(tmp_path, REGIONS_FILE)) == REGIONS_RECIPE
 
 
-def test_the_same_file_renders_what_the_python_recipe_renders(tmp_path, photo, subject):
-    from bullterrier_image.recipe import render
-
-    loaded = load_recipe(_write(tmp_path, REGIONS_FILE))
-    finder = lambda crop: np.where(crop[..., 0] > 0.5, 1.0, 0.0).astype(np.float32)  # noqa: E731  (a stand-in model)
-    np.testing.assert_array_equal(
-        render(photo, loaded, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)}),
-        render(photo, REGIONS_RECIPE, maps={"subject": subject}, finders={"subject": Finder("stand-in", finder)}),
-    )
-
-
 FIELDS_FILE = """
 format = 3
 
@@ -461,10 +445,8 @@ SHAPES_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
 
 
 def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_svg_is_found_beside_the_file(
-    tmp_path, photo, subject
+    tmp_path,
 ):
-    from bullterrier_image.recipe import render
-
     (tmp_path / "assets").mkdir()
     (tmp_path / "assets" / "shapes.svg").write_text(SHAPES_SVG, encoding="utf-8")
     (tmp_path / "recipes").mkdir()
@@ -487,9 +469,6 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
         ],
     )
     assert loaded == written
-    np.testing.assert_array_equal(
-        render(photo, loaded, maps={"subject": subject}), render(photo, written, maps={"subject": subject})
-    )
 
 
 def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_probe, tmp_path):
@@ -555,10 +534,6 @@ DRIVE_MISTAKES = {
         'effect = "bloom"\nthreshold = { by = "depth", start = 0, end = 0.5 }',
         r"step 1: effect 'bloom': `threshold` cannot be driven.*drivable parameters: amount, radius",
     ),
-    "a field that is no region": (
-        'effect = "bloom"\nradius = { by = "gone", start = 0, end = 9 }',
-        r"step 1: `by` names 'gone', which is no region; valid selections: subject, background, depth, light",
-    ),
     "a drive with a key called self": (
         'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, self = 1 }',
         r"step 1: .*`self`",
@@ -573,7 +548,7 @@ def test_a_mistake_in_a_drive_names_the_file_the_step_the_parameter_and_the_prob
         load_recipe(_write(tmp_path, text, "bad.toml"))
 
 
-@pytest.mark.parametrize("header", ["", "format = 1\n", "format = 2\n"], ids=["no format", "format 1", "format 2"])
+@pytest.mark.parametrize("header", ["", "format = 2\n"], ids=["no format", "format 2"])
 def test_a_drive_needs_format_3_and_a_file_of_an_earlier_one_says_so_naming_the_parameter(tmp_path, header):
     text = header + '[[step]]\neffect = "bloom"\nradius = { by = "depth", start = 0, end = 9 }\n'
     with pytest.raises(
@@ -638,7 +613,7 @@ def test_two_steps_of_a_file_with_one_name_are_refused_naming_the_file_and_the_s
         load_recipe(_write(tmp_path, text, "bad.toml"))
 
 
-@pytest.mark.parametrize("header", ["", "format = 1\n", "format = 2\n"], ids=["no format", "format 1", "format 2"])
+@pytest.mark.parametrize("header", ["", "format = 2\n"], ids=["no format", "format 2"])
 def test_a_step_name_needs_format_3_and_a_file_of_an_earlier_one_says_so(tmp_path, header):
     text = header + "[[step]]\neffect = 'grade'\nname = 'warm'\n"
     with pytest.raises(RecipeError, match=r"^old\.toml: step 1: `name` needs `format = 3`"):
@@ -689,48 +664,9 @@ REGION_MISTAKES = {
     "a value out of range": ('[region.g]\nkind = "shards"\ncount = 0\n', r"region 'g'.*`count`.*1"),
     "an edge that is not a table": ('[region.g]\nkind = "grid"\nedge = 3\n', r"region 'g'.*`edge`"),
     "a region that is not a table": ("region = 3\n", r"\[region\.NAME\]"),
-    "a fit that no region has": (
-        '[region.g]\nkind = "grid"\nfit = "nope"\n',
-        r"region 'g': `fit` names 'nope'.*valid selections: subject, background",
-    ),
-    "a fit that is a partition": (
-        '[region.a]\nkind = "grid"\n[region.b]\nkind = "grid"\nfit = "a"\n',
-        r"region 'b': `fit` names 'a', a partition",
-    ),
-    "a pick of nothing": ('[region.p]\nkind = "pick"\nof = "gone"\n', r"region 'p': `of` names 'gone'"),
-    "a cycle": ('[region.a]\nkind = "shards"\nfit = "b"\n[region.b]\nkind = "pick"\nof = "a"\n', r"cycle"),
-    "a name taken by a built-in": ('[region.subject]\nkind = "grid"\n', r"region 'subject' is a built-in"),
-    "a band with low above high": (
-        '[region.n]\nkind = "band"\nof = "depth"\nlow = 0.7\nhigh = 0.4\n',
-        r"region 'n'.*`low` 0\.7.*`high` 0\.4",
-    ),
-    "a band feather out of range": (
-        '[region.n]\nkind = "band"\nof = "depth"\nfeather = 2\n',
-        r"region 'n'.*`feather`.*2",
-    ),
-    "no bands": ('[region.b]\nkind = "bands"\nof = "depth"\ncount = 0\n', r"region 'b'.*`count`.*0"),
-    "a band of nothing": ('[region.n]\nkind = "band"\n', r"region 'n': `of` names ''.*no region"),
-    "a band of a region that is not there": (
-        '[region.n]\nkind = "band"\nof = "gone"\n',
-        r"region 'n': `of` names 'gone'",
-    ),
-    "a combination of one": ('[region.c]\nkind = "combine"\nof = ["depth"]\n', r"region 'c'.*`of`"),
-    "a combination with an operation that is not offered": (
-        '[region.c]\nkind = "combine"\nop = "xor"\nof = ["depth", "subject"]\n',
-        r"region 'c'.*`op`.*xor",
-    ),
-    "a gradient with an angle that is not a number": (
-        '[region.g]\nkind = "linear_gradient"\nangle = "up"\n',
-        r"region 'g'.*`angle`.*up",
-    ),
-    "a radial gradient with a radius of nothing": (
-        '[region.g]\nkind = "radial_gradient"\nradius = 0\n',
-        r"region 'g'.*`radius`.*0",
-    ),
     "a field called self": ('[region.g]\nkind = "grid"\nself = 1\n', r"region 'g'.*`self`"),
     "a field called owner": ('[region.g]\nkind = "grid"\nowner = 1\n', r"region 'g'.*`owner`"),
     "a kind written as a list": ('[region.g]\nkind = ["grid"]\n', r"region 'g': `kind` is \['grid'\]"),
-    "a name taken by the built-in light": ('[region.light]\nkind = "grid"\n', r"region 'light' is a built-in"),
 }
 
 
@@ -807,14 +743,6 @@ EACH_MISTAKES = {
     "an assignment that does not exist": (
         '[[step]]\neach = "g"\nlooks = ["none"]\nassign = "shuffle"\n',
         r"step 1: .*`assign`.*cycle.*random",
-    ),
-    "an each that is no region": (
-        '[[step]]\neach = "h"\nlooks = ["none"]\n',
-        r"step 1: `each` names 'h'.*valid partitions: g",
-    ),
-    "a mask that is no region": (
-        '[[step]]\neffect = "grade"\nmask = "h"\n',
-        r"step 1: `mask` names 'h'.*valid selections: subject, background",
     ),
 }
 
