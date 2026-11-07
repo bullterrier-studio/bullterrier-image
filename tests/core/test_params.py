@@ -1141,3 +1141,58 @@ def test_a_model_declared_from_rust_that_also_has_fields_of_its_own_fails_naming
     body = {"__annotations__": {name: annotation}} | ({} if default is ... else {name: default})
     with pytest.raises(ValueError, match=r"Both.*core=.*extra"):
         types.new_class("Both", (EffectParams,), {"core": "grade"}, lambda namespace: namespace.update(body))
+
+
+# --- a number limited by another (`at_most`, as the Rust declaration writes it) -------------------------------------
+
+
+def height(name: str, default: int, **extra: object) -> dict[str, Any]:
+    """A height in px, 0 to 2000, as the core describes a field."""
+    return {
+        "name": name,
+        "kind": "float",
+        "meaning": "A height.",
+        "default": default,
+        "unit": "px",
+        "min": 0,
+        "max": 2000,
+        "cyclic": False,
+        "choices": [],
+        "drivable": False,
+        "advanced": False,
+    } | extra
+
+
+BANDS = model_of(height("low", 10, at_most="high"), height("high", 100))
+
+
+@pytest.mark.parametrize(
+    ("given", "valid"),
+    [
+        pytest.param({}, True, id="the defaults"),
+        pytest.param({"low": 50, "high": 50}, True, id="equal"),
+        pytest.param({"low": 0, "high": 0}, True, id="both lowest"),
+        pytest.param({"low": 100}, True, id="the lowest up to the default highest"),
+        pytest.param({"low": 101}, False, id="the lowest above the default highest"),
+        pytest.param({"low": 51, "high": 50}, False, id="the lowest above the highest"),
+        pytest.param({"high": 9}, False, id="the highest below the default lowest"),
+    ],
+)
+def test_a_number_may_not_exceed_the_one_it_is_limited_by_whichever_is_given(given, valid):
+    if valid:
+        assert BANDS.parse(given)
+        return
+    with pytest.raises(RecipeError, match=r"`low`.*must not exceed.*`high`"):
+        BANDS.parse(given)
+
+
+def test_a_refusal_shows_both_values():
+    with pytest.raises(RecipeError, match=r"60.*50"):
+        BANDS.parse({"low": 60, "high": 50})
+
+
+def test_a_limit_must_name_another_field_of_the_model():
+    with pytest.raises(ValueError, match=r"`low`.*at_most.*`tall`"):
+        model_of(height("low", 10, at_most="tall"), height("high", 100))
+    with pytest.raises(ValueError, match=r"`low`.*at_most.*`low`"):
+        model_of(height("low", 10, at_most="low"))

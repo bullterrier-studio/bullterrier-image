@@ -17,6 +17,8 @@
 //!   declaration on one is refused with an error naming the type. Left to others: an unknown `unit` is rustc's own
 //!   error ("no variant `Banana` found for enum `params::Unit`"), which is adequate, and that a choice's doc names every
 //!   variant is checked when Python builds the model.
+//!   A number may name another it does not exceed, `at_most = other`: that must be another number of the same unit, with
+//!   a default no lower than the field's own.
 //! - `#[derive(Choice)]` on a fieldless enum: the choices of a parameter, named in `snake_case` in declaration order,
 //!   and the name of each variant. It reads them from text, so the names are written once, in the enum; two variants with the same name are refused.
 //!

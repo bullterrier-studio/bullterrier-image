@@ -220,3 +220,27 @@ fn the_check_takes_its_lengths_from_the_declaration() {
     // no ceiling on `colors`
     assert!(check(&json!({"colors": vec!["#111"; 50]})).is_ok());
 }
+
+/// The band heights: the lowest may not exceed the highest.
+#[derive(Debug, Clone, PartialEq, Deserialize, Params)]
+#[serde(deny_unknown_fields)]
+struct Bands {
+    /// The lowest a band can be, in px.
+    #[param(default = 10.0, unit = px, min = 0, max = 2000, at_most = high)]
+    low: f32,
+    /// The tallest a band can be, in px.
+    #[param(default = 100.0, unit = px, min = 0, max = 2000)]
+    high: f32,
+}
+
+#[test]
+fn a_number_limited_by_another_names_it_in_the_table_and_is_held_to_it_by_the_check() {
+    let table = Bands::table();
+    assert_eq!((table.fields[0].at_most, table.fields[1].at_most), (Some("high"), None));
+    let given = |value: Value| value.as_object().cloned().unwrap_or_default();
+    assert!(table.check("bands", &given(json!({"low": 100, "high": 100}))).is_ok());
+    assert!(matches!(
+        table.check("bands", &given(json!({"low": 101}))),
+        Err(Error::Invalid { field, constraint: Constraint::AtMostField("high", _), .. }) if field == "low"
+    ));
+}

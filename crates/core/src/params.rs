@@ -127,6 +127,10 @@ pub struct Field {
     /// The most elements of a list of colours; none when it has no limit, and not written then.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_length: Option<usize>,
+    /// The name of another number this one may not exceed (`band_min_height` below `band_max_height`); none when it has no
+    /// such limit, and not written then. Both are checked together, whichever is given; both are in the same unit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at_most: Option<&'static str>,
     /// The value may be left out, and the default is `null` (an `Option<Color>`); not written when false. A lookup table
     /// is always so and does not say it.
     #[serde(skip_serializing_if = "std::ops::Not::not")]

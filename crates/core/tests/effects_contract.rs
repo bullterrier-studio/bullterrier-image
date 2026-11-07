@@ -731,6 +731,7 @@ fn field(name: &'static str, kind: Kind, default: Scalar, min: Scalar, max: Scal
         choices: &[],
         min_length: None,
         max_length: None,
+        at_most: None,
         nullable: false,
         drivable: false,
         advanced: false,

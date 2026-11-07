@@ -521,3 +521,101 @@ fn what_is_not_a_documented_struct_of_named_fields_is_refused_naming_it() {
         ("an enum", choice, &["Params", "struct"]),
     ]);
 }
+
+/// A struct of two fields: `first`, `second` (each `#[param(..)] name: type,`), documented.
+macro_rules! pair {
+    ({ $($first:tt)* }, { $($second:tt)* }) => {{
+        let input: DeriveInput = parse_quote! {
+            /// The parameters of a probe.
+            struct Params {
+                /// The first.
+                $($first)*
+                /// The second.
+                $($second)*
+            }
+        };
+        input
+    }};
+}
+
+#[test]
+fn a_number_may_be_limited_by_another_in_its_unit_whose_default_it_does_not_exceed() {
+    let good = [
+        pair! {
+            { #[param(default = 10.0, unit = px, min = 0, max = 2000, at_most = high)] low: f32, },
+            { #[param(default = 100.0, unit = px, min = 0, max = 2000)] high: f32, }
+        },
+        // equal defaults, a whole number limited by a decimal, and the limit declared before the field
+        pair! {
+            { #[param(default = 5.0, unit = count, min = 0, max = 9)] high: f32, },
+            { #[param(default = 5, unit = count, min = 0, max = 9, at_most = high)] low: i32, }
+        },
+    ];
+    for input in &good {
+        let code = expanded(input);
+        assert!(code.as_ref().is_ok_and(|code| code.contains("at_most")), "{code:?}");
+    }
+}
+
+#[test]
+fn an_at_most_that_names_no_other_number_of_its_unit_or_a_lower_default_is_refused_naming_the_field() {
+    let refused = [
+        (
+            "a field that does not exist",
+            pair! {
+                { #[param(default = 10.0, unit = px, min = 0, max = 99, at_most = tall)] low: f32, },
+                { #[param(default = 90.0, unit = px, min = 0, max = 99)] high: f32, }
+            },
+            &["low", "tall"][..],
+        ),
+        (
+            "the field itself",
+            pair! {
+                { #[param(default = 10.0, unit = px, min = 0, max = 99, at_most = low)] low: f32, },
+                { #[param(default = 90.0, unit = px, min = 0, max = 99)] high: f32, }
+            },
+            &["low", "another number"],
+        ),
+        (
+            "a switch",
+            pair! {
+                { #[param(default = 10.0, unit = px, min = 0, max = 99, at_most = high)] low: f32, },
+                { #[param(default = true)] high: bool, }
+            },
+            &["low", "high", "another number"],
+        ),
+        (
+            "another unit",
+            pair! {
+                { #[param(default = 10.0, unit = px, min = 0, max = 99, at_most = high)] low: f32, },
+                { #[param(default = 90.0, unit = degrees, min = 0, max = 99)] high: f32, }
+            },
+            &["low", "high", "degrees"],
+        ),
+        (
+            "a default above the limit's",
+            pair! {
+                { #[param(default = 50.0, unit = px, min = 0, max = 99, at_most = high)] low: f32, },
+                { #[param(default = 40.0, unit = px, min = 0, max = 99)] high: f32, }
+            },
+            &["low", "high", "default"],
+        ),
+        (
+            "a field that is no number",
+            pair! {
+                { #[param(default = true, at_most = high)] low: bool, },
+                { #[param(default = 90.0, unit = px, min = 0, max = 99)] high: f32, }
+            },
+            &["low", "at_most"],
+        ),
+    ];
+    for (rule, input, named) in &refused {
+        let error = expanded(input).err();
+        assert!(
+            error
+                .as_deref()
+                .is_some_and(|text| named.iter().all(|name| text.contains(name))),
+            "{rule}: {error:?}"
+        );
+    }
+}

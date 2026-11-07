@@ -115,3 +115,23 @@ def test_the_schema_accepts_a_field_and_an_optional_colour_as_the_core_writes_th
         "advanced": False,
     } | extra
     assert [error.message for error in SCHEMA.iter_errors(field)] == []
+
+
+def test_the_schema_accepts_a_number_limited_by_another_as_the_core_writes_it():
+    """`at_most` is a key image adds (crates/core/src/params.rs); the format says a reader ignores a key it does not
+    know, so the schema takes the parameter as it takes any number."""
+    field = {
+        "name": "band_min_height",
+        "kind": "float",
+        "meaning": "The lowest a band can be.",
+        "default": 10,
+        "unit": "px",
+        "min": 0,
+        "max": 2000,
+        "cyclic": False,
+        "choices": [],
+        "at_most": "band_max_height",
+        "drivable": False,
+        "advanced": False,
+    }
+    assert [error.message for error in SCHEMA.iter_errors(field)] == []

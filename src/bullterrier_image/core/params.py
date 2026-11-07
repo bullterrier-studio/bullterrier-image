@@ -56,6 +56,7 @@ from pydantic import (
     ConfigDict,
     Field,
     ValidationError,
+    model_validator,
 )
 from pydantic.fields import FieldInfo
 from pydantic.json_schema import DEFAULT_REF_TEMPLATE, GenerateJsonSchema, JsonSchemaMode
@@ -97,6 +98,7 @@ class _Spec:
     advanced: bool
     drivable: bool = False
     cyclic: bool = False
+    at_most: str | None = None
     field_kwargs: dict[str, Any] = field(default_factory=dict)
 
 
@@ -110,6 +112,7 @@ def param(
     advanced: bool = False,
     drivable: bool = False,
     cyclic: bool = False,
+    at_most: str | None = None,
     **field_kwargs: Any,
 ) -> Any:
     """Declare one field of an `EffectParams` model.
@@ -123,11 +126,13 @@ def param(
     pixel; declare it only where the effect's output changes smoothly with the value. Only a float can be.
     cyclic: an angle in degrees whose value and the value a turn (360) further mean the same picture; `min` to `max`
     must be exactly one turn, and a value outside it is stored as the same direction inside it (a value inside, the
-    bounds included, is kept). field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
+    bounds included, is kept). at_most: the name of another number field of the model, in the same unit, that this
+    one may not exceed (a lowest height below the highest); checked when a model is made, whichever of the two is
+    given. field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
 
     The rules are checked when the model class is made; a violation raises `ValueError` naming the model and the field.
     """
-    return _Spec(default, doc, unit, min, max, advanced, drivable, cyclic, field_kwargs)
+    return _Spec(default, doc, unit, min, max, advanced, drivable, cyclic, at_most, field_kwargs)
 
 
 def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> str:
@@ -337,9 +342,27 @@ class EffectParams(ValidatedModel):
 
     @classmethod
     def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
-        """Prove that the defaults themselves validate (a default colour of the wrong form, say)."""
+        """Prove that the defaults themselves validate (a default colour of the wrong form, say), and that every
+        `at_most` names another field of the model."""
         super().__pydantic_init_subclass__(**kwargs)
+        for name, info in cls.model_fields.items():
+            other = _extra(info).get("at_most")
+            if other is not None and (other == name or other not in cls.model_fields):
+                raise ValueError(
+                    f"parameter model {cls.__name__!r}, field `{name}`: at_most names `{other}`, "
+                    "which is not another field"
+                )
         cls.parse({}, f"the defaults of {cls.__name__!r}")
+
+    @model_validator(mode="after")
+    def _numbers_within_their_limits(self) -> Self:
+        """A number declared `at_most=other` may not exceed `other`: the rule `Table::check` applies to a Rust
+        declaration, refused naming both and their values."""
+        for name, info in type(self).model_fields.items():
+            other = _extra(info).get("at_most")
+            if other is not None and getattr(self, name) > getattr(self, other):
+                raise ValueError(f"`{name}` ({getattr(self, name)}) must not exceed `{other}` ({getattr(self, other)})")
+        return self
 
     @classmethod
     def fields_doc(cls) -> tuple[FieldDoc, ...]:
@@ -446,6 +469,7 @@ def core_field(effect: str, entry: dict[str, Any]) -> tuple[Any, Any]:
         advanced=entry["advanced"],
         drivable=entry["drivable"],
         cyclic=entry["cyclic"],
+        at_most=entry.get("at_most"),  # written for a limited number only
         **lengths,
     )
     return annotation, spec
@@ -666,6 +690,7 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
             "advanced": spec.advanced,
             "drivable": spec.drivable,
             "cyclic": spec.cyclic,
+            "at_most": spec.at_most,
         },
         **constraints,
         **spec.field_kwargs,

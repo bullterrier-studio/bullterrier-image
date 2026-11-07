@@ -39,6 +39,7 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
         )
     })?;
     let declared = fields.named.iter().map(declare).collect::<syn::Result<Vec<_>>>()?;
+    check_limits(&declared)?;
     let names = declared.iter().map(|declared| &declared.name);
     let values = declared.iter().map(|declared| &declared.value);
     let rows = declared.iter().map(|declared| &declared.row);
@@ -65,6 +66,44 @@ pub(crate) fn expand(input: &DeriveInput) -> syn::Result<TokenStream> {
     })
 }
 
+/// The `at_most` of every field, checked against the field it names: another number, in the same unit, whose default
+/// the field's own default does not exceed.
+fn check_limits(declared: &[Declared]) -> syn::Result<()> {
+    for field in declared {
+        let Some(Bounded {
+            unit,
+            at_most: Some(other),
+            default,
+        }) = &field.number
+        else {
+            continue;
+        };
+        let broken =
+            |problem: String| Error::new_spanned(&field.name, format!("parameter `{}`: {problem}", field.name));
+        let limit = declared
+            .iter()
+            .find(|candidate| candidate.name == *other && candidate.name != field.name)
+            .and_then(|candidate| candidate.number.as_ref())
+            .ok_or_else(|| {
+                broken(format!(
+                    "at_most names `{other}`, which is not another number parameter"
+                ))
+            })?;
+        if limit.unit != *unit {
+            return Err(broken(format!(
+                "at_most names `{other}`, which is in {}, not {unit}",
+                limit.unit
+            )));
+        }
+        if *default > limit.default {
+            return Err(broken(format!(
+                "the default is above the default of `{other}`, which it may not exceed"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// One field, declared: its name, the expression of its default value, its row of the table and the expression of its
 /// value as JSON.
 struct Declared {
@@ -72,6 +111,15 @@ struct Declared {
     value: TokenStream,
     row: TokenStream,
     write: TokenStream,
+    /// What the rules across the struct (`at_most`) need to know of a number.
+    number: Option<Bounded>,
+}
+
+/// A number field as the rules across the struct see it: its unit, the field it may not exceed and its default.
+struct Bounded {
+    unit: String,
+    at_most: Option<Ident>,
+    default: f64,
 }
 
 /// What a field's `#[param(..)]` attribute says.
@@ -83,6 +131,7 @@ struct Settings {
     max: Option<Expr>,
     min_length: Option<Expr>,
     max_length: Option<Expr>,
+    at_most: Option<Ident>,
     drivable: bool,
     advanced: bool,
     cyclic: bool,
@@ -251,6 +300,14 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     } = parts;
     let (label, cyclic, drivable, advanced) = (name.to_string(), settings.cyclic, settings.drivable, settings.advanced);
     let nullable = shape(ty) == Shape::OptionalColour;
+    let number = number_of(&settings, ty, &broken)?;
+    let at_most = number.as_ref().and_then(|number| number.at_most.as_ref()).map_or_else(
+        || quote!(::core::option::Option::None),
+        |other| {
+            let other = other.to_string();
+            quote!(::core::option::Option::Some(#other))
+        },
+    );
     let row = quote! {
         crate::params::Field {
             name: #label,
@@ -264,12 +321,44 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             choices: #choices,
             min_length: #min_length,
             max_length: #max_length,
+            at_most: #at_most,
             nullable: #nullable,
             drivable: #drivable,
             advanced: #advanced,
         }
     };
-    let write = match shape(ty) {
+    let write = value_as_json(shape(ty), name);
+    Ok(Declared {
+        name: name.clone(),
+        value,
+        row,
+        write,
+        number,
+    })
+}
+
+/// A number field's unit, `at_most` and default for the rules across the struct; none for any other kind, which takes no
+/// `at_most`.
+fn number_of(settings: &Settings, ty: &Type, broken: Broken<'_>) -> syn::Result<Option<Bounded>> {
+    let (Shape::Float | Shape::Int | Shape::Unsigned, Some(unit), Some(Written::Number(default))) =
+        (shape(ty), &settings.unit, settings.default.as_ref().and_then(written))
+    else {
+        return if settings.at_most.is_some() {
+            Err(broken("only a number takes at_most"))
+        } else {
+            Ok(None)
+        };
+    };
+    Ok(Some(Bounded {
+        unit: unit.to_string(),
+        at_most: settings.at_most.clone(),
+        default: default.as_f64(),
+    }))
+}
+
+/// The expression of the field `name`'s value as JSON, by the field's `shape`.
+fn value_as_json(shape: Shape, name: &Ident) -> TokenStream {
+    match shape {
         Shape::Float => quote!(crate::params::decimal(self.#name)),
         Shape::Colour => quote!(::serde_json::Value::Array(
             self.#name.0.iter().copied().map(crate::params::decimal).collect()
@@ -287,13 +376,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         Shape::Lut => quote!(self.#name.json()),
         Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
         Shape::Int | Shape::Unsigned | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
-    };
-    Ok(Declared {
-        name: name.clone(),
-        value,
-        row,
-        write,
-    })
+    }
 }
 
 /// A switch, a colour, a list of colours or a choice: no unit, no bounds, not cyclic, not drivable, and a default of its
@@ -519,12 +602,13 @@ fn settings(field: &Field, name: &Ident) -> syn::Result<Settings> {
             "max" => settings.max = Some(meta.value()?.parse()?),
             "min_length" => settings.min_length = Some(meta.value()?.parse()?),
             "max_length" => settings.max_length = Some(meta.value()?.parse()?),
+            "at_most" => settings.at_most = Some(meta.value()?.parse()?),
             "drivable" => settings.drivable = true,
             "advanced" => settings.advanced = true,
             "cyclic" => settings.cyclic = true,
             _ => {
                 return Err(meta.error(format!(
-                    "parameter `{name}`: `{key}` is not a setting; they are default, unit, min, max, min_length, max_length, drivable, advanced, cyclic"
+                    "parameter `{name}`: `{key}` is not a setting; they are default, unit, min, max, min_length, max_length, at_most, drivable, advanced, cyclic"
                 )));
             }
         }

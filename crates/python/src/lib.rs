@@ -140,7 +140,7 @@ fn effects(declared: bool) -> Vec<String> {
 /// The parameters of the effect called `effect`, as its Rust struct declares them: a dict `{"doc": str, "fields":
 /// [...]}`, each field a dict with `name`, `kind` (`"float"`, `"int"`, `"bool"`, `"choice"`, `"color"`, `"colors"` or `"lut"`),
 /// `meaning`, `default`, `unit`, `min`, `max`, `cyclic`, `choices`, `drivable` and `advanced`, and, for a list of colours
-/// only, `min_length` and (when it has a ceiling) `max_length`. A default or bound is the literal the declaration wrote,
+/// only, `min_length` and (when it has a ceiling) `max_length`, and, for a number limited by another, `at_most` (its name). A default or bound is the literal the declaration wrote,
 /// a whole number an `int` and a decimal a `float`; a colour's default is its `'#rrggbb'` text, a list's a list of
 /// those, a choice's its name and a lookup table's `None` (the identity table).
 ///

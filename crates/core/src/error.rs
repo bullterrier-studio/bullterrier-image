@@ -206,6 +206,8 @@ pub enum Constraint {
     AtLeast(Scalar),
     /// The value is above the highest the parameter takes (inclusive).
     AtMost(Scalar),
+    /// The value is above the value of this other parameter, which it may not exceed.
+    AtMostField(&'static str, Scalar),
     /// The value is none of these names.
     OneOf(&'static [&'static str]),
     /// A colour is `'#rrggbb'`, `'#rgb'` or three numbers from 0 to 1.
@@ -307,6 +309,7 @@ impl fmt::Display for Constraint {
             Self::TrueOrFalse => formatter.write_str("must be true or false"),
             Self::AtLeast(low) => write!(formatter, "must be >= {low}"),
             Self::AtMost(high) => write!(formatter, "must be <= {high}"),
+            Self::AtMostField(other, limit) => write!(formatter, "must not exceed `{other}` ({limit})"),
             Self::OneOf(names) => write!(formatter, "must be one of {}", names.join(", ")),
             Self::Colour => formatter.write_str("must be '#rrggbb', '#rgb' or three numbers from 0 to 1"),
             Self::ColourList => formatter.write_str("must be a list of colours"),

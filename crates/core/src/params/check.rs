@@ -35,7 +35,8 @@ impl Table {
             let declared = self.fields.iter().map(|field| field.name).collect();
             return Err(invalid(name, Constraint::Unknown(declared), value));
         }
-        self.fields
+        let checked: Map<String, Value> = self
+            .fields
             .iter()
             .map(|field| {
                 let value = given.get(field.name).cloned().unwrap_or_else(|| field.default.value());
@@ -44,7 +45,22 @@ impl Table {
                     .map(|normal| (field.name.to_owned(), normal))
                     .map_err(|constraint| invalid(field.name, constraint, &value))
             })
-            .collect()
+            .collect::<Result<_, _>>()?;
+        // each value is in range; now the pairs: a field may not exceed the one it names (declared numbers, so present)
+        for field in &self.fields {
+            let Some(other) = field.at_most else { continue };
+            if let (Some(value), Some(limit)) = (checked.get(field.name), checked.get(other))
+                && let (Some(low), Some(high)) = (value.as_f64(), limit.as_f64())
+                && low > high
+            {
+                return Err(invalid(
+                    field.name,
+                    Constraint::AtMostField(other, Scalar::of(limit)),
+                    value,
+                ));
+            }
+        }
+        Ok(checked)
     }
 }
 
@@ -57,6 +73,13 @@ impl Scalar {
             Self::Float(real) => Some(real),
             Self::Bool(_) | Self::Text(_) | Self::List(_) | Self::Null => None,
         }
+    }
+
+    /// The number `value` holds, as the kind of literal a declaration would write: whole if it is whole.
+    fn of(value: &Value) -> Self {
+        value
+            .as_i64()
+            .map_or_else(|| Self::Float(value.as_f64().unwrap_or_default()), Self::Int)
     }
 
     /// The value as JSON.

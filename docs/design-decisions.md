@@ -842,6 +842,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     place p equal seed s' at place p ^ s ^ s'; fixed for every user, `torn` edges included).
   - *A seed is a `u32`* (the derive's `u32`, parameter kind `int`, range 0..4294967295 as the Python models had): no seed is
     narrowed to `i32`.
+  - *`at_most = other` declares that a number may not exceed another* (`band_min_height` below `band_max_height`): the lowest
+    of a pair of limits cannot be a `min` of its own range, since the other is a value. `Table::check` applies it after each value is
+    in range, whichever of the two is given, and the Python model derives it from the table (`Field.at_most`, written only when
+    set). The parameter format is not extended: its readers ignore a key they do not know, and `test_parameter_format.py` proves
+    the schema takes it. The derive refuses an `at_most` that names no other number, another unit or a lower default.
 
 ## Effects
 
