@@ -113,6 +113,11 @@ ROWS = [
     pytest.param("swirl", {"angle": -720, "radius": 2}, True, id="swirl: lowest angle, widest radius"),
     pytest.param("swirl", {"angle": 720.5}, False, id="swirl: above the highest angle"),
     pytest.param("swirl", {"x": -0.01}, False, id="swirl: a centre left of the picture"),
+    pytest.param(
+        "ripple", {"wavelength": 2, "amplitude": 500}, True, id="ripple: shortest wavelength, largest amplitude"
+    ),
+    pytest.param("ripple", {"wavelength": 1.99}, False, id="ripple: below the shortest wavelength"),
+    pytest.param("ripple", {"phase": 181, "angle": 725}, True, id="ripple: cyclic angles past their ends wrap"),
 ]
 
 

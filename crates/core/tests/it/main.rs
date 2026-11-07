@@ -75,6 +75,7 @@ mod region_check;
 mod registry;
 mod render;
 mod resample;
+mod ripple;
 mod rotate;
 mod rounding;
 mod run_frame;

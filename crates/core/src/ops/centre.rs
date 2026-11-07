@@ -19,6 +19,10 @@ pub(crate) struct Centre {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Spot {
     centre: Centre,
+    /// The pixel's row, from the top: 0 for the first.
+    pub(crate) row: f64,
+    /// The pixel's column, from the left: 0 for the first.
+    pub(crate) column: f64,
     /// How far below the centre the pixel is, in pixels (above is negative).
     pub(crate) down: f64,
     /// How far right of the centre the pixel is, in pixels (left is negative).
@@ -51,11 +55,13 @@ impl Centre {
         let mut out = vec![[0.0; 3]; height * width];
         par::rows(&mut out, width, |first_row, band| {
             for (at, pixel) in band.iter_mut().enumerate() {
-                let (row, column) = (first_row + at / width, at % width);
+                let (row, column) = ((first_row + at / width) as f64, (at % width) as f64);
                 let (read_row, read_column) = source(Spot {
                     centre: self,
-                    down: row as f64 - self.row,
-                    across: column as f64 - self.column,
+                    row,
+                    column,
+                    down: row - self.row,
+                    across: column - self.column,
                 });
                 *pixel = sampler
                     .at(read_row, read_column)

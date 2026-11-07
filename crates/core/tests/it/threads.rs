@@ -285,6 +285,14 @@ fn cases() -> Vec<Case> {
                     .param("interpolation", "bicubic")
                     .param("edge", "mirror"),
                 Step::new("swirl").param("angle", 200).param("interpolation", "nearest"),
+                Step::new("ripple")
+                    .param("wavelength", 9.5)
+                    .param("amplitude", 14)
+                    .param("phase", -50)
+                    .param("angle", 37)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap"),
+                Step::new("ripple").param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
