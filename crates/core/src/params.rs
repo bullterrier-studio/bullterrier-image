@@ -53,7 +53,7 @@ mod derived;
 pub use bullterrier_image_derive::{Choice, Params};
 
 /// The names a choice picks from, in declaration order: what `#[derive(Choice)]` implements for a fieldless enum. The
-/// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `bool`, `Color`, `Option<Color>`,
+/// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `u32`, `bool`, `Color`, `Option<Color>`,
 /// `Vec<Color>`, `FieldName` and `LutName` by their written names.
 pub trait Choice {
     /// The names, in `snake_case`.
@@ -143,7 +143,7 @@ pub struct Field {
 pub enum Kind {
     /// A decimal number (`f32`).
     Float,
-    /// A whole number (`i32`).
+    /// A whole number (`i32` or `u32`).
     Int,
     /// A switch.
     Bool,

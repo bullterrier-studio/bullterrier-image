@@ -82,8 +82,8 @@ pub struct Params {
     pub variation: f32,
     /// Random seed for `spacing` and `variation`: the same seed picks the same points of the same picture, another seed
     /// others.
-    #[param(default = 0, unit = count, min = 0, max = 2147483647, advanced)]
-    pub seed: i32,
+    #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
+    pub seed: u32,
     /// The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour of the light that makes them.
     #[param(default = "#ffffff")]
     pub color: Color,
@@ -154,7 +154,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let chance = if sparse { 1.0 / (spacing * spacing) } else { 1.0 }; // constant: a chance of 1 is every pixel
     let weight = if sparse { 1.0 } else { 1.0 / (ratio * ratio) }; // constant: a weight of 1 leaves a point's light as it is
     let variation = f64::from(params.variation);
-    let seed = params.seed.cast_unsigned();
+    let seed = params.seed;
     // The draws are of the pixel's place and the seed: a point keeps its draw while the picture around it changes.
     let draw = |index: usize, which: u64| unit(mix(seed, &[index as u64, which]));
     let bright: Vec<[f32; 3]> = picture

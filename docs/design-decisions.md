@@ -840,8 +840,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *The core's random streams are its own* (`ops/random.rs`, hashed from seed and place), never NumPy's: `light_leak` and
     `starburst` draw other patches than they did. The hash scrambles the seed first (a seed xored into the place made seed s at
     place p equal seed s' at place p ^ s ^ s'; fixed for every user, `torn` edges included).
-  - *Seeds are `i32` in the core* (no `u32` kind): `light_leak.seed` and `starburst.seed` stop at 2147483647. A `u32` kind is E4's
-    first job (every noise effect is seeded).
+  - *A seed is a `u32`* (the derive's `u32`, parameter kind `int`, range 0..4294967295 as the Python models had): no seed is
+    narrowed to `i32`.
 
 ## Effects
 

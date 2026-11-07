@@ -11,9 +11,9 @@
 //!   `min_length` (at least 1) is required, `max_length` optional, and the default's length lies within both. A
 //!   `LutName` is a 3D lookup table and an `Option<Color>` a colour that may be left out: each is written `#[param()]`,
 //!   because its default is always none and a `default` is refused. A `FieldName` is the name of a selection, with a
-//!   non-empty name for its default. It recognises `f32`, `i32`, `bool`, `Color`, `Option<Color>`, `Vec<Color>`,
+//!   non-empty name for its default. It recognises `f32`, `i32`, `u32`, `bool`, `Color`, `Option<Color>`, `Vec<Color>`,
 //!   `FieldName` and `LutName` by those written names and takes any other type for a
-//!   choice enum: `f64`, `u32`, `Option<f32>` or an alias of `f32` (`type Real = f32`) is not recognised, and a number
+//!   choice enum: `f64`, `u64`, `Option<f32>` or an alias of `f32` (`type Real = f32`) is not recognised, and a number
 //!   declaration on one is refused with an error naming the type. Left to others: an unknown `unit` is rustc's own
 //!   error ("no variant `Banana` found for enum `params::Unit`"), which is adequate, and that a choice's doc names every
 //!   variant is checked when Python builds the model.

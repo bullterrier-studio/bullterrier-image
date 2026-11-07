@@ -89,6 +89,12 @@ ROWS = [
     pytest.param("gradient_map", {"stops": []}, False, id="gradient_map: an empty list"),
     pytest.param("gradient_map", {"stops": "#000000"}, False, id="gradient_map: a colour for a list"),
     pytest.param("gradient", {"colors": ["#102030"]}, True, id="gradient: one colour is a flat fill"),
+    # a seed is a whole number of 32 bits, unsigned
+    pytest.param("light_leak", {"seed": 2**32 - 1}, True, id="light_leak: highest seed"),
+    pytest.param("light_leak", {"seed": 2**32}, False, id="light_leak: above the highest seed"),
+    pytest.param("light_leak", {"seed": -1}, False, id="light_leak: negative seed"),
+    pytest.param("starburst", {"seed": 2**32 - 1}, True, id="starburst: highest seed"),
+    pytest.param("starburst", {"seed": 2**32}, False, id="starburst: above the highest seed"),
     # a choice of thirteen, and the whole number and switch of a generated picture
     # an optional colour: none, which is also the default, and any spelling of a colour; nothing else
     pytest.param("bloom", {"color": None}, True, id="bloom: no colour"),

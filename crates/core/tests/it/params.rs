@@ -3,7 +3,7 @@
 //! `common::recipe::probe_table`, a table written by hand with one parameter of every kind.
 
 use crate::common::recipe::probe_table;
-use bullterrier_image::effects::{grade, pattern, pixel_grid};
+use bullterrier_image::effects::{grade, light_leak, pattern, pixel_grid};
 use bullterrier_image::params::{Choice, Color, Declared, EffectParams, Scalar};
 use bullterrier_image::{Constraint, Error};
 use serde_json::{Map, Value, json};
@@ -479,4 +479,28 @@ fn the_given_map_is_left_as_it_was() {
     let before = given.clone();
     assert!(probe_table().check("probe", &given).is_ok());
     assert_eq!(given, before);
+}
+
+#[test]
+fn a_seed_takes_every_unsigned_32_bit_number_and_nothing_below_or_above() {
+    let seed = |value: Value| {
+        let given = json!({ "seed": value }).as_object().cloned().unwrap_or_default();
+        light_leak::Params::table()
+            .check("light_leak", &given)
+            .map(|checked| checked["seed"].clone())
+    };
+    assert_eq!(seed(json!(0)).ok(), Some(json!(0)));
+    assert_eq!(seed(json!(u32::MAX)).ok(), Some(json!(u32::MAX)));
+    for beyond in [json!(i64::from(u32::MAX) + 1), json!(-1)] {
+        assert!(
+            matches!(seed(beyond.clone()), Err(Error::Invalid { field, .. }) if field == "seed"),
+            "{beyond} is no seed"
+        );
+    }
+    // the typed struct holds the highest seed and writes it back as written
+    let params = light_leak::Params {
+        seed: u32::MAX,
+        ..light_leak::Params::default()
+    };
+    assert_eq!(params.values()["seed"], json!(u32::MAX));
 }

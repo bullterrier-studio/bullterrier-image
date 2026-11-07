@@ -43,6 +43,8 @@ fn a_complete_declaration_is_accepted_for_every_kind_of_field() {
         documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: i32, },
         // a whole number may span all of i32
         documented! { #[param(default = 0, unit = count, min = -2147483648, max = 2147483647)] cells: i32, },
+        // an unsigned whole number may span all of u32
+        documented! { #[param(default = 0, unit = count, min = 0, max = 4294967295)] seed: u32, },
         // the bounds are inclusive: a default may sit on either
         documented! { #[param(default = 0.0, unit = px, min = 0, max = 32)] low: f32, },
         documented! { #[param(default = 32.0, unit = px, min = 0, max = 32)] high: f32, },
@@ -183,6 +185,21 @@ fn a_number_that_breaks_its_range_is_refused_naming_the_field() {
             "a whole number whose default is beyond i32",
             documented! { #[param(default = 5000000000, unit = count, min = 3, max = 6000000000)] cells: i32, },
             &["cells", "i32"],
+        ),
+        (
+            "an unsigned whole number whose max is beyond u32",
+            documented! { #[param(default = 0, unit = count, min = 0, max = 4294967296)] seed: u32, },
+            &["seed", "max", "u32"],
+        ),
+        (
+            "an unsigned whole number whose min is negative",
+            documented! { #[param(default = 0, unit = count, min = -1, max = 32)] seed: u32, },
+            &["seed", "min", "u32"],
+        ),
+        (
+            "an unsigned whole number whose default is beyond u32",
+            documented! { #[param(default = 4294967296, unit = count, min = 0, max = 4294967297)] seed: u32, },
+            &["seed", "u32"],
         ),
         (
             "a whole number that is drivable",
@@ -454,9 +471,9 @@ fn a_type_the_derive_does_not_know_is_refused_naming_the_field_and_the_type() {
             &["cell", "`f64`"],
         ),
         (
-            "u32 is not a whole number the derive knows",
-            documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: u32, },
-            &["cells", "`u32`"],
+            "u64 is not a whole number the derive knows",
+            documented! { #[param(default = 4, unit = count, min = 3, max = 32)] cells: u64, },
+            &["cells", "`u64`"],
         ),
         (
             "an optional number is not a number",
@@ -466,7 +483,7 @@ fn a_type_the_derive_does_not_know_is_refused_naming_the_field_and_the_type() {
         (
             "an alias of f32 is not recognised by its name",
             documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: Real, },
-            &["cell", "`Real`", "(a number is f32 or i32)"],
+            &["cell", "`Real`", "(a number is f32, i32 or u32)"],
         ),
         (
             "an unknown type with a number for its default",

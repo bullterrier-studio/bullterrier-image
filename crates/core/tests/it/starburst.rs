@@ -5,7 +5,6 @@
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::cast_precision_loss,
-    clippy::cast_sign_loss,
     reason = "small picture sizes and kernel reaches"
 )]
 
@@ -385,7 +384,7 @@ fn each_bright_pixel_radiates_with_the_chance_one_over_spacing_squared_from_its_
         seed: 4,
         ..Params::default()
     };
-    let share = |spacing: f32, seed: i32| -> Result<f32, Error> {
+    let share = |spacing: f32, seed: u32| -> Result<f32, Error> {
         let out = spikes(
             &Params {
                 spacing,

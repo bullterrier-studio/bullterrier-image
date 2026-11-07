@@ -134,13 +134,14 @@ enum Written {
     Name(Ident),
 }
 
-/// How the derive reads a field's type: it recognises `f32`, `i32`, `bool`, `Color`, `Option<Color>`, `Vec<Color>`,
+/// How the derive reads a field's type: it recognises `f32`, `i32`, `u32`, `bool`, `Color`, `Option<Color>`, `Vec<Color>`,
 /// `FieldName` and `LutName` by their written names (a type alias is not recognised) and takes any other type for a
 /// choice enum, whose names come from its `Choice` impl.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
     Float,
     Int,
+    Unsigned,
     Switch,
     Colour,
     OptionalColour,
@@ -158,6 +159,7 @@ fn shape(ty: &Type) -> Shape {
     match last.ident.to_string().as_str() {
         "f32" => Shape::Float,
         "i32" => Shape::Int,
+        "u32" => Shape::Unsigned,
         "bool" => Shape::Switch,
         "Color" => Shape::Colour,
         "LutName" => Shape::Lut,
@@ -232,7 +234,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             )
         })?;
         match shape(ty) {
-            Shape::Float | Shape::Int => number_parts(&settings, &written, shape(ty), &broken)?,
+            Shape::Float | Shape::Int | Shape::Unsigned => number_parts(&settings, &written, shape(ty), &broken)?,
             other => other_parts(&settings, &written, other, ty, &broken)?,
         }
     };
@@ -284,7 +286,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         Shape::Field => quote!(::serde_json::Value::from(self.#name.0.clone())),
         Shape::Lut => quote!(self.#name.json()),
         Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
-        Shape::Int | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
+        Shape::Int | Shape::Unsigned | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
     };
     Ok(Declared {
         name: name.clone(),
@@ -309,8 +311,8 @@ fn other_parts(
         if shape == Shape::Choice {
             let ty = ty.to_token_stream().to_string().replace(' ', "");
             broken(&format!(
-                "`{ty}` is not f32, i32, bool, Color, Option<Color>, Vec<Color>, FieldName or LutName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
-                 (a number is f32 or i32)"
+                "`{ty}` is not f32, i32, u32, bool, Color, Option<Color>, Vec<Color>, FieldName or LutName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
+                 (a number is f32, i32 or u32)"
             ))
         } else {
             broken(problem)
@@ -405,7 +407,7 @@ fn unset_parts(
     })
 }
 
-/// A decimal (`f32`) or whole (`i32`) number: a unit, both bounds, a default inside them.
+/// A decimal (`f32`) or whole (`i32` or `u32`) number: a unit, both bounds, a default inside them.
 fn number_parts(settings: &Settings, written: &Written, shape: Shape, broken: Broken<'_>) -> syn::Result<Parts> {
     let Written::Number(number) = *written else {
         return Err(broken("the default of a number is a number"));
@@ -415,13 +417,14 @@ fn number_parts(settings: &Settings, written: &Written, shape: Shape, broken: Br
             "a number needs a unit and both min and max (its documented range)",
         ));
     };
-    let whole = shape == Shape::Int;
+    let whole = shape != Shape::Float;
+    let kind_name = if shape == Shape::Unsigned { "u32" } else { "i32" };
     let check = |number: Number, what: &str| match number {
         Number::Float(_) if whole => Err(broken(&format!(
             "a whole number takes whole numbers, and its {what} is a decimal"
         ))),
-        Number::Int(value) if whole && i32::try_from(value).is_err() => {
-            Err(broken(&format!("its {what} does not fit i32")))
+        Number::Int(value) if whole && !fits(value, shape) => {
+            Err(broken(&format!("its {what} does not fit {kind_name}")))
         }
         _ => Ok(number),
     };
@@ -444,7 +447,7 @@ fn number_parts(settings: &Settings, written: &Written, shape: Shape, broken: Br
             "only a decimal number (f32) can be drivable, and this is a whole number",
         ));
     }
-    let value = number_value(number, whole).ok_or_else(|| broken("the default does not fit i32"))?;
+    let value = number_value(number, shape).ok_or_else(|| broken(&format!("the default does not fit {kind_name}")))?;
     let unit = Ident::new(&capitalised(&unit.to_string()), unit.span());
     let (low, high) = (low.scalar(), high.scalar());
     let kind = if whole { quote!(Int) } else { quote!(Float) };
@@ -461,17 +464,25 @@ fn number_parts(settings: &Settings, written: &Written, shape: Shape, broken: Br
     })
 }
 
-/// The expression of `number` as a field value: an `i32` literal for a whole number, else an `f32` one.
+/// Whether the whole number `value` fits the type of `shape` (`i32` or `u32`).
+fn fits(value: i64, shape: Shape) -> bool {
+    match shape {
+        Shape::Unsigned => u32::try_from(value).is_ok(),
+        _ => i32::try_from(value).is_ok(),
+    }
+}
+
+/// The expression of `number` as a field value: a literal of the field's own type.
 #[expect(
     clippy::cast_possible_truncation,
     reason = "an f32 field holds the nearest f32 to the decimal written"
 )]
-fn number_value(number: Number, whole: bool) -> Option<TokenStream> {
-    let literal = if whole {
-        let Number::Int(value) = number else { return None };
-        Literal::i32_suffixed(i32::try_from(value).ok()?)
-    } else {
-        Literal::f32_suffixed(number.as_f64() as f32)
+fn number_value(number: Number, shape: Shape) -> Option<TokenStream> {
+    let literal = match (shape, number) {
+        (Shape::Float, _) => Literal::f32_suffixed(number.as_f64() as f32),
+        (Shape::Unsigned, Number::Int(value)) => Literal::u32_suffixed(u32::try_from(value).ok()?),
+        (_, Number::Int(value)) => Literal::i32_suffixed(i32::try_from(value).ok()?),
+        _ => return None,
     };
     Some(quote!(#literal))
 }

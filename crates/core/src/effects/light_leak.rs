@@ -50,8 +50,8 @@ pub struct Params {
     pub blobs: i32,
     /// Random seed: the same seed always gives the same leak (the same patches in the same places), another seed a
     /// different one.
-    #[param(default = 0, unit = count, min = 0, max = 2147483647)]
-    pub seed: i32,
+    #[param(default = 0, unit = count, min = 0, max = 4294967295)]
+    pub seed: u32,
 }
 
 /// One patch of light, in px: where its peak lies (in from the side, and along it from the middle), its widths in
@@ -67,7 +67,7 @@ struct Patch {
 /// The patches `params` asks for, drawn from its seed. `half_edge` is how far the picture reaches along the side from
 /// its middle.
 fn patches(params: &Params, half_edge: f64) -> Vec<Patch> {
-    let mut rng = Rng::seeded(params.seed.cast_unsigned());
+    let mut rng = Rng::seeded(params.seed);
     let size = f64::from(params.size);
     (0..params.blobs)
         .map(|_| {
