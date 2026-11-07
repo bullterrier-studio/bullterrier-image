@@ -1,5 +1,5 @@
-//! Rank filters: [`minimum_filter`] replaces each value by the smallest in the square around it, as scipy's
-//! `ndimage.minimum_filter` does.
+//! Rank filters: [`minimum_filter`] and [`maximum_filter`] replace each value by the smallest or the largest in the square
+//! around it, as scipy's `ndimage.minimum_filter` and `maximum_filter` do.
 
 use super::blur::transposed;
 use super::edge::Extension;
@@ -20,6 +20,21 @@ pub(crate) fn minimum_filter(values: &[f32], height: usize, width: usize, size: 
     drop(along);
     smooth_rows(&mut down, height, size, edge);
     transposed(&down, width, height)
+}
+
+/// [`minimum_filter`] with the largest value of each window in place of the smallest.
+pub(crate) fn maximum_filter(values: &[f32], height: usize, width: usize, size: usize, edge: Extension) -> Vec<f32> {
+    // the largest of a window is the smallest of the negated values, negated back (exact in floating point)
+    let negated: Vec<f32> = values.iter().map(|value| -value).collect();
+    let edge = match edge {
+        Extension::Constant(value) => Extension::Constant(-value),
+        other => other,
+    };
+    let mut out = minimum_filter(&negated, height, width, size, edge);
+    for value in &mut out {
+        *value = -*value;
+    }
+    out
 }
 
 /// Each line of `len` values in `lines` replaced by the smallest value in the `size` values around each of its own.
@@ -81,7 +96,7 @@ mod tests {
     //! edge is found by folding an index back into the line one bounce at a time (the filter finds it by modular
     //! arithmetic). The filter is private to the core, and the effect that uses it shows only a combination of it with others.
 
-    use super::minimum_filter;
+    use super::{maximum_filter, minimum_filter};
     use crate::ops::edge::Extension;
 
     /// A different value at nearly every place, 0..1.
@@ -120,25 +135,37 @@ mod tests {
         usize::try_from(found).ok()
     }
 
-    /// The smallest value in the `size` x `size` window around every place, by looking at all of them.
-    fn brute_force(values: &[f32], height: usize, width: usize, size: usize, rule: Extension) -> Vec<f32> {
+    /// The smallest (or the `largest`) value in the `size` x `size` window around every place, by looking at all of them.
+    fn brute_force(
+        values: &[f32],
+        height: usize,
+        width: usize,
+        size: usize,
+        rule: Extension,
+        largest: bool,
+    ) -> Vec<f32> {
+        let (start, keep): (f32, fn(f32, f32) -> f32) = if largest {
+            (f32::NEG_INFINITY, f32::max)
+        } else {
+            (f32::INFINITY, f32::min)
+        };
         let (h, w, s) = (height.cast_signed(), width.cast_signed(), size.cast_signed());
         let mut out = Vec::new();
         for row in 0..h {
             for column in 0..w {
-                let mut smallest = f32::INFINITY;
+                let mut kept = start;
                 for y in row - s / 2..row + s - s / 2 {
                     for x in column - s / 2..column + s - s / 2 {
                         let at = source(rule, y, h).zip(source(rule, x, w));
                         let beyond = if let Extension::Constant(value) = rule {
                             value
                         } else {
-                            f32::INFINITY
+                            start
                         };
-                        smallest = smallest.min(at.map_or(beyond, |(y, x)| values[y * width + x]));
+                        kept = keep(kept, at.map_or(beyond, |(y, x)| values[y * width + x]));
                     }
                 }
-                out.push(smallest);
+                out.push(kept);
             }
         }
         out
@@ -153,23 +180,32 @@ mod tests {
     ];
 
     #[test]
-    fn the_minimum_is_that_of_every_window_for_every_rule_size_and_shape() {
+    fn the_extreme_is_that_of_every_window_for_every_rule_size_and_shape() {
         // pictures from one pixel to a few, thin ones, with windows from 1 to far wider than the picture, even and odd
         let shapes = [(1, 1), (1, 7), (7, 1), (2, 3), (3, 2), (5, 4), (4, 9), (9, 4), (11, 13)];
         for rule in RULES {
             for (height, width) in shapes {
                 let picture = values(height, width);
                 for size in 1..=17 {
-                    let found = minimum_filter(&picture, height, width, size, rule);
-                    let expected = brute_force(&picture, height, width, size, rule);
-                    assert!(
-                        found == expected,
-                        "{rule:?}, {height} x {width}, size {size}: first differs at {:?}",
-                        found
-                            .iter()
-                            .zip(&expected)
-                            .position(|(a, b)| a.to_bits() != b.to_bits())
-                    );
+                    for (name, largest, filter) in [
+                        (
+                            "minimum",
+                            false,
+                            minimum_filter as fn(&[f32], usize, usize, usize, Extension) -> Vec<f32>,
+                        ),
+                        ("maximum", true, maximum_filter),
+                    ] {
+                        let found = filter(&picture, height, width, size, rule);
+                        let expected = brute_force(&picture, height, width, size, rule, largest);
+                        assert!(
+                            found == expected,
+                            "{name}, {rule:?}, {height} x {width}, size {size}: first differs at {:?}",
+                            found
+                                .iter()
+                                .zip(&expected)
+                                .position(|(a, b)| a.to_bits() != b.to_bits())
+                        );
+                    }
                 }
             }
         }
@@ -179,10 +215,11 @@ mod tests {
     fn the_comparison_tells_a_filter_that_differs_apart() {
         // the known-bad pair: another rule, another size, and a window moved half a pixel are not the same minimum
         let picture = values(5, 6);
-        let found = brute_force(&picture, 5, 6, 4, Extension::Reflect);
-        assert_ne!(found, brute_force(&picture, 5, 6, 4, Extension::Wrap));
-        assert_ne!(found, brute_force(&picture, 5, 6, 5, Extension::Reflect));
+        let found = brute_force(&picture, 5, 6, 4, Extension::Reflect, false);
+        assert_ne!(found, brute_force(&picture, 5, 6, 4, Extension::Wrap, false));
+        assert_ne!(found, brute_force(&picture, 5, 6, 5, Extension::Reflect, false));
         assert_ne!(found, minimum_filter(&picture, 5, 6, 4, Extension::Mirror));
+        assert_ne!(found, brute_force(&picture, 5, 6, 4, Extension::Reflect, true));
     }
 
     #[test]

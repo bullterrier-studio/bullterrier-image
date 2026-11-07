@@ -354,6 +354,16 @@ fn cases() -> Vec<Case> {
                     .param("scale", 1)
                     .param("octaves", 1)
                     .param("interpolation", "nearest"),
+                Step::new("parallax")
+                    .param("field", "light")
+                    .param("angle", 33)
+                    .param("amount", 20)
+                    .param("focus", 0.3)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "mirror"),
+                Step::new("parallax")
+                    .param("field", "light")
+                    .param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

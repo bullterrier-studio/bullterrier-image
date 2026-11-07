@@ -162,6 +162,10 @@ ROWS = [
     ),
     pytest.param("displace", {"octaves": 0}, False, id="displace: no layer of noise"),
     pytest.param("displace", {"lacunarity": 0.9}, False, id="displace: layers coarser than the one before"),
+    pytest.param(
+        "parallax", {"angle": 725, "amount": 48, "field": "subject"}, True, id="parallax: cyclic angle, a field"
+    ),
+    pytest.param("parallax", {"amount": 48.1}, False, id="parallax: above the largest amount"),
 ]
 
 
