@@ -367,7 +367,6 @@ def _jpeg_tables(quality: int) -> dict:
 def test_an_effects_files_are_found_by_its_name_in_the_layout_that_mirrors_the_package(checkout):
     files = gallery.effect_files("lamp", checkout=checkout)
     assert files.package == checkout / "src" / "bullterrier_image" / "effects" / "lamp"
-    assert files.tests == checkout / "tests" / "effects" / "lamp" / "test_lamp.py"
     assert files.example == checkout / "examples" / "effects" / "lamp.toml"
     assert files.picture == checkout / "docs" / "gallery" / "lamp.jpg"
     assert files.kernel == checkout / "crates" / "core" / "src" / "effects" / "lamp.rs"

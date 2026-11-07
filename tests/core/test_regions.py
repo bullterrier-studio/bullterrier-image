@@ -78,8 +78,8 @@ def test_values_written_as_a_recipe_file_writes_them_are_accepted():
     assert from_file == from_script
     assert Shards(impact=[0.2, 0.8]).impact == (0.2, 0.8)
     assert Pick(pieces=np.array([2, 3])).pieces == (2, 3)
-    from_file = Cuts(lines=[{"x": 0.2, "y": 0.4, "angle": 330}, {"path": WAVE}], edge={"style": "torn"})
-    assert from_file == Cuts(lines=[Line(x=0.2, y=0.4, angle=330), Curve(path=WAVE)], edge=Edge(style="torn"))
+    cuts_from_file = Cuts(lines=[{"x": 0.2, "y": 0.4, "angle": 330}, {"path": WAVE}], edge={"style": "torn"})
+    assert cuts_from_file == Cuts(lines=[Line(x=0.2, y=0.4, angle=330), Curve(path=WAVE)], edge=Edge(style="torn"))
 
 
 def test_a_preset_sets_the_fields_and_a_field_given_beside_it_wins():
