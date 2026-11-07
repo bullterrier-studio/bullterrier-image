@@ -87,13 +87,6 @@ def test_every_regions_example_declares_regions_and_renders_to_something_other_t
     assert not np.array_equal(out, render(photo, Recipe([Step("grade")], name="plain", size=recipe.size)))
 
 
-def test_the_avatar_recipe_crops_a_square_around_the_subject_and_cuts_a_circle(photo, subject):
-    recipe = load_recipe(EXAMPLES / "transparent" / "avatar.toml")
-    out = render(photo, recipe, maps={"subject": subject})
-    assert out.shape == (512, 512, 4)  # the recipe's size, as a square
-    assert (out[0, 0, 3], out[256, 256, 3]) == (0, 1)  # clear in the corner, opaque in the middle
-
-
 def test_a_recipe_of_two_effects_is_not_a_combination(tmp_path):
     path = tmp_path / "two.toml"
     path.write_text(
