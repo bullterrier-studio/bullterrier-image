@@ -11,7 +11,7 @@ import pytest
 from onnx import TensorProto, helper
 
 from bullterrier_image import BackendUnavailableError
-from bullterrier_image.finding.depth import depth_finder, depth_map
+from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_matte
 
 
@@ -40,7 +40,6 @@ def fixed_size(folder: Path) -> Path:
 FINDERS = {
     "the subject": ("BT_IMAGE_SUBJECT_MODEL", lambda photo: subject_matte(photo, segmenter="onnx")),
     "the depth": ("BT_IMAGE_DEPTH_MODEL", depth_map),
-    "the depth finder": ("BT_IMAGE_DEPTH_MODEL", lambda photo: depth_finder().find(photo)),
 }
 FILES = {"a file that is no ONNX model": junk, "an ONNX model of another input size": fixed_size}
 

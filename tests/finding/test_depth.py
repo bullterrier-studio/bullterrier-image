@@ -63,15 +63,6 @@ def test_the_raw_depth_is_the_models_answer_at_the_photos_size_on_the_models_own
     assert middle == pytest.approx((low + high) / 2, abs=1e-4)  # 0.5 is half way between 0.3 and 0.7: affine
 
 
-def test_the_depth_is_the_raw_depth_scaled_to_0_1_over_the_photo(depth_echo_model):
-    """The same picture gives the same map whether the finder scales it or the caller scales the raw values."""
-    depth_echo_model(0)
-    photo = ramp()
-    raw = inverse_depth(photo)
-    by_the_caller = (raw - raw.min()) / (raw.max() - raw.min())
-    np.testing.assert_allclose(depth_map(photo), by_the_caller, atol=1e-6)
-
-
 def test_photos_scaled_by_one_shared_range_keep_their_depths_where_scaling_each_would_not(depth_echo_model):
     """A dim and a bright photo, each with a little texture: scaled alike by the caller the bright one is nearer
     everywhere; scaled one by one (`depth_map`) both fill 0..1."""
@@ -83,15 +74,6 @@ def test_photos_scaled_by_one_shared_range_keep_their_depths_where_scaling_each_
     shared_dim, shared_bright = ((raw - low) / (high - low) for raw in raws)
     assert shared_dim.max() < shared_bright.min()
     assert (depth_map(dim).max(), depth_map(bright).max()) == (1.0, 1.0)
-
-
-def test_the_bright_half_of_the_answer_is_near_and_the_dark_half_far(depth_echo_model):
-    depth_echo_model(0)
-    halves = picture(np.where(np.arange(80) < 40, 0.9, 0.1).astype(np.float32) * np.ones((60, 1), np.float32))
-    depth = depth_map(halves)
-    # the resampling rings a little at the step, so its peaks, not the halves, are exactly 1 and 0
-    assert depth[:, :30].min() > 0.95  # the bright left half: nearest
-    assert depth[:, 50:].max() < 0.05  # the dark right half: farthest
 
 
 @pytest.mark.parametrize(

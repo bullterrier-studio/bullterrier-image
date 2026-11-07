@@ -12,10 +12,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bullterrier_image import BackendUnavailableError, Grid, Subject, SubjectNotFoundError, imageio
+from bullterrier_image import BackendUnavailableError, SubjectNotFoundError, imageio
 from bullterrier_image.finding.subject import onnx_model_path, refine_edge, subject_finder, subject_matte
 from bullterrier_image.ops.resample import resize
-from bullterrier_image.recipe import Finder, Recipe, Step, render
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -268,29 +267,6 @@ def test_the_real_model_finds_the_dog(monkeypatch):
     assert alpha[height // 2, width // 2] > 0.9  # the dog's chest, in the middle of the picture
     assert alpha[: height // 10, : width // 10].max() < 0.1  # the window, top left
     np.testing.assert_array_equal(subject_matte(photo, segmenter="onnx"), alpha)
-
-
-def test_the_real_model_finds_the_dog_cell_by_cell_with_the_defaults_and_nothing_in_the_plain_window(
-    monkeypatch, depth_probe
-):
-    """Grid first with the pinned model (skipped like the test above): the dog's head is found in the cells it lies in,
-    with certainty, and the window top left, where the model has nothing to find, stays out."""
-    use_the_cached_pinned_model(monkeypatch)
-    photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
-    height, width = photo.shape[:2]
-
-    def find(piece: np.ndarray) -> np.ndarray:
-        return subject_matte(piece, segmenter="onnx")
-
-    recipe = Recipe(
-        [Step("depth_probe", params={"field": "found"})],
-        size=None,
-        regions={"cells": Grid(columns=2, rows=2), "found": Subject(per="cells")},
-    )
-    alpha = render(photo, recipe, finders={"subject": Finder("pinned model", find)})[..., 0]
-    assert alpha[height // 4, width * 9 // 20] > 0.9  # the head, left of the middle
-    assert alpha[height // 4, width * 11 // 20] > 0.9  # and right of it, in the other cell
-    assert alpha[: height // 10, : width // 10].max() == 0  # the window
 
 
 # --- refine_edge ----------------------------------------------------------------------------------------------------

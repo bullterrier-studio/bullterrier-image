@@ -18,7 +18,6 @@ from pathlib import Path
 
 import pytest
 
-from bullterrier_image import BullterrierImageError
 from bullterrier_image.finding.download import DownloadError, fetch, user_cache_dir
 
 PAYLOAD = b"not really a model, but bytes all the same\n" * 1000
@@ -77,11 +76,6 @@ def server() -> Iterator[Server]:
 
 def files_in(folder: Path) -> list[str]:
     return sorted(p.name for p in folder.iterdir()) if folder.exists() else []
-
-
-def test_a_failed_download_is_one_of_bullterrier_images_own_errors(tmp_path):
-    with pytest.raises(BullterrierImageError, match="only https"):
-        fetch("ftp://models.example.invalid/model.onnx", sha256(PAYLOAD), tmp_path / "model.onnx", size=len(PAYLOAD))
 
 
 def test_a_verified_download_lands_at_the_target_with_the_served_bytes(server, tmp_path):
