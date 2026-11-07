@@ -53,15 +53,6 @@ def test_an_unknown_effect_is_an_unknown_effect_error_with_a_clean_message_where
     assert str(raised.value).startswith("unknown.toml")
 
 
-def test_recipe_errors_are_still_caught_by_the_builtin_handlers_callers_already_have():
-    with pytest.raises(ValueError, match="opacity"):
-        Step("grade", opacity=1.5)
-    with pytest.raises(BullterrierImageError, match="opacity"):
-        Step("grade", opacity=1.5)
-    with pytest.raises(KeyError):
-        Step("no_such_effect")
-
-
 @pytest.mark.parametrize(
     ("error", "builtin"),
     [
