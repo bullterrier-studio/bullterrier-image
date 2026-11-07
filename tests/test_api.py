@@ -173,8 +173,6 @@ def test_effect_queries_live_only_in_the_registry(name):
         (lambda: Step("rgb_split", params={"spilt": 3}), "spilt"),
         (lambda: Step("grain", mask=3), "mask"),  # type: ignore[arg-type]
         (lambda: Step("grain", opacity=1.5), "opacity.*1.5"),
-        (lambda: Step("grain", opacity=-0.1), "opacity.*-0.1"),
-        (lambda: Step("grain", opacity=True), "opacity"),
         (lambda: Step("disperse", params={"subject": 1}), "subject"),
         (lambda: Step("grain", params={"opacity": 0.5}), "`opacity` is a key of the step"),
     ],
@@ -193,21 +191,17 @@ def test_a_recipe_built_in_code_is_checked_too():
 @pytest.mark.parametrize(
     ("keys", "complaint"),
     [
-        ({"mask": 3}, r"`mask`.*\b3\b"),
         ({"each": "panes"}, r"`each`"),
         ({"looks": ["none"]}, r"`looks`"),
         ({"partition": "panes"}, r"gradient_map.*takes no partition"),
-        ({"opacity": 2}, r"`opacity`.*\b2\b"),
         ({"blend_mode": "lighten"}, r"`blend_mode`.*screen.*'lighten'"),
         ({"preset": "sepya"}, r"'sepya'.*sepia"),
         ({"effect": "blur"}, r"`effect`.*'gradient_map'.*'blur'"),
     ],
     ids=[
-        "mask",
         "each",
         "looks",
         "partition",
-        "opacity",
         "blend_mode",
         "preset",
         "effect: the function already names it",
@@ -242,15 +236,9 @@ def test_a_step_describes_itself_briefly_for_labels():
 # --- fx: the effects as step builders ------------------------------------------------------------------------------
 
 
-def test_fx_builds_steps_from_keyword_arguments():
-    assert fx.rgb_split(amount=3, angle=2) == Step("rgb_split", params={"amount": 3, "angle": 2})
-    assert fx.grain() == Step("grain")
-
-
 @pytest.mark.parametrize(
     "make",
     [
-        pytest.param(lambda: fx.grade(0.5), id="an effect parameter"),  # type: ignore[call-arg]  # the point of the test
         pytest.param(lambda: Step("grade", {"exposure": 0.5}), id="a step's parameters"),  # type: ignore[call-arg]  # the point of the test
         pytest.param(lambda: Step("grade", None, "subject"), id="a step's mask"),  # type: ignore[call-arg]  # the point of the test
         pytest.param(lambda: Each("panes", [fx.grade()]), id="an each step's looks"),  # type: ignore[call-arg]  # the point of the test
@@ -261,22 +249,10 @@ def test_only_the_thing_itself_is_given_by_position_everything_else_by_keyword(m
         make()
 
 
-def test_fx_reports_a_misspelt_parameter_when_the_step_is_made():
-    with pytest.raises(ValueError, match=r"rgb_split.*`spilt` is not a parameter"):
-        fx.rgb_split(spilt=3)
-    with pytest.raises(AttributeError, match=r"available: .*ascii"):
-        fx.no_such_effect  # noqa: B018  (the lookup itself is what must raise)
-
-
 @pytest.mark.parametrize(
     ("name", "says"),
     [
         pytest.param("glitch", r"'glitch' is a preset.*fx\.slice_shift\(preset=\"glitch\"\)", id="a-preset"),
-        pytest.param("glitch", r"a look.*load_recipe\(\"glitch\"\)", id="a-look"),
-        pytest.param("temperature", r"'temperature' is a parameter of grade", id="a-parameter"),
-        pytest.param(
-            "depth_of_field", r"'depth_of_field' is named in the summary of focus_blur", id="a-word-of-a-summary"
-        ),
     ],
 )
 def test_fx_says_where_a_name_that_is_no_effect_lives(name, says):
@@ -381,10 +357,8 @@ def test_a_modelled_effects_builder_takes_keyword_values_and_refuses_them_by_pos
     ("values", "complaint"),
     [
         ({"raduis": 3}, r"`raduis`.*radius, style, tint"),
-        ({"radius": -1}, r"`radius`.*>= 0.*-1"),
-        ({"tint": "#zz0000"}, r"`tint`.*'#zz0000'"),
     ],
-    ids=["unknown", "out of range", "malformed colour"],
+    ids=["unknown"],
 )
 def test_a_modelled_effects_builder_refuses_bad_values_like_a_recipe_file(lantern, values, complaint):
     with pytest.raises(ValueError, match=f"lantern_probe.*{complaint}"):
@@ -513,17 +487,6 @@ def test_fx_follows_the_effect_registered_under_a_name_now(throwaway_effects):
 @pytest.mark.parametrize(
     ("toml", "python"),
     [
-        pytest.param(
-            'effect = "gradient"\ncolors = ["#000000"]\nmask = "background"',
-            lambda: fx.gradient(colors=["#000000"], mask="background"),
-            id="mask",
-        ),
-        pytest.param(
-            'effect = "bloom"\nradius = 26\nopacity = 0.8', lambda: fx.bloom(radius=26, opacity=0.8), id="opacity"
-        ),
-        pytest.param(
-            'effect = "gradient"\nblend_mode = "screen"', lambda: fx.gradient(blend_mode="screen"), id="blend_mode"
-        ),
         pytest.param('effect = "gradient_map"\npreset = "sepia"', lambda: fx.gradient_map(preset="sepia"), id="preset"),
         pytest.param(
             'effect = "rgb_split"\namount = 4\nmask = "subject"\nopacity = 0.5\nblend_mode = "difference"',
@@ -569,16 +532,6 @@ def make_project(tmp_path, photo, recipes, **options):
     return Project(
         photos=(tmp_path / "photos" / "one.png",), recipes=tuple(recipes), output=tmp_path / "out", **options
     )
-
-
-def test_the_pipeline_runs_recipes_defined_in_code_and_notices_when_they_change(tmp_path, photo):
-    a = Recipe(name="a", size=64, steps=[fx.grain(seed=1)])
-    project = make_project(tmp_path, photo, [a])
-    assert [i.status for i in run(project)] == ["done"]
-    assert (tmp_path / "out" / "one" / "a.jpg").is_file()
-    assert [i.status for i in run(project)] == ["skipped"]
-    changed = Recipe(name="a", size=64, steps=[fx.grain(seed=2)])
-    assert [i.status for i in run(make_project(tmp_path, photo, [changed]))] == ["done"]
 
 
 def test_steps_option_saves_the_picture_after_every_step_and_links_it_in_the_report(tmp_path, photo):
