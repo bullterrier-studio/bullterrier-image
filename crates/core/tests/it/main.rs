@@ -38,6 +38,7 @@ mod highpass;
 mod hsv;
 mod hue_range;
 mod inputs;
+mod kaleidoscope;
 mod lens_blur;
 mod lens_flare;
 mod light_leak;

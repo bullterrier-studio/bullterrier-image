@@ -62,7 +62,7 @@ fn core_effects() -> Result<Vec<Core>, Box<dyn Error>> {
             found.push((one, table));
         }
     }
-    assert!(found.len() >= 37, "only {} core effects are registered", found.len());
+    assert!(found.len() >= 38, "only {} core effects are registered", found.len());
     Ok(found)
 }
 

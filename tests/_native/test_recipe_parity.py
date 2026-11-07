@@ -126,6 +126,12 @@ ROWS = [
     pytest.param("droste", {"scale": 1}, False, id="droste: a copy as big as the picture"),
     pytest.param("droste", {"repeats": 13}, False, id="droste: above the deepest nesting"),
     pytest.param("droste", {"repeats": 2.5}, False, id="droste: a fraction of a copy"),
+    pytest.param(
+        "kaleidoscope", {"segments": 64, "angle": 360, "x": 1}, True, id="kaleidoscope: most segments, ends of angle"
+    ),
+    pytest.param("kaleidoscope", {"segments": 65}, False, id="kaleidoscope: above the most segments"),
+    pytest.param("kaleidoscope", {"segments": 0}, False, id="kaleidoscope: no segments"),
+    pytest.param("kaleidoscope", {"angle": 400}, True, id="kaleidoscope: a cyclic angle past its end wraps"),
     pytest.param("ripple", {"phase": 181, "angle": 725}, True, id="ripple: cyclic angles past their ends wrap"),
 ]
 
