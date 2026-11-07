@@ -303,6 +303,13 @@ fn cases() -> Vec<Case> {
                     .param("x", 0.6)
                     .param("interpolation", "nearest")
                     .param("edge", "wrap"),
+                Step::new("droste")
+                    .param("scale", 0.7)
+                    .param("turn", -50)
+                    .param("repeats", 7)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "mirror"),
+                Step::new("droste").param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

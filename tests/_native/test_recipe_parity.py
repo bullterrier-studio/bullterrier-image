@@ -120,6 +120,12 @@ ROWS = [
     pytest.param("polar", {"mode": "from", "edge": "wrap"}, True, id="polar: the way back, an edge rule"),
     pytest.param("polar", {"mode": "round"}, False, id="polar: a direction that does not exist"),
     pytest.param("polar", {"y": 1.01}, False, id="polar: a centre below the picture"),
+    pytest.param(
+        "droste", {"scale": 0.1, "turn": -180, "repeats": 12}, True, id="droste: smallest scale, ends of turn and depth"
+    ),
+    pytest.param("droste", {"scale": 1}, False, id="droste: a copy as big as the picture"),
+    pytest.param("droste", {"repeats": 13}, False, id="droste: above the deepest nesting"),
+    pytest.param("droste", {"repeats": 2.5}, False, id="droste: a fraction of a copy"),
     pytest.param("ripple", {"phase": 181, "angle": 725}, True, id="ripple: cyclic angles past their ends wrap"),
 ]
 

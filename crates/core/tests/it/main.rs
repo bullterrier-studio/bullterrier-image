@@ -19,6 +19,7 @@ mod cuts_ends;
 mod debug;
 mod deep;
 mod dehaze;
+mod droste;
 mod each;
 mod each_weights;
 mod effect;
