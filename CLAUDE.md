@@ -299,6 +299,10 @@ works from a map declares a `FieldName` parameter and reads its `Layer` from `In
    `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.
 3. **Gate:** `uv run poe check`. Only files named for the effect may appear in `git status`. The integrator runs
    `uv run poe regenerate`; do not commit `fx.pyi` or `docs/effects/`.
+4. **Porting a Python effect to Rust:** the last step is always deleting its Python tests (`tests/effects/<name>/`) that the Rust
+   tests now cover; keep only what Python code can break (preset data, `fx` and recipe plumbing, `size_ratio`). Read, delete,
+   commit: no ledger, no mutant runs unless one specific property is in doubt. A ported effect ships Rust tests and no Python
+   behaviour test (the shared contract is `crates/core/tests/effects_contract.rs`).
 
 ## Fixing defects: structurally, not defensively
 
@@ -363,6 +367,8 @@ golden file, sleep, mock of our own code) is worse than none: delete it. Reviewe
   `[tool.rust-tests.own-binaries]` of `pyproject.toml`; `uv run poe rust-test-layout` (in `check`) fails otherwise.
   Tests share one process and run in parallel: a registered effect gets a name no other test has (`unique`, a per-module
   prefix and a counter), and no test asserts the whole registry.
+- **A behaviour is tested once.** Python tests of an effect the core runs keep only the facade (see "Adding an effect", step 4);
+  the same property tested in Rust and Python is a defect: delete the Python one.
 - Behaviour through the public contract; **property tests, not golden images**. E.g. `pixel_sort` keeps every column's pixel set;
   `kaleidoscope` is symmetric about its mirror axes; a blur never leaves the input's range.
 - Expected values come from an independent oracle (standard, hand computation, brute-force reference), never the code's formula.
