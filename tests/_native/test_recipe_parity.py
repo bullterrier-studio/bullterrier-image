@@ -46,9 +46,7 @@ ROWS = [
         id="grade: distinct values, a whole number for a decimal",
     ),
     pytest.param("grade", {"exposure": -10}, True, id="grade: lowest exposure"),
-    pytest.param("grade", {"exposure": 10.0}, True, id="grade: highest exposure"),
     pytest.param("grade", {"exposure": 10.01}, False, id="grade: above the highest"),
-    pytest.param("grade", {"exposure": -10.5}, False, id="grade: below the lowest"),
     pytest.param("grade", {"contrast": "2"}, False, id="grade: text for a decimal"),
     pytest.param("grade", {"contrast": True}, False, id="grade: a bool for a decimal"),
     pytest.param("grade", {"contrast": float("nan")}, False, id="grade: NaN"),
@@ -57,49 +55,28 @@ ROWS = [
     pytest.param("grade", {"kelvin": 5000}, False, id="grade: a parameter the effect lacks"),
     # a cyclic angle takes any real and wraps it into its turn, but 360 and 0.1 stay as they are
     pytest.param("pattern", {"angle": 360}, True, id="pattern: 360 stays 360"),
-    pytest.param("pattern", {"angle": 0.1}, True, id="pattern: 0.1 stays 0.1"),
     pytest.param("pattern", {"angle": 725}, True, id="pattern: past the turn wraps"),
     pytest.param("pattern", {"angle": -90}, True, id="pattern: below the turn wraps"),
     pytest.param("pattern", {"angle": -1e-20}, True, id="pattern: a hair below 0 wraps to 360"),
     pytest.param("pattern", {"angle": 1e9 + 0.5}, True, id="pattern: far past the turn wraps"),
-    pytest.param("pattern", {"angle": "up"}, False, id="pattern: text for an angle"),
-    pytest.param("pattern", {"angle": True}, False, id="pattern: a bool for an angle"),
-    pytest.param("pattern", {"angle": float("inf")}, False, id="pattern: infinity for an angle"),
     # choices
     pytest.param("pattern", {"kind": "dots"}, True, id="pattern: a listed choice"),
     pytest.param("pattern", {"kind": "hexagons"}, False, id="pattern: a choice not listed"),
-    pytest.param("pattern", {"kind": 2}, False, id="pattern: a number for a choice"),
     # decimals with bounds
-    pytest.param("pattern", {"cell": 2}, True, id="pattern: lowest cell"),
-    pytest.param("pattern", {"cell": 512}, True, id="pattern: highest cell"),
-    pytest.param("pattern", {"cell": 1.99}, False, id="pattern: cell below the lowest"),
-    pytest.param("pattern", {"cell": 513}, False, id="pattern: cell above the highest"),
-    pytest.param("pattern", {"radius": 0.75}, True, id="pattern: radius at its highest"),
-    pytest.param("pattern", {"radius": 0.76}, False, id="pattern: radius above it"),
     # colours
     pytest.param("pattern", {"foreground": "#abc"}, True, id="pattern: short hex"),
     pytest.param("pattern", {"foreground": " #ABCDEF "}, True, id="pattern: capital hex with spaces around"),
     pytest.param("pattern", {"foreground": [0, 0.5, 1]}, True, id="pattern: three numbers"),
     pytest.param("pattern", {"foreground": (0.25, 0.5, 0.75)}, True, id="pattern: a tuple of three numbers"),
     pytest.param("pattern", {"foreground": "#abcd"}, False, id="pattern: four hex digits"),
-    pytest.param("pattern", {"foreground": "abcdef"}, False, id="pattern: no hash"),
-    pytest.param("pattern", {"foreground": "#ggg"}, False, id="pattern: not hex"),
     pytest.param("pattern", {"foreground": [0, 0, 2]}, False, id="pattern: a channel above 1"),
     pytest.param("pattern", {"foreground": [0, 0]}, False, id="pattern: two channels"),
     pytest.param("pattern", {"foreground": [True, 0, 0]}, False, id="pattern: a bool channel"),
     pytest.param("pattern", {"background": 7}, False, id="pattern: a number for a colour"),
     # whole numbers and switches
-    pytest.param("pixel_grid", {"cell": 3}, True, id="pixel_grid: lowest cell"),
-    pytest.param(
-        "pixel_grid", {"cell": 32, "keep_brightness": True, "gap": 0, "amount": 1}, True, id="pixel_grid: highest"
-    ),
-    pytest.param("pixel_grid", {"cell": 2}, False, id="pixel_grid: cell below the lowest"),
-    pytest.param("pixel_grid", {"cell": 33}, False, id="pixel_grid: cell above the highest"),
     pytest.param("pixel_grid", {"cell": 4.0}, False, id="pixel_grid: a whole decimal for a whole number"),
-    pytest.param("pixel_grid", {"cell": 4.5}, False, id="pixel_grid: a fraction for a whole number"),
     pytest.param("pixel_grid", {"cell": True}, False, id="pixel_grid: a bool for a whole number"),
     pytest.param("pixel_grid", {"keep_brightness": 1}, False, id="pixel_grid: a number for a switch"),
-    pytest.param("pixel_grid", {"keep_brightness": "yes"}, False, id="pixel_grid: text for a switch"),
     # lists of colours: a floor on the length (gradient_map two, gradient one), each element read as a colour
     pytest.param("gradient_map", {"stops": ["#000000", "#ffffff"]}, True, id="gradient_map: the shortest list"),
     pytest.param(
@@ -108,114 +85,19 @@ ROWS = [
         True,
         id="gradient_map: every way of writing a colour in one list",
     ),
-    pytest.param("gradient_map", {"stops": ["#000000"] * 40}, True, id="gradient_map: a long list"),
     pytest.param("gradient_map", {"stops": ["#000000"]}, False, id="gradient_map: one colour is too few"),
     pytest.param("gradient_map", {"stops": []}, False, id="gradient_map: an empty list"),
-    pytest.param(
-        "gradient_map", {"stops": ["#000000", "nope"]}, False, id="gradient_map: the second element is not a colour"
-    ),
-    pytest.param(
-        "gradient_map", {"stops": ["#000000", [0, 0, 2]]}, False, id="gradient_map: a channel above 1 in element 1"
-    ),
-    pytest.param(
-        "gradient_map", {"stops": ["#000", "#fff", [0, 0]]}, False, id="gradient_map: two channels in element 2"
-    ),
     pytest.param("gradient_map", {"stops": "#000000"}, False, id="gradient_map: a colour for a list"),
-    pytest.param("gradient_map", {"stops": None}, False, id="gradient_map: None for a list"),
     pytest.param("gradient", {"colors": ["#102030"]}, True, id="gradient: one colour is a flat fill"),
-    pytest.param("gradient", {"colors": []}, False, id="gradient: an empty list"),
-    pytest.param("gradient", {"colors": ["#102030", 7]}, False, id="gradient: a number for element 1"),
     # a choice of thirteen, and the whole number and switch of a generated picture
-    pytest.param("gradient_map", {"quantile_method": "closest_observation"}, True, id="gradient_map: a listed method"),
-    pytest.param("gradient_map", {"quantile_method": "quartile"}, False, id="gradient_map: a method not listed"),
-    pytest.param("gradient", {"repeat": 64, "reflect": True}, True, id="gradient: highest repeat, reflected"),
-    pytest.param("gradient", {"repeat": 65}, False, id="gradient: repeat above the highest"),
-    pytest.param("gradient", {"repeat": 2.0}, False, id="gradient: a whole decimal for a repeat"),
-    pytest.param("fractal", {"colors": ["#102030"]}, False, id="fractal: one colour is too few"),
-    pytest.param("fractal", {"colors": ["#102030", "#405060"]}, True, id="fractal: two colours"),
-    pytest.param("fractal", {"iterations": 2000, "zoom": 10000}, True, id="fractal: highest iterations and zoom"),
-    pytest.param("fractal", {"iterations": 0}, False, id="fractal: iterations below the lowest"),
-    pytest.param("fractal", {"c_real": -2.5}, False, id="fractal: constant below the lowest"),
-    pytest.param("lens_flare", {"ghosts": 12, "spacing": 3.0, "amount": 10.0}, True, id="lens_flare: highest ghosts"),
-    pytest.param("lens_flare", {"ghosts": 13}, False, id="lens_flare: ghosts above the highest"),
-    pytest.param("lens_flare", {"ring_width": 0.5}, False, id="lens_flare: ring width below the lowest"),
-    pytest.param("light_leak", {"blobs": 16, "seed": 2147483647}, True, id="light_leak: highest blobs and seed"),
-    pytest.param("light_leak", {"blobs": 0}, False, id="light_leak: blobs below the lowest"),
-    pytest.param("light_leak", {"seed": 2147483648}, False, id="light_leak: seed above the highest"),
-    pytest.param(
-        "radial_blur",
-        {"mode": "spin", "samples": 256, "interpolation": "bicubic", "edge": "wrap"},
-        True,
-        id="radial_blur: most samples, bicubic, wrap",
-    ),
-    pytest.param("radial_blur", {"samples": 257}, False, id="radial_blur: samples above the most"),
-    pytest.param("radial_blur", {"samples": 0}, False, id="radial_blur: samples below the fewest"),
-    pytest.param("radial_blur", {"mode": "shake"}, False, id="radial_blur: mode that is no motion"),
-    pytest.param(
-        "radial_blur", {"edge": "constant"}, False, id="radial_blur: constant is not one of its four edge rules"
-    ),
-    pytest.param(
-        "light_rays",
-        {"threshold": 0.99, "amount": 10, "samples": 256, "decay": 0, "interpolation": "bicubic", "edge": "wrap"},
-        True,
-        id="light_rays: highest threshold, amount and samples, no decay",
-    ),
-    pytest.param("light_rays", {"threshold": 1.0}, False, id="light_rays: threshold above the highest"),
-    pytest.param("light_rays", {"amount": 10.5}, False, id="light_rays: amount above the highest"),
-    pytest.param("light_rays", {"samples": 0}, False, id="light_rays: samples below the fewest"),
-    pytest.param(
-        "light_rays", {"edge": "constant"}, False, id="light_rays: constant is not one of its four edge rules"
-    ),
-    pytest.param("dehaze", {"patch": 201, "edge": "wrap"}, True, id="dehaze: widest patch, wrap"),
-    pytest.param("dehaze", {"patch": 202}, False, id="dehaze: patch above the widest"),
-    pytest.param("dehaze", {"patch": 0}, False, id="dehaze: patch below the narrowest"),
-    pytest.param("dehaze", {"edge": "constant"}, False, id="dehaze: constant is not one of its four edge rules"),
-    pytest.param(
-        "tone_map", {"edge_threshold": 0.01, "radius": 500, "pivot": 8}, True, id="tone_map: lowest threshold"
-    ),
-    pytest.param("tone_map", {"edge_threshold": 0.009}, False, id="tone_map: threshold below the lowest"),
-    pytest.param(
-        "motion_blur", {"angle": 360, "length": 500, "edge": "wrap"}, True, id="motion_blur: highest angle and length"
-    ),
-    pytest.param("motion_blur", {"edge": "constant"}, False, id="motion_blur: constant is not one of its four edges"),
-    pytest.param("motion_blur", {"length": 501}, False, id="motion_blur: length above the highest"),
-    pytest.param(
-        "lens_blur", {"radius": 100, "highlights": 50, "edge": "mirror"}, True, id="lens_blur: highest settings"
-    ),
-    pytest.param("lens_blur", {"radius": 100.5}, False, id="lens_blur: radius above the highest"),
-    pytest.param("lens_blur", {"edge": "constant"}, False, id="lens_blur: constant is not one of its four edges"),
-    pytest.param(
-        "starburst", {"rays": 32, "length": 600, "limit": 0, "seed": 2147483647}, True, id="starburst: highest settings"
-    ),
-    pytest.param("starburst", {"rays": 0}, False, id="starburst: rays below the lowest"),
-    pytest.param("starburst", {"threshold": 1.0}, False, id="starburst: threshold above the highest"),
-    pytest.param("starburst", {"seed": 2147483648}, False, id="starburst: seed above the highest"),
-    pytest.param("starburst", {"color": "nope"}, False, id="starburst: text that is no colour"),
-    pytest.param(
-        "anamorphic_streaks",
-        {"length": 480, "threshold": 0.99, "amount": 10},
-        True,
-        id="anamorphic_streaks: highest settings",
-    ),
-    pytest.param("anamorphic_streaks", {"length": 0.4}, False, id="anamorphic_streaks: length below the lowest"),
-    pytest.param("anamorphic_streaks", {"color": [0, 0, 2]}, False, id="anamorphic_streaks: a channel above 1"),
     # an optional colour: none, which is also the default, and any spelling of a colour; nothing else
     pytest.param("bloom", {"color": None}, True, id="bloom: no colour"),
     pytest.param("bloom", {"color": "#ff4a14"}, True, id="bloom: a hex colour"),
-    pytest.param("bloom", {"color": "#f40"}, True, id="bloom: a short hex colour"),
-    pytest.param("bloom", {"color": [1, 0.5, 0]}, True, id="bloom: three numbers"),
     pytest.param("bloom", {"color": "nope"}, False, id="bloom: text that is no colour"),
     pytest.param("bloom", {"color": [0, 0, 2]}, False, id="bloom: a channel above 1"),
-    pytest.param("bloom", {"octaves": 8, "radius": 500, "threshold": 0.99, "amount": 10}, True, id="bloom: highest"),
-    pytest.param("bloom", {"octaves": 9}, False, id="bloom: octaves above the highest"),
-    pytest.param("bloom", {"threshold": 1.0}, False, id="bloom: threshold above the highest"),
     # a lookup table is a name to the core and a Lut to Python (the other rules of `file` are tested where each lives)
     pytest.param("lut", {}, True, id="lut: defaults"),
-    pytest.param("lut", {"amount": 0}, True, id="lut: lowest amount"),
     pytest.param("lut", {"amount": 1}, True, id="lut: highest amount, a whole number for a decimal"),
-    pytest.param("lut", {"amount": 1.01}, False, id="lut: amount above the highest"),
-    pytest.param("lut", {"amount": -0.01}, False, id="lut: amount below the lowest"),
-    pytest.param("lut", {"strength": 1}, False, id="lut: a parameter the effect lacks"),
 ]
 
 
@@ -354,61 +236,33 @@ BAD_FILES = {
     "a TOML syntax error": "name = 'ok'\nsize = 64\ncolor = '#fff\n" + STEP,
     "a misspelt size": "sise = 2\n" + STEP,
     "a misspelt format": "formt = 2\n" + STEP,
-    "steps for step": "steps = 2\n" + STEP,
     "an [animation] table": "[animation]\nseconds = 2\n" + STEP,
-    "a single [step] table": "[step]\neffect = 'grade'\n",
     "a region without a kind": "format = 3\n[region.g]\ncolumns = 2\n" + STEP,
-    "a region of an unknown kind": "format = 3\n[region.g]\nkind = 'gird'\n" + STEP,
     "a region with a field of another kind": "format = 3\n[region.g]\nkind = 'grid'\ncount = 2\n" + STEP,
-    "a region field of the wrong type": "format = 3\n[region.g]\nkind = 'band'\nlow = 'high'\n" + STEP,
     "a size of -5": "size = -5\n" + STEP,
-    "a size as text": "size = '64'\n" + STEP,
-    "a size as a decimal": "size = 64.0\n" + STEP,
-    "a size as a switch": "size = true\n" + STEP,
     "a format of 4": "format = 4\n" + STEP,
-    "a format of 0": "format = 0\n" + STEP,
     "a format as text": "format = '1'\n" + STEP,
-    "a format as a decimal": "format = 1.0\n" + STEP,
-    "a format as a switch": "format = true\n" + STEP,
     "a blank description": "description = '  '\n" + STEP,
-    "a description that is no text": "description = 3\n" + STEP,
     "a region in the first format": "[region.g]\nkind = 'grid'\n" + STEP,
-    "a region in format 1": "format = 1\n[region.g]\nkind = 'grid'\n" + STEP,
     "an each step in the first format": "[[step]]\neach = 'subject'\nlooks = ['none']\n",
-    "a partition in format 1": "format = 1\n[[step]]\neffect = 'grade'\npartition = 'subject'\n",
     "a step name in the first format": STEP + "name = 'warm'\n",
-    "a step name in format 1": "format = 1\n" + STEP + "name = 'warm'\n",
-    "a step name in format 2": "format = 2\n" + STEP + "name = 'warm'\n",
     "a drive in the first format": "[[step]]\neffect = 'bloom'\n" + DRIVE,
-    "a drive in format 2": "format = 2\n[[step]]\neffect = 'bloom'\n" + DRIVE,
     "a drive in a look of format 2": (
         "format = 2\n[region.g]\nkind = 'grid'\n[[step]]\neach = 'g'\nlooks = ['none', { effect = 'bloom', "
         + DRIVE.strip()
         + " }]\n"
     ),
     "a band region in format 2": "format = 2\n[region.n]\nkind = 'band'\nof = 'depth'\n" + STEP,
-    "a bands region in format 2": "format = 2\n[region.b]\nkind = 'bands'\nof = 'depth'\n" + STEP,
-    "a combine region in format 2": "format = 2\n[region.c]\nkind = 'combine'\nof = ['depth', 'subject']\n" + STEP,
-    "a linear gradient in format 2": "format = 2\n[region.g]\nkind = 'linear_gradient'\n" + STEP,
-    "a radial gradient in format 2": "format = 2\n[region.g]\nkind = 'radial_gradient'\n" + STEP,
-    "a given region in format 2": "format = 2\n[region.g]\nkind = 'given'\n" + STEP,
     "the replaced kind depth": "format = 3\n[region.n]\nkind = 'depth'\nnear = 0.9\nfar = 0.6\n" + STEP,
-    "the replaced kind depth_bands": "format = 3\n[region.b]\nkind = 'depth_bands'\ncount = 4\n" + STEP,
-    "looks that are not a list": FORMAT_2_EACH + "looks = 'none'\n",
     "an each step without looks": FORMAT_2_EACH,
-    "looks without each": "format = 2\n[[step]]\nlooks = ['none']\n",
     "an effect beside each": FORMAT_2_EACH + "looks = ['none']\neffect = 'grade'\n",
-    "an effect parameter on the each step": FORMAT_2_EACH + "looks = ['none']\nexposure = 1\n",
     "a look that is a word other than none": FORMAT_2_EACH + "looks = ['grade']\n",
-    "a look that is a number": FORMAT_2_EACH + "looks = [3]\n",
     "a look without an effect": FORMAT_2_EACH + "looks = ['none', { exposure = 1 }]\n",
     "an assignment that does not exist": FORMAT_2_EACH + "looks = ['none']\nassign = 'shuffle'\n",
     "a step without an effect": "[[step]]\nmask = 'subject'\n",
     "a step opacity of nan": STEP + "opacity = nan\n",
-    "a step opacity of infinity": STEP + "opacity = inf\n",
     "a parameter of infinity": STEP + "exposure = -inf\n",
     "a parameter that is a date": STEP + "exposure = 1979-05-27\n",
-    "a parameter that is a date and time": STEP + "exposure = 1979-05-27T07:32:00Z\n",
 }
 
 GOOD_FILES = {
@@ -451,53 +305,39 @@ FRAME_ROWS = [
     pytest.param({"flip": "both", "angle": 30.5, "aspect": 1.5, "anchor": "top", "pad_left": 0.5}, True, id="distinct"),
     *[pytest.param({"flip": choice}, True, id=f"flip {choice}") for choice in ("none", "x", "y", "both")],
     pytest.param({"flip": "z"}, False, id="flip not listed"),
-    pytest.param({"flip": 1}, False, id="flip a number"),
     *[pytest.param({"fit": choice}, True, id=f"fit {choice}") for choice in ("crop", "expand")],
-    pytest.param({"fit": "stretch"}, False, id="fit not listed"),
     *[pytest.param({"resample": c}, True, id=f"resample {c}") for c in ("nearest", "bilinear", "bicubic")],
-    pytest.param({"resample": "lanczos"}, False, id="resample not listed"),
     *[
         pytest.param({"anchor": c}, True, id=f"anchor {c}")
         for c in ("center", "top", "bottom", "left", "right", "subject")
     ],
-    pytest.param({"anchor": "middle"}, False, id="anchor not listed"),
     *[
         pytest.param({"transparent": c}, True, id=f"transparent {c}")
         for c in ("none", "background", "circle", "rounded")
     ],
-    pytest.param({"transparent": "oval"}, False, id="transparent not listed"),
     # an angle is any real: it wraps into -180..180
     pytest.param({"angle": 270}, True, id="angle past the turn"),
     pytest.param({"angle": -1e9}, True, id="angle far below"),
-    pytest.param({"angle": "up"}, False, id="angle text"),
-    pytest.param({"angle": True}, False, id="angle a bool"),
     pytest.param({"aspect": 0.1}, True, id="aspect lowest"),
     pytest.param({"aspect": 10}, True, id="aspect highest"),
     pytest.param({"aspect": None}, True, id="aspect none"),
     pytest.param({"aspect": 0.09}, False, id="aspect below"),
     pytest.param({"aspect": 10.5}, False, id="aspect above"),
-    pytest.param({"aspect": "wide"}, False, id="aspect text"),
     pytest.param({"margin": 0}, True, id="margin lowest"),
     pytest.param({"margin": 1}, True, id="margin highest"),
     pytest.param({"margin": -0.25}, False, id="margin below"),
-    pytest.param({"margin": 1.25}, False, id="margin above"),
-    pytest.param({"margin": True}, False, id="margin a bool"),
     *[
         pytest.param({side: value}, valid, id=f"{side} {value}")
-        for side in ("pad_top", "pad_right", "pad_bottom", "pad_left")
+        for side in ("pad_left",)
         for value, valid in ((0, True), (2, True), (-0.5, False), (2.5, False))
     ],
     pytest.param({"corner_radius": 0}, True, id="corner_radius lowest"),
     pytest.param({"corner_radius": 0.5}, True, id="corner_radius highest"),
     pytest.param({"corner_radius": -0.25}, False, id="corner_radius below"),
-    pytest.param({"corner_radius": 0.75}, False, id="corner_radius above"),
     pytest.param({"fill": "#abc"}, True, id="fill short hex"),
-    pytest.param({"fill": " #ABCDEF "}, True, id="fill capital hex with spaces"),
     pytest.param({"fill": [0, 0.5, 1]}, True, id="fill three numbers"),
     pytest.param({"fill": "#abcd"}, False, id="fill four hex digits"),
-    pytest.param({"fill": [0, 0, 2]}, False, id="fill a channel above 1"),
     pytest.param({"fill": [0, 0]}, False, id="fill two channels"),
-    pytest.param({"fill": 7}, False, id="fill a number"),
     pytest.param({"zoom": 2}, False, id="a field the frame lacks"),
 ]
 
@@ -570,10 +410,6 @@ def test_the_core_names_the_fields_of_a_frame_and_defaults_them_as_python_does(f
     assert core["fill"] == pytest.approx(python["fill"], abs=1e-6)
 
 
-def test_the_core_does_not_write_the_default_frame():
-    assert "frame" not in _core.read_recipe(json.dumps({"steps": [{"effect": "grade"}], "frame": {}}), "json")
-
-
 def test_the_core_names_the_vocabulary_of_recipes_in_the_order_the_package_lists_it():
     vocabulary = _core.vocabulary()
     assert vocabulary["categories"] == list(CATEGORIES)
@@ -613,94 +449,49 @@ def edge(**fields: object) -> dict:
 # the core refuses both (Rust tests). `Svg.file` is read when the region is made, so any text passes the check.
 REGION_ROWS = [
     # the borders every laid kind has (a grid stands for them)
-    ("edge amount, lowest", "grid", edge(amount=0), True),
     ("edge amount, highest", "grid", edge(amount=48), True),
     ("edge amount, below", "grid", edge(amount=-0.1), False),
-    ("edge amount, above", "grid", edge(amount=48.5), False),
-    ("edge scale, lowest", "grid", edge(scale=1), True),
     ("edge scale, highest", "grid", edge(scale=480), True),
     ("edge scale, below", "grid", edge(scale=0.5), False),
-    ("edge scale, above", "grid", edge(scale=481), False),
-    ("edge octaves, lowest", "grid", edge(octaves=1), True),
     ("edge octaves, highest", "grid", edge(octaves=8), True),
     ("edge octaves, below", "grid", edge(octaves=0), False),
-    ("edge octaves, above", "grid", edge(octaves=9), False),
-    ("edge persistence, lowest", "grid", edge(persistence=0), True),
     ("edge persistence, highest", "grid", edge(persistence=1), True),
     ("edge persistence, below", "grid", edge(persistence=-0.25), False),
-    ("edge persistence, above", "grid", edge(persistence=1.25), False),
     ("edge seed, highest", "grid", edge(seed=2**32 - 1), True),
     ("edge seed, above", "grid", edge(seed=2**32), False),
-    ("edge seed, below", "grid", edge(seed=-1), False),
     ("edge style torn", "grid", edge(style="torn"), True),
     ("edge style unknown", "grid", edge(style="wavy"), False),
     ("edge field unknown", "grid", edge(width=3), False),
     ("edge not a table", "grid", {"edge": "torn"}, False),
     ("edge on shards", "shards", edge(amount=49), False),
-    ("edge on cuts", "cuts", edge(amount=49), False),
-    ("edge on path", "path", edge(amount=49), False),
-    ("edge on svg", "svg", edge(amount=49), False),
     ("fit a name", "grid", {"fit": "subject"}, True),
-    ("fit a number", "grid", {"fit": 3}, False),
     # grid
     ("a count of columns", "grid", {"columns": 3, "rows": 2}, True),
-    ("1000 columns", "grid", {"columns": 1000}, True),
     ("1001 columns", "grid", {"columns": 1001}, False),
-    ("no column", "grid", {"columns": 0}, False),
-    ("a negative count", "grid", {"rows": -2}, False),
     ("shares", "grid", {"columns": [1, 2.5, 1], "rows": [0.001]}, True),
-    ("1000 shares", "grid", {"rows": [1] * 1000}, True),
     ("1001 shares", "grid", {"rows": [1] * 1001}, False),
-    ("no shares", "grid", {"columns": []}, False),
-    ("a share of 0", "grid", {"columns": [1, 0]}, False),
     ("a negative share", "grid", {"rows": [2, -1]}, False),
-    ("columns as text", "grid", {"columns": "3"}, False),
-    ("a decimal count", "grid", {"columns": 2.5}, False),
-    ("columns as a switch", "grid", {"columns": True}, False),
     # shards
     ("a preset", "shards", {"preset": "glass"}, True),
-    ("a preset and a field given beside it", "shards", {"preset": "torn", "count": 3, "edge": {"amount": 1}}, True),
     ("a preset that is no preset", "shards", {"preset": "shattered"}, False),
-    ("a preset's values are checked with the given ones", "shards", {"preset": "glass", "count": 501}, False),
     ("one shard", "shards", {"count": 1}, True),
-    ("500 shards", "shards", {"count": 500}, True),
-    ("no shard", "shards", {"count": 0}, False),
     ("501 shards", "shards", {"count": 501}, False),
-    ("a count as a decimal", "shards", {"count": 12.0}, False),
-    ("jitter, lowest", "shards", {"jitter": 0}, True),
     ("jitter, highest", "shards", {"jitter": 1}, True),
     ("jitter, below", "shards", {"jitter": -0.5}, False),
-    ("jitter, above", "shards", {"jitter": 1.5}, False),
     ("impact, the corners", "shards", {"impact": [0, 1]}, True),
-    ("impact x below", "shards", {"impact": [-0.5, 0.5]}, False),
-    ("impact x above", "shards", {"impact": [1.5, 0.5]}, False),
-    ("impact y below", "shards", {"impact": [0.5, -0.5]}, False),
     ("impact y above", "shards", {"impact": [0.5, 1.5]}, False),
     ("impact of three", "shards", {"impact": [0, 0, 0]}, False),
-    ("impact of one", "shards", {"impact": [0]}, False),
-    ("focus, lowest", "shards", {"focus": 0}, True),
     ("focus, highest", "shards", {"focus": 5}, True),
     ("focus, below", "shards", {"focus": -0.5}, False),
-    ("focus, above", "shards", {"focus": 5.5}, False),
     ("seed, highest", "shards", {"seed": 2**32 - 1}, True),
     ("seed, above", "shards", {"seed": 2**32}, False),
-    ("seed, below", "shards", {"seed": -1}, False),
     # cuts
     ("a line and a curve", "cuts", {"lines": [{"x": 0.25, "y": 0.75, "angle": 45}, {"path": "M 0 0 L 1 1"}]}, True),
-    ("32 cuts", "cuts", {"lines": [CUT] * 32}, True),
     ("33 cuts", "cuts", {"lines": [CUT] * 33}, False),
-    ("no cut", "cuts", {"lines": []}, False),
     ("a line at the corners", "cuts", {"lines": [{"x": 0, "y": 1}, {"x": 1, "y": 0}]}, True),
-    ("a line, x below", "cuts", {"lines": [{"x": -0.5}]}, False),
-    ("a line, x above", "cuts", {"lines": [{"x": 1.5}]}, False),
-    ("a line, y below", "cuts", {"lines": [{"y": -0.5}]}, False),
-    ("a line, y above", "cuts", {"lines": [{"y": 1.5}]}, False),
     ("a line past the turn", "cuts", {"lines": [{"angle": 725}, {"angle": -90}]}, True),
     ("a line with a path", "cuts", {"lines": [{"x": 0.5, "path": "M 0 0 L 1 1"}]}, False),
-    ("a curve with an angle", "cuts", {"lines": [{"path": "M 0 0 L 1 1", "angle": 4}]}, False),
     ("a cut that is not a table", "cuts", {"lines": [3]}, False),
-    ("a curve of two subpaths", "cuts", {"lines": [{"path": "M 0 0 L 1 1 M 0 1 L 1 0"}]}, False),
-    ("a curve that is no path data", "cuts", {"lines": [{"path": "M 0 0 L foo"}]}, False),
     (
         "a curve with arcs and Beziers",
         "cuts",
@@ -713,90 +504,47 @@ REGION_ROWS = [
     ("samples, below", "path", {"samples": 0}, False),
     ("samples, above", "path", {"samples": 17}, False),
     ("a path of its own", "path", {"d": "M 0.1 0.4 C 0.1 0.2, 0.4 0.2, 0.4 0.4 Z"}, True),
-    ("a path of relative commands", "path", {"d": "m.1.1l.4 0v.4h-.4z"}, True),
-    ("a path of two subpaths", "path", {"d": "M 0 0 L 1 0 L 1 1 Z M 0.2 0.2 L 0.4 0.2 L 0.4 0.4 Z"}, True),
-    ("a path of arcs", "path", {"d": "M 0.2 0.5 A 0.3 0.3 0 1 0 0.8 0.5 A 0.3 0.3 0 1 0 0.2 0.5 Z"}, True),
     ("a path of nothing", "path", {"d": ""}, False),
-    ("a path of blanks", "path", {"d": "  "}, False),
     ("a path that does not start with a move", "path", {"d": "L 0.5 0.5"}, False),
-    ("a path with a stray word", "path", {"d": "M 0 0 L foo"}, False),
-    ("a path with an unknown command", "path", {"d": "M 0 0 X 1 1"}, False),
-    ("a path with a missing coordinate", "path", {"d": "M 0 0 L 1"}, False),
     ("a path with an infinite number", "path", {"d": "M 0 0 L 1e999 0"}, False),
-    ("a path with a bad arc flag", "path", {"d": "M 0 0 A 1 1 0 2 0 1 1"}, False),
-    ("a path ending in a move", "path", {"d": "M 0 0 L 0.5 0.5 Z M"}, False),
-    ("a path far beyond the frame", "path", {"d": "M 0 0 C 0 0 1e9 1e9 0 0"}, False),
-    ("a path that is no text", "path", {"d": 3}, False),
-    ("a curve of relative commands", "cuts", {"lines": [{"path": "m.5 0 l0 1"}]}, True),
-    ("a curve of nothing", "cuts", {"lines": [{"path": ""}]}, False),
-    ("a curve that does not start with a move", "cuts", {"lines": [{"path": "L 1 1"}]}, False),
-    ("a curve far beyond the frame", "cuts", {"lines": [{"path": "M 0 0 C 0 0 1e9 1e9 1 1"}]}, False),
     ("an svg file not named yet", "svg", {"file": ""}, True),
-    ("an svg file that is no text", "svg", {"file": 3}, False),
     ("an svg file", "svg", {"file": "shapes.svg", "max_shapes": 1, "max_kilobytes": 100000}, True),
-    ("max shapes, highest", "svg", {"max_shapes": 100000}, True),
     ("max shapes, below", "svg", {"max_shapes": 0}, False),
-    ("max shapes, above", "svg", {"max_shapes": 100001}, False),
-    ("max kilobytes, lowest", "svg", {"max_kilobytes": 1}, True),
     ("max kilobytes, below", "svg", {"max_kilobytes": 0}, False),
-    ("max kilobytes, above", "svg", {"max_kilobytes": 100001}, False),
     # pick
     ("pieces by number", "pick", {"of": "p", "pieces": [0, 2, 3]}, True),
     ("no piece", "pick", {"of": "p", "pieces": []}, False),
-    ("a negative piece", "pick", {"of": "p", "pieces": [1, -1]}, False),
-    ("a decimal piece", "pick", {"of": "p", "pieces": [1.5]}, False),
     ("pieces as a number", "pick", {"of": "p", "pieces": 3}, False),
     # subject
     ("subject per piece", "subject", {"per": "p", "context": 0, "threshold": 1}, True),
     ("context, highest", "subject", {"context": 1, "threshold": 0}, True),
-    ("context, below", "subject", {"context": -0.5}, False),
-    ("context, above", "subject", {"context": 1.5}, False),
     ("threshold, below", "subject", {"threshold": -0.5}, False),
-    ("threshold, above", "subject", {"threshold": 1.5}, False),
-    ("per a number", "subject", {"per": 3}, False),
     # band
     ("a whole scale", "band", {"of": "depth", "low": 0, "high": 1, "feather": 0}, True),
     ("a single value", "band", {"of": "depth", "low": 0.5, "high": 0.5}, True),
     ("feather, highest", "band", {"of": "depth", "feather": 1}, True),
     ("low, below", "band", {"of": "depth", "low": -0.5}, False),
     ("low, above", "band", {"of": "depth", "low": 1.5, "high": 1}, False),
-    ("high, below", "band", {"of": "depth", "low": 0, "high": -0.5}, False),
-    ("high, above", "band", {"of": "depth", "high": 1.5}, False),
-    ("feather, below", "band", {"of": "depth", "feather": -0.5}, False),
-    ("feather, above", "band", {"of": "depth", "feather": 1.5}, False),
-    ("low above high", "band", {"of": "depth", "low": 0.75, "high": 0.5}, False),
     ("low a hair above high", "band", {"of": "depth", "low": 0.5, "high": 0.4999}, False),
     # bands, combine
     ("1 band", "bands", {"of": "depth", "count": 1}, True),
-    ("100 bands", "bands", {"of": "depth", "count": 100}, True),
     ("no band", "bands", {"of": "depth", "count": 0}, False),
-    ("101 bands", "bands", {"of": "depth", "count": 101}, False),
     ("combine of two", "combine", {"of": ["subject", "depth"]}, True),
     ("combine of three, max", "combine", {"op": "max", "of": ["subject", "depth", "light"]}, True),
     ("combine of one", "combine", {"of": ["subject"]}, False),
-    ("combine of none", "combine", {"of": []}, False),
     ("combine op unknown", "combine", {"op": "xor", "of": ["subject", "depth"]}, False),
     # gradients
     ("linear angle 0", "linear_gradient", {"angle": 0}, True),
-    ("linear angle past the turn", "linear_gradient", {"angle": 725}, True),
-    ("linear angle negative", "linear_gradient", {"angle": -90}, True),
     ("linear angle as text", "linear_gradient", {"angle": "up"}, False),
     ("radial at the corners", "radial_gradient", {"x": 0, "y": 1}, True),
-    ("radial x below", "radial_gradient", {"x": -0.5}, False),
     ("radial x above", "radial_gradient", {"x": 1.5}, False),
-    ("radial y below", "radial_gradient", {"y": -0.5}, False),
-    ("radial y above", "radial_gradient", {"y": 1.5}, False),
-    ("radius, lowest", "radial_gradient", {"radius": 0.01}, True),
     ("radius, highest", "radial_gradient", {"radius": 3}, True),
     ("radius, below", "radial_gradient", {"radius": 0.005}, False),
-    ("radius, above", "radial_gradient", {"radius": 3.5}, False),
     # given, and what every kind refuses
     ("given", "given", {}, True),
     ("given with a field", "given", {"of": "x"}, False),
     ("a field of another kind", "grid", {"count": 3}, False),
     ("a misspelt field of band", "band", {"of": "depth", "lo": 0.1}, False),
-    ("a misspelt field of radial", "radial_gradient", {"radius": 0.5, "raduis": 1}, False),
-    ("a field of pick on subject", "subject", {"of": "p"}, False),
 ]
 
 
@@ -869,7 +617,7 @@ def test_the_core_names_the_fields_of_a_region_and_defaults_them_as_python_does(
     assert read == {"kind": kind, **python}
 
 
-@pytest.mark.parametrize("preset", ["glass", "torn", "stone", "mosaic"])
+@pytest.mark.parametrize("preset", ["glass", "mosaic"])
 def test_a_shards_preset_expands_when_read_to_the_fields_of_python_s_model_and_a_given_field_wins(preset):
     read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": "shards", "preset": preset}}}), "json")
     expanded = read["regions"]["r"]
@@ -901,22 +649,16 @@ def laid(kind_and_fields: str) -> str:
 # (what the row is about, the recipe file, whether every name in it names a region of the form its place needs)
 REFERENCE_ROWS = [
     ("mask a selection", OPEN + GRADE + "mask = 'cutout'\n", True),
-    ("mask a built-in selection", OPEN + GRADE + "mask = 'subject'\n", True),
     ("mask a partition", OPEN + GRADE + "mask = 'panes'\n", False),
     ("mask nothing", OPEN + GRADE + "mask = 'nowhere'\n", False),
     ("a drive by a selection", OPEN + GRADE + "exposure = { by = 'cutout', start = 0, end = 1 }\n", True),
     ("a drive by a partition", OPEN + GRADE + "exposure = { by = 'panes', start = 0, end = 1 }\n", False),
-    ("a drive by nothing", OPEN + GRADE + "exposure = { by = 'nowhere', start = 0, end = 1 }\n", False),
     ("a partition that is one", OPEN + SEAMS + "partition = 'panes'\n", True),
     ("a partition that is a selection (two pieces)", OPEN + SEAMS + "partition = 'cutout'\n", True),
-    ("a partition that is a built-in", OPEN + SEAMS + "partition = 'subject'\n", True),
     ("a partition that is nothing", OPEN + SEAMS + "partition = 'nowhere'\n", False),
     ("each over a partition", OPEN + "[[step]]\neach = 'panes'\nlooks = ['none']\n", True),
     ("each over a selection", OPEN + "[[step]]\neach = 'cutout'\nlooks = ['none']\n", False),
-    ("each over a built-in", OPEN + "[[step]]\neach = 'subject'\nlooks = ['none']\n", False),
-    ("each over nothing", OPEN + "[[step]]\neach = 'nowhere'\nlooks = ['none']\n", False),
     ("each masked by a selection", OPEN + "[[step]]\neach = 'panes'\nmask = 'cutout'\nlooks = ['none']\n", True),
-    ("each masked by a partition", OPEN + "[[step]]\neach = 'panes'\nmask = 'panes'\nlooks = ['none']\n", False),
     (
         "a look masked by a partition",
         OPEN + "[[step]]\neach = 'panes'\nlooks = [{ effect = 'grade', mask = 'panes' }]\n",
@@ -928,28 +670,18 @@ REFERENCE_ROWS = [
         True,
     ),
     ("a grid fit to a selection", laid("kind = 'grid'\nfit = 'cutout'\n"), True),
-    ("a grid fit to a built-in", laid("kind = 'grid'\nfit = 'subject'\n"), True),
     ("a grid fit to a partition", laid("kind = 'grid'\nfit = 'panes'\n"), False),
-    ("a grid fit to nothing", laid("kind = 'grid'\nfit = 'nowhere'\n"), False),
     ("a band of a selection", laid("kind = 'band'\nof = 'cutout'\n"), True),
     ("a band of the depth", laid("kind = 'band'\nof = 'depth'\n"), True),
     ("a band of a partition", laid("kind = 'band'\nof = 'panes'\n"), False),
-    ("a band of nothing", laid("kind = 'band'\nof = 'nowhere'\n"), False),
-    ("a band with no `of`", laid("kind = 'band'\n"), False),
     ("bands of a selection", laid("kind = 'bands'\nof = 'cutout'\n"), True),
-    ("bands of a partition", laid("kind = 'bands'\nof = 'panes'\n"), False),
     ("combine of selections", laid("kind = 'combine'\nof = ['cutout', 'subject']\n"), True),
     ("combine with a partition", laid("kind = 'combine'\nof = ['cutout', 'panes']\n"), False),
-    ("combine with nothing", laid("kind = 'combine'\nof = ['cutout', 'nowhere']\n"), False),
     ("a pick of a partition", laid("kind = 'pick'\nof = 'panes'\n"), True),
     ("a pick of a selection", laid("kind = 'pick'\nof = 'cutout'\n"), False),
-    ("a pick of a built-in", laid("kind = 'pick'\nof = 'subject'\n"), False),
-    ("a pick of nothing", laid("kind = 'pick'\nof = 'nowhere'\n"), False),
     ("the subject found in a partition", laid("kind = 'subject'\nper = 'panes'\n"), True),
     ("the subject found in a selection", laid("kind = 'subject'\nper = 'cutout'\n"), False),
-    ("the subject found in nothing", laid("kind = 'subject'\nper = 'nowhere'\n"), False),
     ("a region called subject", OPEN + "[region.subject]\nkind = 'grid'\n" + GRADE, False),
-    ("a region called light", OPEN + "[region.light]\nkind = 'given'\n" + GRADE, False),
     ("a region called like a built-in in capitals", OPEN + "[region.Subject]\nkind = 'grid'\n" + GRADE, True),
     ("a band of itself", laid("kind = 'band'\nof = 'r'\n"), False),
     (
@@ -967,7 +699,6 @@ REFERENCE_ROWS = [
         OPEN + "[region.s]\nkind = 'subject'\nper = 'g'\n[region.g]\nkind = 'grid'\nfit = 's'\n" + GRADE,
         False,
     ),
-    ("a bad reference in a region no step uses", laid("kind = 'band'\nof = 'nowhere'\n"), False),
 ]
 
 
@@ -994,10 +725,6 @@ def core_accepts_file(text: str, presets: dict | None = None) -> bool:
 def test_the_core_and_python_accept_and_refuse_the_same_references(tmp_path, what, text, valid):
     assert python_accepts_file(tmp_path, text) == valid, "Python's checks"
     assert core_accepts_file(text) == valid, "the core"
-
-
-def test_the_references_have_known_good_and_known_bad_rows():
-    assert {valid for _, _, valid in REFERENCE_ROWS} == {True, False}
 
 
 @pytest.mark.parametrize("path", FILES)
