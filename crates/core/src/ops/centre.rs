@@ -19,6 +19,8 @@ pub(crate) struct Centre {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Spot {
     centre: Centre,
+    /// The pixel's place among the picture's pixels, row after row: `row * width + column`.
+    pub(crate) index: usize,
     /// The pixel's row, from the top: 0 for the first.
     pub(crate) row: f64,
     /// The pixel's column, from the left: 0 for the first.
@@ -80,6 +82,7 @@ impl Centre {
                 let (row, column) = ((first_row + at / width) as f64, (at % width) as f64);
                 let (read_row, read_column) = source(Spot {
                     centre: self,
+                    index: first_row * width + at,
                     row,
                     column,
                     down: row - self.row,

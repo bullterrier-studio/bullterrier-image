@@ -342,6 +342,18 @@ fn cases() -> Vec<Case> {
                     .param("interpolation", "bicubic")
                     .param("edge", "wrap"),
                 Step::new("perspective").param("interpolation", "nearest"),
+                Step::new("displace")
+                    .param("amount", 9)
+                    .param("scale", 17)
+                    .param("octaves", 4)
+                    .param("lacunarity", 1.7)
+                    .param("seed", 4_294_967_295_u32)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap"),
+                Step::new("displace")
+                    .param("scale", 1)
+                    .param("octaves", 1)
+                    .param("interpolation", "nearest"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

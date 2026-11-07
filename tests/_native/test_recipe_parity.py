@@ -152,6 +152,16 @@ ROWS = [
     pytest.param("perspective", {"scale": -0.91}, False, id="perspective: a zoom below -0.9"),
     pytest.param("perspective", {"shear_y": 2.01}, False, id="perspective: a skew past 2"),
     pytest.param("ripple", {"phase": 181, "angle": 725}, True, id="ripple: cyclic angles past their ends wrap"),
+    pytest.param("displace", {"seed": 2**32 - 1}, True, id="displace: highest seed"),
+    pytest.param("displace", {"seed": 2**32}, False, id="displace: above the highest seed"),
+    pytest.param(
+        "displace",
+        {"amount": 500, "scale": 1024, "octaves": 8, "persistence": 1, "lacunarity": 4},
+        True,
+        id="displace: every top of every range",
+    ),
+    pytest.param("displace", {"octaves": 0}, False, id="displace: no layer of noise"),
+    pytest.param("displace", {"lacunarity": 0.9}, False, id="displace: layers coarser than the one before"),
 ]
 
 

@@ -54,3 +54,26 @@ pub(crate) fn step(height: usize, width: usize, low: f32, high: f32) -> Vec<f32>
 pub(crate) fn counted() -> Vec<f32> {
     (0_u8..72).map(|index| f32::from(index) / 80.0).collect()
 }
+
+/// A picture that says where each pixel was read from: red is the row over the last row, green the column over the last
+/// column, blue 0.5 (both sides at least 2). Through a warp that reads between pixels linearly or by a cubic, and stays
+/// inside the picture, pixel `(row, column)` of the result holds the place [`places`] gives back.
+#[expect(clippy::cast_precision_loss, reason = "a test picture is small")]
+pub(crate) fn coordinates(height: usize, width: usize) -> Vec<f32> {
+    let (last_row, last_column) = ((height - 1) as f32, (width - 1) as f32);
+    (0..height * width)
+        .flat_map(|at| [(at / width) as f32 / last_row, (at % width) as f32 / last_column, 0.5])
+        .collect()
+}
+
+/// The (row, column) place each pixel of `picture` (made from [`coordinates`] by a warp) was read from.
+pub(crate) fn places(picture: &[f32], height: usize, width: usize) -> Vec<(f64, f64)> {
+    #[expect(clippy::cast_precision_loss, reason = "a test picture is small")]
+    let (last_row, last_column) = ((height - 1) as f64, (width - 1) as f64);
+    picture
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|pixel| (f64::from(pixel[0]) * last_row, f64::from(pixel[1]) * last_column))
+        .collect()
+}

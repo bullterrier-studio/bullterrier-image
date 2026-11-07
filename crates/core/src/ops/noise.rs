@@ -24,36 +24,75 @@ pub(crate) struct Tear {
     pub(crate) seed: u32,
 }
 
-/// The shifts of a `height` x `width` picture's pixel centres, along x (the first field) and along y (the second), row after
-/// row: each field is smooth noise standardised over the picture to mean 0 and standard deviation 1, so the caller scales it
-/// to the shift it wants. Octave `i` has lattice points `scale_share / 2^i` of the long side apart, with values drawn
-/// evenly from -1 to 1 by `mix(seed, [axis, i, row, column])` (counting the points from the one just before the picture's
-/// first pixel centre, 0) and read at the pixel centres by cubic interpolation through them (Catmull-Rom); the octaves,
-/// weighted `persistence^i`, are summed. An octave whose spacing is under a pixel is left out, and so is every later one. A
-/// picture without variation (one pixel) is all zeros.
-///
-/// The noise is a function of the position in the frame, so the same arguments at twice the size give the same noise at
-/// twice as many places; it takes memory for the two fields and a few rows, however many octaves.
-pub(crate) fn bend(height: usize, width: usize, tear: &Tear) -> [Vec<f32>; 2] {
-    [0, 1].map(|axis| field(height, width, tear, axis))
+/// How the noise of [`fractal`] is laid.
+#[derive(Clone, Debug)]
+pub(crate) struct Fractal {
+    /// The spacing of the coarsest lattice, in px.
+    pub(crate) spacing: f64,
+    /// How many lattices are summed.
+    pub(crate) octaves: u32,
+    /// The weight of each lattice against the one before it.
+    pub(crate) persistence: f64,
+    /// How many times finer each lattice is than the one before (at least 1).
+    pub(crate) lacunarity: f64,
+    /// The seed of the lattice values.
+    pub(crate) seed: u32,
+    /// How far past the lattice's first point the first pixel lies, in px: 0 puts a lattice point on every `spacing`-th pixel
+    /// from the first (a spacing of 1 then gives every pixel a value of its own), 0.5 puts the first lattice point half a
+    /// pixel before the first pixel.
+    pub(crate) origin: f64,
 }
 
-/// The field of one `axis` of [`bend`].
-fn field(height: usize, width: usize, tear: &Tear, axis: u64) -> Vec<f32> {
+/// The shifts of a `height` x `width` picture's pixels, along x (the first field) and along y (the second), row after row:
+/// each field is smooth noise standardised over the picture to mean 0 and standard deviation 1, so the caller scales it to
+/// the shift it wants. Octave `i` has lattice points `spacing / lacunarity^i` apart, with values drawn evenly from -1 to 1
+/// by `mix(seed, [axis, i, row, column])` (counting the points from the one just before the first pixel, 0) and
+/// read at the pixels by cubic interpolation through them (Catmull-Rom), so a pixel on a lattice point has its value; the
+/// octaves, weighted `persistence^i`, are summed. An octave whose spacing is under a pixel is left out, and so is every
+/// later one. A picture without variation (one pixel) is all zeros.
+///
+/// It takes memory for the two fields and a few rows, however many octaves.
+pub(crate) fn fractal(height: usize, width: usize, noise: &Fractal) -> [Vec<f32>; 2] {
+    [0, 1].map(|axis| field(height, width, noise, axis))
+}
+
+/// The shifts of a `height` x `width` picture, as [`fractal`] gives them, for the lattice of a [`Tear`], fixed in the frame.
+pub(crate) fn bend(height: usize, width: usize, tear: &Tear) -> [Vec<f32>; 2] {
     let long_side = length::float(height.max(width));
+    fractal(
+        height,
+        width,
+        &Fractal {
+            spacing: tear.scale_share * long_side,
+            octaves: tear.octaves,
+            persistence: tear.persistence,
+            lacunarity: 2.0, // constant: each octave is twice as fine as the one before (the standard)
+            seed: tear.seed,
+            origin: 0.5, // constant: the noise lies on the frame, where a pixel's centre is half a pixel in
+        },
+    )
+}
+
+/// The field of one `axis` of [`fractal`].
+fn field(height: usize, width: usize, noise: &Fractal, axis: u64) -> Vec<f32> {
     let mut sum = vec![0.0_f32; height * width];
     let mut weight = 1.0; // constant: the coarsest octave counts in full
-    for octave in 0..tear.octaves {
-        // constant: each octave is twice as fine as the one before (lacunarity 2, the standard)
-        let spacing = tear.scale_share * long_side / 2.0_f64.powi(octave.cast_signed());
+    for octave in 0..noise.octaves {
+        let spacing = noise.spacing / noise.lacunarity.powi(octave.cast_signed());
         if spacing < 1.0 {
             break;
         }
-        add_octave(&mut sum, (height, width), spacing, weight, |row, column| {
-            let drawn = unit(mix(tear.seed, &[axis, u64::from(octave), row as u64, column as u64]));
-            2.0 * drawn - 1.0
-        });
-        weight *= tear.persistence;
+        add_octave(
+            &mut sum,
+            (height, width),
+            (spacing, noise.origin),
+            weight,
+            |row, column| {
+                let drawn = unit(mix(noise.seed, &[axis, u64::from(octave), row as u64, column as u64]));
+                2.0 * drawn - 1.0
+            },
+        );
+        weight *= noise.persistence;
     }
     standardised(sum)
 }
@@ -91,18 +130,18 @@ fn cubic(u: f64) -> (usize, [f64; POINTS]) {
     (length::whole(at), weights)
 }
 
-/// Adds `weight` times one octave to `sum` (`height` x `width`): the lattice of `spacing` px, valued by `value(row,
-/// column)`, read at the pixel centres. Separable: each lattice row is interpolated along x once, into a ring of the four
+/// Adds `weight` times one octave to `sum` (`height` x `width`): the lattice of `spacing` px starting `origin` px before the
+/// first pixel's position, valued by `value(row, column)`, read at the pixels. Separable: each lattice row is interpolated along x once, into a ring of the four
 /// rows that a pixel row reads, and the pixel row is their interpolation along y.
 fn add_octave(
     sum: &mut [f32],
     (height, width): (usize, usize),
-    spacing: f64,
+    (spacing, origin): (f64, f64),
     weight: f64,
     value: impl Fn(usize, usize) -> f64,
 ) {
     let across: Vec<(usize, [f64; POINTS])> = (0..width)
-        .map(|column| cubic((length::float(column) + 0.5) / spacing)) // constant: a pixel's centre is half a pixel in
+        .map(|column| cubic((length::float(column) + origin) / spacing))
         .collect();
     let first = across.first().map_or(0, |at| at.0);
     let last = across.last().map_or(0, |at| at.0 + POINTS - 1);
@@ -110,7 +149,7 @@ fn add_octave(
     // the lattice rows that the pixel rows read: row `r` lives in slot `r mod 4`, and is read by four pixel rows at most
     let mut ring: [(usize, Vec<f64>); POINTS] = std::array::from_fn(|_| (usize::MAX, Vec::new()));
     for (row, line) in sum.chunks_exact_mut(width).enumerate().take(height) {
-        let (start, down) = cubic((length::float(row) + 0.5) / spacing);
+        let (start, down) = cubic((length::float(row) + origin) / spacing);
         for lattice_row in start..start + POINTS {
             let slot = &mut ring[lattice_row % POINTS];
             if slot.0 == lattice_row {
