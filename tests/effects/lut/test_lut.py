@@ -1,11 +1,6 @@
-"""Behaviour of the `lut` effect: a `.cube` file read at the boundary, then looked up with trilinear interpolation.
+"""The `lut` effect through Python: a `.cube` file or a `Lut` handed to the registry, `fx` and a recipe file, and the
+`LutError` raised for a bad file or table. Reading a `.cube` and the lookup itself are tested in Rust."""
 
-The expectations are worked out by hand: a table sampled from a function whose lookup is known, `.cube` files written
-here row by row in the format's own order (red changes fastest), and a table of three entries per axis whose midpoint
-is a mean of two entries.
-"""
-
-import sys
 from collections.abc import Callable
 from itertools import product
 from pathlib import Path
@@ -21,85 +16,25 @@ NAME = "lut"
 Mapping = Callable[[float, float, float], tuple[float, float, float]]
 
 
-def write_cube(path: Path, mapping: Mapping, size: int = 2, header: str = "") -> Path:
+def write_cube(path: Path, mapping: Mapping, size: int = 2) -> Path:
     """A `.cube` file whose entry at grid point (r, g, b) holds `mapping(r, g, b)`, rows with red changing fastest."""
     path.parent.mkdir(exist_ok=True)
     rows = [
         " ".join(f"{v:.6f}" for v in mapping(r / (size - 1), g / (size - 1), b / (size - 1)))
         for b, g, r in product(range(size), repeat=3)
     ]
-    text = f'TITLE "a table"\n{header}LUT_3D_SIZE {size}\n# the entries\n' + "\n".join(rows) + "\n"
+    text = f'TITLE "a table"\nLUT_3D_SIZE {size}\n# the entries\n' + "\n".join(rows) + "\n"
     path.write_text(text, encoding="utf-8")
     return path
-
-
-def identity(r: float, g: float, b: float) -> tuple[float, float, float]:
-    return r, g, b
 
 
 def negative(r: float, g: float, b: float) -> tuple[float, float, float]:
     return 1 - r, 1 - g, 1 - b
 
 
-@pytest.mark.parametrize("size", [2, 5, 33], ids=lambda size: f"{size} entries per axis")
-def test_an_identity_table_leaves_the_picture_as_it_was(photo, tmp_path, size):
-    cube = write_cube(tmp_path / "identity.cube", identity, size)
-    np.testing.assert_allclose(registry.apply(NAME, photo, file=load_lut(cube)), photo, atol=1e-5)
-
-
 def test_a_negative_table_gives_the_negative(photo, tmp_path):
     cube = write_cube(tmp_path / "negative.cube", negative)
     np.testing.assert_allclose(registry.apply(NAME, photo, file=load_lut(cube)), 1 - photo, atol=1e-5)
-
-
-@pytest.mark.parametrize("amount", [0.0, 0.25, 0.5, 1.0], ids=lambda amount: f"amount {amount}")
-def test_amount_is_the_share_of_the_way_from_the_picture_to_the_grade(photo, tmp_path, amount):
-    cube = write_cube(tmp_path / "negative.cube", negative)
-    out = registry.apply(NAME, photo, file=load_lut(cube), amount=amount)
-    np.testing.assert_allclose(out, (1 - amount) * photo + amount * (1 - photo), atol=1e-5)
-
-
-def test_a_colour_between_the_entries_is_interpolated_trilinearly(tmp_path):
-    # A table sampled from a function that is linear in each channel on its own is reproduced exactly between entries.
-    def multilinear(r: float, g: float, b: float) -> tuple[float, float, float]:
-        return r * g, b * (1 - r), (r + g + b) / 3
-
-    cube = write_cube(tmp_path / "multilinear.cube", multilinear)
-    colour = np.full((1, 1, 3), (0.25, 0.5, 0.75), np.float32)
-    # by hand: red 0.25 * 0.5 = 0.125; green 0.75 * (1 - 0.25) = 0.5625; blue (0.25 + 0.5 + 0.75) / 3 = 0.5
-    np.testing.assert_allclose(registry.apply(NAME, colour, file=load_lut(cube)), [[[0.125, 0.5625, 0.5]]], atol=1e-6)
-
-
-def test_between_two_entries_of_a_curve_the_result_is_their_mean(tmp_path):
-    # Three entries per axis sample the square at 0, 0.5, 1 (0, 0.25, 1); a value halfway between the first two lies
-    # at the mean of 0 and 0.25.
-    cube = write_cube(tmp_path / "square.cube", lambda r, g, b: (r**2, g**2, b**2), size=3)
-    colour = np.full((1, 1, 3), 0.25, np.float32)
-    np.testing.assert_allclose(registry.apply(NAME, colour, file=load_lut(cube)), 0.125, atol=1e-6)
-
-
-def test_the_file_lists_blue_slowest_and_red_fastest(photo, tmp_path):
-    cube = write_cube(tmp_path / "swap.cube", lambda r, g, b: (b, g, r))
-    np.testing.assert_allclose(registry.apply(NAME, photo, file=load_lut(cube)), photo[..., ::-1], atol=1e-5)
-
-
-def test_colours_beyond_the_domain_take_the_edge_of_the_table(tmp_path):
-    # Over the domain 0.25..0.75 the red entries run 0.5..1 and the green ones 0..0.5: 0 lies below the red edge and
-    # 1 above the green edge, so each gives its table's edge value; blue, an identity, has a quarter of the
-    # way along the domain at 0.375.
-    cube = write_cube(
-        tmp_path / "narrow.cube",
-        lambda r, g, b: (0.5 + r / 2, g / 2, b),
-        header="DOMAIN_MIN 0.25 0.25 0.25\nDOMAIN_MAX 0.75 0.75 0.75\n",
-    )
-    colour = np.array([[[0.0, 1.0, 0.375]]], np.float32)
-    np.testing.assert_allclose(registry.apply(NAME, colour, file=load_lut(cube)), [[[0.5, 0.5, 0.25]]], atol=1e-6)
-
-
-def test_a_table_that_leaves_the_range_gives_a_picture_inside_it(photo):
-    table = np.full((2, 2, 2, 3), (1.4, -0.2, 0.5), np.float32)
-    out = registry.apply(NAME, photo, file=Lut(table))
-    np.testing.assert_allclose(out, np.broadcast_to([1.0, 0.0, 0.5], photo.shape), atol=1e-6)
 
 
 # --- the file is read at the boundary, relative to the recipe ------------------------------------------------------
@@ -125,71 +60,10 @@ def test_fx_takes_the_path_of_a_cube_file(photo, tmp_path, monkeypatch):
     np.testing.assert_allclose(out, 0.5 * photo + 0.5 * (1 - photo), atol=1e-5)
 
 
-ROWS = "0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n"
-BAD_FILES = {
-    "1D table": ("LUT_1D_SIZE 4\n0 0 0\n", r"line 1.*1D"),
-    "no size": ('TITLE "x"\n' + ROWS, r"line 2.*before LUT_3D_SIZE"),
-    "size 1": ("LUT_3D_SIZE 1\n0 0 0\n", r"line 1.*LUT_3D_SIZE"),
-    "size not whole": ("LUT_3D_SIZE 2.5\n", r"line 1.*LUT_3D_SIZE"),
-    "too few rows": ("LUT_3D_SIZE 2\n" + ROWS[:-6], r"needs 8 rows.*has 7"),
-    "too many rows": ("LUT_3D_SIZE 2\n" + ROWS + "0 0 0\n", r"needs 8 rows.*has 9"),
-    "a row of two numbers": ("LUT_3D_SIZE 2\n0 0\n", r"line 2.*needs 3 numbers"),
-    "a word in a row": ("LUT_3D_SIZE 2\n0 0 x\n", r"line 2.*cannot read"),
-    "unknown keyword": ("LUT_3D_SIZE 2\nGAMMA 2.2\n", r"line 2.*unknown keyword"),
-    "domain upside down": ("DOMAIN_MIN 1 1 1\nDOMAIN_MAX 0 0 0\nLUT_3D_SIZE 2\n" + ROWS, r"domain"),
-    "infinite value": ("LUT_3D_SIZE 2\n" + ROWS.replace("0 0 0", "1e999 0 0", 1), r"finite"),
-    "empty file": ("", r"no LUT_3D_SIZE"),
-}
-
-
-@pytest.mark.parametrize(("text", "message"), BAD_FILES.values(), ids=BAD_FILES.keys())
-def test_a_cube_that_cannot_be_used_fails_naming_the_file_and_the_line(tmp_path, text, message):
-    (tmp_path / "bad.cube").write_text(text, encoding="utf-8")
-    with pytest.raises(LutError, match=r"bad\.cube.*" + message):
+def test_a_cube_that_cannot_be_used_raises_lut_error_naming_the_file_and_the_line(tmp_path):
+    (tmp_path / "bad.cube").write_text("LUT_1D_SIZE 4\n0 0 0\n", encoding="utf-8")
+    with pytest.raises(LutError, match=r"bad\.cube.*line 1.*1D"):
         load_lut(tmp_path / "bad.cube")
-
-
-@pytest.mark.parametrize("name", ["binary.cube", "missing.cube"])
-def test_a_cube_that_is_not_text_or_not_there_fails_naming_the_file(tmp_path, name):
-    (tmp_path / "binary.cube").write_bytes(b"\xff\xfe\x00\x01")
-    with pytest.raises(LutError, match=name):
-        load_lut(tmp_path / name)
-
-
-@pytest.mark.parametrize(
-    "line",
-    ["127.0.0.1\tsecret-host", "root:secret:0:0:/var/root", "3 secret 5", "SECRET 1 2 3"],
-    ids=["a row with a word", "a line of another file", "a row with a word between numbers", "an unknown keyword"],
-)
-def test_a_fault_names_the_line_number_and_never_quotes_a_line_of_the_file(tmp_path, line):
-    (tmp_path / "other.txt").write_text(f"LUT_3D_SIZE 2\n{line}\n", encoding="utf-8")
-    with pytest.raises(LutError, match=r"line 2") as caught:
-        load_lut(tmp_path / "other.txt")
-    assert "secret" not in str(caught.value).lower()
-
-
-LIMIT = 64 * 1024 * 1024  # the documented limit of `load_lut`, in bytes
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="/dev/zero is a POSIX device")
-def test_a_file_that_never_ends_is_refused_after_reading_only_the_limit():
-    with pytest.raises(LutError, match="64 MiB"):
-        load_lut("/dev/zero")
-
-
-@pytest.mark.parametrize(
-    ("size", "refused"),
-    [pytest.param(LIMIT, False, id="exactly at the limit"), pytest.param(LIMIT + 1, True, id="one byte over")],
-)
-def test_a_file_over_the_limit_is_refused_and_one_at_it_is_read(tmp_path, size, refused):
-    cube = tmp_path / "big.cube"
-    head = "LUT_3D_SIZE 2\n" + ROWS
-    cube.write_text(head + "#" * (size - len(head)), encoding="utf-8")  # the rest is one long comment
-    if refused:
-        with pytest.raises(LutError, match="64 MiB"):
-            load_lut(cube)
-    else:
-        assert load_lut(cube).size == 2
 
 
 def test_a_recipe_with_a_bad_cube_fails_at_load_naming_step_parameter_and_file(tmp_path):
