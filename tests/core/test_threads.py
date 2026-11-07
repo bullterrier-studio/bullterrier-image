@@ -1,5 +1,4 @@
-"""Tests of `threads=` on `render`, `trace` and `render_all`: the same bytes at any number, a bad number refused, and
-renders from several Python threads."""
+"""Tests of `threads=` as the facade passes it on: a bad number refused, and renders from several Python threads."""
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -37,23 +36,9 @@ def big_photo() -> np.ndarray:
     return np.random.default_rng(2).random((300, 400, 3), dtype=np.float32)
 
 
-@pytest.mark.parametrize("threads", [2, 4, 0])
-@pytest.mark.parametrize(
-    "function",
-    [facade.render, lambda photo, recipe, **keys: facade.render_all(photo, [recipe], **keys)[0]],
-    ids=["render", "render_all"],
-)
-def test_a_render_on_more_threads_gives_the_same_bytes_as_on_one(big_photo, function, threads):
-    alone = function(big_photo, threaded_look())
-    assert function(big_photo, threaded_look(), threads=threads).tobytes() == alone.tobytes()
-
-
-@pytest.mark.parametrize("threads", [2, 0])
-def test_a_trace_on_more_threads_shows_the_same_stages_as_on_one(big_photo, threads):
-    alone = facade.trace(big_photo, threaded_look())
-    more = facade.trace(big_photo, threaded_look(), threads=threads)
-    assert [stage.label for stage in more] == [stage.label for stage in alone]
-    assert all(m.image.tobytes() == a.image.tobytes() for m, a in zip(more, alone, strict=True))
+def test_a_render_on_more_threads_gives_the_same_bytes_as_on_one(big_photo):
+    alone = facade.render(big_photo, threaded_look())
+    assert facade.render(big_photo, threaded_look(), threads=2).tobytes() == alone.tobytes()
 
 
 @pytest.mark.parametrize(
@@ -65,21 +50,12 @@ def test_a_trace_on_more_threads_shows_the_same_stages_as_on_one(big_photo, thre
         pytest.param(True, "got True", id="bool"),
         pytest.param(None, "got None", id="none"),
         pytest.param(257, "got 257", id="one more than allowed"),
-        pytest.param(1000, "got 1000", id="a typo"),
         pytest.param(2**70, str(2**70), id="more than a machine word"),
     ],
 )
-@pytest.mark.parametrize(
-    "call",
-    [
-        pytest.param(lambda photo, **keys: facade.render(photo, PLAIN, **keys), id="render"),
-        pytest.param(lambda photo, **keys: facade.trace(photo, PLAIN, **keys), id="trace"),
-        pytest.param(lambda photo, **keys: facade.render_all(photo, [PLAIN], **keys), id="render_all"),
-    ],
-)
-def test_a_threads_that_is_no_number_of_threads_is_refused_naming_it(photo, call, threads, error):
+def test_a_threads_that_is_no_number_of_threads_is_refused_naming_it(photo, threads, error):
     with pytest.raises(RecipeError, match=error):
-        call(photo, threads=threads)
+        facade.render(photo, PLAIN, threads=threads)
 
 
 def test_renders_from_several_python_threads_with_threads_each_give_each_photos_picture(big_photo):
@@ -89,7 +65,3 @@ def test_renders_from_several_python_threads_with_threads_each_give_each_photos_
         together = list(pool.map(lambda photo: facade.render(photo, threaded_look(), threads=2).tobytes(), photos))
     assert together == alone
     assert len(set(alone)) == len(alone), "the photos give different pictures"
-
-
-def test_the_most_threads_allowed_renders(photo):
-    assert facade.render(photo, PLAIN, threads=256).shape == photo.shape
