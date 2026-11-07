@@ -29,6 +29,7 @@ mod files_write;
 mod focus_blur;
 mod fractal;
 mod gaussian_blur;
+mod grade;
 mod gradient;
 mod gradient_map;
 mod grid_shift;

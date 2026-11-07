@@ -121,6 +121,43 @@ fn a_grey_between_two_ranges_takes_the_smoothstep_share_of_each() -> Result<(), 
 }
 
 #[test]
+fn balance_softness_and_amount_set_where_the_shadows_hand_over_how_sharply_and_how_far() -> Result<(), Error> {
+    let shadows = |balance, softness, amount| color_balance::Params {
+        balance,
+        softness,
+        amount,
+        ..pushing([[0.7, 0.5, 0.5], GREY, GREY])
+    };
+    let red = |params: &color_balance::Params, grey: f32| run(params, &[[grey; 3]]).map(|out| out[0][0]);
+    // grey 0.4 is 0.104 shadow at balance 0.5 (the shadow/midtone hand-over centred on 0.25 is 0.896 done), 0.5 at
+    // balance 0.8 (centred on 0.4), 0.784 at balance 1 (centred on 0.5: smoothstep(0.3) = 0.216)
+    for (balance, share) in [(0.5, 0.104), (0.8, 0.5), (1.0, 0.784)] {
+        let out = red(&shadows(balance, 1.0, 1.0), 0.4)?;
+        assert!(
+            (out - (0.4 + 0.2 * share)).abs() <= TOLERANCE,
+            "balance {balance}: {out}"
+        );
+    }
+    // greys 0.2 and 0.3 are equally far from the hand-over at 0.25, which is `softness` * 0.5 wide
+    for (softness, dark, lighter) in [(1.0, 0.648, 0.352), (0.4, 0.84375, 0.15625), (0.1, 1.0, 0.0)] {
+        let params = shadows(0.5, softness, 1.0);
+        let (low, high) = (red(&params, 0.2)?, red(&params, 0.3)?);
+        assert!(
+            (low - (0.2 + 0.2 * dark)).abs() <= TOLERANCE,
+            "softness {softness}: {low}"
+        );
+        assert!(
+            (high - (0.3 + 0.2 * lighter)).abs() <= TOLERANCE,
+            "softness {softness}: {high}"
+        );
+    }
+    // amount scales the push
+    let out = run(&shadows(0.5, 1.0, 0.25), &[[0.0; 3]])?;
+    assert_pixel(out[0], [0.05, 0.0, 0.0], "amount 0.25 of a push of 0.2");
+    Ok(())
+}
+
+#[test]
 fn preserving_the_luminosity_takes_the_brightness_a_push_added_back_out_of_every_channel() -> Result<(), Error> {
     let params = |preserve_luminosity| color_balance::Params {
         preserve_luminosity,

@@ -88,6 +88,26 @@ fn a_midtone_gamma_is_a_power_of_one_over_gamma_that_keeps_black_and_white() -> 
 }
 
 #[test]
+fn the_gamma_acts_between_the_input_points_and_the_output_points() -> Result<(), Error> {
+    let params = levels::Params {
+        black: 0.25,
+        white: 0.75,
+        gamma: 2.0,
+        output_black: 0.1,
+        output_white: 0.9,
+    };
+    // the middle of the input points is 0.5, its gamma 2 is 0.5 ** 0.5, which is then placed between 0.1 and 0.9
+    let out = levelled(&params, &[0.25, 0.5, 0.75])?;
+    assert_close(
+        &out,
+        &[0.1, 0.1 + 0.8 * 0.5_f32.sqrt(), 0.9],
+        TOLERANCE,
+        "all five together",
+    );
+    Ok(())
+}
+
+#[test]
 fn output_points_in_reverse_make_the_negative() -> Result<(), Error> {
     let negative = levels::Params {
         output_black: 1.0,
@@ -296,6 +316,65 @@ fn a_curve_is_held_at_its_end_points_beyond_them() -> Result<(), Error> {
         &[0.1, 0.5, 0.5],
         TOLERANCE,
         "beyond the ends",
+    );
+    Ok(())
+}
+
+#[test]
+fn each_point_of_a_channel_curve_moves_only_that_channel_at_that_input() -> Result<(), Error> {
+    // nine different heights, so a point read for another channel or another input gives another number
+    let params = curves::Params {
+        red_shadows: 0.10,
+        green_shadows: 0.15,
+        blue_shadows: 0.20,
+        red_midtones: 0.45,
+        green_midtones: 0.55,
+        blue_midtones: 0.65,
+        red_highlights: 0.80,
+        green_highlights: 0.85,
+        blue_highlights: 0.95,
+        ..curves::Params::default()
+    };
+    let out = run(&params, &greys(&[0.25, 0.5, 0.75]))?;
+    for (pixel, expected) in out
+        .iter()
+        .zip([[0.10, 0.15, 0.20], [0.45, 0.55, 0.65], [0.80, 0.85, 0.95]])
+    {
+        assert_close(pixel, &expected, TOLERANCE, "the three channel curves at their points");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_channel_curve_keeps_black_and_white_and_follows_the_master_curve() -> Result<(), Error> {
+    let ends = curves::Params {
+        red_shadows: 0.4,
+        red_highlights: 0.5,
+        ..curves::Params::default()
+    };
+    assert_close(
+        &run(&ends, &greys(&[0.0, 1.0]))?[0],
+        &[0.0; 3],
+        TOLERANCE,
+        "black stays black",
+    );
+    assert_close(
+        &run(&ends, &greys(&[0.0, 1.0]))?[1],
+        &[1.0; 3],
+        TOLERANCE,
+        "white stays white",
+    );
+    // the master takes 0.5 to 0.25 first; red's shadows point then takes 0.25 to 0.5 (the other order gives 0.25 twice)
+    let both = curves::Params {
+        midtones: 0.25,
+        red_shadows: 0.5,
+        ..curves::Params::default()
+    };
+    assert_close(
+        &run(&both, &greys(&[0.5]))?[0],
+        &[0.5, 0.25, 0.25],
+        TOLERANCE,
+        "master, then channel",
     );
     Ok(())
 }

@@ -229,6 +229,53 @@ fn a_limit_of_one_flattens_the_histogram_so_the_mapping_is_the_uniform_ramp() ->
 }
 
 #[test]
+fn a_limit_in_between_bounds_how_steeply_the_tones_are_pulled_apart() -> Result<(), Error> {
+    // 16 bins: every bin holds 4 pixels but bin 5, which holds 600. Unclipped, the output jumps by about 600/660 at the
+    // crowded bin; with a limit, no step between neighbouring bins is above `limit` times the uniform step 1 / bins
+    let bins = 16_u8;
+    let mut bin_of_pixel: Vec<u8> = (0..bins).flat_map(|bin| [bin; 4]).collect();
+    bin_of_pixel.extend([5; 596]);
+    let greys: Vec<f32> = bin_of_pixel
+        .iter()
+        .map(|&bin| (f32::from(bin) + 0.5) / f32::from(bins))
+        .collect();
+    let levels = |limit: f32| -> Result<Vec<f32>, Error> {
+        let out = grid_of(
+            &equalize::Params {
+                tiles: 1,
+                limit,
+                bins: i32::from(bins),
+            },
+            1,
+            greys.len(),
+            &greys,
+        )?;
+        Ok((0..bins)
+            .map(|bin| out[bin_of_pixel.iter().position(|&b| b == bin).unwrap_or(0)])
+            .collect())
+    };
+    let steps = |levels: &[f32]| levels.windows(2).map(|pair| pair[1] - pair[0]).collect::<Vec<_>>();
+    assert!(
+        steps(&levels(256.0)?).iter().any(|&step| step > 0.8),
+        "the crowded bin takes most of the range"
+    );
+    for limit in [1.5, 2.0, 4.0] {
+        let clipped = levels(limit)?;
+        assert!(
+            steps(&clipped)
+                .iter()
+                .all(|&step| 0.0 < step && step <= limit / 16.0 + TOLERANCE),
+            "limit {limit}: {clipped:?}"
+        );
+        assert!(
+            (clipped[15] - 1.0).abs() <= TOLERANCE,
+            "the clipped mass is redistributed, not lost"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 #[expect(clippy::cast_precision_loss, reason = "a position is below 32")]
 fn neighbouring_tiles_blend_by_the_distance_to_their_centres() -> Result<(), Error> {
     // 16 rows by 32 columns in 2 x 2 tiles of 8 x 16: the left half is one dark grey (bin 64 of 256), the right half

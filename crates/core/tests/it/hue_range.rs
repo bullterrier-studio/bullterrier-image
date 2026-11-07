@@ -96,3 +96,20 @@ fn the_centre_of_the_range_can_lie_anywhere_on_the_wheel() -> Result<(), Error> 
     assert_eq!(out[1..], [[1.0, 1.0, 0.0], [0.0, 1.0, 1.0], [1.0, 0.0, 0.0]]);
     Ok(())
 }
+
+#[test]
+fn a_range_without_feather_ends_where_its_width_ends() -> Result<(), Error> {
+    // width 40 is 20 degrees either side of the centre 0; the hues 19.5 (inside) and 20.5 (outside) have full saturation
+    // and value, so green is hue / 60 and the hue shift of 90 takes 19.5 to 109.5: red (120 - 109.5) / 60, green 1
+    let params = selective_color::Params {
+        hue: 0.0,
+        width: 40.0,
+        feather: 0.0,
+        hue_shift: 90.0,
+        ..selective_color::Params::default()
+    };
+    let out = run(&params, &[[1.0, 19.5 / 60.0, 0.0], [1.0, 20.5 / 60.0, 0.0]])?;
+    assert_pixel(out[0], [0.175, 1.0, 0.0], "inside");
+    assert_eq!(out[1], [1.0, 20.5 / 60.0, 0.0], "outside");
+    Ok(())
+}
