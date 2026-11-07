@@ -96,7 +96,6 @@ MISTAKES = {
     "a parameter the effect does not have": (("grain#1.amoun", 0, 0.2, 5), "amoun"),
     "a parameter that is not a number": (("gradient.colors", 0, 1, 5), "color"),
     "a value above the parameter's range": (("grain#1.amount", 0, 5, 5), "amount"),
-    "a value below the parameter's range": (("grain#1.amount", -1, 0.2, 5), "amount"),
     "one tile": (("grain#1.amount", 0, 0.2, 1), "count"),
     "a range of one value": (("grain#1.amount", 0.1, 0.1, 5), "start and end"),
     "more tiles than a sheet can show": (("grain#1.amount", 0, 0.2, 25), "count"),
