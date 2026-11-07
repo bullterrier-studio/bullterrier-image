@@ -31,7 +31,6 @@ from bullterrier_image import (
     fx,
     imageio,
     load_recipe,
-    render,
     run,
     trace,
 )
@@ -548,8 +547,6 @@ def test_trace_gives_the_input_and_the_picture_after_each_step_in_order(photo):
     np.testing.assert_array_equal(stages[0].image, photo)
     assert not np.array_equal(stages[1].image, stages[0].image)
     assert not np.array_equal(stages[3].image, stages[2].image)
-
-
 
 
 def test_trace_shows_the_subject_matte_when_the_recipe_uses_one(photo, subject):

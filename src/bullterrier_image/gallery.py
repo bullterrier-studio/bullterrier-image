@@ -2,8 +2,8 @@
 `docs/effects/`, `fx.pyi`) and the files of a new effect (`new_effect`, from the template).
 
 Everything about an effect is found by its name, in a layout that mirrors the package: its code in
-`src/bullterrier_image/effects/<name>/`, its Rust kernel in `crates/core/src/effects/`, its tests in
-`tests/effects/<name>/`, its example recipe in `examples/effects/` and its gallery picture in `docs/gallery/`.
+`src/bullterrier_image/effects/<name>/`, its Rust kernel in `crates/core/src/effects/`, its example recipe in
+`examples/effects/` and its gallery picture in `docs/gallery/`.
 `effect_files` is the one place that says so; everything else asks it. Effects carry their own documentation
 (category, docstring, signature), so nothing here is written by hand and no effect needs a shared file edited. The
 shared files (`docs/effects/`, `fx.pyi`) are regenerated deliberately, once, at integration (`poe regenerate`), not on
@@ -70,7 +70,6 @@ class EffectFiles(NamedTuple):
     """Where everything about one effect lives in a source checkout, by its name."""
 
     package: Path  # src/bullterrier_image/effects/<name>/: its Python code; an effect the core runs has none
-    tests: Path  # tests/effects/<name>/test_<name>.py: its behaviour tests
     example: Path  # examples/effects/<name>.toml: the short recipe that shows it, rendered for its picture
     picture: Path  # docs/gallery/<name>.jpg: its gallery picture (JPEG, longest side 480 px), shown by the catalogue
     kernel: Path  # crates/core/src/effects/<name>.rs: its Rust kernel, which declares and runs it (once ported)
@@ -80,7 +79,6 @@ def effect_files(name: str, *, checkout: Path = CHECKOUT) -> EffectFiles:
     """Where the files of an effect called `name` live in `checkout`, whether or not they exist (yet)."""
     return EffectFiles(
         package=_layout(checkout).effects / name,
-        tests=checkout / "tests" / "effects" / name / f"test_{name}.py",
         example=checkout / "examples" / "effects" / f"{name}.toml",
         picture=checkout / "docs" / "gallery" / f"{name}.jpg",
         kernel=checkout / "crates" / "core" / "src" / "effects" / f"{name}.rs",
@@ -196,8 +194,8 @@ def stub_text() -> str:
 def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[Path]:
     """Write the files of a new effect called `name`, in `category` (one of `registry.CATEGORIES`), into `checkout`,
     each made from the template in `src/bullterrier_image/effects/_template/` and placed where `effect_files` says: its
-    Rust kernel (`Params`, which declares one documented example field, and `render`), its tests (`test_<name>.py`) and
-    its example recipe. Returns the files written, sorted.
+    Rust kernel (`Params`, which declares one documented example field, and `render`) and its
+    example recipe. Returns the files written, sorted.
 
     The kernel is the whole effect: the registry builds the Python side from its declaration, so there is no package.
     Once the extension is rebuilt with the kernel (`uv sync`, which a Rust file's change triggers), the effect is
@@ -234,7 +232,6 @@ def new_effect(name: str, category: str, *, checkout: Path = CHECKOUT) -> list[P
             f"{name!r} cannot name an effect: fx defines {name!r} for itself, so fx.{name} would not build the effect"
         )
     targets = {  # template file -> where its copy goes
-        "test_effect.py.tmpl": files.tests,
         "example.toml.tmpl": files.example,
         "kernel.rs.tmpl": files.kernel,
     }

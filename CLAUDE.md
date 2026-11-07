@@ -42,7 +42,7 @@ inside the package (`Recipe`, `fx`, `RecipeError`, effects, parameters) carry no
 A **microkernel**: a small `core` (contracts, registry, recipe engine) plus **plugins** (effects) found by auto-discovery. A
 recipe is a **pipes-and-filters** list of steps, each a pure filter `image -> image`. One **vertical slice** per effect, joined by
 its name; `tests/` mirrors `src/`:
-`crates/core/src/effects/<name>.rs` (an effect the core runs; a Python one is `src/bullterrier_image/effects/<name>/`, code only), `tests/effects/<name>/test_<name>.py`,
+`crates/core/src/effects/<name>.rs` (an effect the core runs; a Python one is `src/bullterrier_image/effects/<name>/`, code only),
 `examples/effects/<name>.toml`, `docs/gallery/<name>.jpg`. `gallery.effect_files(name)` is the one place that knows these paths.
 Shared numeric code lives in `ops/`, named by concept.
 
@@ -289,13 +289,13 @@ Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template
 defines the shape; `grade` (`crates/core/src/effects/grade.rs`) is the worked example. An effect that
 works from a map declares a `FieldName` parameter and reads its `Layer` from `Inputs` (`focus_blur`); one that cannot be described in Rust yet keeps a Python body (`effects/relight/`).
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the Rust kernel `crates/core/src/effects/<name>.rs` (`META` with the
-   category, a public `Params` with one example field, `render`), `tests/effects/<name>/test_<name>.py` and
-   `examples/effects/<name>.toml`; no Python file. The effect exists once the extension is rebuilt with the kernel (`uv run` and `uv sync`
+   category, a public `Params` with one example field, `render`) and
+   `examples/effects/<name>.toml`; no Python file and no Python test. The effect exists once the extension is rebuilt with the kernel (`uv run` and `uv sync`
    do); then it passes the gate as written (`uv run poe check-scaffold` proves it in a copy; CI runs it).
 2. **Fill in:** replace the example field with the effect's own in `Params` (the one declaration), `META` (opacity below 1
    if its steps should be mixed in partway), and the kernel with the effect (the `///` doc of `Params` documents it for users; its first
    sentence is the summary; a parameter that matters only while another is set gets a row in
-   `parameters_are_read.rs`); in the test file, the behaviour's properties (contract tests already cover ranges, schema, call styles); in the example recipe, 1 to 3 steps at
+   `parameters_are_read.rs`); its behaviour's properties as a module of `crates/core/tests/it` (`effects_contract.rs` already covers ranges, refusals, seeds, threads, size); in the example recipe, 1 to 3 steps at
    `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.
 3. **Gate:** `uv run poe check`. Only files named for the effect may appear in `git status`. The integrator runs
    `uv run poe regenerate`; do not commit `fx.pyi` or `docs/effects/`.
@@ -404,7 +404,7 @@ When a test reaches inside (`tests/test_suite_rules.py` fails on private imports
 - Own test effects: `throwaway_effects`, or `fresh_registry` for an empty registry (public interface only).
 - "Work was skipped" shows in the files (an untouched sentinel), not in a spy.
 
-Writing a test file (model: `src/bullterrier_image/effects/_template/test_effect.py.tmpl`):
+Writing a test file:
 - **Parametrise by default:** cases differing by literals are one table (`pytest.param(..., id=...)` or a dict) with good and
   bad rows together; the id states the rule.
 - **A new test file only for a new module**, at the mirror path (`tests/ops/test_blur.py` for `ops/blur.py`).

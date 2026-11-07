@@ -1,12 +1,12 @@
 """`poe new-effect` (tools/dev.py): a new effect is a set of new files named for it, written from the template, that
 works as written: its Rust kernel (`crates/core/src/effects/<name>.rs`, which is the whole effect: the registry builds
-its Python side from it), its tests (`tests/effects/<name>/`) and its example recipe (`examples/effects/<name>.toml`),
+its Python side from it) and its example recipe (`examples/effects/<name>.toml`),
 where `gallery.effect_files` says they belong.
 
 The scaffold always writes into the checkout it runs from, so these tests run it on a copy: in-process through
 `gallery.new_effect(checkout=...)`, or as the command, in a fresh interpreter importing the copy. The last two prove
 rule 4 of CLAUDE.md on a copy of the whole tree: adding an effect creates files and changes none, and they pass the
-gates that need no new build of the extension (ruff; the core compiled with the kernel under clippy; the Rust rules).
+gates that need no new build of the extension (the core compiled with the kernel under clippy; the Rust rules).
 Running the new effect needs the extension rebuilt in an environment of the copy's own (`uv sync`, about 30 s): that
 test is marked `rebuild`, left out of `poe test` and run by `poe check-scaffold` (CI runs it on Linux).
 """
@@ -67,11 +67,10 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
     assert {path: after[path] for path in before} == before  # nothing that was there changed
     assert sorted(checkout / path for path in set(after) - set(before)) == written  # it reports what it wrote
     for path in written:
-        assert path in (files.tests, files.example, files.kernel), path
+        assert path in (files.example, files.kernel), path
         assert "$" not in path.read_text(encoding="utf-8"), f"{path.name} still holds a template placeholder"
     assert not files.package.exists()  # the kernel is the whole effect: no Python folder
     assert files.kernel in written
-    assert files.tests in written
     recipe = tomllib.loads(files.example.read_text(encoding="utf-8"))
     assert recipe["name"] == "lamp_probe"
     assert recipe["size"] == 480
@@ -82,12 +81,11 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
     "existing",
     [
         "src/bullterrier_image/effects/lamp_probe/notes.txt",
-        "tests/effects/lamp_probe/test_lamp_probe.py",
         "examples/effects/lamp_probe.toml",
         "docs/gallery/lamp_probe.jpg",
         "crates/core/src/effects/lamp_probe.rs",
     ],
-    ids=["package", "tests", "example recipe", "picture", "Rust kernel"],
+    ids=["package", "example recipe", "picture", "Rust kernel"],
 )
 def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
     (checkout / existing).parent.mkdir(parents=True, exist_ok=True)
@@ -137,7 +135,7 @@ def test_a_bad_name_or_category_is_refused_saying_why_and_nothing_is_written(che
 @pytest.mark.parametrize("name", ["os", "core", "sys"])
 def test_a_name_shared_with_some_other_module_is_fine_when_fx_does_not_use_it(checkout, name):
     written = gallery.new_effect(name, "light", checkout=checkout)
-    assert gallery.effect_files(name, checkout=checkout).tests in written
+    assert gallery.effect_files(name, checkout=checkout).kernel in written
 
 
 def test_the_command_writes_the_files_prints_them_and_says_how_to_make_the_picture(checkout):
@@ -196,21 +194,19 @@ def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_exi
     kernel = f"crates/core/src/effects/{PROBE}.rs"
     assert kernel in created  # its Rust kernel among them ...
     places = (
-        f"tests/effects/{PROBE}/",
         f"examples/effects/{PROBE}.",
         kernel,
     )
     assert all(path.startswith(places) for path in created), created  # ... and only files named for the effect
 
 
-def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tmp_path, tracked_files):
-    """Bounded on purpose, to keep the suite fast: in the copy, ruff on the new Python files; rustfmt, and clippy on the
+def test_a_scaffolded_effect_passes_clippy_and_the_rust_rules_as_written(tmp_path, tracked_files):
+    """Bounded on purpose, to keep the suite fast: in the copy, rustfmt and clippy on the
     core crate with the new kernel compiled in (the core alone builds in seconds; the rebuilt extension is the next
     test's); then the scans of the new files (no hidden tunables, no Rust effect referring to another), selected by
     name."""
     copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
-    created = _scaffold_into(copy)
-    python = [path for path in created if path.endswith(".py")]
+    _scaffold_into(copy)
     environment = {
         **os.environ,
         "PYTHONPATH": str(copy / "src"),  # the copy's bullterrier_image, not the installed one
@@ -220,8 +216,6 @@ def test_a_scaffolded_effect_passes_ruff_clippy_and_the_rust_rules_as_written(tm
     clippy = ["--package", "bullterrier-image", "--all-targets", "--locked", "--quiet", "--", "-D", "warnings"]
     scans = ["tests/effects/test_no_hidden_tunables.py", "tests/test_layering.py", "-k", PROBE]
     checks = [
-        [sys.executable, "-m", "ruff", "format", "--check", "--no-cache", *python],
-        [sys.executable, "-m", "ruff", "check", "--no-cache", *python],
         ["cargo", "fmt", "--all", "--check"],
         ["cargo", "clippy", *clippy],
         [
@@ -292,7 +286,7 @@ def test_a_scaffolded_effect_passes_its_own_and_the_contract_tests_once_the_exte
         ["uv", "sync", "--locked", "--quiet", "--python", sys.executable],
         ["uv", "run", "--no-sync", "python", "-c", registered],
         ["uv", "run", "--no-sync", "pytest", "-q", "-rA", "-n", "0", "-p", "no:cacheprovider", "-p", "no:randomly",
-         f"--basetemp={tmp_path / 'tmp'}", f"tests/effects/{PROBE}", "tests/effects/test_contract.py", "-k", PROBE],
+         f"--basetemp={tmp_path / 'tmp'}", "tests/effects/test_contract.py", "-k", PROBE],
     ]  # fmt: skip
     outputs = []
     for command in commands:
@@ -304,7 +298,6 @@ def test_a_scaffolded_effect_passes_its_own_and_the_contract_tests_once_the_exte
     for note in ("Replace", "crates/", "uv sync", "Rust"):  # no note to the author, should they forget to edit it
         assert note not in documentation, documentation
     passed = [line for line in done.stdout.splitlines() if line.startswith("PASSED ")]
-    assert any(f"tests/effects/{PROBE}/test_{PROBE}.py::" in line for line in passed), done.stdout[-4000:]
     assert any(line.startswith("PASSED tests/effects/test_contract.py::") for line in passed), done.stdout[-4000:]
 
 
