@@ -58,6 +58,7 @@ mod lut_cube;
 mod lut_effect;
 mod motion_blur;
 mod noise;
+mod noise_field;
 mod paper_texture;
 mod parallax;
 mod params;

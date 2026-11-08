@@ -469,6 +469,27 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "generated noise pictures",
+            Recipe::new([
+                Step::new("noise_field").param("kind", "value").param("warp", 20),
+                Step::new("noise_field")
+                    .param("kind", "perlin")
+                    .param("warp", 12.5)
+                    .param("octaves", 3)
+                    .param("seed", 4_294_967_295_u32),
+                Step::new("noise_field")
+                    .param("kind", "worley")
+                    .param("scale", 30)
+                    .param("warp", 8),
+                Step::new("noise_field")
+                    .param("kind", "sine")
+                    .param("scale", 40)
+                    .param("warp", 15),
+                Step::new("noise_field"),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "the guided filter and the minimum filter, on the rows and the columns turned into rows",
             Recipe::new([
                 Step::new("tone_map").param("radius", 5).param("amount", 1.0),
