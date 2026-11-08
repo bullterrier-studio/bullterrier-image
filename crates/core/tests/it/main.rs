@@ -110,6 +110,7 @@ mod svg_drawing;
 mod swirl;
 mod threads;
 mod threads_rows;
+mod tile;
 mod tone;
 mod tone_map;
 mod torn;

@@ -376,6 +376,40 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "shifts and strips, by each edge rule",
+            Recipe::new([
+                Step::new("lenticular")
+                    .param("strip", 7)
+                    .param("shift", -9.5)
+                    .param("edge", "wrap"),
+                Step::new("interlace")
+                    .param("offset", 11.25)
+                    .param("field", "even")
+                    .param("edge", "mirror"),
+                Step::new("echo")
+                    .param("copies", 5)
+                    .param("dx", -6.5)
+                    .param("dy", 3.25)
+                    .param("fade", 0.3)
+                    .param("edge", "reflect"),
+                Step::new("rgb_split")
+                    .param("pair", "red_cyan")
+                    .param("angle", 33)
+                    .param("amount", 12.5)
+                    .param("edge", "wrap"),
+                Step::new("tile")
+                    .param("columns", 4)
+                    .param("rows", 3)
+                    .param("offset_x", 0.37)
+                    .param("offset_y", -0.6),
+                Step::new("echo").param("copies", 0),
+                Step::new("lenticular"),
+                Step::new("interlace"),
+                Step::new("rgb_split"),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "the guided filter and the minimum filter, on the rows and the columns turned into rows",
             Recipe::new([
                 Step::new("tone_map").param("radius", 5).param("amount", 1.0),
