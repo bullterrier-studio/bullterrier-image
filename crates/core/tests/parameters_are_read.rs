@@ -86,6 +86,12 @@ fn conditional() -> Vec<Conditional> {
             field: "reflect",
             with: vec![("repeat", json!(2))],
         },
+        // a slid strip reaches beyond the edge only when it starts nearer the edge than it slides
+        Conditional {
+            effect: "lenticular",
+            field: "edge",
+            with: vec![("strip", json!(2))],
+        },
         // the value beyond the edge is seen only by the edge rule that uses it
         Conditional {
             effect: "gaussian_blur",

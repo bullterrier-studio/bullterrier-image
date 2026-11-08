@@ -44,6 +44,7 @@ mod kaleidoscope;
 mod lens_blur;
 mod lens_distortion;
 mod lens_flare;
+mod lenticular;
 mod light_leak;
 mod light_rays;
 mod limits;
