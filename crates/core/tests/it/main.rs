@@ -24,6 +24,7 @@ mod displace;
 mod droste;
 mod each;
 mod each_weights;
+mod echo;
 mod effect;
 mod error;
 mod files_icc;
