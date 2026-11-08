@@ -81,11 +81,11 @@ def test_a_category_has_a_page_only_while_it_has_effects(fresh_registry, registe
     pages = gallery.render_effects_pages()
     assert set(pages) == {"README.md", "light.md"}  # no page, no index row and no link for a category without effects
     assert "distortion" not in pages["README.md"].lower()
-    register_probe("swirl", "distortion")
+    register_probe("bend", "distortion")
     pages = gallery.render_effects_pages()
     assert set(pages) == {"README.md", "light.md", "distortion.md"}
-    assert "`swirl`" in pages["distortion.md"]
-    assert "`swirl`" not in pages["light.md"]
+    assert "`bend`" in pages["distortion.md"]
+    assert "`bend`" not in pages["light.md"]
 
 
 def test_the_index_lists_every_effect_once_alphabetically_linking_to_its_category_page(fresh_registry, register_probe):
