@@ -34,6 +34,7 @@ mod files_icc;
 mod files_read;
 mod files_write;
 mod flow_lines;
+mod flow_warp;
 mod focus_blur;
 mod fog;
 mod fractal;

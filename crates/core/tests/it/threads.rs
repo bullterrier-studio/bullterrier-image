@@ -518,6 +518,21 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "pictures carried along noise",
+            Recipe::new([
+                Step::new("flow_warp")
+                    .param("amount", 40.5)
+                    .param("steps", 3)
+                    .param("scale", 30)
+                    .param("variation", 200)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap")
+                    .param("seed", 4_294_967_295_u32),
+                Step::new("flow_warp"),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "the guided filter and the minimum filter, on the rows and the columns turned into rows",
             Recipe::new([
                 Step::new("tone_map").param("radius", 5).param("amount", 1.0),
