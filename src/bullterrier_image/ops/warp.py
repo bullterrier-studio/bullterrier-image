@@ -1,6 +1,5 @@
-"""Warping a picture: reading it at float coordinates, and the coordinates of a warp about a centre."""
+"""Warping a picture: reading it at float coordinates."""
 
-from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
@@ -58,63 +57,3 @@ def remap(
         axis=-1,
     )
     return np.clip(out, 0, 1)
-
-
-@dataclass(frozen=True)
-class Centre:
-    """A point in a picture of `height` x `width` px that a warp is about, with every pixel's place measured from it.
-
-    `x` and `y` are fractions of the way from the first pixel to the last (0 the first column or row, 0.5 the
-    middle, 1 the last), so the centre can sit on a pixel. `distance` is each pixel's distance from the centre in
-    pixels, shape (height, width); the centre pixel's is 0.
-    """
-
-    height: int
-    width: int
-    x: float
-    y: float
-
-    @classmethod
-    def middle(cls, height: int, width: int) -> "Centre":
-        """The centre of a picture of `height` x `width` px: half way across and down, between the middle two pixels
-        of a side that has an even number of them."""
-        return cls(height, width, x=0.5, y=0.5)  # constant: the middle of a picture is half way across it
-
-    @property
-    def distance(self) -> np.ndarray:
-        """The distance in px of every pixel from the centre, float64, shape (height, width)."""
-        return np.hypot(*self.offsets())
-
-    def sources(
-        self, scale: float | np.ndarray | None = None, turn: float | np.ndarray | None = None
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Where each pixel of a radial warp reads the picture: its offset from the centre scaled, then turned.
-
-        Returns (rows, cols), float64, each of shape (height, width), for `remap`. A pixel's source is the centre plus
-        the pixel's offset from it multiplied by `scale` (2 reads twice as far out, 0.5 half as far) and then turned
-        counter-clockwise by `turn` radians as the picture is seen (rows run down and columns right: a pixel right of
-        the centre reads the point above it for a quarter turn), so the picture's content appears turned clockwise.
-        `scale` and `turn` are each a number, or an array of shape (height, width) that differs from pixel to
-        pixel; None (the default) leaves that step out. The centre pixel always reads itself; with neither given
-        every pixel reads itself.
-        """
-        dr, dc = self.offsets()
-        if scale is not None:
-            dr, dc = dr * scale, dc * scale
-        if turn is not None:
-            dr, dc = dr * np.cos(turn) - dc * np.sin(turn), dr * np.sin(turn) + dc * np.cos(turn)
-        centre_row, centre_col = self.y * (self.height - 1), self.x * (self.width - 1)
-        return np.broadcast_to(centre_row + dr, self.shape), np.broadcast_to(centre_col + dc, self.shape)
-
-    @property
-    def shape(self) -> tuple[int, int]:
-        """The shape of the picture, (height, width)."""
-        return self.height, self.width
-
-    def offsets(self) -> tuple[np.ndarray, np.ndarray]:
-        """Where each pixel is from the centre, in px: the row offset, shape (height, 1), and the column offset, shape
-        (1, width), both float64, positive below and right of the centre. They broadcast against each other, and against
-        `distance`, to (height, width)."""
-        dr = np.arange(self.height, dtype=np.float64)[:, None] - self.y * (self.height - 1)
-        dc = np.arange(self.width, dtype=np.float64)[None, :] - self.x * (self.width - 1)
-        return dr, dc
