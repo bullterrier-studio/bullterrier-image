@@ -223,6 +223,17 @@ fn conditional() -> Vec<Conditional> {
             field: "band_max_height",
             with: vec![("bands", json!(7))],
         },
+        // the clumping blur is run only for specks of more than a pixel
+        Conditional {
+            effect: "grain",
+            field: "truncate",
+            with: vec![("size", json!(6.0))],
+        },
+        Conditional {
+            effect: "grain",
+            field: "edge",
+            with: vec![("size", json!(6.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

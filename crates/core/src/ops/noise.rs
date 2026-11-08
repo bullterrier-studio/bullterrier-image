@@ -98,7 +98,7 @@ fn field(height: usize, width: usize, noise: &Fractal, axis: u64) -> Vec<f32> {
 }
 
 /// `sum` shifted to mean 0 and scaled to standard deviation 1; all zeros if it has no variation.
-fn standardised(mut sum: Vec<f32>) -> Vec<f32> {
+pub(crate) fn standardised(mut sum: Vec<f32>) -> Vec<f32> {
     let count = length::float(sum.len());
     let mean = sum.iter().map(|&value| f64::from(value)).sum::<f64>() / count;
     let variance = sum.iter().map(|&value| (f64::from(value) - mean).powi(2)).sum::<f64>() / count;

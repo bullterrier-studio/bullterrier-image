@@ -34,6 +34,7 @@ mod focus_blur;
 mod fractal;
 mod gaussian_blur;
 mod grade;
+mod grain;
 mod gradient;
 mod gradient_map;
 mod grid_shift;

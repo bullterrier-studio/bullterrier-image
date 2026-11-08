@@ -424,6 +424,21 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "seeded noise and marks",
+            Recipe::new([
+                Step::new("grain")
+                    .param("amount", 0.2)
+                    .param("balance", -0.6)
+                    .param("size", 3.5)
+                    .param("color", true)
+                    .param("distribution", "uniform")
+                    .param("seed", 4_294_967_295_u32)
+                    .param("edge", "wrap"),
+                Step::new("grain"),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "the guided filter and the minimum filter, on the rows and the columns turned into rows",
             Recipe::new([
                 Step::new("tone_map").param("radius", 5).param("amount", 1.0),
