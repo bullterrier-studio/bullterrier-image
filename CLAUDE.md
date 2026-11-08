@@ -123,9 +123,10 @@ the Python `Lut` wraps the core's table (`_core.Lut`). `_core.effects()` lists t
 `trace` install a rayon pool of that size (`ops/par.rs`); the render stays on the calling thread, only row bands run on the
 pool, and rayon's global pool is never used. A kernel fills its output with `par::rows(out, row_len, |first_row, band| ..)`
 (`Picture::map` and `map_at` do, so a per-pixel effect is threaded as written); outside a pool it runs inline, and
-`Effect::apply` takes no thread parameter. Rule: the output is byte-identical at any thread count, so a band reads only
-input rows and carries nothing from one row to the next, and a reduction chunks by the data, never by the thread count.
-Tests: render at threads 1, 2, 3, 10 and compare bytes (`crates/core/tests/it/threads.rs`). Python: `render`/`trace`/`render_all`
+`Effect::apply` takes no thread parameter. Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only
+input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count). Never add
+real complexity for the last bit: if a kernel's rounding differs between runs with no visible effect, compare within a small
+tolerance. Tests: render at threads 1, 2, 3, 10 and compare (`crates/core/tests/it/threads.rs`). Python: `render`/`trace`/`render_all`
 take `threads=`; `Step.apply` and `fx` use 1.
 
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
@@ -383,7 +384,7 @@ golden file, sleep, mock of our own code) is worse than none: delete it. Reviewe
   equivalent or marginal and left. Skip thin kernels whose behaviour tests already compare hand-worked values. Before the crate
   is published, one separate deeper pass over `ops/` and the parameter checks (`cargo-mutants` or by hand, under `memguard`);
   not a CI gate. Use `PYTHONDONTWRITEBYTECODE=1` and clear `__pycache__` between mutants.
-- Refactors prove behaviour is preserved by comparing outputs before and after (byte-identical), in the report, not committed.
+- Refactors prove behaviour is preserved by comparing outputs before and after (identical, or equal within float tolerance), in the report, not committed.
 
 **Tests describe behaviour, not implementation:** they must survive any behaviour-preserving refactor.
 - Never import underscore names, read production constants or private attributes, or call private functions. Worth testing means
