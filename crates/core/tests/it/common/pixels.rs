@@ -81,3 +81,8 @@ pub(crate) fn run_with_field<P: EffectParams>(
     )?;
     Ok(image.into_values())
 }
+
+/// Channel `which` (0 red, 1 green, 2 blue) of the picture `values`, three channels a pixel.
+pub(crate) fn channel(values: &[f32], which: usize) -> Vec<f32> {
+    values.as_chunks::<3>().0.iter().map(|pixel| pixel[which]).collect()
+}

@@ -32,6 +32,7 @@ pub(crate) mod raster;
 pub(crate) mod resample;
 pub(crate) mod rotate;
 pub(crate) mod sample;
+pub(crate) mod shift;
 pub(crate) mod sites;
 pub(crate) mod svg;
 pub(crate) mod tone;

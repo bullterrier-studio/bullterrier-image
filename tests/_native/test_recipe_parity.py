@@ -169,6 +169,9 @@ ROWS = [
     pytest.param("chromatic_aberration", {"samples": 32, "amount": 100}, True, id="chromatic_aberration: the largest"),
     pytest.param("chromatic_aberration", {"samples": 2}, False, id="chromatic_aberration: fewer than three copies"),
     pytest.param("chromatic_aberration", {"amount": -1}, False, id="chromatic_aberration: a negative amount"),
+    pytest.param("rgb_split", {"pair": "red_cyan", "angle": 725, "amount": 500}, True, id="rgb_split: cyclic angle"),
+    pytest.param("rgb_split", {"pair": "green_blue"}, False, id="rgb_split: a pair it lacks"),
+    pytest.param("rgb_split", {"amount": -0.5}, False, id="rgb_split: a negative amount"),
 ]
 
 

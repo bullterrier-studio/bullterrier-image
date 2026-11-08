@@ -85,3 +85,17 @@ pub(crate) fn warped(
     }
     out
 }
+
+/// The picture `pixels` moved down by `dy` and right by `dx`, from the definition: pixel (row, column) is the picture read
+/// linearly at (row - `dy`, column - `dx`), a place beyond the picture read as `rule` says.
+#[expect(clippy::cast_precision_loss, reason = "a test picture is small")]
+pub(crate) fn moved(pixels: &[f32], height: usize, width: usize, rule: Edge, dy: f64, dx: f64) -> Vec<f32> {
+    warped(
+        pixels,
+        height,
+        width,
+        Interpolation::Bilinear,
+        (rule, rule),
+        |row, column| (row as f64 - dy, column as f64 - dx),
+    )
+}
