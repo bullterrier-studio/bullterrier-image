@@ -18,8 +18,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `echo` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.copies.unsigned_abs()) * f64::from(params.dy.abs()), params.edge == Edge::Wrap)
 }
 
 /// Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`.

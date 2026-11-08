@@ -17,8 +17,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `sharpen` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.radius * params.truncate), params.edge == EdgeOrConstant::Wrap)
 }
 
 /// An unsharp mask: the difference between the picture and a blurred copy is added back, scaled by `amount`.

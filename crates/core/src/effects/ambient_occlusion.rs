@@ -18,8 +18,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `ambient_occlusion` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 
 /// An ambient occlusion: each pixel darkened by `gain` times how much farther it lies than the depth around it, within

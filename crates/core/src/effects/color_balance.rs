@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `color_balance` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 const NEUTRAL: f32 = 0.5; // constant: mid grey, the colour that leaves a range alone

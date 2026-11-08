@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `curves` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Where the control points sit on the input axis: black, a quarter, the middle, three quarters and white.

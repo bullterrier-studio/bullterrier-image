@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `levels` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch,

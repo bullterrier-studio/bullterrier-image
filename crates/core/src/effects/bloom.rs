@@ -19,8 +19,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `bloom` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.radius * params.truncate), params.edge == EdgeOrConstant::Wrap)
 }
 
 /// Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at `octaves`

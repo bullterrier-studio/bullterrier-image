@@ -19,8 +19,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `tone_map` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::Radius(2.0 * f64::from(params.radius))
 }
 
 /// Luminance below this (about 13 stops under white) counts as this much in the logarithm, so black has a finite

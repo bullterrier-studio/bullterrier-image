@@ -16,7 +16,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `lut` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`.

@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `selective_color` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// The smallest feather; only keeps a hard-edged range (feather 0) from dividing by zero, a pixel past the edge still

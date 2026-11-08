@@ -18,8 +18,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `motion_blur` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.length), params.edge == Edge::Wrap)
 }
 
 /// Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.

@@ -18,8 +18,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `focus_blur` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 
 /// A shallow depth of field, or a tilt-shift miniature: pixels whose `field` value lies near `focus` stay sharp, and the

@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `lenticular` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Radius(0.0)
 }
 
 /// Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px, as a lenticular

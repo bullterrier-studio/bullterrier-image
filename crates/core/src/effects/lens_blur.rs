@@ -22,8 +22,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `lens_blur` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.radius), params.edge == Edge::Wrap)
 }
 
 /// Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels.

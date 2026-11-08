@@ -20,7 +20,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `anamorphic_streaks` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Radius(0.0)
 }
 
 /// Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened

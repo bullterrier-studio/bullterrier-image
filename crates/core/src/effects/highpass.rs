@@ -17,8 +17,8 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `highpass` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 
 /// The level the detail is centred on.

@@ -20,8 +20,13 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `parallax` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+// The depth is read up to that far away (the nearest within the largest shift) and the picture up to the shift itself, no
+// farther: the two reads do not add.
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(
+        f64::from(params.amount) * f64::from(params.focus.max(1.0 - params.focus)),
+        params.edge == Edge::Wrap,
+    )
 }
 
 /// Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera move would: layers

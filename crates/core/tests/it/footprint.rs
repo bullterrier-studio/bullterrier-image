@@ -37,7 +37,7 @@ const TYPICAL_PX: f64 = 12.0;
 const RATIOS: [f64; 3] = [0.5, 1.0, 2.0];
 /// At least this many effects of the core are less than `Whole` with their defaults, so declaring all of them `Whole`
 /// does not pass.
-const NOT_WHOLE: usize = 1;
+const NOT_WHOLE: usize = 20;
 
 type Setting = Map<String, Value>;
 
