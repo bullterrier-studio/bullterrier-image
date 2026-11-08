@@ -515,10 +515,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   ten of them are gigabytes. At 16 bit (6 bytes a pixel) a 12 MP picture is 72 MB, at 8 bit (3 bytes) 36 MB. 8 bit bands
   visibly in smooth gradients and cannot take a further grade; 16 bit does not; float32 keeps out-of-range values. Decide before
   E5, because kernels are being written against float32.
-- **Open: a render that takes the design scale from its caller (owner decides).** A `px` value is scaled by the working
-  picture's longest side over 480, derived from the picture and never passed in. A picture of another size placed on a
-  larger canvas then gets a finer grain than its neighbour, and a band of rows would scale by the band, not the canvas. Taking
-  the design scale from the caller reverses that decision; needed by the banded render. `Options` has `size` and `threads` only.
+- **Open: a frame of reference that the renderer hands an effect (owner decides).** An effect derives three things from the
+  picture it is given: the canvas size, its own position in it, and the design scale (a `px` value is scaled by the working
+  picture's longest side over 480, never passed in). A picture of another size placed on a larger canvas then gets a finer
+  grain than its neighbour, and a band of rows would scale, centre and seed by the band instead of the canvas. One input
+  would give all three: the full canvas size, the band's row offset and the design scale, set by the caller. It reverses the
+  rule that the ratio is derived from the working picture, and with position-hashed noise it is what lets the 40 effects that
+  declare the whole picture band. `Options` has `size` and `threads` only. Design it once, with the banded render.
 - **Open: alpha through effects that move pixels.** `Picture` is RGB by type and only the cut-out after the last step adds
   alpha. A look applied to an already transparent picture (cut out, then sliced, displaced or torn) moves the colour but not the
   alpha. No decision.
