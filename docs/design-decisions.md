@@ -879,6 +879,26 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - *`perspective` floors the depth at 1e-9*: the old Python divided by zero on the vanishing line and produced NaN; a pixel there
     now reads a place far away, where the edge rule decides, and the result stays finite.
 
+- **Noise and texture effects run in Rust; every effect declares its footprint (E4).** Decisions:
+  - *`ops/gauss.rs` (`ndtr`) uses the pure-Rust `libm` crate for `erfc`*: an accurate normal CDF is hard to write by hand, the
+    crate is small and licence-clean (`cargo deny` passes). Value, Perlin, Worley and sine fields are hashed by position, so
+    they do not depend on the thread count; Worley looks sites up in a bucket grid, not a kd-tree.
+  - *Seeds draw from the core's own streams* (`Rng`, `Rng::shuffled` for nested prefixes: a larger `count` of `dead_pixels` keeps
+    every pixel a smaller one had). The old NumPy numbers are not reproduced; bicubic is Catmull-Rom (differs from scipy's spline
+    up to 0.37 on noise).
+  - *`fog` reads its cloud field evenly spread over 0..1*, as its doc always said. The old body passed it through `ndtr` twice,
+    which kept it within about 0.04..0.96; defaults barely move (mean cloud 0.718 to 0.715) and the `smoke` preset has
+    plumes about 14% thinner that now reach the full amount.
+  - *`flow_lines` runs on one thread*: its lines stamp ink into one shared picture.
+  - *Footprint is part of the effect contract.* Each effect declares `footprint(&Params) -> Footprint`: `Pixel` (reads nothing
+    around a pixel), `Radius(r)` (design px, rows only; the margin adds 2 rows for interpolation) or `Whole`. `Whole` is the safe
+    answer, and the foreign effect default. A generic test (`tests/it/footprint.rs`) renders bands of rows plus their margin and
+    compares them with the same rows of the whole render (tolerance 1e-4: crops differ by rounding in blurs), so a wrong claim
+    fails; known-bad doubles prove it. *Consequence:* only 22 of the 62 core effects are narrower than `Whole`, and of the E4
+    ones only `melt`. An effect that draws from one sequential seeded stream, knows where a pixel is (a centre, row parity,
+    the picture height) or normalises over the picture is `Whole`; relaxing them needs the frame of reference described under
+    "Determinism" (position-hashed noise, the band's offset and the canvas size). No banded renderer exists yet.
+
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*
