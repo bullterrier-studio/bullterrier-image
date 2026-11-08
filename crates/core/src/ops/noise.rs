@@ -73,8 +73,9 @@ pub(crate) fn bend(height: usize, width: usize, tear: &Tear) -> [Vec<f32>; 2] {
     )
 }
 
-/// The field of one `axis` of [`fractal`].
-fn field(height: usize, width: usize, noise: &Fractal, axis: u64) -> Vec<f32> {
+/// The field of the independent noise number `stream` for the lattice of `noise`, standardised as [`fractal`]'s are ([`fractal`]
+/// gives streams 0 and 1): another stream, another seed's worth of lattice values. A single field costs half of [`fractal`].
+pub(crate) fn field(height: usize, width: usize, noise: &Fractal, stream: u64) -> Vec<f32> {
     let mut sum = vec![0.0_f32; height * width];
     let mut weight = 1.0; // constant: the coarsest octave counts in full
     for octave in 0..noise.octaves {
@@ -88,7 +89,7 @@ fn field(height: usize, width: usize, noise: &Fractal, axis: u64) -> Vec<f32> {
             (spacing, noise.origin),
             weight,
             |row, column| {
-                let drawn = unit(mix(noise.seed, &[axis, u64::from(octave), row as u64, column as u64]));
+                let drawn = unit(mix(noise.seed, &[stream, u64::from(octave), row as u64, column as u64]));
                 2.0 * drawn - 1.0
             },
         );

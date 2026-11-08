@@ -234,6 +234,17 @@ fn conditional() -> Vec<Conditional> {
             field: "edge",
             with: vec![("size", json!(6.0))],
         },
+        // the weave is laid only by the woven kinds; 'paper' is fibres alone
+        Conditional {
+            effect: "paper_texture",
+            field: "spacing",
+            with: vec![("kind", json!("canvas"))],
+        },
+        Conditional {
+            effect: "paper_texture",
+            field: "fibre",
+            with: vec![("kind", json!("canvas"))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",
