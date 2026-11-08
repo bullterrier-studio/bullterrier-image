@@ -1,7 +1,10 @@
 //! `lens_distortion`: barrel or pincushion distortion, or a fisheye, with the picture scaled back. What it does is
 //! documented once, on `Params`.
 
-#![expect(clippy::doc_markdown, reason = "the choice 'brown_conrady' is spelt as the user writes it, in the help text")]
+#![expect(
+    clippy::doc_markdown,
+    reason = "the choice 'brown_conrady' is spelt as the user writes it, in the help text"
+)]
 
 use serde::Deserialize;
 
@@ -113,7 +116,14 @@ fn fisheye_reach(amount: f64) -> f64 {
     let barrel = amount > 0.0;
     let law = |u: f64| if barrel { u.tan() } else { u.atan() };
     // constant: tan reaches infinity at pi / 2; atan(u) / u is 1 + amount at a u below 2 / (1 + amount) (at most 2 / 0.7)
-    let (mut low, mut high) = (0.0, if barrel { std::f64::consts::FRAC_PI_2 } else { 2.0 / (1.0 + amount) });
+    let (mut low, mut high) = (
+        0.0,
+        if barrel {
+            std::f64::consts::FRAC_PI_2
+        } else {
+            2.0 / (1.0 + amount)
+        },
+    );
     // constant: 60 halvings shrink a bracket of a few radians below double precision
     for _ in 0..60 {
         let middle = f64::midpoint(low, high);

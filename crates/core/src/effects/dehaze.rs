@@ -98,7 +98,11 @@ fn darkest_channel(picture: &Picture<'_>, light: [f32; 3]) -> Vec<f32> {
 /// one, with the highest `dark` channel. The pixels tied at the lowest dark value taken are chosen in reading order, so
 /// the choice does not depend on how a sort orders ties, and the first of the brightest wins.
 fn airlight(picture: &Picture<'_>, dark: &[f32], fraction: f32) -> [f32; 3] {
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a count of pixels")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a count of pixels"
+    )]
     let count = ((f64::from(fraction) * float(dark.len())) as usize).max(1);
     let mut sorted = dark.to_vec();
     let (_, &mut threshold, _) = sorted.select_nth_unstable_by(dark.len() - count, f32::total_cmp);

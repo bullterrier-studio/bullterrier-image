@@ -124,7 +124,10 @@ fn mappings(picture: &Picture<'_>, tile_rows: usize, tile_columns: usize, bins: 
         let mut running = 0.0; // constant: the running total starts empty
         mappings.extend(histogram.iter().map(|&count| {
             running += count;
-            #[expect(clippy::cast_possible_truncation, reason = "the mapping is stored in f32, as the picture is")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "the mapping is stored in f32, as the picture is"
+            )]
             let share = (running / pixels) as f32;
             share
         }));

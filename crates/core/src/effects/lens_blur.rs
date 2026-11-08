@@ -64,7 +64,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let reach = radius.ceil() as usize;
     // A pixel's weight is the share of it inside the disc, estimated by a linear ramp one pixel wide across the rim (the
     // usual anti-aliased edge: 1 half a pixel inside, 0 half a pixel outside, 1/2 on the rim itself).
-    let disc = Kernel::from_fn((reach, reach), |down, right| (radius + 0.5 - down.hypot(right)).clamp(0.0, 1.0));
+    let disc = Kernel::from_fn((reach, reach), |down, right| {
+        (radius + 0.5 - down.hypot(right)).clamp(0.0, 1.0)
+    });
     let edge = params.edge.extension();
     if params.highlights == 0.0 {
         return Image::from_pixels(height, width, convolve(picture.pixels(), height, width, &disc, edge));

@@ -59,13 +59,20 @@ fn offsets(length: usize) -> Vec<f64> {
 
 /// The picture faded toward the colour.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let (amount, radius, feather) = (f64::from(params.amount), f64::from(params.radius), f64::from(params.feather));
+    let (amount, radius, feather) = (
+        f64::from(params.amount),
+        f64::from(params.radius),
+        f64::from(params.feather),
+    );
     // The norm with exponent p = 2 / roundness, scaled so that a corner is at 1 (p = infinity, a rectangle, is the
     // larger offset). Dividing by the larger offset first keeps the power from underflowing when p is large.
     let exponent = (params.roundness > 0.0).then(|| 2.0 / f64::from(params.roundness));
     let (down, across) = (offsets(picture.height()), offsets(picture.width()));
     let tint = params.color.0.map(f64::from);
-    #[expect(clippy::cast_possible_truncation, reason = "the mix is made in f64 and stored in the f32 picture")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the mix is made in f64 and stored in the f32 picture"
+    )]
     picture.map_at(|row, column, pixel| {
         let (far, near) = (down[row].max(across[column]), down[row].min(across[column]));
         let distance = match exponent {

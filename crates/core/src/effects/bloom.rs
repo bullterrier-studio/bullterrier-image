@@ -20,7 +20,10 @@ pub(crate) const META: Meta = Meta {
 
 /// What `bloom` reads around a pixel.
 pub(crate) fn footprint(params: &Params) -> Footprint {
-    Footprint::reach(f64::from(params.radius * params.truncate), params.edge == EdgeOrConstant::Wrap)
+    Footprint::reach(
+        f64::from(params.radius * params.truncate),
+        params.edge == EdgeOrConstant::Wrap,
+    )
 }
 
 /// Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at `octaves`
@@ -82,7 +85,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     // The highlights as planes: one for each channel, or one of the brightest channel when a colour sets the hue.
     let planes: Vec<Vec<f32>> = match params.color {
         None => (0..3)
-            .map(|channel| pixels.iter().map(|&pixel| highlights(pixel, params.threshold)[channel]).collect())
+            .map(|channel| {
+                pixels
+                    .iter()
+                    .map(|&pixel| highlights(pixel, params.threshold)[channel])
+                    .collect()
+            })
             .collect(),
         Some(_) => vec![
             pixels
@@ -92,7 +100,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         ],
     };
     // the halo is an average, so an even picture stays as bright as its highlights
-    let shares: Vec<f64> = (0..params.octaves).map(|octave| f64::from(params.persistence).powi(octave)).collect();
+    let shares: Vec<f64> = (0..params.octaves)
+        .map(|octave| f64::from(params.persistence).powi(octave))
+        .collect();
     let total: f64 = shares.iter().sum();
     let edge = params.edge.extension(params.constant_value);
     let halos: Vec<Vec<f32>> = planes

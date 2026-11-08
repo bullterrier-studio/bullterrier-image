@@ -73,7 +73,11 @@ fn half_area(away: f64, plateau: f64, reach: f64) -> f64 {
     reason = "a row number is far below 2**52; the gain is applied to f32 pictures"
 )]
 fn gains(height: usize, params: &Params) -> Vec<f32> {
-    let (spacing, thickness, offset) = (f64::from(params.spacing), f64::from(params.thickness), f64::from(params.offset));
+    let (spacing, thickness, offset) = (
+        f64::from(params.spacing),
+        f64::from(params.thickness),
+        f64::from(params.offset),
+    );
     let half = thickness / 2.0; // a line's half width, in periods; its middle is that far after its start
     let reach = f64::from(params.softness) * half.min(0.5 - half); // each edge fades this far either side of the hard edge
     // Length of line above each row edge, counting from the first line: whole periods, plus the part of this period,

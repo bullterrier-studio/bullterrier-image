@@ -71,7 +71,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let columns: Vec<[f64; 3]> = {
         let channel = |index: f64| lit(picture.width(), cell, index * stripe + margin, lit_stripe);
         let [red, green, blue] = [0.0, 1.0, 2.0].map(channel);
-        red.iter().zip(&green).zip(&blue).map(|((&r, &g), &b)| [r, g, b]).collect()
+        red.iter()
+            .zip(&green)
+            .zip(&blue)
+            .map(|((&r, &g), &b)| [r, g, b])
+            .collect()
     };
     let mean_gain = if params.keep_brightness {
         // each channel is lit over its stripe's share of a cell less the gap's border, in both directions
@@ -94,11 +98,16 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
 /// The share of each of `count` pixels (pixel i spans i to i + 1) covered by the intervals of `length` from `start`
 /// repeated every `period`, as the difference of the length lit below each pixel edge. `length` is not negative and
 /// at most `period` (the caller works it out as a length, never as the difference of two positions).
-#[expect(clippy::cast_precision_loss, reason = "a pixel index is far below the 2^53 an f64 holds exactly")]
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "a pixel index is far below the 2^53 an f64 holds exactly"
+)]
 fn lit(count: usize, period: f64, start: f64, length: f64) -> Vec<f64> {
     let lit_below = |edge: usize| {
         let edge = edge as f64;
         (edge / period).floor() * length + (edge.rem_euclid(period) - start).clamp(0.0, length)
     };
-    (0..count).map(|index| lit_below(index + 1) - lit_below(index)).collect()
+    (0..count)
+        .map(|index| lit_below(index + 1) - lit_below(index))
+        .collect()
 }

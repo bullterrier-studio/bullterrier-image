@@ -102,7 +102,14 @@ pub struct Params {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let master = Curve::through(
         &INPUTS,
-        &[params.black, params.shadows, params.midtones, params.highlights, params.white].map(f64::from),
+        &[
+            params.black,
+            params.shadows,
+            params.midtones,
+            params.highlights,
+            params.white,
+        ]
+        .map(f64::from),
     );
     // a channel curve starts at black and ends at white; only its middle three points move
     let curve_of = |heights: [f32; 3]| {

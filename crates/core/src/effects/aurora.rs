@@ -122,9 +122,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     picture.map_at(|row, column, _| {
         let above = base + f64::from(params.waviness) * f64::from(ripple[column]) - length::float(row);
         let up = above / tall; // 0 at the base, 1 at the curtain's top
-        let brightness = cast::single(
-            (above + 0.5).clamp(0.0, 1.0) * (1.0 - up).clamp(0.0, 1.0).powf(falloff) * ray[column],
-        );
+        let brightness =
+            cast::single((above + 0.5).clamp(0.0, 1.0) * (1.0 - up).clamp(0.0, 1.0).powf(falloff) * ray[column]);
         let colour = ramp::at(&stops, cast::single(up.clamp(0.0, 1.0)));
         [0, 1, 2].map(|channel| sky[channel] + brightness * (colour[channel] - sky[channel]))
     })

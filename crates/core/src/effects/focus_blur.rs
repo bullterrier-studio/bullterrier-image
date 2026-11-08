@@ -71,7 +71,11 @@ pub struct Params {
 }
 
 /// The picture blurred by w x `radius` at each pixel, w the distance of its field from the sharp band.
-#[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "levels is from 1 to 16")]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "levels is from 1 to 16"
+)]
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     // `Inputs::declared_by` refuses an offer that lacks a declared field, so this branch is out of reach: `render` cannot
     // return an error, and a field cannot be read without an Option
@@ -92,6 +96,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         f64::from(params.truncate),
         params.edge.extension(),
     );
-    let pixels = blurred.into_iter().map(|pixel| pixel.map(|value| value.clamp(0.0, 1.0)));
+    let pixels = blurred
+        .into_iter()
+        .map(|pixel| pixel.map(|value| value.clamp(0.0, 1.0)));
     Image::from_pixels(picture.height(), picture.width(), pixels.collect())
 }

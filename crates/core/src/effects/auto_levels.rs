@@ -54,7 +54,9 @@ pub struct Params {
 /// The stretched picture.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let remaps = match params.mode {
-        Mode::PerChannel => [0, 1, 2].map(|channel| stretch(picture.pixels().iter().map(|pixel| pixel[channel]), params.clip)),
+        Mode::PerChannel => {
+            [0, 1, 2].map(|channel| stretch(picture.pixels().iter().map(|pixel| pixel[channel]), params.clip))
+        }
         Mode::Linked => [stretch(picture.values().iter().copied(), params.clip); 3],
     };
     picture.map(|pixel| [0, 1, 2].map(|channel| remaps[channel].apply(pixel[channel])))
@@ -69,7 +71,11 @@ fn stretch(values: impl Iterator<Item = f32>, clip: f32) -> Remap {
     let high = count - 1 - cut;
     let (below, white, _) = ordered.select_nth_unstable_by(high, f32::total_cmp);
     let white = *white;
-    let black = if cut < high { *below.select_nth_unstable_by(cut, f32::total_cmp).1 } else { white };
+    let black = if cut < high {
+        *below.select_nth_unstable_by(cut, f32::total_cmp).1
+    } else {
+        white
+    };
     if white <= black {
         Remap::new(0.0, 1.0, 1.0, 0.0, 1.0)
     } else {

@@ -65,10 +65,7 @@ pub struct Params {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
-    let (half_height, half_width) = (
-        (height - 1).max(1) as f64 / 2.0,
-        (width - 1).max(1) as f64 / 2.0,
-    );
+    let (half_height, half_width) = ((height - 1).max(1) as f64 / 2.0, (width - 1).max(1) as f64 / 2.0);
     let scale = f64::from(params.scale);
     let (copies, turn) = (f64::from(params.repeats), f64::from(params.turn).to_radians());
     // the smallest size that is told apart from 0, as `repeats` allows: a pixel in the very middle would need endlessly
@@ -84,7 +81,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     Centre::new(height, width, 0.5, 0.5).warp(&sampler, |spot| {
         let size = (spot.down.abs() / half_height).max(spot.across.abs() / half_width);
         // the copy the pixel is in: how many steps of 1 / scale carry its size out to `scale` or more
-        let depth = ((scale / size.max(nearest)).ln() / -scale.ln()).ceil().clamp(0.0, copies);
+        let depth = ((scale / size.max(nearest)).ln() / -scale.ln())
+            .ceil()
+            .clamp(0.0, copies);
         spot.moved(scale.powf(-depth), turn * depth)
     })
 }

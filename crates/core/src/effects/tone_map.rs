@@ -79,7 +79,14 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         .map(|&pixel| luminance(pixel).max(LUMINANCE_FLOOR).log2())
         .collect();
     let epsilon = f64::from(params.edge_threshold).powi(2);
-    let base = guided_filter(&log_luma, &log_luma, height, width, whole(f64::from(params.radius)), epsilon);
+    let base = guided_filter(
+        &log_luma,
+        &log_luma,
+        height,
+        width,
+        whole(f64::from(params.radius)),
+        epsilon,
+    );
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;
         let exponent = (params.contrast - 1.0) * (base[at] + params.pivot) + params.amount * (log_luma[at] - base[at]);

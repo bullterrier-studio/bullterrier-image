@@ -101,7 +101,11 @@ fn colour_balance(temperature: f32, tint: f32) -> Option<[f32; 3]> {
 fn vibrance(pixel: [f32; 3], amount: f32) -> [f32; 3] {
     let strongest = pixel[0].max(pixel[1]).max(pixel[2]);
     let weakest = pixel[0].min(pixel[1]).min(pixel[2]);
-    let chroma = if strongest > 0.0 { (strongest - weakest) / strongest } else { 0.0 };
+    let chroma = if strongest > 0.0 {
+        (strongest - weakest) / strongest
+    } else {
+        0.0
+    };
     let spread = 1.0 + amount * (1.0 - chroma); // the factor by which saturation grows
     pixel.map(|value| (strongest - spread * (strongest - value)).clamp(0.0, 1.0))
 }

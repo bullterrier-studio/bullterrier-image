@@ -5,12 +5,12 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_plane;
+use crate::ops::cast;
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
 use crate::ops::noise::standardised;
 use crate::ops::par;
 use crate::ops::random::{mix, unit};
-use crate::ops::cast;
 use crate::params::{Choice, Params};
 use crate::{Image, Inputs, Picture};
 

@@ -5,9 +5,9 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Meta};
-use crate::ops::{cast, length};
 use crate::ops::noise::{Fractal, field, standardised};
 use crate::ops::random::{mix, unit};
+use crate::ops::{cast, length};
 use crate::params::{Choice, Params};
 use crate::{Image, Inputs, Picture};
 
@@ -92,7 +92,10 @@ fn wave(count: usize, axis: u64, params: &Params) -> Vec<f64> {
             let wave = (std::f64::consts::TAU * position / spacing).cos();
             if params.kind == Kind::Linen {
                 // constant: stream 2 of the seed's hashes, apart from the fibres' lattices (streams 0 and 1)
-                wave * unit(mix(params.seed, &[2, axis, length::whole((position / spacing).floor()) as u64]))
+                wave * unit(mix(
+                    params.seed,
+                    &[2, axis, length::whole((position / spacing).floor()) as u64],
+                ))
             } else {
                 wave
             }
@@ -123,10 +126,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                 .map(|at| cast::single(down[at / width] + across[at % width]))
                 .collect(),
         );
-        let (weave_share, fibre_share) = (
-            f64::from(1.0 - params.fibre).sqrt(),
-            f64::from(params.fibre).sqrt(),
-        );
+        let (weave_share, fibre_share) = (f64::from(1.0 - params.fibre).sqrt(), f64::from(params.fibre).sqrt());
         texture = standardised(
             weave
                 .iter()

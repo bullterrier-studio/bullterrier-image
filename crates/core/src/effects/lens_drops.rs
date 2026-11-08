@@ -142,7 +142,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                         continue;
                     }
                     let shown = sampler
-                        .at(drop.middle_row - refraction * down, drop.middle_column - refraction * across)
+                        .at(
+                            drop.middle_row - refraction * down,
+                            drop.middle_column - refraction * across,
+                        )
                         .map(|level| level.clamp(0.0, 1.0));
                     let shine = highlight * distance * (distance - down) / (2.0 * drop.reach * drop.reach);
                     let pixel = &mut band[(row - first_row) * width + column];

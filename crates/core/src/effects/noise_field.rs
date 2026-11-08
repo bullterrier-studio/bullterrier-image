@@ -123,7 +123,8 @@ fn layers(params: &Params, finest: f64) -> Vec<Layer> {
 }
 
 /// A pair of independent standard normal numbers drawn by the hash of `words` (Box-Muller).
-fn normals(seed: u32, words: [u64; 4]) -> [f64; 2] { // constant: the four words are stream, octave, row and column
+// constant: the four words are stream, octave, row and column
+fn normals(seed: u32, words: [u64; 4]) -> [f64; 2] {
     let draw = |part| unit(mix(seed, &[words[0], words[1], words[2], words[3], part])); // constant: the same four words
     // 1 - u lies in (0, 1], so the logarithm is finite
     let radius = (-2.0 * (1.0 - draw(0)).ln()).sqrt(); // constant: Box-Muller (1958)
@@ -135,12 +136,22 @@ fn normals(seed: u32, words: [u64; 4]) -> [f64; 2] { // constant: the four words
 /// random slope, a pixel blends the four corners of its cell.
 fn perlin(height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32> {
     let mut sum = vec![0.0_f32; height * width];
-    for Layer { octave, spacing, weight } in layers(params, 1.0) {
+    for Layer {
+        octave,
+        spacing,
+        weight,
+    } in layers(params, 1.0)
+    {
         // lattice points to reach the last row and column, and the one past each
         let rows = length::whole(((length::float(height) - 1.0) / spacing).floor()) + 2;
         let columns = length::whole(((length::float(width) - 1.0) / spacing).floor()) + 2;
         let slopes: Vec<[f64; 2]> = (0..rows * columns)
-            .map(|at| normals(params.seed, [stream, u64::from(octave), (at / columns) as u64, (at % columns) as u64]))
+            .map(|at| {
+                normals(
+                    params.seed,
+                    [stream, u64::from(octave), (at / columns) as u64, (at % columns) as u64],
+                )
+            })
             .collect();
         par::rows(&mut sum, width, |first_row, band| {
             for (at, value) in band.iter_mut().enumerate() {
@@ -171,15 +182,28 @@ fn fade(t: f64) -> f64 {
 /// jittered grid (one random point in each cell, and a ring of cells round the picture), in cells.
 fn worley(height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32> {
     let mut sum = vec![0.0_f32; height * width];
-    for Layer { octave, spacing: cell, weight } in layers(params, 1.0) {
+    for Layer {
+        octave,
+        spacing: cell,
+        weight,
+    } in layers(params, 1.0)
+    {
         let rows = length::whole((length::float(height) / cell).ceil()) + 2;
         let columns = length::whole((length::float(width) / cell).ceil()) + 2;
         // the cells are numbered from -1, so a point just outside the picture can be the nearest
         let points: Vec<[f64; 2]> = (0..rows * columns)
             .map(|at| {
                 let (row, column) = (at / columns, at % columns);
-                let jitter = |part| unit(mix(params.seed, &[stream, u64::from(octave), row as u64, column as u64, part]));
-                [(length::float(column) - 1.0 + jitter(0)) * cell, (length::float(row) - 1.0 + jitter(1)) * cell]
+                let jitter = |part| {
+                    unit(mix(
+                        params.seed,
+                        &[stream, u64::from(octave), row as u64, column as u64, part],
+                    ))
+                };
+                [
+                    (length::float(column) - 1.0 + jitter(0)) * cell,
+                    (length::float(row) - 1.0 + jitter(1)) * cell,
+                ]
             })
             .collect();
         let buckets = Buckets::new(&points);
@@ -204,7 +228,10 @@ struct Wave {
 impl Wave {
     /// A wave of `wavelength` px in a random direction and phase.
     fn drawn(rng: &mut Rng, wavelength: f64) -> Self {
-        let (angle, phase) = (std::f64::consts::TAU * rng.uniform(), std::f64::consts::TAU * rng.uniform());
+        let (angle, phase) = (
+            std::f64::consts::TAU * rng.uniform(),
+            std::f64::consts::TAU * rng.uniform(),
+        );
         Self {
             along: [angle.cos(), angle.sin()],
             phase,

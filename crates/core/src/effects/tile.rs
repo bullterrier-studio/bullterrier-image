@@ -63,7 +63,11 @@ fn area_weights(source: usize, target: usize) -> Vec<(usize, Vec<f64>)> {
         .map(|stretch| {
             #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
             let (start, end) = (stretch as f64 * step, (stretch + 1) as f64 * step);
-            #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "inside 0..=source")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "inside 0..=source"
+            )]
             let (first, past) = (start.floor() as usize, (end.ceil().min(source_len)) as usize);
             let weights = (first..past)
                 .map(|pixel| {
@@ -80,7 +84,10 @@ fn area_weights(source: usize, target: usize) -> Vec<(usize, Vec<f64>)> {
 /// `pixels` (`height` x `width`) averaged by area down to `cell_height` x `cell_width`, rows first, then columns.
 fn averaged(pixels: &[[f32; 3]], height: usize, width: usize, cell_height: usize, cell_width: usize) -> Vec<[f32; 3]> {
     let mut down = vec![[0.0_f64; 3]; cell_height * width];
-    for ((first, weights), line) in area_weights(height, cell_height).iter().zip(down.chunks_exact_mut(width)) {
+    for ((first, weights), line) in area_weights(height, cell_height)
+        .iter()
+        .zip(down.chunks_exact_mut(width))
+    {
         for (offset, weight) in weights.iter().enumerate() {
             let row = &pixels[(first + offset) * width..][..width];
             for (total, pixel) in line.iter_mut().zip(row) {
@@ -100,7 +107,10 @@ fn averaged(pixels: &[[f32; 3]], height: usize, width: usize, cell_height: usize
                     *level += weight * value;
                 }
             }
-            #[expect(clippy::cast_possible_truncation, reason = "the sums are made in f64 and stored in the f32 cell")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "the sums are made in f64 and stored in the f32 cell"
+            )]
             cell.push(sum.map(|level| level as f32));
         }
     }
@@ -122,5 +132,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         f64::from(params.offset_x) * cell_width as f64,
     );
     let cell = shifted(&cell, cell_height, cell_width, down, across, Extension::Wrap);
-    picture.map_at(|row, column, _| cell[(row % cell_height) * cell_width + column % cell_width].map(|level| level.clamp(0.0, 1.0)))
+    picture.map_at(|row, column, _| {
+        cell[(row % cell_height) * cell_width + column % cell_width].map(|level| level.clamp(0.0, 1.0))
+    })
 }

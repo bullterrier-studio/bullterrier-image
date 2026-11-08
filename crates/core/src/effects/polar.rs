@@ -93,7 +93,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         // the rows by distance from the centre, the columns by the angle clockwise from straight up: a whole turn wide
         Direction::To => centre.warp(&sampler.wrapping_columns(), |spot| {
             let turn = spot.across.atan2(-spot.down);
-            ((1.0 - spot.distance() / reach) * last_row, turn / std::f64::consts::TAU * columns)
+            (
+                (1.0 - spot.distance() / reach) * last_row,
+                turn / std::f64::consts::TAU * columns,
+            )
         }),
         // the distance from the centre falls from the reach on the first row to 0 on the last
         Direction::From => centre.warp(&sampler, |spot| {

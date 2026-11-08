@@ -76,7 +76,10 @@ pub struct Params {
 }
 
 /// The pattern, in the picture's size: the picture is used only for its height and width.
-#[expect(clippy::cast_precision_loss, reason = "a pixel index is far below the 2^24 an f32 holds exactly")]
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "a pixel index is far below the 2^24 an f32 holds exactly"
+)]
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let (sin, cos) = params.angle.to_radians().sin_cos();
     let cell = params.cell;

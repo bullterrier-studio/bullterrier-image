@@ -102,5 +102,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             (low.min(value), high.max(value))
         });
     let smeared = radial::accumulate(&sampler, params.mode, centre, &readings);
-    Image::from_pixels(height, width, smeared.into_iter().map(|pixel| pixel.map(|level| level.clamp(low, high))).collect())
+    Image::from_pixels(
+        height,
+        width,
+        smeared
+            .into_iter()
+            .map(|pixel| pixel.map(|level| level.clamp(low, high)))
+            .collect(),
+    )
 }

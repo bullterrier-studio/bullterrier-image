@@ -120,7 +120,11 @@ fn continuous(index: f64) -> Place {
 )]
 fn discrete(index: f64, down: impl Fn(f64, f64) -> bool) -> Place {
     let previous = index.floor();
-    let chosen = if down(index - previous, index) { previous } else { previous + 1.0 };
+    let chosen = if down(index - previous, index) {
+        previous
+    } else {
+        previous + 1.0
+    };
     Place::At(chosen.max(0.0) as usize)
 }
 

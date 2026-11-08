@@ -74,7 +74,11 @@ fn sources(size: usize, params: &Params) -> Vec<usize> {
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
     let last = (size - 1) as f64;
     // rounded half to even, as NumPy and Python round
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "0..=size - 1 after the rounding")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "0..=size - 1 after the rounding"
+    )]
     let line = (f64::from(params.at) * last).round_ties_even() as usize;
     #[expect(clippy::cast_possible_truncation, reason = "a span of at most a few thousand px")]
     let reach = f64::from(params.span).round_ties_even() as i64;

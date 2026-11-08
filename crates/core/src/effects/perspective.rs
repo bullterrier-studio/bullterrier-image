@@ -145,7 +145,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         // a pixel on the vanishing line would read a place at infinity: it reads one far away instead, where the edge rule
         // alone says what shows
         let depth = back[2][0] * across + back[2][1] * down + back[2][2];
-        let depth = if depth.abs() < VANISHING { VANISHING.copysign(depth) } else { depth };
+        let depth = if depth.abs() < VANISHING {
+            VANISHING.copysign(depth)
+        } else {
+            depth
+        };
         spot.place_at(
             (back[1][0] * across + back[1][1] * down + back[1][2]) / depth,
             (back[0][0] * across + back[0][1] * down + back[0][2]) / depth,

@@ -77,8 +77,13 @@ fn patches(params: &Params, half_edge: f64) -> Vec<Patch> {
     let size = f64::from(params.size);
     (0..params.blobs)
         .map(|_| {
-            let (place, offset, spread, stretch, weight) =
-                (rng.uniform(), rng.uniform(), rng.uniform(), rng.uniform(), rng.uniform());
+            let (place, offset, spread, stretch, weight) = (
+                rng.uniform(),
+                rng.uniform(),
+                rng.uniform(),
+                rng.uniform(),
+                rng.uniform(),
+            );
             let sigma = size * (0.5 + 0.5 * spread);
             Patch {
                 depth: place * size,
@@ -103,7 +108,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let patches = patches(params, half_edge);
     let tint = params.color.0.map(|channel| params.amount * channel);
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
-    #[expect(clippy::cast_possible_truncation, reason = "the wash is summed in f64 and stored in the f32 picture")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the wash is summed in f64 and stored in the f32 picture"
+    )]
     picture.map_at(|row, column, pixel| {
         let right = column as f64 - (width - 1.0) / 2.0;
         let up = (height - 1.0) / 2.0 - row as f64;
@@ -112,7 +120,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         let wash: f64 = patches
             .iter()
             .map(|patch| {
-                let (in_from, across) = ((depth - patch.depth) / patch.sigma, (along - patch.along) / patch.sigma_along);
+                let (in_from, across) = (
+                    (depth - patch.depth) / patch.sigma,
+                    (along - patch.along) / patch.sigma_along,
+                );
                 patch.weight * (-0.5 * (in_from * in_from + across * across)).exp()
             })
             .sum();

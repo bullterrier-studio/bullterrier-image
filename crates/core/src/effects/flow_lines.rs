@@ -83,13 +83,19 @@ pub struct Params {
 /// it, coverage 1 within `radius` - 1/2 of the pixel's centre and falling to 0 at `radius` + 1/2 (a pixel's own width).
 fn stamp(ink: &mut [f32], (height, width): (usize, usize), radius: f64, (x, y): (f64, f64)) {
     let reach = length::whole(radius.ceil()).cast_signed();
-    let (corner_column, corner_row) = (length::whole(x.floor()).cast_signed(), length::whole(y.floor()).cast_signed());
+    let (corner_column, corner_row) = (
+        length::whole(x.floor()).cast_signed(),
+        length::whole(y.floor()).cast_signed(),
+    );
     for row in corner_row - reach..=corner_row + reach {
         for column in corner_column - reach..=corner_column + reach {
             if !(0..height.cast_signed()).contains(&row) || !(0..width.cast_signed()).contains(&column) {
                 continue;
             }
-            let (centre_x, centre_y) = (length::float(column.cast_unsigned()) + 0.5, length::float(row.cast_unsigned()) + 0.5);
+            let (centre_x, centre_y) = (
+                length::float(column.cast_unsigned()) + 0.5,
+                length::float(row.cast_unsigned()) + 0.5,
+            );
             let covers = (radius - (centre_x - x).hypot(centre_y - y) + 0.5).clamp(0.0, 1.0);
             let at = &mut ink[row.cast_unsigned() * width + column.cast_unsigned()];
             *at = at.max(cast::single(covers));
@@ -126,7 +132,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let mut starts = Rng::seeded(params.seed);
     let mut ink = vec![0.0_f32; height * width];
     for _ in 0..lines {
-        let mut at = (starts.uniform() * length::float(width), starts.uniform() * length::float(height));
+        let mut at = (
+            starts.uniform() * length::float(width),
+            starts.uniform() * length::float(height),
+        );
         for _ in 0..=moves {
             // a line ends where it leaves the picture
             if !(0.0..length::float(width)).contains(&at.0) || !(0.0..length::float(height)).contains(&at.1) {

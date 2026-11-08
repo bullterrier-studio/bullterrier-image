@@ -131,7 +131,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         bumps.push(bump(centre, size, 0.0, fade));
     }
     let tint = params.color.0.map(|channel| params.amount * channel);
-    #[expect(clippy::cast_possible_truncation, reason = "the flare is summed in f64 and stored in the f32 picture")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the flare is summed in f64 and stored in the f32 picture"
+    )]
     picture.map_at(|row, column, pixel| {
         let flare = bumps.iter().map(|bump| bump.at(row, column)).sum::<f64>() as f32;
         screen(pixel, tint.map(|channel| channel * flare))

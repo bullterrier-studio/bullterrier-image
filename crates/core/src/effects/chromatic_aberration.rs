@@ -134,7 +134,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         let scale = 1.0 - shift * (1.0 - 2.0 * copy as f64 / (copies - 1) as f64);
         // the middle copy (of an odd number) is the picture itself; reading it would only add rounding noise
         let seen = (2 * copy != copies - 1).then(|| centre.warp(&sampler, |spot| spot.moved(scale, 0.0)));
-        let shown = seen.as_ref().map_or_else(|| picture.pixels(), |image| image.as_picture().pixels());
+        let shown = seen
+            .as_ref()
+            .map_or_else(|| picture.pixels(), |image| image.as_picture().pixels());
         for (total, pixel) in sum.iter_mut().zip(shown) {
             for channel in 0..3 {
                 total[channel] += weight[channel] as f32 * pixel[channel];

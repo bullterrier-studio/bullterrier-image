@@ -131,13 +131,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let (cloud, sway_down, sway_across) = (noise(0), noise(1), noise(2));
     // the cloud field as a grey picture for the sampler to read between its pixels
     let cloud_pixels: Vec<[f32; 3]> = cloud.iter().map(|&z| [z; 3]).collect();
-    let sampler = Sampler::new(
-        &cloud_pixels,
-        height,
-        width,
-        params.resampling,
-        params.edge.extension(),
-    );
+    let sampler = Sampler::new(&cloud_pixels, height, width, params.resampling, params.edge.extension());
     let (rise, turbulence) = (f64::from(params.rise), f64::from(params.turbulence));
     let mut warped = vec![0.0_f32; height * width];
     par::rows(&mut warped, width, |first_row, band| {

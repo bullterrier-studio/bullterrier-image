@@ -114,7 +114,11 @@ fn spikes(params: &Params) -> Kernel {
                 let along = right * cos + down * sin; // px out along the spike's direction
                 let across = (down * cos - right * sin).abs(); // px sideways from its line
                 let thin = (width / 2.0 + 0.5 - across).clamp(0.0, 1.0); // a line `width` px wide, soft at its sides
-                let fade = if along >= 0.0 { (1.0 - along / length).clamp(0.0, 1.0) } else { 0.0 };
+                let fade = if along >= 0.0 {
+                    (1.0 - along / length).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
                 thin * fade
             })
             .fold(0.0, f64::max)
@@ -173,7 +177,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                 return light; // no draw for a pixel that makes no light
             }
             let chosen = chance >= 1.0 || draw(index, 0) < chance;
-            let scale = if variation == 0.0 { 1.0 } else { 1.0 - variation * draw(index, 1) };
+            let scale = if variation == 0.0 {
+                1.0
+            } else {
+                1.0 - variation * draw(index, 1)
+            };
             let scale = if chosen { weight * scale } else { 0.0 };
             #[expect(clippy::cast_possible_truncation, reason = "narrowing is the point")]
             light.map(|value| value * scale as f32)
@@ -184,6 +192,5 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     #[expect(clippy::cast_possible_truncation, reason = "narrowing is the point")]
     let strength = (f64::from(params.amount) * kernel.total()) as f32;
     let tint = params.color.0.map(|channel| strength * channel);
-    picture
-        .map_at(|row, column, pixel| screen(pixel, [0, 1, 2].map(|c| spread[row * width + column][c] * tint[c])))
+    picture.map_at(|row, column, pixel| screen(pixel, [0, 1, 2].map(|c| spread[row * width + column][c] * tint[c])))
 }

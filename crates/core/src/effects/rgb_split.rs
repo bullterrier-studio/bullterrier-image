@@ -1,7 +1,10 @@
 //! `rgb_split`: red pushed one way along an angle, blue (and for a red-cyan pair green) the other way. What it does is
 //! documented once, on `Params`.
 
-#![expect(clippy::doc_markdown, reason = "the choices 'red_blue' and 'red_cyan' are spelt as the user writes them, in the help text")]
+#![expect(
+    clippy::doc_markdown,
+    reason = "the choices 'red_blue' and 'red_cyan' are spelt as the user writes them, in the help text"
+)]
 
 use serde::Deserialize;
 
@@ -77,8 +80,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let red = shifted(pixels, height, width, dy, dx, edge);
     let opposite = shifted(pixels, height, width, -dy, -dx, edge);
     let green_moves = params.pair == Pair::RedCyan;
-    let split = pixels.iter().zip(&red).zip(&opposite).map(|((own, red), opposite)| {
-        [red[0], if green_moves { opposite[1] } else { own[1] }, opposite[2]]
-    });
+    let split = pixels
+        .iter()
+        .zip(&red)
+        .zip(&opposite)
+        .map(|((own, red), opposite)| [red[0], if green_moves { opposite[1] } else { own[1] }, opposite[2]]);
     Image::from_pixels(height, width, split.collect())
 }

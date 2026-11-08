@@ -83,11 +83,23 @@ fn strips(rng: &mut Rng, height: usize, count: usize, furthest: usize) -> Vec<Ba
 /// A band drawn at random: a height between `lowest` and `tallest` (at least 1, at most the picture's), a row for its top
 /// that keeps it inside the picture, and a slide of up to `amount` px either way, cut to whole pixels toward 0.
 fn band(rng: &mut Rng, height: usize, lowest: f64, tallest: f64, amount: f64) -> Band {
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a height in 0..=2000 * ratio, cut to whole px")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a height in 0..=2000 * ratio, cut to whole px"
+    )]
     let rows = ((lowest + rng.uniform() * (tallest - lowest)) as usize).clamp(1, height);
-    #[expect(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a row of the picture")]
+    #[expect(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a row of the picture"
+    )]
     let top = (rng.uniform() * (height - rows) as f64) as usize;
-    #[expect(clippy::cast_possible_truncation, reason = "a slide of at most 2000 px, cut toward 0")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a slide of at most 2000 px, cut toward 0"
+    )]
     let distance = (-amount + rng.uniform() * 2.0 * amount) as i64;
     Band { top, rows, distance }
 }
@@ -98,8 +110,15 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let mut rng = Rng::seeded(params.seed);
     let mut moves = Vec::new();
     if params.slices > 0 {
-        #[expect(clippy::cast_sign_loss, clippy::cast_possible_truncation, reason = "positive, and a slide of at most 2000 px")]
-        let (count, furthest) = (params.slices as usize, f64::from(params.amount).round_ties_even() as usize);
+        #[expect(
+            clippy::cast_sign_loss,
+            clippy::cast_possible_truncation,
+            reason = "positive, and a slide of at most 2000 px"
+        )]
+        let (count, furthest) = (
+            params.slices as usize,
+            f64::from(params.amount).round_ties_even() as usize,
+        );
         moves = strips(&mut rng, height, count, furthest);
     }
     let (lowest, tallest, amount) = (

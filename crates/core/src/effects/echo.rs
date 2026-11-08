@@ -19,7 +19,10 @@ pub(crate) const META: Meta = Meta {
 
 /// What `echo` reads around a pixel.
 pub(crate) fn footprint(params: &Params) -> Footprint {
-    Footprint::reach(f64::from(params.copies.unsigned_abs()) * f64::from(params.dy.abs()), params.edge == Edge::Wrap)
+    Footprint::reach(
+        f64::from(params.copies.unsigned_abs()) * f64::from(params.dy.abs()),
+        params.edge == Edge::Wrap,
+    )
 }
 
 /// Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`.
@@ -82,7 +85,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             }
         }
     }
-    #[expect(clippy::cast_possible_truncation, reason = "the sums are made in f64 and stored in the f32 image")]
-    let average = sum.into_iter().map(|pixel| pixel.map(|level| (level / total_weight).clamp(0.0, 1.0) as f32));
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the sums are made in f64 and stored in the f32 image"
+    )]
+    let average = sum
+        .into_iter()
+        .map(|pixel| pixel.map(|level| (level / total_weight).clamp(0.0, 1.0) as f32));
     Image::from_pixels(height, width, average.collect())
 }

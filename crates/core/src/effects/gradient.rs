@@ -106,6 +106,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     };
     let stops: Vec<[f32; 3]> = params.colors.iter().map(|colour| colour.0).collect();
     picture.map_at(|row, column, _| {
-        ramp::at(&stops, along_colours(t[row * width + column], params.repeat, params.reflect))
+        ramp::at(
+            &stops,
+            along_colours(t[row * width + column], params.repeat, params.reflect),
+        )
     })
 }

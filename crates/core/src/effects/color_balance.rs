@@ -75,7 +75,8 @@ pub struct Params {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let centre = params.balance / 2.0;
     let width = params.softness / 2.0;
-    let pushes = [params.shadows, params.midtones, params.highlights].map(|colour| colour.0.map(|value| value - NEUTRAL));
+    let pushes =
+        [params.shadows, params.midtones, params.highlights].map(|colour| colour.0.map(|value| value - NEUTRAL));
     picture.map(|pixel| {
         let luma = luminance(pixel);
         let lower = handover(luma, centre, width);
