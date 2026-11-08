@@ -899,6 +899,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     the picture height) or normalises over the picture is `Whole`; relaxing them needs the frame of reference described under
     "Determinism" (position-hashed noise, the band's offset and the canvas size). No banded renderer exists yet.
 
+- **Test cost: the Rust tests are optimised, the proofs of the gates run when their inputs change (tiers `fast`, `check`, `full`).**
+  The Rust tests render pictures, so the test profile is optimised (`opt-level = 1`: the suite went from 13 min to 33 s with the
+  same assertions; the stack-depth test needs less stack optimised, and a mutant that recurses still fails it). The proofs that a
+  gate fails on bad input cost minutes (they build the workspace in a copy) and prove the gate configuration, not the code, so
+  `check` runs them on a push only when the configuration or the proofs changed, and `full` always (before a release, in CI).
+  Debug builds keep no object files on macOS (`split-debuginfo = "off"`): they were 38 of 52 GB of `target/`.
+
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*

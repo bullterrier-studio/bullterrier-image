@@ -334,7 +334,16 @@ A fix removes the cause, not the symptom (reasoning in `docs/design-decisions.md
 
 ## Lint, types and gates
 
-`uv run poe check` runs every gate, cheapest first, stopping at the first failure: `ruff format --check` and `rust-fmt`;
+Three tiers. `uv run poe fast`: format, lint, types, Rust tests (the inner loop). `uv run poe check`: every static gate, the build
+check, the Rust tests and the Python suite (`gate` and `rebuild` tests left out); run it once before a merge. `uv run poe full`:
+`check` plus `gate-tests` (marker `gate`: tests that copy the project, write one deliberate mistake and check a gate fails; each
+removes its copy and build folder), `check-scaffold`, `audit` and `check-min-deps`; run before a release (`poe release` does, CI
+does). Each step runs once per tier. A gate needs a known-bad row for every kind of source it must see (an effect file pulled in
+by `include!` is one); the rows live in `tests/tools/test_rust_gates.py`, and `[tool.gate-proofs] triggers` lists the files whose
+change makes `check` run the proofs on a push. Test and build profile: `[profile.test] opt-level = 1`, `[profile.dev] debug =
+"line-tables-only"`, `split-debuginfo = "off"` (macOS otherwise keeps every object file).
+
+`check` runs every gate, cheapest first, stopping at the first failure: `ruff format --check` and `rust-fmt`;
 `ruff check` (plus `PLW1514` explicit encodings, `BLE` no blind `except`, `PTH` pathlib, `PYI` stubs) and `rust-lint`
 (clippy pedantic, `unwrap`/`expect`/`panic`/print banned, dead code, missing docs, unreachable `pub`; `[workspace.lints]`
 in `Cargo.toml`); `dead-code` (vulture on `src`; exemptions in `[tool.vulture]`); `rust-doc`; `deptry`; `rust-tools` (cargo-shear and cargo-deny at the versions
@@ -345,7 +354,7 @@ contracts, the effect contract at odd sizes and across every number's range, and
 `ops`: a number is a `param`, a trivial operand or index, or carries `# constant: <reason>`; a library option never gets a
 marker). Each gate has a test proving it fails on a known-bad input.
 
-Every poe task that runs tests (`rust-test`, `test`, `check-min-deps`, `check-scaffold`) runs under `tools/run_capped.py`, which
+Every poe task that runs tests (`rust-test`, `test`, `gate-tests`, `check-min-deps`, `check-scaffold`) runs under `tools/run_capped.py`, which
 kills the command's process group and exits 99 when its summed RSS passes the cap (`[tool.run-capped]`), so a runaway fails the
 gate instead of freezing the machine. Mutation runs use it too, 99 counting as killed: `uv run python tools/run_capped.py
 --cap-mb 3000 --deadline 120 -- CMD` (deadline exit 98). macOS and Linux; on Windows the cap is not enforced.
@@ -449,10 +458,11 @@ follow "Fixing defects"; design follows the skill (no shallow wrappers; per-effe
 
 Once per clone: `uv run poe setup` (hooks and commit template). While working: `uv run poe fast` (format, lint, types, Rust
 tests) and the tests covering your change. Once, before you report, merge or push: `uv run poe check` (`uv run poe fix` repairs
-what it can). Commit hooks run ruff only; the pre-push hook runs the whole gate for a push to `main` or a tag (and for any
-push while local `main` has unpushed code) that changes more than documentation, unless a clean, passing `uv run poe check`
-already ran on exactly the pushed tree (the record is in the git folder: commit before you run `check`, then merge and push;
-the merge and the push do not repeat it).
+what it can). Commit hooks run ruff only; the pre-push hook runs `poe check` for a push to `main` (and for any push while local
+`main` has unpushed code) that changes more than documentation, plus `poe gate-tests` when the push changes a file in
+`[tool.gate-proofs] triggers` or git cannot say what changed; a tag push needs `poe full`. A pass already recorded on exactly the
+pushed tree is not repeated (the record is in the git folder and carries its tier: a `check` pass never satisfies a tag; commit
+before you run `check`, then merge and push).
 - **Trunk-based:** short-lived branch `<type>/<short-description>` (`feat/glow-falloff`), in a worktree only when the owner asks
   (the brief says so); rebase on `main` before reporting; the controller merges. Never push.
 - **Conventional Commits 1.0:** `type(scope)!: subject`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
