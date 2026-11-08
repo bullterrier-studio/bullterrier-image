@@ -317,3 +317,22 @@ A look is added to `examples/recipes/` by the batch that builds its last missing
 (`depth`, `light`, `subject`, a region), resolved like a `Drive`'s `by`. `ambient_occlusion` and `parallax` still take the
 injected `depth`; `disperse`, `drop_shadow`, `outline`, `reflection` and `rim_light` the injected `subject`. Moving them
 onto `field` leaves one mechanism; the owner schedules it.
+
+**Feature batch after E5 (E5b).** Halftone inks with a per-ink offset, line screens, ink separation and dither inks, then the
+risograph recipe. The Rust port of those effects (E5) stays a parity port; the new capability follows it.
+
+**E6 additions.** `defringe` (halo removal) and `light_wrap`, next to `outline`, `rim_light` and `blend`.
+
+**Subject matte (R6).** Matte refinement as a post-process of the subject matte (the guided filter is the primitive), choosing
+one instance among several (several people, pick one), and an AI upscaler as a model kind in the model catalogue.
+
+**Banded render, before E7.** Run a recipe in bands of rows, each step with the margin its footprint declares, and fall back to
+the whole picture for a whole-picture step; `px` values scale with the whole canvas, not the band. Needs first: a position-hashed
+(counter-based) noise, so that seeded effects (grain, dead pixels, dust and scratches, flow lines) can render a band without
+drawing the rows above it; until then they declare the whole picture. E7's final memory measurement is its acceptance test.
+
+**After E7, in this order of value.** `distance_field`; glass, then emboss and bevel (new rows); `stipple`; `engraving`;
+`crosshatch`; `dissolve`; `color_transfer` (the picture parameter kind may already unblock it: check); `denoise`.
+
+**Input depth.** A 16-bit input is read as sRGB (a watch item): fix in the image files (R5) or E7. Colour management beyond sRGB
+(CMYK, ICC output) is not image's job.

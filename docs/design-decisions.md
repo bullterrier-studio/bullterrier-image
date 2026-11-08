@@ -510,6 +510,19 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   tested with stand-in models, a test of a real model asserts coarse properties only. *Reason:* better models keep
   appearing, and pulling one in should be cheap.
 
+- **Open: the storage precision of a finished layer (owner decides).** Kernels work on float32 pictures. A picture held
+  between steps or kept for later costs 12 bytes a pixel as float32: 12 MP = 144 MB, A3 at 300 dpi (about 17 MP) = 200 MB, so
+  ten of them are gigabytes. At 16 bit (6 bytes a pixel) a 12 MP picture is 72 MB, at 8 bit (3 bytes) 36 MB. 8 bit bands
+  visibly in smooth gradients and cannot take a further grade; 16 bit does not; float32 keeps out-of-range values. Decide before
+  E5, because kernels are being written against float32.
+- **Open: a render that takes the design scale from its caller (owner decides).** A `px` value is scaled by the working
+  picture's longest side over 480, derived from the picture and never passed in. A picture of another size placed on a
+  larger canvas then gets a finer grain than its neighbour, and a band of rows would scale by the band, not the canvas. Taking
+  the design scale from the caller reverses that decision; needed by the banded render. `Options` has `size` and `threads` only.
+- **Open: alpha through effects that move pixels.** `Picture` is RGB by type and only the cut-out after the last step adds
+  alpha. A look applied to an already transparent picture (cut out, then sliced, displaced or torn) moves the colour but not the
+  alpha. No decision.
+
 ## Performance
 
 - **Cost grows with the picture, not with the parameters, and memory stays a few pictures deep.** A 12 MP photo is
