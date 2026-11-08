@@ -450,6 +450,11 @@ fn cases() -> Vec<Case> {
                     .param("seed", 4_294_967_295_u32),
                 Step::new("paper_texture").param("kind", "canvas"),
                 Step::new("paper_texture"),
+                Step::new("torn_edge")
+                    .param("width", 30)
+                    .param("scale", 11)
+                    .param("fill", "#336699")
+                    .param("seed", 4_294_967_295_u32),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

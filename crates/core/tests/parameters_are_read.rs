@@ -245,6 +245,38 @@ fn conditional() -> Vec<Conditional> {
             field: "fibre",
             with: vec![("kind", json!("canvas"))],
         },
+        // the default width tears the whole 12 px picture, where nothing else shows; the tear varies only with some
+        // roughness, and its layers and seed only when they are not all washed into one wave
+        Conditional {
+            effect: "torn_edge",
+            field: "roughness",
+            with: vec![("width", json!(3.0))],
+        },
+        Conditional {
+            effect: "torn_edge",
+            field: "scale",
+            with: vec![("width", json!(3.0)), ("roughness", json!(0.9))],
+        },
+        Conditional {
+            effect: "torn_edge",
+            field: "octaves",
+            with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
+        },
+        Conditional {
+            effect: "torn_edge",
+            field: "persistence",
+            with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
+        },
+        Conditional {
+            effect: "torn_edge",
+            field: "lacunarity",
+            with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
+        },
+        Conditional {
+            effect: "torn_edge",
+            field: "seed",
+            with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

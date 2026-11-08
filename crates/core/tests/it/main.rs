@@ -119,5 +119,6 @@ mod tile;
 mod tone;
 mod tone_map;
 mod torn;
+mod torn_edge;
 mod trace;
 mod typed_params;
