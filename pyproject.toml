@@ -355,6 +355,7 @@ ignore_names = [
     "corner_radius",
     "style",
     "max_shapes",
+    "focus",
     "context",
     "op",
     "model_config",  # pydantic reads each model's settings from this class attribute
