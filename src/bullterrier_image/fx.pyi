@@ -354,16 +354,7 @@ black_and_white : Black and white by Rec. 709 luma: every channel is the picture
 
 @_effect
 def chromatic_aberration(*, amount: float | Drive = 4.0, samples: int = 3, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['prism'] | None = None) -> Step:
-    """Lens colour fringes or a prism rainbow: add up `samples` copies of the picture, scaled about the centre `x`, `y`
-and coloured as a spectrum.
-
-Copy k stands for the colour k / (samples - 1) of the way from red to blue and shows each pixel d px from the centre
-read at d x (1 - e x (1 - 2k / (samples - 1))), with e = `amount` / R, R the distance of the farthest corner (red
-is shifted outward, blue inward, the middle copy stays). A channel of the result is the weighted average of that
-channel in the copies, the weights following the simple spectrum above (red from the red and yellow copies, green
-from yellow to cyan, blue from cyan and blue) and adding up to 1, so a flat picture and the centre are unchanged
-and the result never leaves 0..1. With 3 samples red is the red copy, green the picture itself and blue the blue
-copy. Each copy is read by `interpolation`.
+    """Lens colour fringes or a prism rainbow: add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum.  Copy k stands for the colour k / (samples - 1) of the way from red to blue and shows each pixel d px from the centre read at d x (1 - e x (1 - 2k / (samples - 1))), with e = `amount` / R, R the distance of the farthest corner (red is shifted outward, blue inward, the middle copy stays). A channel of the result is the weighted average of that channel in the copies, the weights following the simple spectrum (red from the red and yellow copies, green from yellow to cyan, blue from cyan and blue) and adding up to 1, so a flat picture and the centre are unchanged and the result never leaves 0..1. With 3 samples red is the red copy, green the picture itself and blue the blue copy. Each copy is read by `interpolation`.
 
 Parameters
 ----------
@@ -391,8 +382,8 @@ Advanced parameters
 interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from a copy: 'nearest' takes the closest pixel
     (fastest, but the fringes step), 'bilinear' blends the four pixels around it
-    (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring
-    pixels (sharpest, a little slower, and may ring beside hard edges).
+    (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels
+    (sharpest, a little slower, and may ring beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the copies see beyond the picture's edge (the bluer ones read from farther out
     than they show): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
@@ -762,13 +753,7 @@ disintegrate : Heavy: the whole outline and the top come apart, in long plumes i
 
 @_effect
 def displace(*, amount: float | Drive = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['scatter'] | None = None) -> Step:
-    """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px: warp,
-tearing, scatter, frosted glass.
-
-Each pixel shows the picture at its own place plus a move (rows, columns) from two fractal noise fields of the
-same `scale`, `octaves`, `persistence` and `lacunarity`, drawn from `seed` independently of each other. The moves
-are scaled together, by one number, so that the longest of them is `amount` px: no pixel reads from farther than
-that, so the `edge` rule only matters within `amount` px of the border.
+    """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px: warp, tearing, scatter, frosted glass.  Each pixel shows the picture at its own place plus a move (down, right) from two fractal noise fields of the same `scale`, `octaves`, `persistence` and `lacunarity`, drawn from `seed` independently of each other. The moves are scaled together, by one number, so that the longest of them is `amount` px: no pixel reads from farther than that, so the `edge` rule only matters within `amount` px of the border.
 
 Parameters
 ----------
@@ -780,7 +765,7 @@ scale : number, px, 1 to 1024, default 80.0
     Size of the coarsest waves of the displacement in pixels, the spacing of the first
     noise lattice. Larger = broad, slow wobbles that bend the picture; small = fine,
     jittery tearing; 1 (with 1 octave and 'nearest') = every pixel moves on its own,
-    frosted glass, most by about a quarter of `amount`.
+    frosted glass.
 octaves : whole number, count, 1 to 8, default 3
     How many layers of noise are summed, each finer than the last (by `lacunarity`) and
     weaker (by `persistence`). 1 = smooth waves, more = more fine, ragged detail. Layers
@@ -803,8 +788,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pixel near the border sees when its move reads from beyond the picture:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
@@ -968,13 +953,7 @@ layered_cutouts : Cut-paper layers (set `opacity` 1): four opaque copies of the 
 
 @_effect
 def droste(*, scale: float = 0.5, turn: float = 20.0, repeats: int = 4, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Show the picture again, `scale` times as large and turned by `turn`, in its own middle, up to `repeats` times.
-
-Measure each pixel's distance from the middle as a share of the picture's half-width or half-height, whichever
-is larger (1 at the edge, so the picture and its copies are rectangles of the picture's shape). A pixel nearer
-than `scale` is inside a copy: it shows the picture at `1 / scale` times its own distance, turned by `turn`, and
-if that is nearer than `scale` again, it is inside a copy of the copy, and so on, `repeats` times at most. The
-outside of the picture is the picture as it is.
+    """Show the picture again in its own middle, `scale` times as large and turned by `turn`, up to `repeats` times.  A Droste effect: a picture that contains a smaller copy of itself, which contains a smaller copy. Measure each pixel's distance from the middle as a share of the picture's half-width or half-height, whichever is larger (1 at the edge, so the picture and its copies are rectangles of the picture's shape). A pixel nearer than `scale` is inside a copy: it shows the picture at 1 / `scale` times its own distance, turned by `turn`, and if that is nearer than `scale` again, it is inside a copy of the copy, and so on, `repeats` times at most. The outside of the picture is the picture as it is. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -998,8 +977,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but the small copies turn
     blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little
-    slower, and may ring beside hard edges).
+    'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
+    and may ring beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a turned copy shows where it reads from beyond the picture (a turned copy's
     corners reach past the edge): 'reflect' (mirrored, edge pixel repeated), 'mirror'
@@ -1058,18 +1037,14 @@ Step opacity
     ...
 
 @_effect
-def echo(*, copies: int = 4, dx: float = 14.0, dy: float = 0.0, fade: float = 0.5, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`.
-
-The result is the weighted average of the picture (weight 1) and copy k, the picture moved by k times (`dx`,
-`dy`) (weight (1 - fade)^k), so the weights add up to one: the picture's brightness is kept, a flat picture stays
-flat and nothing leaves the range 0..1. What a copy shows where it moved off the picture is set by `edge`.
+def echo(*, copies: int = 4, dx: float = 14.0, dy: float = 0.0, fade: float = 0.5, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`.  The result is the weighted average of the picture (weight 1) and copy k, the picture moved by k times (`dx`, `dy`) (weight (1 - `fade`)^k), so the weights add up to one: the picture's brightness is kept, a flat picture stays flat and nothing leaves the range 0..1. What a copy shows where it moved off the picture is set by `edge`.
 
 Parameters
 ----------
 copies : whole number, count, 0 to 32, default 4
     How many copies are laid over the picture, 0 to 32; 0 leaves the picture unchanged.
-    More copies make a longer trail (the time grows with the count).
+    More copies make a longer smear along the step, and cost more.
 dx : number, px, -500 to 500, default 14.0
     How far each copy lies to the right of the one before it, in pixels, -500 to 500
     (negative is to the left); copy k is k times this far from the picture. A fraction
@@ -1086,7 +1061,7 @@ fade : number, fraction, 0 to 1, default 0.5
 
 Advanced parameters
 -------------------
-edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What a copy shows where it has moved off the picture's edge: 'nearest' repeats the
     picture's edge pixels (a smear along the edge), 'wrap' brings back what left on the
     other side, 'reflect' mirrors the picture (the edge line repeated once), 'mirror'
@@ -1743,12 +1718,8 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 @_effect
-def interlace(*, offset: float = 6.0, field: Literal['odd', 'even'] = 'odd', edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched.
-
-The two fields of an interlaced frame are the odd and the even rows; when the picture moved between them, every
-vertical edge breaks into a comb. Here one field (`field`) is moved by `offset` and the other stays, which gives
-that comb on a still picture. What the slide uncovers at the side is set by `edge`.
+def interlace(*, offset: float = 6.0, field: Literal['odd', 'even'] = 'odd', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched.  The two fields of an interlaced frame are the odd and the even rows; when the picture moved between them, every vertical edge breaks into a comb. Here one field (`field`) is moved by `offset` and the other stays, which gives that comb on a still picture. What the slide uncovers at the side is set by `edge`.
 
 Parameters
 ----------
@@ -1764,7 +1735,7 @@ field : one of 'odd', 'even', default 'odd'
 
 Advanced parameters
 -------------------
-edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'nearest'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What fills the gap the slide opens at the side: 'nearest' holds the row's last pixel
     there, 'wrap' brings back what left on the other side, 'reflect' mirrors the row
     (the edge pixel repeated once), 'mirror' mirrors it about the edge pixel."""
@@ -1828,15 +1799,7 @@ byte_corrupt : A corrupted JPEG: a moderate-quality picture with 40 damaged coef
 
 @_effect
 def kaleidoscope(*, segments: int = 6, angle: float = 0.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['mirror'] | None = None) -> Step:
-    """Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a
-kaleidoscope, or with one segment a plain mirror.
-
-A pixel at angle a about the centre (clockwise from pointing right) and distance d shows the picture at the same
-distance d and the angle that a folds to: a less `angle`, taken modulo the sector 360 / `segments`, and if that
-passes half a sector, mirrored to what it falls short of the sector by, then `angle` added back. The wedge from
-`angle` for half a sector is the picture as it is, the next half a sector its mirror image, and so on round the
-centre, which keeps its own pixel. One segment is a single mirror axis: the half of the picture clockwise from
-`angle` is kept, its reflection replaces the other half.
+    """Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a kaleidoscope, or with one segment a plain mirror.  A wedge of the picture and its mirror image repeated round a centre. A pixel at angle a about the centre (clockwise from pointing right) and distance d shows the picture at the same distance d and the angle that a folds to: a less `angle`, taken modulo the sector 360 / `segments`, and if that passes half a sector, mirrored to what it falls short of the sector by, then `angle` added back. The wedge from `angle` for half a sector is the picture as it is, the next half a sector its mirror image, and so on round the centre, which keeps its own pixel. One segment is a single mirror axis: the half of the picture clockwise from `angle` is kept, its reflection replaces the other half. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -1869,11 +1832,10 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges). With 'nearest' every output pixel is an input pixel, so a
-    mirror (1 or 2 segments through the middle) is exact and exactly symmetric; the
-    other two blend, and a mirror then differs from an exact reflection by rounding
-    error only.
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges). With 'nearest' every output pixel is an input pixel, so a mirror
+    (1 or 2 segments through the middle) is exact and exactly symmetric; the other two
+    blend, and a mirror then differs from an exact reflection by rounding error only.
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the kaleidoscope sees beyond the picture's edge (a wedge reaches past it in the
     corners, and wherever the centre is off to one side): 'reflect' (mirrored, edge
@@ -1910,16 +1872,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def lens_distortion(*, model: Literal['brown_conrady', 'fisheye'] = 'brown_conrady', amount: float = 0.2, fit: Literal['frame', 'centre'] = 'frame', x: float = 0.5, y: float = 0.5, border: str | list[float] | tuple[float, float, float] | None = None, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['fisheye'] | None = None) -> Step:
-    """Bend the picture as a lens does, barrel, pincushion or fisheye, with the curve `model` and strength
-`amount` about the axis `x`, `y`.
-
-Each pixel at distance d from the axis shows the picture on the same ray at d x s(d / R), R the distance of the
-farthest corner. s is 1 at the axis and 1 + `amount` at the farthest corner: for 'brown_conrady' 1 + `amount` x
-(d / R)^2 (the Brown-Conrady radial term, k1 only); for 'fisheye' tan(u d / R) / (u d / R), the equidistant
-fisheye for a half field of view u (the arctangent, its inverse, for a negative `amount`). With `fit` 'frame' s is
-divided by 1 + `amount` so that the corner stays put (a barrel then reads only inside the picture). The axis never
-moves, and the result never leaves 0..1. What the bend reads from beyond the picture is the `edge` rule's, or
-`border` where that is set.
+    """Bend the picture as a lens does, barrel, pincushion or fisheye, with the curve `model` and strength `amount` about the axis `x`, `y`.  Lens distortion: the picture bent about the lens axis, by the radial polynomial of the Brown-Conrady model or as through a fisheye lens, so straight lines bow outward (barrel) or inward (pincushion). Each pixel at distance d from the axis shows the picture on the same ray at d x s(d / R), R the distance of the farthest corner. s is 1 at the axis and 1 + `amount` at the farthest corner: for 'brown_conrady' 1 + `amount` x (d / R)^2 (the Brown-Conrady radial term, k1 only); for 'fisheye' tan(u d / R) / (u d / R), the equidistant fisheye for a half field of view u (the arctangent, its inverse, for a negative `amount`). With `fit` 'frame' s is divided by 1 + `amount` so that the corner stays put (a barrel then reads only inside the picture). The axis never moves, and the result never leaves 0..1. What the bend reads from beyond the picture is the `edge` rule's, or `border` where that is set.
 
 Parameters
 ----------
@@ -1966,8 +1919,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but lines turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What shows where the bend reads from beyond the picture (with fit 'centre', or a
     pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
@@ -2086,12 +2039,8 @@ ring_width : number, px, 1 to 300, default 12.0
     ...
 
 @_effect
-def lenticular(*, strip: int = 6, shift: float = 5.0, edge: Literal['wrap', 'nearest', 'reflect', 'mirror'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px.
-
-The strips keep their places; what changes is what they show: the 1st, 3rd, ... strips show the picture as it is
-and the 2nd, 4th, ... show the whole picture moved sideways by `shift`, so the two views are interlaced as under a
-lenticular lens. A strip shows the moved picture at the strip's own columns.
+def lenticular(*, strip: int = 6, shift: float = 5.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px, as a lenticular print is seen off-centre.  The strips keep their places; what changes is what they show: the 1st, 3rd, ... strips show the picture as it is and the 2nd, 4th, ... show the whole picture moved sideways by `shift`, so the two views are interlaced as under a lenticular lens. A strip shows the moved picture at the strip's own columns.
 
 Parameters
 ----------
@@ -2108,7 +2057,7 @@ shift : number, px, -500 to 500, default 5.0
 
 Advanced parameters
 -------------------
-edge : one of 'wrap', 'nearest', 'reflect', 'mirror', default 'nearest'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What a slid strip shows where its picture has moved off the picture's side:
     'nearest' (the outermost column repeated), 'wrap' (the opposite side comes round),
     'reflect' (mirrored, edge column repeated), 'mirror' (mirrored about the edge
@@ -2170,7 +2119,7 @@ blobs : whole number, count, 1 to 16, default 3
     How many patches of light there are, at random places along that side (each brighter
     or fainter and stretched along the edge by chance). Overlapping patches merge into
     one wash; raising it gives a more even, wider leak.
-seed : whole number, count, 0 to 2147483647, default 0
+seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same leak (the same patches in the same
     places), another seed a different one."""
     ...
@@ -2542,14 +2491,7 @@ fibre : number, fraction, 0 to 1, default 0.3
 
 @_effect
 def parallax(*, field: str = 'depth', angle: float = 0.0, amount: float = 9.6, focus: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera
-move would.
-
-Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of
-the largest shift, so a near object lands whole over what lies behind it. Background it uncovers is the background
-beside it stretched over the gap: a 2.5D look, not a new view.
-
-`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1, 1 = nearest.
+    """Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera move would: layers nearer than `focus` shift along `angle`, farther ones the opposite way, each by its distance in depth from the focus.  Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of the largest shift, so a near object lands whole over what lies behind it. Background it uncovers is the background beside it stretched over the gap: a 2.5D look, not a new view.
 
 Parameters
 ----------
@@ -2576,8 +2518,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pixel near the border sees when its shift reads from beyond the picture:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
@@ -2694,14 +2636,7 @@ feather : number, px, 0 to 32, default 1.0
 
 @_effect
 def perspective(*, vertical: float = 0.25, horizontal: float = 0.0, shear_x: float = 0.0, shear_y: float = 0.0, rotate: float = 0.0, scale: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['shear'] | None = None) -> Step:
-    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, shear, turn and zoom it.
-
-The picture is moved by one projective transform about its centre, which keeps straight lines straight: first the
-vertical keystone (the far edge shrinks to 1 - `vertical` of the near one, the near edge keeps its width), then the
-horizontal one, then the skew (rows slide sideways by `shear_x` px per row, then columns down by `shear_y` px per
-column, so the area never changes), then `rotate` degrees clockwise, then `scale`. With all six at 0 the picture is
-returned unchanged. The output beyond the vanishing line reads from outside the picture, so `edge` says what it
-shows.
+    """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, shear, turn and zoom it.  A perspective correction: a keystone and a skew along each axis, then a turn and a zoom about the centre. The picture is moved by one projective transform about its centre, which keeps straight lines straight: first the vertical keystone (the far edge shrinks to 1 - `vertical` of the near one, the near edge keeps its width), then the horizontal one, then the skew (rows slide sideways by `shear_x` px per row, then columns down by `shear_y` px per column, so the area never changes), then `rotate` degrees clockwise, then `scale`. With all six at 0 the picture is returned unchanged. The output beyond the vanishing line reads from outside the picture, so `edge` says what it shows. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -2746,8 +2681,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What fills the margins the keystone, skew, turn and zoom uncover around the picture:
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
@@ -2760,12 +2695,7 @@ shear : A shear: rows slid sideways in proportion to their height, so the pictur
 
 @_effect
 def pinch_bulge(*, amount: float = 0.5, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`.
-
-Each pixel at distance d from the centre, d inside the radius, shows the picture on the same ray from the centre
-at distance d x (1 - amount x (1 - d / radius)^2), read by `interpolation`: nearer the centre for a bulge, so
-the middle is magnified, and farther out for a pinch. Pixels at the radius or beyond, and the centre itself, keep
-their place, no pixel is folded over, and the result never leaves 0..1.
+    """Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`.  The picture about the centre is magnified (bulge) or shrunk (pinch) most at the centre and not at all at `radius`. Each pixel at distance d from the centre, d inside the radius, shows the picture on the same ray from the centre at distance d x (1 - amount x (1 - d / radius)^2), read by `interpolation`: nearer the centre for a bulge, so the middle is magnified, and farther out for a pinch. Pixels at the radius or beyond, and the centre itself, keep their place, no pixel is folded over, and the result never leaves 0..1.
 
 Parameters
 ----------
@@ -2794,8 +2724,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but a bulge turns blocky),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pinch sees beyond the picture's edge (it reads from farther out than it
     shows): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
@@ -2865,12 +2795,7 @@ order : one of 'ascending', 'descending', default 'ascending'
 
 @_effect
 def polar(*, mode: Literal['to', 'from'] = 'to', x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from').
-
-The planet has the radius of half the shorter side, from the first pixel to the last. 'to': a pixel d px from the
-centre shows the row (1 - d / radius) down the picture, from the top, and the column that is the fraction of a
-whole turn, clockwise from straight up, of the width; the columns wrap round, so the seam shows nothing. 'from':
-each pixel reads the planet at the distance and angle that its row and column name, the same relation the other way.
+    """Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from').  Rectangular coordinates to polar (the picture wrapped round a centre) or back. The planet has the radius of half the shorter side, from the first pixel to the last. 'to': a pixel d px from the centre shows the row (1 - d / radius) down the picture, from the top, and the column that is the fraction of a whole turn, clockwise from straight up, of the width; the columns wrap round, so the seam shows nothing. 'from': each pixel reads the planet at the distance and angle that its row and column name, the same relation the other way. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -2894,8 +2819,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but the middle of a planet turns
     blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little
-    slower, and may ring beside hard edges).
+    'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
+    and may ring beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre
     planet leaves it in 'from' (the angle itself never has an edge; it wraps round):
@@ -3150,15 +3075,8 @@ emboss : An embossed print: the picture's brightness as a 6 px relief in grey, l
     ...
 
 @_effect
-def rgb_split(*, pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['nearest', 'wrap', 'reflect', 'mirror'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['anaglyph'] | None = None) -> Step:
-    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch
-fringe or a red-cyan 3D anaglyph.
-
-Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves
-`amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the
-channels end up exactly `amount` px from each other in a row, which shows as a red fringe on one side of an edge and
-a blue (or cyan) one on the other. Whole or fractional distances are allowed; what a channel shows where it has
-left the picture is set by `edge`.
+def rgb_split(*, pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['anaglyph'] | None = None) -> Step:
+    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch fringe or a red-cyan 3D anaglyph.  Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves `amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the channels end up exactly `amount` px from each other in a row, which shows as a red fringe on one side of an edge and a blue (or cyan) one on the other. Whole or fractional distances are allowed; what a channel shows where it has left the picture is set by `edge`.
 
 Parameters
 ----------
@@ -3179,7 +3097,7 @@ amount : number, px, 0 to 500, default 8.0
 
 Advanced parameters
 -------------------
-edge : one of 'nearest', 'wrap', 'reflect', 'mirror', default 'nearest'
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What a moved channel shows where it has left the picture's edge: 'nearest' repeats
     the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what
     left on the other side, 'reflect' mirrors the channel (the edge line repeated once),
@@ -3248,12 +3166,7 @@ field_threshold : number, fraction, 0 to 1, default 0.5
 
 @_effect
 def ripple(*, wavelength: float = 40.0, amplitude: float = 6.0, phase: float = 0.0, angle: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`.
-
-A pixel at distance s px from the picture's centre measured along the wave's direction (`angle` degrees clockwise
-from pointing right) is moved by amplitude x sin(2 pi s / wavelength + phase) px, at a right angle to that
-direction (down for angle 0, left for angle 90), and the point between pixels is read by `interpolation`. The wave
-is at its phase along the line through the centre, so turning `angle` turns the whole pattern about the centre.
+    """Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`.  A pixel at distance s px from the picture's centre measured along the wave's direction (`angle` degrees clockwise from pointing right) is moved by amplitude x sin(2 pi s / wavelength + phase) px, at a right angle to that direction (down for angle 0, left for angle 90), and the point between pixels is read by `interpolation`. The wave is at its phase along the line through the centre, so turning `angle` turns the whole pattern about the centre. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -3283,8 +3196,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the wave sees beyond the picture's edge (it moves pixels in from outside along
     the edges): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
@@ -3487,12 +3400,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def slice_shift(*, slices: int = 30, amount: float = 24.0, seed: int = 0, bands: int = 0, band_min_height: float = 4.8, band_max_height: float = 28.8, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:
-    """Glitch tearing: cut the picture into horizontal strips at random rows and slide each sideways by a random
-distance, then slide `bands` more strips of random height placed at random rows.
-
-A strip that slides out of the picture on one side comes back in on the other (it wraps around), and the strip
-moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts, the
-bands and the slides depend only on `seed`, `slices`, `bands`, `amount` and the picture's size.
+    """Glitch tearing: the picture cut into strips and bands that slide sideways by random distances, wrapping around.  Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide `bands` more strips of random height placed at random rows. A strip that slides out of the picture on one side comes back in on the other (it wraps around), and the strip moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts, the bands and the slides depend only on `seed`, `slices`, `bands`, `amount` and the picture's size.
 
 Parameters
 ----------
@@ -3580,7 +3488,7 @@ variation : number, fraction, 0 to 1, default 0.0
     How much the points differ in brightness, and so in how far their spikes show: each
     one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1
     = from full down to nothing.
-seed : whole number, count, 0 to 2147483647, default 0
+seed : whole number, count, 0 to 4294967295, default 0
     Random seed for `spacing` and `variation`: the same seed picks the same points of
     the same picture, another seed others.
 
@@ -3591,10 +3499,7 @@ sparkle : Scattered glitter: small white four-pointed glints on a random few of 
 
 @_effect
 def stretch(*, axis: Literal['vertical', 'horizontal'] = 'vertical', at: float = 0.5, span: float = 72.0, side: Literal['both', 'after', 'before'] = 'both', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Repeat one row (or column) of the picture over the `span` of rows (columns) beside it.
-
-The line sits at `at` and keeps its place; the lines within `span` of it on the chosen `side` become copies of it,
-the rest of the picture is untouched. Every output pixel is an input pixel, so no colour is invented.
+    """A pixel stretch: one line of the picture repeated over the lines beside it, the way a glitched file smears.  Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. The line sits at `at` and keeps its place; the lines within `span` of it on the chosen `side` become copies of it, the rest of the picture is untouched. Every output pixel is an input pixel, so no colour is invented.
 
 Parameters
 ----------
@@ -3619,11 +3524,7 @@ side : one of 'both', 'after', 'before', default 'both'
 
 @_effect
 def swirl(*, angle: float = 90.0, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`.
-
-Each pixel at distance d from the centre, d inside the radius, shows the picture at the point turned about the
-centre by angle x (1 - d / radius)^2, clockwise for a positive angle, read by `interpolation`. Pixels at the radius
-or beyond, and the centre itself, keep their place, and the result never leaves 0..1.
+    """Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`.  The picture is turned about the centre by an angle that falls smoothly from `angle` at the centre to nothing at `radius`. Each pixel at distance d from the centre, d inside the radius, shows the picture at the point turned about the centre by angle x (1 - d / radius)^2, clockwise for a positive angle, read by `interpolation`. Pixels at the radius or beyond, and the centre itself, keep their place, and the result never leaves 0..1.
 
 Parameters
 ----------
@@ -3650,8 +3551,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What the swirl sees beyond the picture's edge (a swirl near the border turns pixels
     in from outside): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored
@@ -3661,15 +3562,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def tile(*, columns: int = 3, rows: int = 3, offset_x: float = 0.0, offset_y: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['scan_roll'] | None = None) -> Step:
-    """Repeat the picture scaled down in a grid, or slide it around: a rolling scan, a wrap-around shift.
-
-The picture is averaged down by area (each new pixel is the mean of the source pixels it covers, fractions of a
-pixel counted in part) to a cell of whole pixels, width // columns by height // rows and at least 1 px each. The
-cell is slid by `offset_x` and `offset_y` of its size, wrapping around within the cell (a fraction of a pixel
-blends the two pixels it lies between), and repeated across the picture. When the grid does not divide the
-picture, the leftover pixels (width mod columns on the right, height mod rows at the bottom) show the start of the
-next copy, cut off. One column and one row give the picture itself, or with an offset the picture rolled around, as
-on a television whose sync slipped (the `scan_roll` preset).
+    """Repeat the picture scaled down in a grid, or slide it around: a rolling scan, a wrap-around shift.  The picture is averaged down by area (each new pixel is the mean of the source pixels it covers, fractions of a pixel counted in part) to a cell of whole pixels, width // `columns` by height // `rows` and at least 1 px each. The cell is slid by `offset_x` and `offset_y` of its size, wrapping around within the cell (a fraction of a pixel blends the two pixels it lies between), and repeated across the picture. When the grid does not divide the picture, the leftover pixels (width mod `columns` on the right, height mod `rows` at the bottom) show the start of the next copy, cut off. One column and one row give the picture itself, or with an offset the picture rolled around, as on a television whose sync slipped (the `scan_roll` preset).
 
 Parameters
 ----------

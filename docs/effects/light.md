@@ -96,7 +96,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from a copy: 'nearest' takes the closest pixel (fastest, but the fringes step), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from a copy: 'nearest' takes the closest pixel (fastest, but the fringes step), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the copies see beyond the picture's edge (the bluer ones read from farther out than they show): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
@@ -223,7 +223,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `size` | number | px | 6 to 600 | `150.0` | How big the patches are and how deep they reach into the picture, in px tuned for a picture about 480 px high: each patch is a soft bump whose width is between half of this and all of it, centred between the edge and this far in. Raising it floods more of the picture. |
 | `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | The side the light comes in from, as the direction from the picture's centre, in degrees clockwise from pointing right, as seen on screen: 0 = the right edge, 90 = the bottom, 180 = the left, 270 = the top; in between, the corner. |
 | `blobs` | whole number | count | 1 to 16 | `3` | How many patches of light there are, at random places along that side (each brighter or fainter and stretched along the edge by chance). Overlapping patches merge into one wash; raising it gives a more even, wider leak. |
-| `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed: the same seed always gives the same leak (the same patches in the same places), another seed a different one. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed: the same seed always gives the same leak (the same patches in the same places), another seed a different one. |
 
 ### `light_rays`
 
@@ -350,7 +350,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `width` | number | px | 1 to 20 | `1.0` | The thickness in px of each spike, tuned for a picture about 480 px high, with a soft edge one px wide: 1 = a hairline. Raising it makes bolder spikes. |
 | `limit` | number | fraction | 0 to 1 | `1.0` | The most pixels that send out spikes, as a share of all the picture's pixels, the brightest first: the threshold is raised just enough to keep to it (never above 0.99, so a picture with more than this share of near-white pixels still lights those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to keep a low `threshold` from flooding large bright areas. |
 | `variation` | number | fraction | 0 to 1 | `0.0` | How much the points differ in brightness, and so in how far their spikes show: each one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1 = from full down to nothing. |
-| `seed` | whole number | count | 0 to 2147483647 | `0` | Random seed for `spacing` and `variation`: the same seed picks the same points of the same picture, another seed others. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for `spacing` and `variation`: the same seed picks the same points of the same picture, another seed others. |
 
 </details>
 
