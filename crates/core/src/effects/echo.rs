@@ -53,7 +53,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let (height, width) = (picture.height(), picture.width());
     let copies = params.copies.unsigned_abs() as usize;
     let keep = f64::from(1.0 - params.fade);
-    let mut weight = 1.0_f64; // the picture's own
+    // constant: the picture's own weight is one, each copy's a share of the one before
+    let mut weight = 1.0_f64;
     let mut total_weight = weight;
     let mut sum: Vec<[f64; 3]> = picture.pixels().iter().map(|pixel| pixel.map(f64::from)).collect();
     for copy in 1..=copies {

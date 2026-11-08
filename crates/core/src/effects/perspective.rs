@@ -71,8 +71,8 @@ pub struct Params {
     pub edge: Edge,
 }
 
-/// The least depth a pixel is read at (the centre of the picture has depth 1). constant: any floor far under 1 and far over
-/// the rounding of the depth keeps the place finite.
+/// The least depth a pixel is read at (the centre of the picture has depth 1).
+// constant: any floor far under 1 and far over the rounding of the depth keeps the place finite
 const VANISHING: f64 = 1e-9;
 
 /// A 3x3 matrix, row by row.
@@ -87,6 +87,7 @@ fn product(left: &Matrix, right: &Matrix) -> Matrix {
 fn inverse(m: &Matrix) -> Matrix {
     // the cofactor of an entry: the minor of the other two rows and columns, taken in cyclic order, which signs it
     let cofactor = |row: usize, column: usize| {
+        // constant: a matrix has 3 rows and columns, so the next two of each are taken modulo 3
         let (r1, r2, c1, c2) = ((row + 1) % 3, (row + 2) % 3, (column + 1) % 3, (column + 2) % 3);
         m[r1][c1] * m[r2][c2] - m[r1][c2] * m[r2][c1]
     };
