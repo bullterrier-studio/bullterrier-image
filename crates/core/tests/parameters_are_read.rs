@@ -295,6 +295,58 @@ fn conditional() -> Vec<Conditional> {
             field: "light",
             with: vec![("scratches", json!(100))],
         },
+        // the 12 px picture is too small for the default density to start a single line; at the largest density it has
+        // several, and a line's length, thickness, colour and flow matter once there is one
+        Conditional {
+            effect: "flow_lines",
+            field: "length",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "step",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "thickness",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "scale",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "octaves",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "persistence",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "lacunarity",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "twist",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "seed",
+            with: vec![("density", json!(50.0))],
+        },
+        Conditional {
+            effect: "flow_lines",
+            field: "line",
+            with: vec![("density", json!(50.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",
