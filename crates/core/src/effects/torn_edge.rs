@@ -89,6 +89,7 @@ fn distances(length: usize, side: u64, params: &Params) -> Vec<f32> {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     let (top, bottom) = (distances(width, 0, params), distances(width, 1, params));
+    // constant: each of the four edges draws from a stream of its own
     let (left, right) = (distances(height, 2, params), distances(height, 3, params));
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**24")]
     picture.map_at(|row, column, pixel| {

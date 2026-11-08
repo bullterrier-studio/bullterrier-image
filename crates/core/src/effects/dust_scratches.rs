@@ -13,7 +13,7 @@ use crate::{Image, Inputs, Picture};
 /// Where `dust_scratches` sits in the catalogue: a worn print shows its marks partway, so a step lays them at 0.8.
 pub(crate) const META: Meta = Meta {
     category: Category::Texture,
-    opacity: 0.8,
+    opacity: 0.8, // constant: the default opacity of a step: a worn print shows its marks partway
     inputs: &[],
 };
 
@@ -109,10 +109,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     // mark number `mark` of `stream`, its `part`-th number: a hash, so a higher count keeps every mark of a lower one
     let draw = |stream: u64, mark: usize, part: u64| unit(mix(params.seed, &[stream, mark as u64, part]));
     let size = f64::from(params.size);
-    // constant: density is counted per 1000 square px
     let (rows, columns) = (length::float(height), length::float(width));
-    let dust = length::whole(f64::from(params.density) * rows * columns / 1000.0);
+    let dust = length::whole(f64::from(params.density) * rows * columns / 1000.0); // constant: density counts marks per 1000 square px
     for mark in 0..dust {
+        // constant: the numbers of the six draws that make a dust mark
         let [x, y, extent, tone, kind, direction] = [0, 1, 2, 3, 4, 5].map(|part| draw(0, mark, part));
         let centre = (x * columns, y * rows);
         let cover = if tone < 0.5 { &mut light } else { &mut dark };
@@ -127,6 +127,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         }
     }
     for mark in 0..params.scratches.cast_unsigned() as usize {
+        // constant: the numbers of the four draws that make a scratch
         let [x, extent, tone, lean] = [0, 1, 2, 3].map(|part| draw(1, mark, part));
         let reach = rows * (0.5 + extent / 2.0);
         let turn = f64::from(params.angle).to_radians() * (2.0 * lean - 1.0);

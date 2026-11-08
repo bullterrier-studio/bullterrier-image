@@ -121,7 +121,8 @@ fn noise(height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32> 
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     // one noise for all three channels, or one for each
-    let planes: Vec<Vec<f32>> = (0..if params.color { 3 } else { 1 })
+    let channels = if params.color { 3 } else { 1 }; // constant: colour grain is one noise per red, green, blue
+    let planes: Vec<Vec<f32>> = (0..channels)
         .map(|stream| noise(height, width, params, stream))
         .collect();
     picture.map_at(|row, column, pixel| {

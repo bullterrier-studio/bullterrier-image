@@ -123,8 +123,8 @@ fn layers(params: &Params, finest: f64) -> Vec<Layer> {
 }
 
 /// A pair of independent standard normal numbers drawn by the hash of `words` (Box-Muller).
-fn normals(seed: u32, words: [u64; 4]) -> [f64; 2] {
-    let draw = |part| unit(mix(seed, &[words[0], words[1], words[2], words[3], part]));
+fn normals(seed: u32, words: [u64; 4]) -> [f64; 2] { // constant: the four words are stream, layer, cell and axis
+    let draw = |part| unit(mix(seed, &[words[0], words[1], words[2], words[3], part])); // constant: the same four words
     // 1 - u lies in (0, 1], so the logarithm is finite
     let radius = (-2.0 * (1.0 - draw(0)).ln()).sqrt(); // constant: Box-Muller (1958)
     let angle = std::f64::consts::TAU * draw(1);
@@ -164,7 +164,7 @@ fn perlin(height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32>
 
 /// Perlin's improved-noise fade curve 6t^5 - 15t^4 + 10t^3 (SIGGRAPH 2002): zero slope at both ends.
 fn fade(t: f64) -> f64 {
-    t * t * t * (t * (t * 6.0 - 15.0) + 10.0) // constant: Perlin's coefficients
+    t * t * t * (t * (t * 6.0 - 15.0) + 10.0) // constant: Perlin's improved-noise fade coefficients
 }
 
 /// Cellular noise of `layers` summed, not standardised: per layer the distance of each pixel to the nearest point of a
@@ -232,7 +232,7 @@ fn sine(height: usize, width: usize, params: &Params) -> Vec<f32> {
         for (at, value) in band.iter_mut().enumerate() {
             let (y, x) = (length::float(first_row + at / width), length::float(at % width));
             let (mut push_x, mut push_y) = (0.0, 0.0);
-            let mut total = 0.0;
+            let mut total = 0.0; // constant: the sum starts at zero
             for (weight, [first, second]) in &waves {
                 let (one, two) = (first.at(x, y, push_x, push_y), second.at(x, y, push_x, push_y));
                 total += weight * (one + two);
