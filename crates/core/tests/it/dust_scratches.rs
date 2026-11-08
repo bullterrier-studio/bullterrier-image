@@ -9,9 +9,9 @@ use bullterrier_image::Error;
 use bullterrier_image::effects::dust_scratches::Params;
 use bullterrier_image::params::Color;
 
-use crate::common::compare::first_bit_difference;
+use crate::common::compare::{first_bit_difference, first_difference};
 use crate::common::pictures::varied;
-use crate::common::pixels::run_picture;
+use crate::common::pixels::{is_pixel, run_picture};
 
 const WHITE: Color = Color([1.0; 3]);
 
@@ -31,7 +31,12 @@ fn grey(size: usize) -> Vec<f32> {
 /// Which pixels of a mid-grey `size` square picture the marks touch.
 fn changed(params: &Params, size: usize) -> Result<Vec<bool>, Error> {
     let out = run_picture(params, size, size, &grey(size))?;
-    Ok(out.as_chunks::<3>().0.iter().map(|pixel| *pixel != [0.5; 3]).collect())
+    Ok(out
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|pixel| !is_pixel(*pixel, [0.5; 3]))
+        .collect())
 }
 
 /// How far each pixel of a mid-grey `size` square picture is covered by marks, 0..1, when both colours are white.
@@ -224,7 +229,7 @@ fn larger_specks_cover_more_of_the_picture() -> Result<(), Error> {
 fn a_straight_scratch_covers_its_width_in_every_row() -> Result<(), Error> {
     // a vertical scratch of width w covers, summed across a row, exactly w pixels (the antialiased line is a box of width w
     // seen through the one-pixel pixel box, and sampling that at whole pixels keeps its area)
-    for width in [1.0, 2.5, 4.0] {
+    for (width, ends) in [(1.0_f32, 3_usize), (2.5, 4), (4.0, 6)] {
         let cover = coverage(
             &Params {
                 scratches: 1,
@@ -241,7 +246,7 @@ fn a_straight_scratch_covers_its_width_in_every_row() -> Result<(), Error> {
             marked.len() >= 80,
             "width {width}: runs over at least half of the 160 rows"
         );
-        let ends = width as usize + 2; // the rounded ends are not a full width
+        // `ends`: the rows of the rounded ends, which are not a full width
         for sum in &marked[ends..marked.len() - ends] {
             assert!((sum - f64::from(width)).abs() < 1e-3, "width {width}: {sum}");
         }
@@ -376,7 +381,13 @@ fn where_a_light_mark_crosses_a_dark_one_the_light_one_lies_on_top() -> Result<(
         ..Params::default()
     };
     let out = run_picture(&params, 160, 160, &grey(160))?;
-    let count = |colour: [f32; 3]| out.as_chunks::<3>().0.iter().filter(|pixel| **pixel == colour).count();
+    let count = |colour: [f32; 3]| {
+        out.as_chunks::<3>()
+            .0
+            .iter()
+            .filter(|pixel| is_pixel(**pixel, colour))
+            .count()
+    };
     let (light, dark) = (count([1.0, 0.0, 0.0]), count([0.0, 0.0, 1.0]));
     assert!(
         dark > 1000 && light as f64 > 1.3 * dark as f64,
@@ -460,7 +471,7 @@ fn the_same_seed_gives_the_same_marks_and_another_seed_other_marks() -> Result<(
                 160,
             )
         };
-        assert!(at(1)? != at(2)?);
+        assert!(first_difference(&at(1)?, &at(2)?).is_some());
     }
     Ok(())
 }

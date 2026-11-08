@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
-use crate::ops::cast;
+use crate::ops::{cast, length};
 use crate::ops::noise::{Fractal, field, standardised};
 use crate::ops::random::{mix, unit};
 use crate::params::{Choice, Params};
@@ -78,15 +78,15 @@ pub struct Params {
 
 /// The wave of one axis of the weave: `cos(2 pi p / spacing)` at each of `length` positions `p`, scaled for 'linen' by a
 /// strength drawn for the thread (one pitch wide) the position lies in. `axis` keeps the rows' threads apart from the columns'.
-fn wave(length: usize, axis: u64, params: &Params) -> Vec<f64> {
+fn wave(count: usize, axis: u64, params: &Params) -> Vec<f64> {
     let spacing = f64::from(params.spacing);
-    (0..length)
+    (0..count)
         .map(|at| {
-            let position = at as f64;
+            let position = length::float(at);
             let wave = (std::f64::consts::TAU * position / spacing).cos();
             if params.kind == Kind::Linen {
                 // constant: stream 2 of the seed's hashes, apart from the fibres' lattices (streams 0 and 1)
-                wave * unit(mix(params.seed, &[2, axis, (position / spacing) as u64]))
+                wave * unit(mix(params.seed, &[2, axis, length::whole((position / spacing).floor()) as u64]))
             } else {
                 wave
             }

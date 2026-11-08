@@ -86,3 +86,11 @@ pub(crate) fn run_with_field<P: EffectParams>(
 pub(crate) fn channel(values: &[f32], which: usize) -> Vec<f32> {
     values.as_chunks::<3>().0.iter().map(|pixel| pixel[which]).collect()
 }
+
+/// Whether `pixel` is `expected` to within a float's last digits (an exact comparison of floats is a lint).
+pub(crate) fn is_pixel(pixel: [f32; 3], expected: [f32; 3]) -> bool {
+    pixel
+        .iter()
+        .zip(expected)
+        .all(|(level, wanted)| (level - wanted).abs() < 1e-6)
+}

@@ -6,6 +6,7 @@ use bullterrier_image::Error;
 use bullterrier_image::effects::paper_texture::{Kind, Params};
 
 use crate::common::compare::first_bit_difference;
+use crate::common::numbers::float;
 use crate::common::pictures::varied;
 use crate::common::pixels::run_picture;
 use crate::common::stats::{correlation, deviation, mean, neighbour_correlation};
@@ -165,7 +166,7 @@ fn a_canvas_without_fibre_is_the_sum_of_two_cosines_of_the_thread_pitch() -> Res
     };
     let added = texture(&params, 64)?;
     for (row, column) in [(0, 0), (1, 5), (2, 2), (7, 3), (33, 60), (63, 63)] {
-        let wave = |at: usize| (std::f64::consts::TAU * at as f64 / 8.0).cos();
+        let wave = |at: usize| (std::f64::consts::TAU * float(at) / 8.0).cos();
         let expected = 0.5 * 0.2 * (wave(row) + wave(column));
         assert!((added[row * 64 + column] - expected).abs() < 1e-5, "({row}, {column})");
     }
@@ -176,12 +177,12 @@ fn a_canvas_without_fibre_is_the_sum_of_two_cosines_of_the_thread_pitch() -> Res
 fn a_linen_thread_has_one_strength_over_its_whole_pitch_and_threads_differ() -> Result<(), Error> {
     // linen without fibre: a thread's wave cos(2 pi x / spacing) is scaled as a whole, so columns 1 and pitch - 1 of one
     // pitch (equal cosines) agree, while column pitch - 1 and the next pitch's column 1 (equal cosines) differ
-    for pitch in [8_usize, 12] {
+    for (pitch, spacing) in [(8_usize, 8.0_f32), (12, 12.0)] {
         let size = pitch * 6;
         let params = Params {
             kind: Kind::Linen,
             amount: 0.2,
-            spacing: pitch as f32,
+            spacing,
             fibre: 0.0,
             seed: 1,
             ..Params::default()
@@ -320,6 +321,6 @@ fn all_fibre_makes_a_weave_the_paper_texture_and_paper_ignores_the_thread_pitch(
         },
         64,
     )?;
-    assert!(neighbour_correlation(&paper, 64) != neighbour_correlation(&woven, 64));
+    assert!((neighbour_correlation(&paper, 64) - neighbour_correlation(&woven, 64)).abs() > 0.01);
     Ok(())
 }

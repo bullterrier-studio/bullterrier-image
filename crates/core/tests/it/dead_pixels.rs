@@ -7,7 +7,7 @@ use bullterrier_image::effects::dead_pixels::Params;
 use bullterrier_image::params::Color;
 
 use crate::common::compare::first_bit_difference;
-use crate::common::pixels::run_picture;
+use crate::common::pixels::{is_pixel, run_picture};
 
 const GREY: f32 = 0.5;
 
@@ -65,9 +65,9 @@ fn every_pixel_is_the_picture_as_it_was_the_stuck_colour_or_black() -> Result<()
     let out = pixels(&run_picture(&params, 20, 30, &picture)?);
     let mut differing = 0;
     for (after, before) in out.iter().zip(pixels(&picture)) {
-        if *after != before {
+        if !is_pixel(*after, before) {
             differing += 1;
-            assert!(*after == [1.0; 3] || *after == [0.0; 3], "{after:?}");
+            assert!(is_pixel(*after, [1.0; 3]) || is_pixel(*after, [0.0; 3]), "{after:?}");
         }
     }
     assert!((12..=25).contains(&differing), "{differing}"); // 25 faulty pixels, a few of which were already as they show
@@ -85,11 +85,13 @@ fn stuck_is_the_share_of_the_defects_that_are_the_colour_and_the_rest_are_black(
             stuck,
             color: Color([1.0, 128.0 / 255.0, 0.0]),
             seed: 1,
-            ..Params::default()
         };
         let out = pixels(&run_picture(&params, 40, 50, &grey(40, 50))?);
-        let stuck_count = out.iter().filter(|pixel| **pixel == [1.0, 128.0 / 255.0, 0.0]).count();
-        let dead_count = out.iter().filter(|pixel| **pixel == [0.0; 3]).count();
+        let stuck_count = out
+            .iter()
+            .filter(|pixel| is_pixel(**pixel, [1.0, 128.0 / 255.0, 0.0]))
+            .count();
+        let dead_count = out.iter().filter(|pixel| is_pixel(**pixel, [0.0; 3])).count();
         assert_eq!((stuck_count, dead_count), (bright, 10 - bright), "stuck {stuck}");
     }
     Ok(())

@@ -4,6 +4,7 @@
 use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
+use crate::ops::length;
 use crate::ops::random::Rng;
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -62,7 +63,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let cells = picture.height().div_ceil(size) * columns; // the last cells are cut off by the edge
     let faulty = Rng::seeded(params.seed).shuffled(cells, (params.count.cast_unsigned() as usize).min(cells));
     // the first `count` x `stuck` of them (halves to the even number) are stuck
-    let stuck = (faulty.len() as f64 * f64::from(params.stuck)).round_ties_even() as usize;
+    let stuck = length::whole(length::float(faulty.len()) * f64::from(params.stuck));
     let mut grid = vec![Cell::Fine; cells];
     for (rank, &cell) in faulty.iter().enumerate() {
         grid[cell] = if rank < stuck { Cell::Stuck } else { Cell::Dead };

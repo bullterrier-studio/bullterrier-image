@@ -6,7 +6,8 @@ use bullterrier_image::Error;
 use bullterrier_image::effects::torn_edge::Params;
 use bullterrier_image::params::Color;
 
-use crate::common::compare::first_bit_difference;
+use crate::common::compare::{first_bit_difference, first_difference};
+use crate::common::numbers::float;
 use crate::common::pictures::varied;
 use crate::common::pixels::run_picture;
 use crate::common::stats::{correlation, deviation, mean};
@@ -27,11 +28,13 @@ fn torn(params: &Params, height: usize, width: usize) -> Result<Vec<bool>, Error
 fn run_from_top(torn: &[bool], width: usize, first: usize, last: usize) -> Vec<f64> {
     (first..last)
         .map(|column| {
-            torn.iter()
-                .skip(column)
-                .step_by(width)
-                .take_while(|gone| **gone)
-                .count() as f64
+            float(
+                torn.iter()
+                    .skip(column)
+                    .step_by(width)
+                    .take_while(|gone| **gone)
+                    .count(),
+            )
         })
         .collect()
 }
@@ -127,7 +130,7 @@ fn every_pixel_is_untouched_or_exactly_the_fill_and_the_middle_is_whole() -> Res
         .zip(picture.as_chunks::<3>().0)
         .enumerate()
     {
-        if after == before {
+        if after.iter().zip(before).all(|(a, b)| a.to_bits() == b.to_bits()) {
             kept += 1;
         } else {
             assert_eq!(*after, fill, "pixel {at}");
@@ -296,7 +299,7 @@ fn the_layers_of_the_tear_are_set_by_octaves_persistence_and_lacunarity() -> Res
     ];
     let jaggedness = |params: &Params| -> Result<f64, Error> {
         let tear = run_from_top(&torn(params, 300, 1500)?, 1500, 200, 1300);
-        Ok(tear.windows(2).map(|pair| (pair[1] - pair[0]).abs()).sum::<f64>() / (tear.len() - 1) as f64)
+        Ok(tear.windows(2).map(|pair| (pair[1] - pair[0]).abs()).sum::<f64>() / float(tear.len() - 1))
     };
     for (row, (smoother, rougher)) in rows.iter().enumerate() {
         assert!(jaggedness(rougher)? > 1.2 * jaggedness(smoother)?, "row {row}");
@@ -344,8 +347,8 @@ fn the_same_seed_tears_the_same_line_and_another_seed_another() -> Result<(), Er
             160,
         )
     };
-    assert!(at(1)? == at(1)?);
-    assert!(at(1)? != at(2)?);
-    assert!(at(u32::MAX)? != at(u32::MAX - 1)?);
+    assert!(first_difference(&at(1)?, &at(1)?).is_none());
+    assert!(first_difference(&at(1)?, &at(2)?).is_some());
+    assert!(first_difference(&at(u32::MAX)?, &at(u32::MAX - 1)?).is_some());
     Ok(())
 }

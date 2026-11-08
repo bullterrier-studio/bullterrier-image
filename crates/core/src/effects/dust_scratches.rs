@@ -4,6 +4,7 @@
 use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
+use crate::ops::length;
 use crate::ops::random::{mix, unit};
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -65,25 +66,21 @@ type Point = (f64, f64);
 
 /// Draws the segment from `start` to `end` (a speck has equal ends), `radius` px wide each side, into `cover` (`height` x
 /// `width`): each pixel takes the larger of its value and how far the shape covers it, 0..1, soft by one pixel.
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "bounds clamped to the picture are non-negative, and a cast saturates"
-)]
 fn stamp(cover: &mut [f32], (height, width): (usize, usize), start: Point, end: Point, radius: f64) {
     // shortcut: the box around the shape, so a long leaning scratch visits its whole slanted box; a row-by-row span would
     // visit only the line, worth it once scratches lean far on a very large picture
     let reach = radius + 1.0;
-    let top = (start.1.min(end.1) - reach).max(0.0) as usize;
-    let bottom = ((start.1.max(end.1) + reach).max(0.0) as usize + 1).min(height);
-    let left = (start.0.min(end.0) - reach).max(0.0) as usize;
-    let right = ((start.0.max(end.0) + reach).max(0.0) as usize + 1).min(width);
+    // the pixels the shape can touch (`whole` of a negative number is 0)
+    let first = |coordinate: f64| length::whole(coordinate.floor());
+    let top = first(start.1.min(end.1) - reach);
+    let bottom = (first(start.1.max(end.1) + reach) + 1).min(height);
+    let left = first(start.0.min(end.0) - reach);
+    let right = (first(start.0.max(end.0) + reach) + 1).min(width);
     let along = (end.0 - start.0, end.1 - start.1);
     let length = along.0 * along.0 + along.1 * along.1;
     for row in top..bottom {
         for column in left..right {
-            #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
-            let (x, y) = (column as f64 - start.0, row as f64 - start.1);
+            let (x, y) = (length::float(column) - start.0, length::float(row) - start.1);
             // how far along the segment (0..1) its nearest point to the pixel lies; a speck has no length to divide by
             let nearest = if length > 0.0 {
                 ((x * along.0 + y * along.1) / length).clamp(0.0, 1.0)
@@ -100,7 +97,6 @@ fn stamp(cover: &mut [f32], (height, width): (usize, usize), start: Point, end: 
 }
 
 /// The picture with the marks drawn on it.
-#[expect(clippy::cast_precision_loss, reason = "a picture side and a mark count are far below 2**52")]
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     let (mut light, mut dark) = (vec![0.0_f32; height * width], vec![0.0_f32; height * width]);
@@ -108,10 +104,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let draw = |stream: u64, mark: usize, part: u64| unit(mix(params.seed, &[stream, mark as u64, part]));
     let size = f64::from(params.size);
     // constant: density is counted per 1000 square px
-    let dust = (f64::from(params.density) * (height * width) as f64 / 1000.0).round_ties_even() as usize;
+    let (rows, columns) = (length::float(height), length::float(width));
+    let dust = length::whole(f64::from(params.density) * rows * columns / 1000.0);
     for mark in 0..dust {
         let [x, y, extent, tone, kind, direction] = [0, 1, 2, 3, 4, 5].map(|part| draw(0, mark, part));
-        let centre = (x * width as f64, y * height as f64);
+        let centre = (x * columns, y * rows);
         let cover = if tone < 0.5 { &mut light } else { &mut dark };
         if kind < f64::from(params.hairs) {
             // a hair, up to `size` long, in any direction, one pixel wide: half a pixel each side of its line
@@ -125,9 +122,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     }
     for mark in 0..params.scratches.cast_unsigned() as usize {
         let [x, extent, tone, lean] = [0, 1, 2, 3].map(|part| draw(1, mark, part));
-        let reach = height as f64 * (0.5 + extent / 2.0);
+        let reach = rows * (0.5 + extent / 2.0);
         let turn = f64::from(params.angle).to_radians() * (2.0 * lean - 1.0);
-        let start = (x * width as f64, (height as f64 - reach) * extent);
+        let start = (x * columns, (rows - reach) * extent);
         let end = (start.0 + reach * turn.tan(), start.1 + reach);
         let cover = if tone < 0.5 { &mut light } else { &mut dark };
         stamp(cover, (height, width), start, end, f64::from(params.width) / 2.0);

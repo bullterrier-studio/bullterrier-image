@@ -6,6 +6,7 @@ use bullterrier_image::effects::grain::{Distribution, Params};
 use bullterrier_image::{Edge, Error};
 
 use crate::common::compare::first_bit_difference;
+use crate::common::numbers::float;
 use crate::common::pictures::varied;
 use crate::common::pixels::run_picture;
 use crate::common::stats::{correlation, deviation, mean, neighbour_correlation};
@@ -30,11 +31,11 @@ fn added(params: &Params, picture: &[f32], which: usize) -> Result<Vec<f64>, Err
 }
 
 /// A weak grain at mid-grey and below, so that nothing of a flat patch up to 0.5 is clipped.
-fn weak(params: Params) -> Params {
+fn weak() -> Params {
     Params {
         amount: 0.013,
         balance: -7.0 / 13.0,
-        ..params
+        ..Params::default()
     }
 }
 
@@ -167,20 +168,17 @@ fn each_pixel_follows_its_own_brightness() -> Result<(), Error> {
 #[test]
 fn grey_grain_is_the_same_in_every_channel_and_colour_grain_is_independent_per_channel() -> Result<(), Error> {
     let flat = patch([0.5; 3]);
-    let grey = weak(Params {
-        seed: 2,
-        ..Params::default()
-    });
+    let grey = Params { seed: 2, ..weak() };
     let channels: Vec<Vec<f64>> = (0..3)
         .map(|which| added(&grey, &flat, which))
         .collect::<Result<_, _>>()?;
     assert_eq!(channels[0], channels[1]);
     assert_eq!(channels[0], channels[2]);
-    let colour = weak(Params {
+    let colour = Params {
         color: true,
         seed: 2,
-        ..Params::default()
-    });
+        ..weak()
+    };
     let channels: Vec<Vec<f64>> = (0..3)
         .map(|which| added(&colour, &flat, which))
         .collect::<Result<_, _>>()?;
@@ -198,11 +196,11 @@ fn size_above_one_pixel_clumps_the_grain_and_one_pixel_does_not() -> Result<(), 
     let flat = patch([0.5; 3]);
     let correlation_at = |size| -> Result<f64, Error> {
         let grain = added(
-            &weak(Params {
+            &Params {
                 size,
                 seed: 1,
-                ..Params::default()
-            }),
+                ..weak()
+            },
             &flat,
             0,
         )?;
@@ -255,7 +253,7 @@ fn uniform_grain_stays_within_its_bound_and_gaussian_grain_does_not() -> Result<
     assert!(largest <= bound * 1.0001, "{largest}"); // float32 rounding of the picture
     assert!(largest > 0.99 * bound, "{largest}"); // and it fills the range
     let inner = uniform.iter().filter(|value| value.abs() < bound / 2.0).count();
-    assert!((inner as f64 / uniform.len() as f64 - 0.5).abs() < 0.01); // evenly: half within half the bound
+    assert!((float(inner) / float(uniform.len()) - 0.5).abs() < 0.01); // evenly: half within half the bound
     let gaussian = added(
         &Params {
             amount: 0.03,
@@ -274,13 +272,13 @@ fn edge_and_truncate_decide_what_the_clumping_blur_sees_beyond_the_border() -> R
     // the blur (size 8: sigma 4) reaches truncate x 4 px in from the border: 4 px at 1, 16 px at 4
     let flat = vec![0.5; 96 * 96 * 3];
     let grain = |truncate, edge| -> Result<Vec<f64>, Error> {
-        let params = weak(Params {
+        let params = Params {
             size: 8.0,
             seed: 2,
             truncate,
             edge,
-            ..Params::default()
-        });
+            ..weak()
+        };
         let out = run_picture(&params, 96, 96, &flat)?;
         Ok(out.iter().step_by(3).map(|value| f64::from(value - 0.5)).collect())
     };
