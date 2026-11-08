@@ -216,7 +216,7 @@ cap-mb = 14000
 
 # Read by tools/pre_push.py (`poe proofs`, the last step of `poe check`): the gate proofs (tests marked `gate`) run in
 # `check` only when the change touches one of these globs (`*` also crosses `/`), relative to the repository root, or when
-# the base to compare with cannot be read. List every file a proof copies, edits or anchors on; a proof that edits a file
+# the base to compare with cannot be read. List every file a proof copies or whose text it anchors on, never one it only appends to; a proof that edits a file
 # nothing here names would go unrun when that file changes (tests/tools/test_pre_push.py checks the offence rows of
 # test_rust_gates.py). `poe full` runs them always.
 [tool.gate-proofs]
@@ -230,11 +230,7 @@ triggers = [
     "Cargo.toml",
     "Cargo.lock",
     "crates/*/Cargo.toml",
-    "crates/core/build.rs",
-    "crates/core/src/lib.rs",
-    "crates/core/src/ops.rs",
     "crates/core/src/effects/grade.rs",
-    "crates/core/tests/it/main.rs",
     "crates/core/tests/parameters_are_read.rs",
     "tools/*",
     "tests/tools/*",

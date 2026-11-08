@@ -575,9 +575,11 @@ def test_the_proofs_are_needed_when_a_changed_file_matches_a_trigger_or_the_chan
     assert pre_push.proofs_needed(changed, TRIGGERS) is needed
 
 
-def test_every_file_a_gate_proof_writes_a_fault_into_is_a_trigger():
-    """The triggers are written once, in pyproject.toml; the offences of tests/tools/test_rust_gates.py are the proofs'
-    own list of the files they edit, so a new offence row whose file the list lacks fails here."""
+def test_every_file_a_gate_proof_anchors_on_is_a_trigger_and_no_file_it_only_appends_to_is():
+    """The triggers are written once, in pyproject.toml. The offences of tests/tools/test_rust_gates.py are the proofs'
+    own list of the files they edit. A change that needs the file's text (it fails on an empty file) makes the file a
+    trigger: editing that text can unrun the proof. A file a proof only appends to is not one, or each new module would
+    cost a proof run."""
     spec = importlib.util.spec_from_file_location(
         "rust_gates_offences", ROOT / "tests" / "tools" / "test_rust_gates.py"
     )
@@ -586,8 +588,18 @@ def test_every_file_a_gate_proof_writes_a_fault_into_is_a_trigger():
     gates = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gates)
     triggers = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["gate-proofs"]["triggers"]
-    edited = {file for _task, file, _change, _named in gates.OFFENCES.values()}
-    assert [file for file in sorted(edited) if not pre_push.proofs_needed([file], triggers)] == []
+
+    def anchors_on_text(change) -> bool:
+        try:
+            change("")
+        except AssertionError:
+            return True
+        return False
+
+    anchored = {file for _task, file, change, _named in gates.OFFENCES.values() if anchors_on_text(change)}
+    appended = {file for _task, file, change, _named in gates.OFFENCES.values()} - anchored
+    assert [file for file in sorted(anchored) if not pre_push.proofs_needed([file], triggers)] == []
+    assert [file for file in sorted(appended) if pre_push.proofs_needed([file], triggers)] == []
 
 
 @pytest.fixture
