@@ -86,7 +86,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `steps` | whole number | count | 1 to 32 | `6` | How many equal steps the journey is made in, the picture being resampled once per step: with 1 every pixel moves straight `amount` px in the direction of the flow where it stands; more steps follow the bends of the flow and smear the picture into streaks along it, a little softer each time. Raising it costs time in proportion. |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
 | `lacunarity` | number | ratio | 1 to 4 | `2.0` | How much finer each layer is than the one before: the lattice spacing is divided by this per layer. 1 = every layer the same size, 2 = each half as coarse, larger = detail drops off faster in size. |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a pixel near the border sees when the flow carries it in from beyond the picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
@@ -168,7 +168,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the pixels above and below it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbours (sharpest, a little slower, and may ring beside hard edges). |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the pixels above and below it (smooth, slightly soft), 'bicubic' fits a cubic through the neighbours (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What the drips read above the picture's top edge (only the top `amount` rows are pulled from there): 'nearest' (the top row repeated, so the top smears down), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap' (the bottom of the picture). |
 
 </details>

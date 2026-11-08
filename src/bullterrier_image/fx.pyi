@@ -125,14 +125,7 @@ photo : number, fraction, 0 to 1, default 0.0
 
 @_effect
 def aurora(*, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#2bff9a', '#7a2cff'), sky: str | list[float] | tuple[float, float, float] = '#02050f', base: float = 0.75, height: float = 336.0, falloff: float = 0.8, waviness: float = 40.0, scale: float = 200.0, rays: float = 0.7, ray_width: float = 10.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky.
-
-A generated background: the input is used only for its height and width, its content is ignored. In column x the
-curtain's base is the row `base` x height + `waviness` x ripple(x), the ripple being fractal noise of unit
-deviation along the picture (`scale`). A pixel d = (rows above the base) / `height` up the
-curtain has brightness (1 - d)**`falloff`, 0 below the base (a 1 px anti-aliased edge) and above d = 1, times the
-column's ray, 1 - `rays` x (1 - r) with r in 0..1 the rank of a second fractal noise along the picture
-(`ray_width`). Its colour is `colors` at d, mixed into `sky` by that brightness.
+    """Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky.  A generated background: the input is used only for its height and width, its content is ignored. In column x the curtain's base is the row `base` x height + `waviness` x ripple(x), the ripple being fractal noise of unit deviation along the picture (`scale`). A pixel d = (rows above the base) / `height` up the curtain has brightness (1 - d)^`falloff`, 0 below the base (a 1 px anti-aliased edge) and above d = 1, times the column's ray, 1 - `rays` x (1 - r) with r in 0..1 the rank of a second fractal noise along the picture (`ray_width`). Its colour is `colors` at d, mixed into `sky` by that brightness.
 
 Parameters
 ----------
@@ -507,11 +500,7 @@ solarize : Darkroom solarization: the tones rise to the middle grey, then fold b
 
 @_effect
 def dead_pixels(*, count: int = 120, size: int = 4, stuck: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black.
-
-The picture is divided into cells of `size` px (the last row and column of cells may be cut off by the picture's
-edge). `seed` shuffles the cells and the first `count` are the faulty ones, so a larger count keeps every pixel a
-smaller one had; the first `round(count x stuck)` of those are stuck. Everything else is the picture, bit for bit.
+    """Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black.  The picture is divided into cells of `size` px (the last row and column of cells may be cut off by the picture's edge). `seed` shuffles the cells and the first `count` are the faulty ones, so a larger count keeps every pixel a smaller one had; the first `round(count x stuck)` of those are stuck. Everything else is the picture, bit for bit.
 
 Parameters
 ----------
@@ -988,13 +977,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def dust_scratches(*, density: float = 0.6, size: float = 8.0, hairs: float = 0.15, scratches: int = 2, angle: float = 4.0, width: float = 1.0, light: str | list[float] | tuple[float, float, float] = '#ffffff', dark: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Draw light and dark specks, hairs and scratches at random places over the picture.
-
-`density` marks per 1000 px² are specks (random radius up to `size` / 2, mostly small) or, for a share `hairs` of
-them, one-pixel hairs up to `size` px long; `scratches` long lines lean up to `angle` from vertical and are `width`
-wide. Each mark is `light` or `dark` with equal chance, solid inside, with antialiased edges (where a light mark
-crosses a dark one the light one lies on top). A higher `density` keeps every mark of a lower one and adds more;
-the same `seed` always gives the same marks.
+    """Draw light and dark specks, hairs and scratches at random places over the picture.  `density` marks per 1000 px² are specks (random radius up to `size` / 2, mostly small) or, for a share `hairs` of them, one-pixel hairs up to `size` px long; `scratches` long lines lean up to `angle` from vertical and are `width` wide. Each mark is `light` or `dark` with equal chance, solid inside, with antialiased edges (where a light mark crosses a dark one the light one lies on top). A higher `density` keeps every mark of a lower one and adds more; the same `seed` always gives the same marks.
 
 Parameters
 ----------
@@ -1148,14 +1131,7 @@ bins : whole number, count, 2 to 256, default 256
 
 @_effect
 def flow_lines(*, density: float = 2.0, length: float = 120.0, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.
-
-A generated background: the input is used only for its height and width, its content is ignored. The flow's
-direction at each pixel is `twist` times a fractal noise field. Each of the `density` per 1000 px² lines starts at
-a random point and follows the flow for `length` px in steps of `step` px (the direction read at the pixel the
-line is in; the steps are `length` / `step` rounded), ending early where it would leave the picture. A soft disc
-`thickness` px across is stamped at every point; where discs overlap the strongest counts, so lines stay as bold
-as one.
+    """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.  A generated background: the input is used only for its height and width, its content is ignored. The flow's direction at each pixel is `twist` times a fractal noise field. Each of the `density` per 1000 px² lines starts at a random point and follows the flow for `length` px in steps of `step` px (the direction read at the pixel the line is in; the steps are `length` / `step` rounded), ending early where it would leave the picture. A soft disc `thickness` px across is stamped at every point; where discs overlap the strongest counts, so lines stay as bold as one.
 
 Parameters
 ----------
@@ -1204,12 +1180,7 @@ lacunarity : number, ratio, 1 to 4, default 2.0
 
 @_effect
 def flow_warp(*, amount: float = 20.0, steps: int = 6, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, angle: float = 0.0, variation: float = 60.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise.
-
-The flow at each pixel points `angle` degrees clockwise from pointing right, turned by the noise field (scaled
-to `variation` degrees of spread). The picture is moved along it in `steps` equal steps of `amount` / `steps` px,
-each step moving what is at a pixel one step along the flow there, so a pixel's content follows the bends of the
-flow and piles up into streaks where currents meet. The path of any content is `amount` px long.
+    """Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise.  The flow at each pixel points `angle` degrees clockwise from pointing right, turned by a noise field (`scale`, `octaves`, `persistence`, `lacunarity`, standardised to mean 0 and standard deviation 1, then scaled to `variation` degrees of spread). The picture is moved along it in `steps` equal steps of `amount` / `steps` px, each step moving what is at a pixel one step along the flow there, so a pixel's content follows the bends of the flow and piles up into streaks where currents meet. The path of any content is `amount` px long. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -1256,8 +1227,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-    ring beside hard edges).
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a pixel near the border sees when the flow carries it in from beyond the
     picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
@@ -1309,17 +1280,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def fog(*, amount: float | Drive = 0.77, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, coverage: float = 0.93, feather: float = 1.0, floor: float = 0.5, scale: float = 150.0, rise: float = 1.0, turbulence: float = 0.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['smoke'] | None = None) -> Step:
-    """Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom.
-
-The clouds are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped
-when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise`
-(so the clouds are drawn out `rise` times upward from the bottom edge), pushed `turbulence` px along two more
-noise fields. The warped field is standardised and passed through the normal cumulative distribution, giving u
-spread evenly over 0..1; the cloud shape is smoothstep((u - (1 - `coverage`)) / `feather`), so about `coverage` of
-the picture has cloud and the shape climbs from 0 to 1 across the `feather` share of pixels above the cut. The
-opacity at a pixel is `amount` x (1 - `gradient` x (1 - t)) x (`floor` + (1 - `floor`) x shape), where t is how
-far down the frame the pixel's row centre is (0 at the top edge, 1 at the bottom edge). Each pixel becomes
-picture + opacity x (color - picture), so the fog lowers contrast as well as tinting.
+    """Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom. Fog, mist, haze, steam and smoke are settings of it.  The clouds are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise` (so the clouds are drawn out `rise` times upward from the bottom edge), pushed `turbulence` px along two more noise fields. The warped field is standardised and passed through the normal cumulative distribution, giving u spread evenly over 0..1; the cloud shape is smoothstep((u - (1 - `coverage`)) / `feather`), so about `coverage` of the picture has cloud and the shape climbs from 0 to 1 across the `feather` share of pixels above the cut. The opacity at a pixel is `amount` x (1 - `gradient` x (1 - t)) x (`floor` + (1 - `floor`) x shape), where t is how far down the frame the pixel's row centre is (0 at the top edge, 1 at the bottom edge). Each pixel becomes picture + opacity x (color - picture), so the fog lowers contrast as well as tinting.
 
 Parameters
 ----------
@@ -1586,13 +1547,7 @@ xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts b
 
 @_effect
 def grain(*, amount: float | Drive = 0.08, balance: float | Drive = 0.0, size: float = 1.0, color: bool = False, distribution: Literal['gaussian', 'uniform'] = 'gaussian', seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['film_grain', 'noise'] | None = None) -> Step:
-    """Film grain or sensor noise: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier
-where `balance` says.
-
-The noise, Gaussian or uniform by `distribution` (zero mean, unit standard deviation either way), is multiplied
-by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x (1 + `balance` x (2 L - 1)). It
-is the same in all channels (grey grain) unless `color`, which gives each channel its own. The result is clipped
-to 0..1; the same `seed` always gives the same grain.
+    """Film grain or sensor noise: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says.  The noise, Gaussian or uniform by `distribution` (zero mean, unit standard deviation either way), is multiplied by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x (1 + `balance` x (2 L - 1)). It is the same in all channels (grey grain) unless `color`, which gives each channel its own. The result is clipped to 0..1; the same `seed` always gives the same grain.
 
 Parameters
 ----------
@@ -1935,14 +1890,7 @@ fisheye : A fisheye lens: the middle swells and the edges squeeze in, like a 108
 
 @_effect
 def lens_drops(*, count: int = 14, radius: float = 24.0, size_variation: float = 0.5, refraction: float = 1.5, blur: float = 1.5, highlight: float = 0.0, seed: int = 0, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.
-
-A drop at a random place has a random radius from (1 - `size_variation`) x `radius` to all of it. The pixel at
-offset d from its middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by
-`interpolation` and `edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over
-the drop, `highlight` x (distance / radius)² x (1 - dy / distance) / 2 with dy the pixel's row below the middle.
-Later drops cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the
-same drops.
+    """Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.  A drop at a random place has a random radius from (1 - `size_variation`) x `radius` to all of it. The pixel at offset d from its middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by `interpolation` and `edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over the drop, `highlight` x (distance / radius)^2 x (1 - dy / distance) / 2 with dy the pixel's row below the middle. Later drops cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the same drops. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -1955,7 +1903,8 @@ radius : number, px, 1 to 200, default 24.0
     Tuned for a picture about 480 px high. Larger = bigger drops.
 size_variation : number, fraction, 0 to 1, default 0.5
     How much the drops differ in size: each has a random share of `radius` from 1 -
-    size_variation to 1. 0 = every drop alike, 1 = from the full radius down to specks.
+    `size_variation` to 1. 0 = every drop alike, 1 = from the full radius down to
+    specks.
 refraction : number, ratio, 0.25 to 4, default 1.5
     How strongly a drop bends the scene: it shows the picture turned upside down about
     the drop's middle and this many times as wide. 1 = the same scale, turned round;
@@ -1980,8 +1929,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture inside a drop: 'nearest' takes
     the closest pixel (fastest, keeps every value exactly as it is but edges turn
     jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little
-    slower, and may ring beside hard edges).
+    'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
+    and may ring beside hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What a drop sees beyond the picture's edge (a drop near the border or a strong
     refraction reads from outside it), and the blur with it: 'reflect' (mirrored, edge
@@ -2241,13 +2190,7 @@ amount : number (drivable), fraction, 0 to 1, default 1.0
 
 @_effect
 def melt(*, amount: float = 40.0, scale: float = 12.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column.
-
-Each column has a drip length between 0 and 1, smooth noise along the row of `scale` px (made from a Gaussian
-noise through the normal CDF, so lengths spread evenly), and a pixel is pulled down by `amount` x the column's
-length x its own brightness (Rec. 709 luminance): it shows the picture from that many px higher up in the same
-column, read by `interpolation` with `edge` above the top. Nothing moves sideways, black pixels stay in place, and
-the same `seed` gives the same drips.
+    """Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column.  Each column has a drip length between 0 and 1: smooth noise along the row, `scale` px wide and standardised to mean 0 and standard deviation 1, passed through the normal cumulative distribution so that lengths spread evenly. A pixel is pulled down by `amount` x its column's length x its own brightness (Rec. 709 luminance): it shows the picture that many px higher up in the same column, read by `interpolation` with `edge` above the top. Nothing moves sideways, black pixels stay in place, and the same `seed` gives the same drips. The result never leaves 0..1.
 
 Parameters
 ----------
@@ -2268,8 +2211,8 @@ interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
     How a point between pixels is read from the picture: 'nearest' takes the closest
     pixel (fastest, keeps every value exactly as it is but edges turn jagged),
     'bilinear' blends the pixels above and below it (smooth, slightly soft), 'bicubic'
-    fits a cubic spline through the neighbours (sharpest, a little slower, and may ring
-    beside hard edges).
+    fits a cubic through the neighbours (sharpest, a little slower, and may ring beside
+    hard edges).
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What the drips read above the picture's top edge (only the top `amount` rows are
     pulled from there): 'nearest' (the top row repeated, so the top smears down),
@@ -2301,22 +2244,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def noise_field(*, kind: Literal['value', 'perlin', 'worley', 'sine'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, warp: float = 0.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['plasma'] | None = None) -> Step:
-    """Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine,
-the classic plasma), coloured through `colors`.
-
-A generated background: the input is used only for its height and width, its content is ignored. Followed by
-`shatter` with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise is
-standardised to zero mean and unit deviation over the picture and passed through the normal cumulative
-distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is `fractal`
-noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with
-Perlin's fade curve); 'worley' sums octaves of F1 (the distance to the nearest feature point, one point per cell
-of `scale` / `lacunarity`**i, measured in those cells), weight `persistence`**i; 'sine' sums octaves of two plane
-sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`**i, random
-directions a and phases p, weight `persistence`**i, layer i evaluated at positions pushed along x and y by `warp`
-px times the two waves of layer i - 1.
-
-For the other kinds `warp` reads the finished picture at points shifted by two further fields of the kind (the
-seed's streams 1 and 2, standardised, so their deviation is `warp` px), bicubically, mirrored beyond the edge.
+    """Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine, the classic plasma), coloured through `colors`.  A generated background: the input is used only for its height and width, its content is ignored. Followed by `shatter` with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise is standardised to zero mean and unit deviation over the picture and passed through the normal cumulative distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is fractal noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with Perlin's fade curve); 'worley' sums octaves of F1 (the distance to the nearest feature point, one point per cell of `scale` / `lacunarity`^i, measured in those cells), weight `persistence`^i; 'sine' sums octaves of two plane sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`^i, random directions a and phases p, weight `persistence`^i, layer i evaluated at positions pushed along x and y by `warp` px times the two waves of layer i - 1.  For the other kinds `warp` reads the finished picture at points shifted by two further fields of the kind (the seed's streams 1 and 2, standardised, so their deviation is `warp` px), bicubically, mirrored beyond the edge.
 
 Parameters
 ----------
@@ -2440,13 +2368,7 @@ field_threshold : number, fraction, 0 to 1, default 0.5
 
 @_effect
 def paper_texture(*, kind: Literal['paper', 'canvas', 'linen'] = 'paper', amount: float = 0.1, scale: float = 6.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, spacing: float = 6.0, fibre: float = 0.3, seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture.
-
-The texture has zero mean and unit standard deviation over the picture, so `amount` is its relative strength and
-the average brightness is kept (before clipping to 0..1). The fibres are fractal noise (`scale`, `octaves`,
-`persistence`, `lacunarity`); a weave is a cosine wave of period `spacing` across the columns plus one down the
-rows, mixed with the fibres by `fibre`. The same texture multiplies every channel; the same `seed` gives the same
-texture.
+    """Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture.  The texture has zero mean and unit standard deviation over the picture, so `amount` is its relative strength and the average brightness is kept (before clipping to 0..1). The fibres are fractal noise (`scale`, `octaves`, `persistence`, `lacunarity`); a weave is a cosine wave of period `spacing` across the columns plus one down the rows, mixed with the fibres by `fibre`. The same texture multiplies every channel; the same `seed` gives the same texture.
 
 Parameters
 ----------
@@ -3685,19 +3607,13 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def torn_edge(*, width: float = 24.0, roughness: float = 0.5, scale: float = 24.0, octaves: int = 3, persistence: float = 0.4, lacunarity: float = 2.0, fill: str | list[float] | tuple[float, float, float] = '#f5f0e6', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`.
-
-The distance along a side is `width` x (1 + `roughness` x noise), the noise fractal (`scale`, `octaves`,
-`persistence`, `lacunarity`) of zero mean and unit deviation along that side, so it averages `width` and has a
-standard deviation `roughness` x `width` (a negative distance tears nothing there). A pixel is torn away if it is
-closer to a side than that side's distance at its position. Every other pixel is kept exactly; the four sides tear
-independently, and the same `seed` always gives the same tear.
+    """Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`.  The distance along a side is `width` x (1 + `roughness` x noise), the noise fractal (`scale`, `octaves`, `persistence`, `lacunarity`) of zero mean and unit deviation along that side, so it averages `width` and has a standard deviation `roughness` x `width` (a negative distance tears nothing there). A pixel is torn away if it is closer to a side than that side's distance at its position. Every other pixel is kept exactly; the four sides tear independently, and the same `seed` always gives the same tear.
 
 Parameters
 ----------
 width : number, px, 0 to 200, default 24.0
-    How far in the tear is from each side on average, in px: 0 = no tear. Larger = more
-    of the border torn away.
+    How far the tear is from each side on average, in px: 0 = no tear. Larger = more of
+    the border torn away.
 roughness : number, fraction, 0 to 1, default 0.5
     How ragged the tear is: the standard deviation of its distance from the side as a
     fraction of `width`. 0 = a straight cut exactly `width` in, 0.3 is a gentle tear, 1

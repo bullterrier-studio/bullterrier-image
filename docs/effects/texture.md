@@ -107,7 +107,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `width` | number | px | 0 to 200 | `24.0` | How far in the tear is from each side on average, in px: 0 = no tear. Larger = more of the border torn away. |
+| `width` | number | px | 0 to 200 | `24.0` | How far the tear is from each side on average, in px: 0 = no tear. Larger = more of the border torn away. |
 | `roughness` | number | fraction | 0 to 1 | `0.5` | How ragged the tear is: the standard deviation of its distance from the side as a fraction of `width`. 0 = a straight cut exactly `width` in, 0.3 is a gentle tear, 1 wanders between the very edge and twice the width. |
 | `scale` | number | px | 1 to 200 | `24.0` | Size of the tear's broadest bays and tongues along the side, in px (the spacing of the first noise lattice). Larger = long slow waves, small = a jagged edge. |
 | `octaves` | whole number | count | 1 to 8 | `3` | How many layers of detail make up the tear, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth waves, more = a fibrous, ragged edge. Layers finer than a pixel are dropped. |

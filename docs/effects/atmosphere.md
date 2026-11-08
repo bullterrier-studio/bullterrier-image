@@ -49,7 +49,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- | --- | --- | --- | --- |
 | `count` | whole number | count | 0 to 200 | `14` | How many drops there are, whatever the size of the picture (a number, not a density: the drops' size is in design px, so the same count looks alike at any size). 0 = none (the picture unchanged). |
 | `radius` | number | px | 1 to 200 | `24.0` | The radius in px of the biggest drops; the smallest are smaller by `size_variation`. Tuned for a picture about 480 px high. Larger = bigger drops. |
-| `size_variation` | number | fraction | 0 to 1 | `0.5` | How much the drops differ in size: each has a random share of `radius` from 1 - size_variation to 1. 0 = every drop alike, 1 = from the full radius down to specks. |
+| `size_variation` | number | fraction | 0 to 1 | `0.5` | How much the drops differ in size: each has a random share of `radius` from 1 - `size_variation` to 1. 0 = every drop alike, 1 = from the full radius down to specks. |
 | `refraction` | number | ratio | 0.25 to 4 | `1.5` | How strongly a drop bends the scene: it shows the picture turned upside down about the drop's middle and this many times as wide. 1 = the same scale, turned round; above 1 a wider view in miniature, as in a real drop; below 1 a magnified view. |
 | `blur` | number | px | 0 to 20 | `1.5` | How much the scene inside a drop is blurred, the sigma of a Gaussian in px, as a drop is never quite in focus. 0 = sharp. |
 | `highlight` | number | fraction | 0 to 1 | `0.0` | How bright the drops' shine is: white light screened along the rim of each drop, strongest at its top (light from above) and fading to nothing at its bottom and in its middle. 0 = none, so a flat picture stays flat; 0.5 is a soft glint. |
@@ -60,7 +60,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the blur's Gaussian is cut off, in sigmas (only when blur > 0). Larger is more exact and slower. |
-| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture inside a drop: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic spline through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
+| `interpolation` | one of 'nearest', 'bilinear', 'bicubic' |  |  | `'bilinear'` | How a point between pixels is read from the picture inside a drop: 'nearest' takes the closest pixel (fastest, keeps every value exactly as it is but edges turn jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower, and may ring beside hard edges). |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What a drop sees beyond the picture's edge (a drop near the border or a strong refraction reads from outside it), and the blur with it: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
