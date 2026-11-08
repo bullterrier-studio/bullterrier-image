@@ -147,7 +147,8 @@ build-check = { sequence = ["uv build --quiet --clear --no-create-gitignore --ou
 lint-workflows = { sequence = ["uv run actionlint", "zizmor --offline .github"], default_item_type = "cmd", help = "Lint the GitHub workflows (actionlint, zizmor)" }
 # The Rust gates, each beside its Python counterpart; cargo comes with rustup, at the version rust-toolchain.toml pins.
 # Warnings fail only here (`-D warnings`), never a user's build. tests/tools/test_rust_gates.py shows each one failing.
-rust-fmt = { cmd = "cargo fmt --all --check", help = "Check the Rust formatting (rustfmt.toml)" }
+# rustfmt does not follow the `include!` that pulls the effect files in (build.rs), so they are checked by name.
+rust-fmt = { shell = "cargo fmt --all --check && rustfmt --check crates/core/src/effects/*.rs", help = "Check the Rust formatting (rustfmt.toml), the effect files included" }
 rust-lint = { cmd = "cargo clippy --workspace --all-targets --locked --quiet -- -D warnings", help = "Lint the Rust code: clippy, dead code, missing docs, unreachable pub, unsafe ([workspace.lints] in Cargo.toml)" }
 rust-doc = { cmd = "cargo doc --workspace --no-deps --locked --quiet", env = { RUSTDOCFLAGS = "-D warnings" }, help = "Build the Rust documentation; any rustdoc warning (a broken link) fails" }
 rust-tools = { cmd = "uv run python tools/rust_tools.py check", help = "Check that the cargo tools the gate runs are installed at the versions Cargo.toml pins" }

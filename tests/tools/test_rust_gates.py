@@ -105,6 +105,12 @@ def replaced(old: str, new: str) -> Callable[[str], str]:
 # One offence each: (task, file, change, what the report must name: the rule, and where it was broken)
 OFFENCES = {
     "unformatted code": ("rust-fmt", CORE, appended("pub  fn  spaced( )->u8{1}\n"), ["Diff in", CORE]),
+    "unformatted code in an effect file (which rustfmt does not reach through include!)": (
+        "rust-fmt",
+        "crates/core/src/effects/grade.rs",
+        appended("pub  fn  spaced( )->u8{1}\n"),
+        ["Diff in", "effects/grade.rs"],
+    ),
     "an unwrap": (
         "rust-lint",
         CORE,
