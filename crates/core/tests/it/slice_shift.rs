@@ -278,7 +278,8 @@ fn the_glitch_preset_tears_a_few_bands() -> Result<(), Error> {
         ..Params::default()
     };
     let slid = slides(&glitch)?;
-    assert!(slid.iter().all(|slide| slide.abs() <= 28));
+    // bands may overlap, so a row's slide is the sum of the bands covering it
+    assert!(slid.iter().all(|slide| slide.abs() <= 7 * 28));
     let moved = slid.iter().filter(|slide| **slide != 0).count();
     assert!((1..=7 * 28).contains(&moved), "{moved} rows moved");
     Ok(())

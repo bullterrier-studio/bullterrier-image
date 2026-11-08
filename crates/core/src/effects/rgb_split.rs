@@ -32,7 +32,7 @@ pub enum Pair {
 ///
 /// Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves
 /// `amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the
-/// channels end up exactly `amount` px from each other in a row, which shows as a red fringe on one side of an edge and a
+/// channels end up exactly twice `amount` px from each other in a row, which shows as a red fringe on one side of an edge and a
 /// blue (or cyan) one on the other. Whole or fractional distances are allowed; what a channel shows where it has left the
 /// picture is set by `edge`.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]

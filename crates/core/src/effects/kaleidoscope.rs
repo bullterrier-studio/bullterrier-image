@@ -41,7 +41,7 @@ pub struct Params {
     /// Where the pattern starts, as the direction in degrees, clockwise from pointing right (as CSS rotate), of the first
     /// mirror axis and of the wedge that follows it: 0 puts an axis along the line right of the centre; turning it turns
     /// the mirror axes, and shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90 the left,
-    /// 180 the top and -90 the right. The pattern repeats every 360 / segments degrees.
+    /// 180 the top and 270 the right. The pattern repeats every 360 / segments degrees.
     #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)]
     pub angle: f32,
     /// The centre's horizontal position as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the

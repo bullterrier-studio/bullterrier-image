@@ -1817,7 +1817,7 @@ angle : number (cyclic), degrees, 0 to 360, default 0.0
     (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts
     an axis along the line right of the centre; turning it turns the mirror axes, and
     shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90
-    the left, 180 the top and -90 the right. The pattern repeats every 360 / segments
+    the left, 180 the top and 270 the right. The pattern repeats every 360 / segments
     degrees.
 x : number, fraction, 0 to 1, default 0.5
     The centre's horizontal position as a fraction of the way across the picture: 0 =
@@ -3076,7 +3076,7 @@ emboss : An embossed print: the picture's brightness as a 6 px relief in grey, l
 
 @_effect
 def rgb_split(*, pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['anaglyph'] | None = None) -> Step:
-    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch fringe or a red-cyan 3D anaglyph.  Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves `amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the channels end up exactly `amount` px from each other in a row, which shows as a red fringe on one side of an edge and a blue (or cyan) one on the other. Whole or fractional distances are allowed; what a channel shows where it has left the picture is set by `edge`.
+    """Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch fringe or a red-cyan 3D anaglyph.  Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves `amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the channels end up exactly twice `amount` px from each other in a row, which shows as a red fringe on one side of an edge and a blue (or cyan) one on the other. Whole or fractional distances are allowed; what a channel shows where it has left the picture is set by `edge`.
 
 Parameters
 ----------
