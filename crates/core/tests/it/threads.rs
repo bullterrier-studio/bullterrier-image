@@ -495,6 +495,13 @@ fn cases() -> Vec<Case> {
                     .param("twist", 400)
                     .param("seed", 2_147_483_647),
                 Step::new("flow_lines"),
+                Step::new("aurora")
+                    .param("base", 0.6)
+                    .param("height", 250.5)
+                    .param("waviness", 30)
+                    .param("octaves", 4)
+                    .param("seed", 4_294_967_295_u32),
+                Step::new("aurora"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
