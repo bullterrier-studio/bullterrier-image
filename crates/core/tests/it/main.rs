@@ -52,6 +52,7 @@ mod interlace;
 mod kaleidoscope;
 mod lens_blur;
 mod lens_distortion;
+mod lens_drops;
 mod lens_flare;
 mod lenticular;
 mod light_leak;
