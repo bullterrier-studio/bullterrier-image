@@ -408,6 +408,14 @@ fn cases() -> Vec<Case> {
                     .param("span", 40)
                     .param("side", "after"),
                 Step::new("stretch"),
+                Step::new("slice_shift")
+                    .param("slices", 40)
+                    .param("amount", 30.5)
+                    .param("seed", 4_294_967_295_u32)
+                    .param("bands", 6)
+                    .param("band_min_height", 3)
+                    .param("band_max_height", 20.5),
+                Step::new("slice_shift"),
                 Step::new("echo").param("copies", 0),
                 Step::new("lenticular"),
                 Step::new("interlace"),

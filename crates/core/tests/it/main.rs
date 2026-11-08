@@ -103,6 +103,7 @@ mod shards;
 mod shards_sites;
 mod sharpen;
 mod shift;
+mod slice_shift;
 mod spatial;
 mod starburst;
 mod stretch;

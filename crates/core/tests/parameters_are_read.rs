@@ -11,7 +11,9 @@
 use std::error::Error;
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
-use bullterrier_image::{Category, Effect, FieldParam, Image, Inputs, Layer, Lut, Picture, effect, effects};
+use bullterrier_image::{
+    Category, Constraint, Effect, Error as CoreError, FieldParam, Image, Inputs, Layer, Lut, Picture, effect, effects,
+};
 use serde_json::{Map, Value, json};
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -210,6 +212,17 @@ fn conditional() -> Vec<Conditional> {
             field: "border",
             with: vec![("fit", json!("centre"))],
         },
+        // bands are drawn only when there are some, and the heights are then drawn between the two limits
+        Conditional {
+            effect: "slice_shift",
+            field: "band_min_height",
+            with: vec![("bands", json!(7))],
+        },
+        Conditional {
+            effect: "slice_shift",
+            field: "band_max_height",
+            with: vec![("bands", json!(7))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",
@@ -372,7 +385,22 @@ fn changes(
     for candidate in candidates(field) {
         let mut given = context.clone();
         given.insert(field.name.to_owned(), candidate);
-        if differs(&baseline, &render(effect, table, &given, &picture)?) {
+        let result = match render(effect, table, &given, &picture) {
+            // a value on the wrong side of the parameter it may not exceed is no alternative to try
+            Err(error)
+                if matches!(
+                    error.downcast_ref::<CoreError>(),
+                    Some(CoreError::Invalid {
+                        constraint: Constraint::AtMostField(..),
+                        ..
+                    })
+                ) =>
+            {
+                continue;
+            }
+            other => other?,
+        };
+        if differs(&baseline, &result) {
             return Ok(true);
         }
     }

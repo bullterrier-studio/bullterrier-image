@@ -186,6 +186,32 @@ ROWS = [
     pytest.param("stretch", {"span": 2000.5}, False, id="stretch: a span above the largest"),
     pytest.param("stretch", {"at": 1.01}, False, id="stretch: a line past the last"),
     pytest.param("stretch", {"side": "around"}, False, id="stretch: a side it lacks"),
+    pytest.param(
+        "slice_shift",
+        {
+            "slices": 500,
+            "amount": 2000,
+            "seed": 2**32 - 1,
+            "bands": 500,
+            "band_min_height": 2000,
+            "band_max_height": 2000,
+        },
+        True,
+        id="slice_shift: every top",
+    ),
+    pytest.param("slice_shift", {"seed": 2**32}, False, id="slice_shift: a seed past 32 bits"),
+    pytest.param("slice_shift", {"bands": 501}, False, id="slice_shift: more than 500 bands"),
+    pytest.param(
+        "slice_shift", {"band_min_height": 50, "band_max_height": 50}, True, id="slice_shift: equal band limits"
+    ),
+    pytest.param(
+        "slice_shift",
+        {"band_min_height": 51, "band_max_height": 50},
+        False,
+        id="slice_shift: a lowest band above the tallest",
+    ),
+    pytest.param("slice_shift", {"band_min_height": 30}, False, id="slice_shift: a lowest above the default tallest"),
+    pytest.param("slice_shift", {"band_max_height": 4}, False, id="slice_shift: a tallest below the default lowest"),
     pytest.param("echo", {"copies": 32, "dx": -500, "dy": 500, "fade": 1}, True, id="echo: every top"),
     pytest.param("echo", {"copies": 33}, False, id="echo: more than 32 copies"),
     pytest.param("echo", {"fade": 1.01}, False, id="echo: a fade past 1"),
