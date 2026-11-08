@@ -69,6 +69,12 @@ undocumented_unsafe_blocks = "warn"
 debug = "line-tables-only"
 split-debuginfo = "off"
 
+# The Rust tests render pictures: unoptimised, the 1090 tests of the `it` binary took 408 s (one test of 376 s); at 1 they
+# take 8 s, the rebuild after touching one effect is no slower and the target folder smaller (measured; 2 gains little
+# more and rebuilds slower). Overflow checks and debug assertions stay on.
+[profile.test]
+opt-level = 1
+
 # The tools the gate runs that rustup does not install, each at the version the gate expects. `uv run poe setup`
 # installs them; `tools/rust_tools.py` reads this table, the one place their versions are written.
 [workspace.metadata.tools]
