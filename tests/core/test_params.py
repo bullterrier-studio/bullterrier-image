@@ -1105,10 +1105,18 @@ def test_a_kind_the_core_has_and_this_package_has_not_is_refused_naming_the_fiel
         core_field("probe", {**LISTS[0], "name": "cells", "kind": "tuple"})
 
 
-@pytest.mark.parametrize("name", ["ghost", "aurora"])  # no such effect; a Python effect the core runs by callback
-def test_declaring_a_model_from_an_effect_the_core_does_not_implement_fails_when_the_class_is_made(name):
+# no such effect; a Python effect the core runs by callback
+@pytest.mark.parametrize("name", ["ghost", "callback_probe"])
+def test_declaring_a_model_from_an_effect_the_core_does_not_implement_fails_when_the_class_is_made(
+    name, throwaway_effects
+):
     """The usual cause is an extension built before the effect's kernel was written, so the error says to rebuild."""
-    registry.get("aurora")  # the registry has loaded its effects, so the core knows `aurora` by callback as well
+
+    @registry.effect(category="light", params=Probe)
+    def callback_probe(rgb: np.ndarray, params: Probe) -> np.ndarray:
+        """Does nothing: registering it makes the core know the name by callback."""
+        return rgb
+
     with pytest.raises(ValueError, match=rf"'{name}'.*uv sync"):
 
         class Nowhere(EffectParams, core=name):
