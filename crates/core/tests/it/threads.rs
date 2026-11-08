@@ -435,6 +435,12 @@ fn cases() -> Vec<Case> {
                     .param("seed", 4_294_967_295_u32)
                     .param("edge", "wrap"),
                 Step::new("grain"),
+                Step::new("dead_pixels")
+                    .param("count", 3_000)
+                    .param("size", 3)
+                    .param("stuck", 0.4)
+                    .param("color", "#ff8000")
+                    .param("seed", 4_294_967_295_u32),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

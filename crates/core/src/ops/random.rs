@@ -4,7 +4,7 @@
 //! of state filled from the seed by `SplitMix64` (<https://prng.di.unimi.it/splitmix64.c>), as its authors advise. It is
 //! not the stream of numpy's `default_rng(seed)`: a seed draws other numbers than that does.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 /// A random stream.
 pub(crate) struct Rng {
@@ -82,6 +82,23 @@ impl Rng {
             }
         }
         chosen.into_iter().collect()
+    }
+
+    /// The first `count` numbers of a random order of 0..`bound`, every order equally likely: `count` different numbers, and the
+    /// first `n` of a longer prefix are the `n` of a shorter one (a partial Fisher-Yates shuffle, whose swaps are kept in a
+    /// table so that memory and time follow `count`, not `bound`). `count` is at most `bound`.
+    pub(crate) fn shuffled(&mut self, bound: usize, count: usize) -> Vec<usize> {
+        let mut moved: HashMap<usize, usize> = HashMap::new();
+        (0..count)
+            .map(|first| {
+                let pick = first + self.below(bound - first);
+                let chosen = moved.get(&pick).copied().unwrap_or(pick);
+                // the number that stood at `first` takes the place `pick` leaves
+                let displaced = moved.get(&first).copied().unwrap_or(first);
+                moved.insert(pick, displaced);
+                chosen
+            })
+            .collect()
     }
 
     /// A number from 0 to `bound` - 1, every one equally likely (Lemire's unbiased bounded draw, "Fast Random Integer
