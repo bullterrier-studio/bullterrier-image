@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
@@ -13,6 +14,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `equalize` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 // constant: the clipped excess is redistributed until less than this share of a tile's pixels is left over (a pure
 // stopping guard: the loop shrinks the excess geometrically, so this ends it long before f64 rounding matters)

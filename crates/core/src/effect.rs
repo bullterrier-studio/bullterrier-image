@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::params::{Declared, Kind, Table};
-use crate::{Error, Image, Inputs, Picture};
+use crate::{Error, Footprint, Image, Inputs, Picture};
 
 /// The sections of the effect catalogue. Every effect is in exactly one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -168,6 +168,16 @@ pub trait Effect: Send + Sync {
         None
     }
 
+    /// What it reads around a pixel when run with `params`, an object with exactly its parameters as a step writes them
+    /// (completed and checked, in design pixels): `Footprint::Whole` unless the effect says it is less. Whatever an
+    /// effect says holds for the picture it is run on (see [`Footprint`]).
+    ///
+    /// # Errors
+    /// [`Error::Params`] if `params` are not the effect's parameters, as for [`apply`](Self::apply).
+    fn footprint(&self, _params: &Value) -> Result<Footprint, Error> {
+        Ok(Footprint::Whole)
+    }
+
     /// Run it on `picture` with `params` (an object with the effect's parameters): a new image of the picture's size.
     /// `inputs` holds the inputs the effect declares and nothing else, each of the picture's size: the core makes it
     /// so (see [`Inputs`]).
@@ -215,21 +225,23 @@ pub(crate) struct Meta {
     pub(crate) inputs: &'static [Input],
 }
 
-/// An effect written in Rust, in a file of `src/effects/`: its `META`, its `Params` (read from the parameters) and its
-/// `render`. The build script makes one for each file.
+/// An effect written in Rust, in a file of `src/effects/`: its `META`, its `Params` (read from the parameters), its
+/// `footprint` and its `render`. The build script makes one for each file.
 pub(crate) struct Native<P> {
     name: &'static str,
     meta: &'static Meta,
     /// The `FieldName` parameters of `P`, read from its declaration, so a field is declared once.
     fields: Vec<FieldParam>,
+    footprint: fn(&P) -> Footprint,
     render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
 }
 
 impl<P: Declared> Native<P> {
-    /// The effect called `name` (its file's name) with its `meta` and `render`.
+    /// The effect called `name` (its file's name) with its `meta`, `footprint` and `render`.
     pub(crate) fn new(
         name: &'static str,
         meta: &'static Meta,
+        footprint: fn(&P) -> Footprint,
         render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
     ) -> Self {
         let fields = P::table()
@@ -242,8 +254,19 @@ impl<P: Declared> Native<P> {
             name,
             meta,
             fields,
+            footprint,
             render,
         }
+    }
+}
+
+impl<P: DeserializeOwned> Native<P> {
+    /// `params` as the effect's parameters.
+    fn read(&self, params: serde_json::Value) -> Result<P, Error> {
+        serde_json::from_value(params).map_err(|source| Error::Params {
+            effect: self.name,
+            source,
+        })
     }
 }
 
@@ -272,12 +295,12 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
         Some(P::table())
     }
 
+    fn footprint(&self, params: &Value) -> Result<Footprint, Error> {
+        Ok((self.footprint)(&self.read(params.clone())?))
+    }
+
     fn apply(&self, picture: &Picture<'_>, params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
-        let params = serde_json::from_value(params).map_err(|source| Error::Params {
-            effect: self.name,
-            source,
-        })?;
-        Ok((self.render)(picture, &params, inputs))
+        Ok((self.render)(picture, &self.read(params)?, inputs))
     }
 }
 
@@ -289,6 +312,7 @@ mod tests {
     use serde::Deserialize;
 
     use super::{Category, FieldParam, Meta, Native};
+    use crate::Footprint;
     use crate::params::{FieldName, Params};
     use crate::{Effect, Image, Inputs, Picture};
 
@@ -313,13 +337,17 @@ mod tests {
         inputs: &[],
     };
 
+    fn footprint(_params: &Probe) -> Footprint {
+        Footprint::Pixel
+    }
+
     fn render(picture: &Picture<'_>, _params: &Probe, _inputs: &Inputs<'_>) -> Image {
         picture.map(|pixel| pixel)
     }
 
     #[test]
     fn the_fields_are_the_field_parameters_of_the_declaration_with_their_default_names() {
-        let probe = Native::new("probe", &META, render);
+        let probe = Native::new("probe", &META, footprint, render);
         assert_eq!(
             probe.fields(),
             [FieldParam::new("follow", "depth"), FieldParam::new("within", "light")]

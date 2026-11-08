@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
@@ -13,6 +14,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `channel_mixer` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights: black
 /// and white, infrared, colour swaps.

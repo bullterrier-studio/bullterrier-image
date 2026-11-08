@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
@@ -16,6 +17,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `kaleidoscope` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a
 /// kaleidoscope, or with one segment a plain mirror.

@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::{cast, length};
 use crate::ops::noise::{Fractal, field, standardised};
@@ -16,6 +17,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `paper_texture` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The surfaces `paper_texture` can lay.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]

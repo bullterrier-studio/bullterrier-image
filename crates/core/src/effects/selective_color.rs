@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::colorspace::{hsv_to_rgb, rgb_to_hsv};
 use crate::params::Params;
@@ -14,6 +15,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `selective_color` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The smallest feather; only keeps a hard-edged range (feather 0) from dividing by zero, a pixel past the edge still
 /// gets weight 0.

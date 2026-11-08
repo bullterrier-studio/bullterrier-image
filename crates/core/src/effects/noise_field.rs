@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::gauss::ndtr;
@@ -20,6 +21,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `noise_field` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The noises `noise_field` can make.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]

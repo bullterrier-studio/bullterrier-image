@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur;
 use crate::ops::edge::EdgeOrConstant;
@@ -14,6 +15,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `gaussian_blur` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Soften the picture with a Gaussian blur of standard deviation `radius` px.
 ///

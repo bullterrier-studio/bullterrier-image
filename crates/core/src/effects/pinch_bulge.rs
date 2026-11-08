@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
@@ -16,6 +17,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `pinch_bulge` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`.
 ///

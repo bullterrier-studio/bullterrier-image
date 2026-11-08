@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::tone::Remap;
 use crate::params::{Choice, Params};
@@ -14,6 +15,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `auto_levels` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// What is stretched.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]

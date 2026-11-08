@@ -5,6 +5,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
@@ -18,6 +19,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `lens_distortion` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The curve of the bend.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]

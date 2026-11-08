@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
 use crate::params::Params;
-use crate::{Image, Inputs, Picture};
+use crate::{Footprint, Image, Inputs, Picture};
 
 // What the effect declares besides its parameters: its section of the catalogue, the opacity of a step of it that sets
 // none (below 1 for an effect meant to be mixed in partway) and the inputs it takes (none yet: list `Input::Partition`
@@ -16,6 +16,15 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+// What the effect reads around a pixel, for these parameters: `Footprint::Pixel` (nothing but the pixel itself, as here),
+// `Footprint::Radius(r)` (rows up to `r` design px away: a blur's radius, a displacement's amount) or `Footprint::Whole`
+// (anything else: an effect that knows where a pixel is in the picture, its height, or a statistic of all of it, or
+// when unsure). `crates/core/tests/it/footprint.rs` renders bands of rows with their margin and fails a claim that is
+// less than the truth.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Pixel
+}
 
 // The parameters are declared once, here: each field's `///` doc comment and `#[param(..)]` make its description,
 // default and range, and the Python model is built from them. Replace the example

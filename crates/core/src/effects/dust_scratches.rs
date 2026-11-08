@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::length;
 use crate::ops::random::{mix, unit};
@@ -15,6 +16,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 0.8,
     inputs: &[],
 };
+
+/// What `dust_scratches` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Draw light and dark specks, hairs and scratches at random places over the picture.
 ///

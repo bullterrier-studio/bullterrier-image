@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cast::single;
 use crate::ops::length;
@@ -16,6 +17,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `fractal` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The escape radius. Any radius above 2 decides escape correctly; a large one makes the smooth count
 /// `n + 1 - log2(log|z| / log R)` continuous across iteration boundaries (Linas Vepstas, "Renormalizing the Mandelbrot

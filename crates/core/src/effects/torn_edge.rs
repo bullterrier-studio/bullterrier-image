@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::noise::{Fractal, field};
 use crate::params::{Color, Params};
@@ -14,6 +15,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `torn_edge` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`.
 ///

@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::radial::{self, Motion};
@@ -16,6 +17,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `radial_blur` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.
 ///

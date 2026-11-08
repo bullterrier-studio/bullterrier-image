@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
@@ -17,6 +18,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `flow_warp` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise.
 ///

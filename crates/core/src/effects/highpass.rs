@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur;
 use crate::ops::edge::Edge;
@@ -14,6 +15,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `highpass` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The level the detail is centred on.
 const MID_GREY: f32 = 0.5; // constant: halfway between black and white

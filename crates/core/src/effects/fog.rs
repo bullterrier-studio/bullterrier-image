@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::gauss::ndtr;
@@ -18,6 +19,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `fog` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom. Fog, mist, haze,
 /// steam and smoke are settings of it.

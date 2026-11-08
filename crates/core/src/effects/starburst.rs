@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::convolve::{Kernel, convolve};
 use crate::ops::edge::Extension;
@@ -18,6 +19,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[Input::SizeRatio],
 };
+
+/// What `starburst` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The highest `threshold` there is (the `max` of the field); `limit` raises a threshold no further, so near-white pixels
 /// still light.

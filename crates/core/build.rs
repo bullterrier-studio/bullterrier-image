@@ -34,8 +34,8 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
 }
 
 /// The Rust source of the list: a module per effect file, the `EffectParams` impl that names the effect of its `Params`,
-/// and `builtin()`, which makes each effect from its `META`, its `Params` (read from the parameters) and its `render`
-/// (`fn(&Picture, &Params, &Inputs) -> Image`).
+/// and `builtin()`, which makes each effect from its `META`, its `Params` (read from the parameters), its `footprint`
+/// (`fn(&Params) -> Footprint`) and its `render` (`fn(&Picture, &Params, &Inputs) -> Image`).
 fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     let mut code = String::new();
     for (name, path) in files {
@@ -54,7 +54,7 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     for (name, _) in files {
         writeln!(
             code,
-            "        ::std::sync::Arc::new(crate::effect::Native::new({name:?}, &{name}::META, {name}::render)),"
+            "        ::std::sync::Arc::new(crate::effect::Native::new({name:?}, &{name}::META, {name}::footprint, {name}::render)),"
         )?;
     }
     writeln!(code, "    ]\n}}")?;

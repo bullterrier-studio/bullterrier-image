@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::color::luminance;
@@ -19,6 +20,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `melt` reads around a pixel.
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
+}
 
 /// Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column.
 ///

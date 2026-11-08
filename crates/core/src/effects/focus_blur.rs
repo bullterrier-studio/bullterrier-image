@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur;
 use crate::ops::edge::Edge;
@@ -15,6 +16,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `focus_blur` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// A shallow depth of field, or a tilt-shift miniature: pixels whose `field` value lies near `focus` stay sharp, and the
 /// farther a value lies from it, higher or lower, the more the pixel is blurred, up to `radius`.

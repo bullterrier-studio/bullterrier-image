@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::light::screen;
 use crate::ops::random::Rng;
@@ -15,6 +16,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `light_leak` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Add `blobs` seeded patches of warm light coming in from the side `angle` points to, tinted `color` and screened
 /// over the picture by `amount`.

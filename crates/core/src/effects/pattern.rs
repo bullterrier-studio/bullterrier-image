@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::{Choice, Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -13,6 +14,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `pattern` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The shapes `pattern` can draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]

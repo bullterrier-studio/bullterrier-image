@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_plane;
 use crate::ops::color::luminance;
@@ -19,6 +20,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `grain` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Where the noise values come from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]

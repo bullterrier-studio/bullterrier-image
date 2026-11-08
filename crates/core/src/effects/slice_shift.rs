@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::random::Rng;
 use crate::ops::shift::{Band, slide_bands};
@@ -15,6 +16,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `slice_shift` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Glitch tearing: the picture cut into strips and bands that slide sideways by random distances, wrapping around.
 ///

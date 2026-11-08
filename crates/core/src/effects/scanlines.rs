@@ -5,6 +5,7 @@ use std::f64::consts::PI;
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
@@ -15,6 +16,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `scanlines` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`.
 ///

@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::{LutName, Params};
 use crate::{Image, Inputs, Picture};
@@ -12,6 +13,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `lut` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`.
 ///

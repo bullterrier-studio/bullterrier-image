@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur;
 use crate::ops::edge::Edge;
@@ -15,6 +16,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 0.6, // constant: the default opacity of a step: a full occlusion is heavy, the step mixes it in partway
     inputs: &[],
 };
+
+/// What `ambient_occlusion` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// An ambient occlusion: each pixel darkened by `gain` times how much farther it lies than the depth around it, within
 /// `radius`.

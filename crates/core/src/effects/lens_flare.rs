@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::light::screen;
 use crate::params::{Color, Params};
@@ -14,6 +15,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `lens_flare` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Add a halo and a ring round the light at (`x`, `y`) and `ghosts` soft discs along the line from it through the
 /// picture's centre, tinted `color` and screened over the picture by `amount`.

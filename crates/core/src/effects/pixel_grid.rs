@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
@@ -13,6 +14,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `pixel_grid` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 const CHANNELS: f64 = 3.0; // constant: one stripe for each of red, green and blue
 

@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::colorspace::{linear_to_srgb, srgb_to_linear};
@@ -15,6 +16,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `grade` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first.
 ///

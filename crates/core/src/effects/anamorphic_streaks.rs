@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::convolve::{Kernel, convolve};
 use crate::ops::edge::Extension;
@@ -16,6 +17,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `anamorphic_streaks` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened
 /// over the picture by `amount`.

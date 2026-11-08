@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
@@ -18,6 +19,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `dehaze` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// The smallest airlight channel used as a divisor, so a black picture (airlight 0) cannot divide by zero; it changes no
 /// picture with a visible sky (a channel below 1/1000 is black in any 8-bit file).

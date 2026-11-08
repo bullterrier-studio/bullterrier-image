@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::{Choice, Params};
 use crate::{Image, Inputs, Picture};
@@ -13,6 +14,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `stretch` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Which way the line is smeared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Choice)]

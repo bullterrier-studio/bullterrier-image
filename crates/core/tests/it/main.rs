@@ -37,6 +37,7 @@ mod flow_lines;
 mod flow_warp;
 mod focus_blur;
 mod fog;
+mod footprint;
 mod fractal;
 mod gaussian_blur;
 mod grade;

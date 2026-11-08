@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::guided::guided_filter;
@@ -16,6 +17,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `tone_map` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Luminance below this (about 13 stops under white) counts as this much in the logarithm, so black has a finite
 /// logarithm; a guard against log(0), as in Reinhard et al. 2002's small delta.

@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::tone::Curve;
 use crate::params::Params;
@@ -14,6 +15,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `curves` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Where the control points sit on the input axis: black, a quarter, the middle, three quarters and white.
 const INPUTS: [f64; 5] = [0.0, 0.25, 0.5, 0.75, 1.0]; // constant: the five points the parameters name, evenly spaced

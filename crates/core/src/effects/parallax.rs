@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
@@ -17,6 +18,11 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[],
 };
+
+/// What `parallax` reads around a pixel.
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    Footprint::Whole
+}
 
 /// Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera move would: layers
 /// nearer than `focus` shift along `angle`, farther ones the opposite way, each by its distance in depth from the focus.
