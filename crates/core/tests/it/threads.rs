@@ -469,7 +469,7 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
-            "generated noise pictures",
+            "generated pictures",
             Recipe::new([
                 Step::new("noise_field").param("kind", "value").param("warp", 20),
                 Step::new("noise_field")
@@ -486,6 +486,15 @@ fn cases() -> Vec<Case> {
                     .param("scale", 40)
                     .param("warp", 15),
                 Step::new("noise_field"),
+                Step::new("flow_lines")
+                    .param("density", 20)
+                    .param("length", 90.5)
+                    .param("step", 1.5)
+                    .param("thickness", 3.5)
+                    .param("octaves", 3)
+                    .param("twist", 400)
+                    .param("seed", 2_147_483_647),
+                Step::new("flow_lines"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
