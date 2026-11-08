@@ -5,7 +5,10 @@ Needs uv, git and rustup (`rust-toolchain.toml` pins the compiler; rustup instal
 ```bash
 uv sync                # builds the Rust extension too; uv rebuilds it when a Rust file changes
 uv run poe setup       # once per clone: the git hooks, the commit-message template, the pinned cargo tools
-uv run poe check       # before every push or merge: every gate, Python and Rust
+uv run poe fast        # the inner loop: format, lint, types, Rust tests
+uv run poe check       # before every merge or push to main: every gate, Python and Rust
+uv run poe full        # before a release: check + gate proofs + scaffold + audit + lowest dependencies
+uv run poe gate-tests  # the proofs that each gate fails on a known-bad change (minutes; CI runs them)
 uv run poe check-min-deps   # for CI: the tests on Python 3.12 with the lowest dependency releases the floors allow
 uv run poe check-scaffold   # for CI: a scaffolded effect, after `uv sync` in a copy, passes its tests (about 30 s)
 uv run poe fix         # applies the automatic lint and format fixes
@@ -38,9 +41,15 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
   pictures kept (`uv run poe gallery --force` renders all again; effect named with `--only` always rendered).
 - Every gate (ruff, vulture, deptry, build check, mypy, tests; for Rust rustfmt, clippy, rustdoc, cargo-shear,
   cargo-deny, stubtest, cargo test) is configured in `pyproject.toml` and `Cargo.toml`, listed in
-  [CLAUDE.md](../CLAUDE.md#lint-types-and-gates). `uv run poe fast` is the inner loop (format, lint, types, Rust tests). Push to `main` (or a tag) runs the whole gate via
-  pre-push hook unless it changes only documentation (pages and `docs/images/`) or a clean, passing `uv run poe check` already
-  ran on exactly the pushed tree; other branches checked by CI when the pull request opens.
+  [CLAUDE.md](../CLAUDE.md#lint-types-and-gates). `uv run poe fast` is the inner loop (format, lint, types, Rust tests).
+- Three tiers. `fast`: the inner loop. `check`: every static gate, the Rust tests and the Python suite. `full`: `check`
+  then the gate proofs (`gate-tests`: pytest marker `gate`,
+  tests that copy the project, write one fault and see a gate fail; they remove their copies and build folders), the
+  scaffold test (`rebuild`), the audit and the lowest-dependency run. The pre-push hook runs `check` for a push to `main`,
+  plus `gate-tests` when the push changes a file in `[tool.pre-push]` (`pyproject.toml`: what a proof edits or stands on)
+  or git cannot say what changed, and `full` for a tag; none of it for a push that changes only documentation or a tree a
+  tier at least as high already passed (the record names the tier: a `check` pass never satisfies a tag); other branches
+  are checked by CI when the pull request opens. CI runs the proofs as one job (`gate-tests.yml`).
 - Apple Vision test skipped off macOS. Portable subject backend and depth model tested with tiny stand-in models built in the
   tests: suite never downloads a real model; tests of real models run only when already in cache and assert coarse
   properties (a model update may change every pixel).

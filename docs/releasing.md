@@ -8,7 +8,8 @@ How a change is checked on GitHub and how a version reaches PyPI. The short rule
 `.github/workflows/ci.yml` runs on every push to main, pull request and merge-queue entry, and by hand (Actions tab,
 *CI*, *Run workflow*). Stage 1 runs every check in parallel: `lint.yml` (format, lint, dead code, dependencies, types,
 workflows, each Rust gate a step of its own), `test.yml` (the Rust tests and the suite on Linux, macOS and Windows,
-Python 3.12 to 3.14), `min-deps.yml` (the lowest allowed dependencies), `security.yml` (pip-audit and cargo-deny's
+Python 3.12 to 3.14), `min-deps.yml` (the lowest allowed dependencies), `gate-tests.yml` (the proofs that each gate fails on a
+known-bad change, on Linux), `security.yml` (pip-audit and cargo-deny's
 advisories, CodeQL for Python and Rust, and dependency review on pull requests) and `pre-commit.yml` (the commit hooks
 over every file). Stage 2, `build.yml`, only once every check passed: the sdist and one abi3 wheel per platform
 ([which](design-decisions.md#the-rust-core); built with maturin-action), checked by `tools/check_dists.py` and kept as
@@ -34,8 +35,8 @@ uv run poe release 0.1.0        # the release: PyPI
 behind or diverged from origin/main (commits ahead of it are fine: they are pushed with the release); the version is a
 release version (MAJOR.MINOR.PATCH, optionally aN, bN or rcN) greater than the one in `pyproject.toml` and than every
 `v*` tag, and no test writes it; `ci-ok` has not failed on GitHub for the commit (asked through `gh`; if gh is missing
-or offline, or CI has not run on the commit yet, it only warns, as the tag runs the whole CI again); `poe check`
-passes. Then it prints the plan (old and new version, the changelog section, the commit, the tag, the remote and what
+or offline, or CI has not run on the commit yet, it only warns, as the tag runs the whole CI again); `poe full`
+passes (`check`, the gate proofs, the scaffold test, the audit and the lowest-dependency run). Then it prints the plan (old and new version, the changelog section, the commit, the tag, the remote and what
 the push carries) and asks `[y/N]`; `--dry-run` stops there, `--yes` does not ask. On yes: `uv version` writes
 `pyproject.toml` and `uv.lock`, the section goes into CHANGELOG.md, `chore(release): v0.1.0` is committed, the
 annotated tag `v0.1.0` is created and `git push --atomic origin main v0.1.0` pushes both, or neither.

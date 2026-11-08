@@ -13,6 +13,7 @@ import sys
 import tarfile
 import tomllib
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -21,13 +22,15 @@ from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[2]
 # one xdist worker runs this module, so the Rust build folder its builds share is reused across its tests
-pytestmark = pytest.mark.xdist_group("build-gate")
+pytestmark = [pytest.mark.xdist_group("build-gate"), pytest.mark.gate]
 RUST_FILES = ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rustfmt.toml")
 
 
 @pytest.fixture(scope="module")
-def rust_build_folder(tmp_path_factory) -> Path:
-    return tmp_path_factory.mktemp("target")
+def rust_build_folder(tmp_path_factory) -> Iterator[Path]:
+    folder = tmp_path_factory.mktemp("target")
+    yield folder
+    shutil.rmtree(folder)
 
 
 @pytest.fixture

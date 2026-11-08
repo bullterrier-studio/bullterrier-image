@@ -1,0 +1,45 @@
+# The tests that prove the gates can fail: each copies the project, writes one deliberate mistake and checks the gate
+# rejects it (marker `gate`; `poe test` leaves them out). Slow, so once, on Linux. Called by ci.yml; can also be started
+# by hand.
+name: Gate tests
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate-tests:
+    name: Gates fail on a known-bad change
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      # rustup is on every runner; with no argument it installs the toolchain rust-toolchain.toml pins
+      - name: Install the pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && cargo --version
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      # the gates run the cargo tools (cargo-shear, cargo-deny); their versions are written once, in Cargo.toml's
+      # [workspace.metadata.tools], and install-action downloads prebuilt, checksum-verified binaries
+      - name: Read the cargo tools' versions (Cargo.toml)
+        id: cargo-tools
+        shell: bash
+        run: echo "specs=$(uv run --no-project python tools/rust_tools.py specs)" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: ${{ steps.cargo-tools.outputs.specs }}
+      # every crate Cargo.lock names (dev-dependencies and the cargo-deny gate's metadata too); the gates run offline
+      - name: Fetch the locked crates (cargo fetch)
+        run: cargo fetch --locked
+      - name: Install the locked dependencies (builds the Rust extension)
+        run: uv sync --locked
+      - name: Gate tests (pytest; skips and the 10 slowest tests are listed)
+        run: uv run --locked poe gate-tests -ra --durations=10

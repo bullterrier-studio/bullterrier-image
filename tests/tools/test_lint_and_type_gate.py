@@ -17,7 +17,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 # one xdist worker runs this module, so its fixture (a copy of the project and a cold mypy cache) is built once
-pytestmark = [pytest.mark.xdist_group("lint-and-type-gate"), pytest.mark.typecheck]
+pytestmark = [pytest.mark.xdist_group("lint-and-type-gate"), pytest.mark.typecheck, pytest.mark.gate]
 LIBRARY_MODULE = "src/bullterrier_image/ops/probe.py"  # a module of the package, under no per-file exemption
 TEST_MODULE = "tests/test_probe.py"
 
@@ -43,13 +43,14 @@ def mypy(checkout: Path) -> Verdict:
 
 
 @pytest.fixture(scope="module")
-def checkout(tmp_path_factory) -> Path:
+def checkout(tmp_path_factory) -> Iterator[Path]:
     root = tmp_path_factory.mktemp("checkout")
     skip = shutil.ignore_patterns("__pycache__", "*.pyc")
     shutil.copytree(ROOT / "src", root / "src", ignore=skip)
     shutil.copytree(ROOT / "tests", root / "tests", ignore=skip)
     shutil.copy(ROOT / "pyproject.toml", root)
-    return root
+    yield root
+    shutil.rmtree(root)
 
 
 @pytest.fixture

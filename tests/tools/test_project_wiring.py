@@ -77,8 +77,9 @@ def test_poe_accepts_every_task_and_each_runs_a_command(poe_runs):
 
 
 def test_the_gate_only_checks_and_never_rewrites_files(poe_runs):
-    commands = poe_runs["check"]
-    assert [command for command in commands if fixing_words(shlex.split(command))] == [], commands
+    for task in ("check", "full"):
+        commands = poe_runs[task]
+        assert [command for command in commands if fixing_words(shlex.split(command))] == [], commands
 
 
 def test_fast_runs_only_what_check_runs(poe_runs):
@@ -86,10 +87,34 @@ def test_fast_runs_only_what_check_runs(poe_runs):
     assert [command for command in poe_runs["fast"] if command not in poe_runs["check"]] == []
 
 
-def test_check_remembers_a_pass_for_the_push_by_starting_and_ending_with_the_hook_tool(poe_runs):
-    commands = poe_runs["check"]
+@pytest.mark.parametrize(("task", "tier"), [("check", "check"), ("full", "full")])
+def test_a_tier_remembers_a_pass_for_the_push_by_starting_and_ending_with_the_hook_tool(poe_runs, task, tier):
+    commands = poe_runs[task]
     assert commands[0].endswith("tools/pre_push.py start")
-    assert commands[-1].endswith("tools/pre_push.py pass")
+    assert commands[-1].endswith(f"tools/pre_push.py pass {tier}")
+
+
+# What `check` leaves to `full`: the gate proofs and the scaffold test (minutes, in copies), the audit (network) and the
+# lowest-dependency run (a second environment).
+FULL_ONLY = ("pytest -q -n auto -m gate", "-m rebuild", "pip-audit", "--resolution lowest-direct")
+
+
+def test_check_leaves_the_proofs_the_scaffold_the_audit_and_the_minimum_dependencies_to_full(poe_runs):
+    full_only = [command for command in poe_runs["full"] if any(word in command for word in FULL_ONLY)]
+    assert len(full_only) >= len(FULL_ONLY), full_only
+    assert [command for command in poe_runs["check"] if command in full_only] == []
+    assert [command for command in poe_runs["fast"] if command in full_only] == []
+
+
+def test_full_runs_everything_check_runs_but_the_record_of_the_tier(poe_runs):
+    missing = [command for command in poe_runs["check"][:-1] if command not in poe_runs["full"]]
+    assert missing == []
+
+
+def test_the_python_suite_leaves_the_gate_proofs_to_their_own_task(poe_runs):
+    for task in ("test", "check-min-deps"):
+        assert "not gate" in poe_runs[task][0], poe_runs[task]
+    assert " -m gate" in poe_runs["gate-tests"][0]
 
 
 def test_every_poe_command_runs_a_dev_dependency_or_a_system_tool(pyproject, poe_runs):

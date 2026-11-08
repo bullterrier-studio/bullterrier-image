@@ -61,7 +61,7 @@ jobs:
           elif [ "$CODE" = true ]; then
             msg="Pull request that changes code: every check runs."
           else
-            msg="Pull request that changes only documentation: lint, test, min-deps, security and build are skipped; pre-commit runs."
+            msg="Pull request that changes only documentation: lint, test, min-deps, gate-tests, security and build are skipped; pre-commit runs."
           fi
           echo "$msg"
           echo "$msg" >> "$GITHUB_STEP_SUMMARY"
@@ -79,6 +79,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/min-deps.yml # zizmor: ignore[self-repository] (see the note above)
+  gate-tests:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    uses: ./.github/workflows/gate-tests.yml # zizmor: ignore[self-repository] (see the note above)
   security:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -91,7 +95,7 @@ jobs:
 
   # stage 2: the distributions, from a commit that passed every check (release.yml publishes these files)
   build:
-    needs: [changes, lint, test, min-deps, security, pre-commit]
+    needs: [changes, lint, test, min-deps, gate-tests, security, pre-commit]
     # `!failure()`: a job that was skipped (documentation only) does not stop the build, one that failed does
     if: ${{ !cancelled() && !failure() && needs.changes.outputs.code == 'true' }}
     uses: ./.github/workflows/build.yml # zizmor: ignore[self-repository] (see the note above)
@@ -99,7 +103,7 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always() # report a result even when a job it needs failed or was skipped
-    needs: [changes, lint, test, min-deps, security, pre-commit, build]
+    needs: [changes, lint, test, min-deps, gate-tests, security, pre-commit, build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

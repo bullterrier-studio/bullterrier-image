@@ -309,6 +309,17 @@ def depth_echo_model(tmp_path, monkeypatch) -> Callable[[int], Path]:
     return write
 
 
+@pytest.fixture(autouse=True)
+def _gate_scratch_removed(request):
+    """A test marked `gate` or `rebuild` copies the project and builds in the copy (gigabytes): its temporary folder is
+    removed as soon as it ends, not kept with the last sessions' (pytest's `tmp_path_retention_count`)."""
+    copies = any(request.node.get_closest_marker(name) for name in ("gate", "rebuild"))
+    scratch = request.getfixturevalue("tmp_path") if copies else None
+    yield
+    if scratch is not None:
+        shutil.rmtree(scratch)
+
+
 @pytest.fixture
 def project_copy(tmp_path):
     """`project_copy(*names)` copies the project's src/ (without bytecode caches) and the files `names` at its root into

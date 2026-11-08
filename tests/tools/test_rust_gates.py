@@ -19,7 +19,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 # one xdist worker runs this module, so its copy of the workspace and its build folder are made once
-pytestmark = pytest.mark.xdist_group("rust-gates")
+pytestmark = [pytest.mark.xdist_group("rust-gates"), pytest.mark.gate]
 WORKSPACE_FILES = ["pyproject.toml", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rustfmt.toml", "deny.toml"]
 CORE = "crates/core/src/lib.rs"
 CORE_MANIFEST = "crates/core/Cargo.toml"
@@ -32,7 +32,7 @@ class Verdict:
 
 
 @pytest.fixture(scope="module")
-def workspace(tmp_path_factory) -> Path:
+def workspace(tmp_path_factory) -> Iterator[Path]:
     root = tmp_path_factory.mktemp("workspace")
     for name in WORKSPACE_FILES:
         shutil.copy(ROOT / name, root)
@@ -43,25 +43,30 @@ def workspace(tmp_path_factory) -> Path:
         shutil.copy(ROOT / outside, root / outside)
     (root / "tools").mkdir()
     shutil.copy(ROOT / "tools" / "run_capped.py", root / "tools")  # `rust-test` runs under it
-    return root
+    yield root
+    shutil.rmtree(root)
 
 
 @pytest.fixture(scope="module")
-def cargo_env(tmp_path_factory) -> dict[str, str]:
-    """`uv run`'s environment (PyO3 finds this Python), offline, uncoloured, with one build folder for every copy."""
-    return {
+def cargo_env(tmp_path_factory) -> Iterator[dict[str, str]]:
+    """`uv run`'s environment (PyO3 finds this Python), offline, uncoloured, with one build folder for every copy; the
+    folder is removed afterwards (gigabytes)."""
+    target = tmp_path_factory.mktemp("target")
+    yield {
         **os.environ,
         "PATH": os.pathsep.join([str(Path(sys.executable).parent), os.environ.get("PATH", "")]),
-        "CARGO_TARGET_DIR": str(tmp_path_factory.mktemp("target")),
+        "CARGO_TARGET_DIR": str(target),
         "CARGO_NET_OFFLINE": "true",
         "CARGO_TERM_COLOR": "never",
         "NO_COLOR": "1",
     }
+    shutil.rmtree(target)
 
 
 def poe(workspace: Path, task: str, env: dict[str, str]) -> Verdict:
+    """`task` is a poe task and the arguments after its name: `rust-test --lib probe::` runs only what they select."""
     # the simple executor: the commands run in this environment, as under `uv run`, without making one for the copy
-    command = [sys.executable, "-m", "poethepoet", "--executor", "simple", task]
+    command = [sys.executable, "-m", "poethepoet", "--executor", "simple", *task.split()]
     result = subprocess.run(command, cwd=workspace, env=env, capture_output=True, encoding="utf-8", check=False)
     return Verdict(result.returncode, result.stdout + result.stderr)
 
@@ -102,7 +107,10 @@ def replaced(old: str, new: str) -> Callable[[str], str]:
     return rewrite
 
 
-# One offence each: (task, file, change, what the report must name: the rule, and where it was broken)
+# One offence each: (task and the arguments that select what it runs, file, change, what the report must name: the
+# rule, and where it was broken). Every kind of source a gate must see has a row: the core's lib.rs, an `ops` module, an
+# effect file (pulled in by include!, which rustfmt does not follow), a test module of tests/it, the build script and
+# the manifests.
 OFFENCES = {
     "unformatted code": ("rust-fmt", CORE, appended("pub  fn  spaced( )->u8{1}\n"), ["Diff in", CORE]),
     "unformatted code in an effect file (which rustfmt does not reach through include!)": (
@@ -110,6 +118,30 @@ OFFENCES = {
         "crates/core/src/effects/grade.rs",
         appended("pub  fn  spaced( )->u8{1}\n"),
         ["Diff in", "effects/grade.rs"],
+    ),
+    "unformatted code in the build script": (
+        "rust-fmt",
+        "crates/core/build.rs",
+        appended("pub  fn  spaced( )->u8{1}\n"),
+        ["Diff in", "build.rs"],
+    ),
+    "unformatted code in a test module": (
+        "rust-fmt",
+        "crates/core/tests/it/main.rs",
+        appended("pub  fn  spaced( )->u8{1}\n"),
+        ["Diff in", "tests/it/main.rs"],
+    ),
+    "an unwrap in an effect file": (
+        "rust-lint",
+        "crates/core/src/effects/grade.rs",
+        appended("\n/// Probe.\n#[must_use]\npub fn probe(text: &str) -> u8 {\n    text.parse().unwrap()\n}\n"),
+        ["unwrap_used", "effects/grade.rs"],
+    ),
+    "an unwrap in a test module": (
+        "rust-lint",
+        "crates/core/tests/it/main.rs",
+        appended("\n/// Probe.\n#[must_use]\npub fn probe(text: &str) -> u8 {\n    text.parse().unwrap()\n}\n"),
+        ["unwrap_used", "tests/it/main.rs"],
     ),
     "an unwrap": (
         "rust-lint",
@@ -151,7 +183,7 @@ OFFENCES = {
         ["unreachable-pub", "crates/core/src/ops.rs"],
     ),
     "a declared parameter no test shows to change the result": (
-        "rust-test",
+        "rust-test --test parameters_are_read",
         "crates/core/src/effects/grade.rs",
         replaced(
             "\n}\n\n/// The graded picture.",
@@ -199,7 +231,7 @@ OFFENCES = {
         ["rejected", "GPL-3.0-only"],
     ),
     "a failing Rust test": (
-        "rust-test",
+        "rust-test --lib probe::",
         CORE,
         appended(
             "\n#[cfg(test)]\nmod probe {\n    #[test]\n    fn fails() {\n        assert_eq!(1 + 1, 3);\n    }\n}\n"

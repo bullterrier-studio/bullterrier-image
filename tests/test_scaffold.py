@@ -8,7 +8,8 @@ The scaffold always writes into the checkout it runs from, so these tests run it
 rule 4 of CLAUDE.md on a copy of the whole tree: adding an effect creates files and changes none, and they pass the
 gates that need no new build of the extension (the core compiled with the kernel under clippy; the Rust rules).
 Running the new effect needs the extension rebuilt in an environment of the copy's own (`uv sync`, about 30 s): that
-test is marked `rebuild`, left out of `poe test` and run by `poe check-scaffold` (CI runs it on Linux).
+test is marked `rebuild`, left out of `poe test` and run by `poe check-scaffold` (CI runs it on Linux). The two that
+build the core in the copy are marked `gate`, like the other tests that write a fault into a copy (`poe gate-tests`).
 """
 
 import hashlib
@@ -200,6 +201,7 @@ def test_adding_an_effect_creates_only_new_files_named_for_it_and_changes_no_exi
     assert all(path.startswith(places) for path in created), created  # ... and only files named for the effect
 
 
+@pytest.mark.gate
 def test_a_scaffolded_effect_passes_clippy_and_the_rust_rules_as_written(tmp_path, tracked_files):
     """Bounded on purpose, to keep the suite fast: in the copy, rustfmt and clippy on the
     core crate with the new kernel compiled in (the core alone builds in seconds; the rebuilt extension is the next
@@ -240,6 +242,7 @@ def test_a_scaffolded_effect_passes_clippy_and_the_rust_rules_as_written(tmp_pat
     } <= passed, done.stdout[-4000:]
 
 
+@pytest.mark.gate
 def test_an_effect_named_like_a_crate_the_cores_effect_table_uses_does_not_hide_that_crate(tmp_path, tracked_files):
     copy = _copy_of_the_tree(tmp_path / "tree", tracked_files)
     shadowing = run_dev_script(copy, "new-effect", "serde_json", "--category", "utilities")
