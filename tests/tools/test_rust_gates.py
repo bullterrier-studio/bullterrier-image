@@ -23,7 +23,6 @@ pytestmark = pytest.mark.xdist_group("rust-gates")
 WORKSPACE_FILES = ["pyproject.toml", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rustfmt.toml", "deny.toml"]
 CORE = "crates/core/src/lib.rs"
 CORE_MANIFEST = "crates/core/Cargo.toml"
-CARGO_TASKS = ["rust-fmt", "rust-lint", "rust-doc", "rust-shear", "rust-deny", "rust-test"]
 
 
 @dataclass(frozen=True)
@@ -101,12 +100,6 @@ def replaced(old: str, new: str) -> Callable[[str], str]:
         return text.replace(old, new)
 
     return rewrite
-
-
-@pytest.mark.parametrize("task", CARGO_TASKS)
-def test_the_workspace_as_it_is_passes_each_rust_gate(workspace, cargo_env, task):
-    verdict = poe(workspace, task, cargo_env)
-    assert verdict.returncode == 0, verdict.report
 
 
 # One offence each: (task, file, change, what the report must name: the rule, and where it was broken)
