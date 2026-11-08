@@ -2,7 +2,7 @@
 //! (`bullterrier_image::params`); an effect imports them from there.
 //!
 //! - `#[derive(Params)]` on an effect's `Params` struct: each field is declared once, by its type, its `///` doc
-//!   comment and a `#[param(default = .., unit = .., min = .., max = .., min_length = .., max_length = .., drivable,
+//!   comment and a `#[param(default = .., unit = .., min = .., max = .., min_length = .., max_length = .., at_most = .., drivable,
 //!   advanced, cyclic)]` attribute. The struct's own doc comment documents the effect's parameters as a whole. The
 //!   derive writes `Default`, the values as a recipe writes them and the table the Python package builds the effect's
 //!   model from, and refuses a broken declaration at compile time, naming the field, for each rule it checks: a doc, a

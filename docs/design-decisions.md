@@ -848,6 +848,21 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     set). The parameter format is not extended: its readers ignore a key they do not know, and `test_parameter_format.py` proves
     the schema takes it. The derive refuses an `at_most` that names no other number, another unit or a lower default.
 
+- **Warps, shifts and fractal noise are core ops; the E3 effects run in Rust (E3).** Decisions:
+  - *`ops/centre.rs`, `ops/shift.rs` and `fractal` in `ops/noise.rs`* are the shared numeric code of the 18 effects (warp about a
+    centre, whole or fractional shift with an edge rule, smooth lattice noise). `Sampler::wrapping_columns` makes the columns
+    wrap whatever the rule for the rows, since an angle's seam (`polar`, `droste`) wraps while the rows keep their edge rule.
+    Python's `warp.Centre` is gone; `warp.remap`, `shift` and `fractal` stay until their last Python user (E4/E5) goes.
+  - *`u32` seeds and `at_most` came with this batch* (`light_leak` and `starburst` have their full seed range again); their
+    decisions are the two bullets of the E2 entry above, which they amend.
+  - *`echo` stays in image.* It lays displaced, fading copies of one picture over itself: a spatial ghost with no earlier frame.
+    Trails and datamosh need earlier frames and are video's.
+  - *The old NumPy numbers are not reproduced.* `displace`'s lattice noise is uniform in -1..1 (NumPy drew normal values), and
+    any seeded effect differs from the old Python per seed (the core's own streams, see E2). Bicubic is Catmull-Rom, not scipy's
+    spline, so edges differ slightly at `bicubic`.
+  - *`perspective` floors the depth at 1e-9*: the old Python divided by zero on the vanishing line and produced NaN; a pixel there
+    now reads a place far away, where the edge rule decides, and the result stays finite.
+
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*
