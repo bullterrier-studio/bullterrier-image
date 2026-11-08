@@ -35,6 +35,7 @@ mod files_read;
 mod files_write;
 mod flow_lines;
 mod focus_blur;
+mod fog;
 mod fractal;
 mod gaussian_blur;
 mod grade;

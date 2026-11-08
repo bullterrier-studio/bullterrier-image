@@ -502,6 +502,18 @@ fn cases() -> Vec<Case> {
                     .param("octaves", 4)
                     .param("seed", 4_294_967_295_u32),
                 Step::new("aurora"),
+                Step::new("fog")
+                    .param("amount", 0.9)
+                    .param("coverage", 0.5)
+                    .param("feather", 0.2)
+                    .param("floor", 0.1)
+                    .param("scale", 40)
+                    .param("rise", 3.5)
+                    .param("turbulence", 25)
+                    .param("resampling", "bicubic")
+                    .param("edge", "wrap")
+                    .param("seed", 4_294_967_295_u32),
+                Step::new("fog"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

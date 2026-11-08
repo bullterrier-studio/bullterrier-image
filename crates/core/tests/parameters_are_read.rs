@@ -347,6 +347,18 @@ fn conditional() -> Vec<Conditional> {
             field: "line",
             with: vec![("density", json!(50.0))],
         },
+        // nothing moves the noise at the defaults (no turbulence, no rise), so how it is read between pixels and beyond the
+        // border changes nothing; the largest turbulence moves it a few pixels at the 12 px size of the test
+        Conditional {
+            effect: "fog",
+            field: "resampling",
+            with: vec![("turbulence", json!(500.0))],
+        },
+        Conditional {
+            effect: "fog",
+            field: "edge",
+            with: vec![("turbulence", json!(500.0))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",
