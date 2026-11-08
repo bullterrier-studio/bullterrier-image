@@ -518,7 +518,7 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
-            "pictures carried along noise",
+            "pictures carried along noise and pulled down in drips",
             Recipe::new([
                 Step::new("flow_warp")
                     .param("amount", 40.5)
@@ -529,6 +529,13 @@ fn cases() -> Vec<Case> {
                     .param("edge", "wrap")
                     .param("seed", 4_294_967_295_u32),
                 Step::new("flow_warp"),
+                Step::new("melt")
+                    .param("amount", 60.5)
+                    .param("scale", 9)
+                    .param("interpolation", "bicubic")
+                    .param("edge", "wrap")
+                    .param("seed", 4_294_967_295_u32),
+                Step::new("melt"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

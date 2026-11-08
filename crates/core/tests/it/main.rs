@@ -60,6 +60,7 @@ mod limits;
 mod lut;
 mod lut_cube;
 mod lut_effect;
+mod melt;
 mod motion_blur;
 mod noise;
 mod noise_field;
