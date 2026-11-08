@@ -277,6 +277,24 @@ fn conditional() -> Vec<Conditional> {
             field: "seed",
             with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
         },
+        // the 12 px picture is too small for the default density to make a single speck; at the largest density it has
+        // one, and one mark of a seed is a hair or a speck, light or dark
+        Conditional {
+            effect: "dust_scratches",
+            field: "size",
+            with: vec![("density", json!(5.0))],
+        },
+        Conditional {
+            effect: "dust_scratches",
+            field: "hairs",
+            with: vec![("density", json!(5.0))],
+        },
+        // the default two scratches may both be dark: a hundred are not
+        Conditional {
+            effect: "dust_scratches",
+            field: "light",
+            with: vec![("scratches", json!(100))],
+        },
         // a dot is drawn only by the 'dots' kind; the default kind is a grid
         Conditional {
             effect: "pattern",

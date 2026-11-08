@@ -23,6 +23,7 @@ mod deep;
 mod dehaze;
 mod displace;
 mod droste;
+mod dust_scratches;
 mod each;
 mod each_weights;
 mod echo;
