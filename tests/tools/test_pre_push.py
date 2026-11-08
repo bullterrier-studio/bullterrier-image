@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -356,14 +357,14 @@ def passed_gate(
 def test_a_gate_that_passed_on_a_clean_tree_is_remembered_for_that_tree_and_no_other(git_repo, monkeypatch):
     first = git_repo.commit("chore: start", {"start.txt": "start"})
     monkeypatch.chdir(git_repo.path)
-    assert not pre_push.tier_passed_on(first)
+    assert not pre_push.gate_passed_on(first)
 
     passed_gate(git_repo)
 
-    assert pre_push.tier_passed_on(first)
+    assert pre_push.gate_passed_on(first)
     second = git_repo.commit("chore: more", {"more.txt": "more"})
-    assert not pre_push.tier_passed_on(second), "another tree is not the one that was checked"
-    assert pre_push.tier_passed_on(first), "the checked tree is still remembered"
+    assert not pre_push.gate_passed_on(second), "another tree is not the one that was checked"
+    assert pre_push.gate_passed_on(first), "the checked tree is still remembered"
 
 
 def test_a_commit_with_the_same_tree_counts_as_the_tree_that_passed(git_repo, monkeypatch):
@@ -371,7 +372,7 @@ def test_a_commit_with_the_same_tree_counts_as_the_tree_that_passed(git_repo, mo
     monkeypatch.chdir(git_repo.path)
     passed_gate(git_repo)
     git_repo.git("commit", "-q", "--allow-empty", "-m", "chore: same tree, new commit")
-    assert pre_push.tier_passed_on("HEAD")
+    assert pre_push.gate_passed_on("HEAD")
 
 
 @pytest.mark.parametrize(
@@ -390,15 +391,15 @@ def test_a_pass_is_not_remembered_unless_the_tree_was_the_same_and_clean_through
     git_repo.commit("chore: start", {"start.txt": "start"})
     monkeypatch.chdir(git_repo.path)
     passed_gate(git_repo, **run)
-    assert not pre_push.tier_passed_on("HEAD")
-    assert not pre_push.tier_passed_on("HEAD~1" if run.get("change_between") else "HEAD")
+    assert not pre_push.gate_passed_on("HEAD")
+    assert not pre_push.gate_passed_on("HEAD~1" if run.get("change_between") else "HEAD")
 
 
 def test_outside_a_repository_nothing_is_remembered_and_nothing_fails(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     pre_push.record_gate_start()
     pre_push.record_gate_pass("check")
-    assert not pre_push.tier_passed_on("HEAD")
+    assert not pre_push.gate_passed_on("HEAD")
 
 
 @pytest.mark.parametrize(
@@ -443,7 +444,7 @@ def test_a_push_right_after_a_passed_gate_does_not_run_it_again(monkeypatch):
     assert pre_push.main() == 0
 
 
-# The tiers: check for main, check and the proofs when a proof's file changed, full for a tag --------------------
+# The tiers: check for main, full for a tag or a ref it cannot classify, the proofs only when their files change ---
 
 
 class FakeUv:
@@ -483,84 +484,50 @@ def push(monkeypatch, ref, before, after):
 
 
 @pytest.mark.parametrize(
-    ("ref", "changed", "plan"),
+    ("ref", "tier"),
     [
-        pytest.param("refs/heads/main", ["src/code.py"], ("check", False), id="code: check alone"),
-        pytest.param(
-            "refs/heads/main", ["crates/core/src/effects/bloom.rs"], ("check", False), id="an effect: check alone"
-        ),
-        pytest.param("refs/heads/main", ["src/code.py", "tools/dev.py"], ("check", True), id="a tool: and the proofs"),
-        pytest.param("refs/heads/main", ["rustfmt.toml"], ("check", True), id="a gate's configuration: and the proofs"),
-        pytest.param(
-            "refs/heads/main", ["tests/tools/test_rust_gates.py"], ("check", True), id="a proof: and the proofs"
-        ),
-        pytest.param("refs/heads/main", [".github/workflows/ci.yml"], ("check", True), id="a workflow: and the proofs"),
-        pytest.param("refs/heads/main", [], ("check", True), id="no file listed: no proof that none is a trigger"),
-        pytest.param("refs/heads/main", None, ("check", True), id="git cannot say what changed: fail safe"),
-        pytest.param("refs/heads/main", ["README.md"], None, id="documentation only: nothing"),
-        pytest.param("refs/tags/v1.0.0", ["src/code.py"], ("full", False), id="a tag: full"),
-        pytest.param("refs/tags/v1.0.0", None, ("full", False), id="a tag with an unknown range: full"),
-        pytest.param("refs/tags/v1.0.0", ["README.md"], None, id="a tag of documentation only: nothing"),
-        pytest.param("", ["src/code.py"], ("check", False), id="no ref reported: check"),
+        pytest.param("refs/heads/main", "check", id="main"),
+        pytest.param("refs/heads/feat/x", "check", id="a branch pushed along with unpushed code on main"),
+        pytest.param("refs/tags/v1.0.0", "full", id="a tag"),
+        pytest.param("", "full", id="no ref reported"),
+        pytest.param("main", "full", id="a ref that is not spelt like one"),
     ],
 )
-def test_a_push_needs_the_tier_its_ref_and_files_call_for(git_repo, monkeypatch, ref, changed, plan):
-    level(git_repo)
-    monkeypatch.chdir(git_repo.path)
-    expected = pre_push.Plan(*plan) if plan else None
-    assert pre_push.plan_for(ref, "origin", changed) == expected
-
-
-def test_a_trigger_in_the_commits_of_main_a_branch_push_carries_runs_the_proofs(git_repo, monkeypatch):
-    level(git_repo)
-    git_repo.commit("chore: tool", {"tools/new_tool.py": "x = 1"})
-    monkeypatch.chdir(git_repo.path)
-    assert pre_push.plan_for("refs/heads/feat/x", "origin", ["src/code.py"]) == pre_push.Plan("check", proofs=True)
+def test_a_push_needs_the_gate_its_ref_calls_for(ref, tier):
+    assert pre_push.tier_for(ref) == tier
 
 
 @pytest.mark.parametrize(
-    ("path", "triggers"),
+    ("passed", "needed", "covers"),
     [
-        pytest.param("tools/pre_push.py", True, id="a file in a listed folder"),
-        pytest.param("tests/tools/conftest.py", True, id="a file in a listed folder, nested"),
-        pytest.param("pyproject.toml", True, id="a listed file"),
-        pytest.param("src/bullterrier_image/ops/blur.py", False, id="library code"),
-        pytest.param("crates/core/src/ops/blur.rs", False, id="a Rust module no proof edits"),
-        pytest.param("tools_extra/x.py", False, id="a folder whose name only starts like a listed one"),
-        pytest.param("docs/page.md", False, id="documentation"),
+        pytest.param("check", "check", True, id="check covers check"),
+        pytest.param("full", "check", True, id="full covers check"),
+        pytest.param("full", "full", True, id="full covers full"),
+        pytest.param("check", "full", False, id="check never covers full"),
+        pytest.param(None, "check", False, id="nothing passed"),
     ],
 )
-def test_only_the_files_a_proof_edits_or_stands_on_trigger_the_proofs(path, triggers):
-    assert pre_push.triggers_proofs(path) is triggers
-
-
-def test_every_file_a_gate_proof_writes_a_fault_into_triggers_the_proofs():
-    """The list of triggers is written once, in pyproject.toml; the offences of tests/tools/test_rust_gates.py are the
-    proofs' own list of the files they edit, so a new offence row whose file the list lacks fails here."""
-    spec = importlib.util.spec_from_file_location(
-        "rust_gates_offences", ROOT / "tests" / "tools" / "test_rust_gates.py"
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    gates = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gates)
-    edited = {file for _task, file, _change, _named in gates.OFFENCES.values()}
-    assert [file for file in sorted(edited) if not pre_push.triggers_proofs(file)] == []
+def test_a_full_pass_covers_a_check_push_and_never_the_reverse(git_repo, monkeypatch, passed, needed, covers):
+    git_repo.commit("chore: start", {"start.txt": "start"})
+    monkeypatch.chdir(git_repo.path)
+    if passed:
+        passed_gate(git_repo, tier=passed)
+    assert pre_push.gate_passed_on("HEAD", needed) is covers
 
 
 @pytest.mark.parametrize(
-    ("passed", "ref", "runs"),
+    ("ref", "passed", "runs"),
     [
-        pytest.param(None, "refs/heads/main", ["check"], id="nothing passed: check"),
-        pytest.param("check", "refs/heads/main", [], id="check passed: nothing to run"),
-        pytest.param("full", "refs/heads/main", [], id="full passed: nothing to run"),
-        pytest.param(None, "refs/tags/v1.0.0", ["full"], id="a tag, nothing passed: full"),
-        pytest.param("check", "refs/tags/v1.0.0", ["full"], id="a check pass never satisfies a tag"),
-        pytest.param("full", "refs/tags/v1.0.0", [], id="a full pass satisfies a tag"),
+        pytest.param("refs/heads/main", None, ["check"], id="main, nothing passed: check"),
+        pytest.param("refs/heads/main", "check", [], id="main, check passed: nothing"),
+        pytest.param("refs/heads/main", "full", [], id="main, full passed: nothing"),
+        pytest.param("refs/tags/v1.0.0", None, ["full"], id="a tag, nothing passed: full"),
+        pytest.param("refs/tags/v1.0.0", "check", ["full"], id="a check pass never satisfies a tag"),
+        pytest.param("refs/tags/v1.0.0", "full", [], id="a full pass satisfies a tag"),
     ],
 )
-def test_a_tier_that_passed_on_the_pushed_tree_is_not_repeated_and_a_lower_one_does_not_stand_in(
-    git_repo, monkeypatch, uv, passed, ref, runs
+def test_the_hook_runs_the_gate_its_ref_needs_unless_it_already_passed_on_the_pushed_tree(
+    git_repo, monkeypatch, uv, ref, passed, runs
 ):
     before = git_repo.commit("chore: start", {"start.txt": "start"})
     after = git_repo.commit("feat: code", {"src/code.py": "x = 1"})
@@ -572,16 +539,115 @@ def test_a_tier_that_passed_on_the_pushed_tree_is_not_repeated_and_a_lower_one_d
     assert uv.calls == runs
 
 
-def test_the_proofs_run_after_check_for_a_trigger_and_not_after_a_failed_check(git_repo, monkeypatch, uv):
+def test_the_hook_returns_the_status_of_the_gate_it_ran(git_repo, monkeypatch, uv):
     before = git_repo.commit("chore: start", {"start.txt": "start"})
-    after = git_repo.commit("chore: tool", {"tools/new_tool.py": "x = 1"})
+    after = git_repo.commit("feat: code", {"src/code.py": "x = 1"})
     monkeypatch.chdir(git_repo.path)
     push(monkeypatch, "refs/heads/main", before, after)
-    assert pre_push.main() == 0
-    assert uv.calls == ["check", "gate-tests"]
-    uv.answer(2)
-    assert pre_push.main() == 2
-    assert uv.calls[2:] == ["check"]
+    uv.answer(3)
+    assert pre_push.main() == 3
+
+
+# a project whose proofs trigger on tools/ and whose gate-tests task exits 7
+PROJECT = (
+    "[tool.gate-proofs]\ntriggers = ['tools/*']\n\n[tool.poe.tasks]\ngate-tests = \"python -c 'raise SystemExit(7)'\"\n"
+)
+TRIGGERS = ["tools/*", "pyproject.toml", "crates/*/Cargo.toml", ".github/*"]
+
+
+@pytest.mark.parametrize(
+    ("changed", "needed"),
+    [
+        pytest.param(["src/code.py"], False, id="library code"),
+        pytest.param(["crates/core/src/ops/blur.rs"], False, id="a Rust module no proof edits"),
+        pytest.param(["docs/page.md"], False, id="documentation"),
+        pytest.param(["tools/pre_push.py"], True, id="a file in a listed folder"),
+        pytest.param(["tools/sub/deep.py"], True, id="a file below a listed folder: * crosses /"),
+        pytest.param(["pyproject.toml"], True, id="a listed file"),
+        pytest.param(["crates/core/Cargo.toml"], True, id="a glob in the middle of a path"),
+        pytest.param(["src/code.py", ".github/workflows/ci.yml"], True, id="one trigger among others"),
+        pytest.param(["tools_extra/x.py"], False, id="a folder whose name only starts like a listed one"),
+        pytest.param([], False, id="nothing changed"),
+        pytest.param(None, True, id="the paths are unknown"),
+    ],
+)
+def test_the_proofs_are_needed_when_a_changed_file_matches_a_trigger_or_the_change_is_unknown(changed, needed):
+    assert pre_push.proofs_needed(changed, TRIGGERS) is needed
+
+
+def test_every_file_a_gate_proof_writes_a_fault_into_is_a_trigger():
+    """The triggers are written once, in pyproject.toml; the offences of tests/tools/test_rust_gates.py are the proofs'
+    own list of the files they edit, so a new offence row whose file the list lacks fails here."""
+    spec = importlib.util.spec_from_file_location(
+        "rust_gates_offences", ROOT / "tests" / "tools" / "test_rust_gates.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    gates = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gates)
+    triggers = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["gate-proofs"]["triggers"]
+    edited = {file for _task, file, _change, _named in gates.OFFENCES.values()}
+    assert [file for file in sorted(edited) if not pre_push.proofs_needed([file], triggers)] == []
+
+
+@pytest.fixture
+def clone(git_repo, monkeypatch):
+    """A working repository whose `origin/main` is its first commit, with a pyproject.toml whose gate-tests task exits 7
+    and whose triggers name `tools/*`; the current directory."""
+    git_repo.write(
+        "pyproject.toml",
+        PROJECT,
+    )
+    git_repo.commit("chore: start", {"start.txt": "start"})
+    git_repo.add_remote()
+    git_repo.push()
+    monkeypatch.chdir(git_repo.path)
+    return git_repo
+
+
+@pytest.mark.parametrize(
+    ("make", "paths"),
+    [
+        pytest.param(lambda repo: repo.commit("feat: code", {"src/code.py": "x"}), ["src/code.py"], id="a commit"),
+        pytest.param(lambda repo: repo.write("untracked.txt", "u"), ["untracked.txt"], id="an untracked file"),
+        pytest.param(lambda repo: repo.write("start.txt", "edited"), ["start.txt"], id="an unstaged edit"),
+        pytest.param(lambda repo: (repo.write("new.txt", "n"), repo.git("add", "new.txt")), ["new.txt"], id="staged"),
+        pytest.param(lambda repo: None, [], id="nothing"),
+    ],
+)
+def test_the_change_is_everything_the_working_tree_differs_in_from_the_base_with_origin_main(clone, make, paths):
+    make(clone)
+    changed = pre_push.changed_since_base()
+    assert changed is not None
+    assert sorted(changed) == paths
+
+
+def test_the_change_is_unknown_without_origin_main(git_repo, monkeypatch):
+    git_repo.commit("chore: start", {"start.txt": "start"})
+    monkeypatch.chdir(git_repo.path)
+    assert pre_push.changed_since_base() is None
+
+
+@pytest.mark.parametrize(
+    ("path", "status"),
+    [
+        pytest.param("tools/new_tool.py", 7, id="a trigger changed: the proofs run (their status is the step's)"),
+        pytest.param("src/code.py", 0, id="nothing they test changed: left to full and CI"),
+    ],
+)
+def test_the_proofs_step_runs_gate_tests_only_when_the_change_touches_a_trigger(clone, path, status):
+    clone.commit("feat: change", {path: "x = 1"})
+    assert pre_push.run_proofs() == status
+
+
+def test_the_proofs_step_runs_gate_tests_when_the_base_cannot_be_read(git_repo, monkeypatch):
+    git_repo.write(
+        "pyproject.toml",
+        PROJECT,
+    )
+    git_repo.commit("chore: start", {"start.txt": "start"})
+    monkeypatch.chdir(git_repo.path)
+    assert pre_push.run_proofs() == 7
 
 
 # One gate per checkout --------------------------------------------------------------------------------------------

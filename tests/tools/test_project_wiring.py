@@ -96,7 +96,7 @@ def test_a_tier_remembers_a_pass_for_the_push_by_starting_and_ending_with_the_ho
 
 # What `check` leaves to `full`: the gate proofs and the scaffold test (minutes, in copies), the audit (network) and the
 # lowest-dependency run (a second environment).
-FULL_ONLY = ("pytest -q -n auto -m gate", "-m rebuild", "pip-audit", "--resolution lowest-direct")
+FULL_ONLY = ("--dist=loadfile -m gate", "-m rebuild", "pip-audit", "--resolution lowest-direct")
 
 
 def test_check_leaves_the_proofs_the_scaffold_the_audit_and_the_minimum_dependencies_to_full(poe_runs):
@@ -106,9 +106,11 @@ def test_check_leaves_the_proofs_the_scaffold_the_audit_and_the_minimum_dependen
     assert [command for command in poe_runs["fast"] if command in full_only] == []
 
 
-def test_full_runs_everything_check_runs_but_the_record_of_the_tier(poe_runs):
+def test_full_runs_everything_check_runs_but_the_conditional_proofs_and_the_record(poe_runs):
+    """`check` runs the proofs only when the change touches what they test (`pre_push.py proofs`); `full` always."""
+    conditional = next(command for command in poe_runs["check"] if command.endswith("pre_push.py proofs"))
     missing = [command for command in poe_runs["check"][:-1] if command not in poe_runs["full"]]
-    assert missing == []
+    assert missing == [conditional]
 
 
 def test_the_python_suite_leaves_the_gate_proofs_to_their_own_task(poe_runs):

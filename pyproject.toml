@@ -160,17 +160,20 @@ stubtest = { cmd = "uv run python -m mypy.stubtest --mypy-config-file pyproject.
 rust-test = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast", help = "Run the Rust tests, every binary even after one fails" }
 dead-code = { cmd = "vulture src", help = "Find dead code in src (vulture)" }
 # The gate in three tiers (docs/development.md). `fast`: the inner loop. `check`: before every merge or push to main.
-# `full`: before a release. `checks` is what check and full share, without the tests; each is run once in either.
+# `full`: before a release and a tag. `gates` is what check and full share; each step runs once in either.
 fast = { sequence = [{ ref = "rust-fmt" }, "ruff format --check .", { ref = "rust-lint" }, "ruff check .", "mypy", { ref = "rust-test" }], default_item_type = "cmd", help = "The inner loop: format, lint, types and the Rust tests; the Python suite, dead code, dependencies, the build checks and the gate proofs are left to check and full" }
-checks = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, { ref = "build-check" }, "mypy", { ref = "stubtest" }], default_item_type = "cmd", help = "The static gates and the build checks, without the tests (what check and full share)" }
-check = { sequence = ["python tools/pre_push.py start", { ref = "checks" }, { ref = "rust-test" }, { ref = "test" }, "python tools/pre_push.py pass check"], default_item_type = "cmd", help = "The gate before a merge or a push to main: every static gate, the Rust tests and the Python suite; stops at the first failure; a pass on a clean tree is remembered, so pushing exactly that tree does not repeat it" }
-# Everything: check, then the proofs that each gate fails on a known-bad change (gate-tests),
-# the scaffold test, the audit (needs the network) and the suite on the lowest dependencies. A tag push and `poe release` need it.
-full = { sequence = ["python tools/pre_push.py start", { ref = "checks" }, { ref = "rust-test" }, { ref = "test" }, { ref = "gate-tests" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "check-min-deps" }, "python tools/pre_push.py pass full"], default_item_type = "cmd", help = "Everything check runs, plus the gate proofs, the scaffold test, the audit and the lowest-dependency run (before a release)" }
+gates = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, { ref = "build-check" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "test" }], default_item_type = "cmd", help = "Every gate except the proofs that each gate can fail (format, lint, workflows, dead code, docs, dependencies, distributions, types, tests)" }
+# A pass on a clean tree is remembered with its tier, so pushing exactly that tree does not repeat it; `check` runs the
+# proofs only when the change touches what they test ([tool.gate-proofs] below), `full` always
+proofs = { cmd = "python tools/pre_push.py proofs", help = "Run the gate proofs if the change touches what they test (or the base cannot be read)" }
+check = { sequence = ["python tools/pre_push.py start", { ref = "gates" }, { ref = "proofs" }, "python tools/pre_push.py pass check"], default_item_type = "cmd", help = "The gate before a merge or a push to main: every gate, and the proofs when the change touches what they test; a pass is remembered for that tree" }
+# Everything a release needs: check with the proofs always run, then the scaffold test, the audit (needs the network) and
+# the suite on the lowest dependencies. A tag push and `poe release` need it.
+full = { sequence = ["python tools/pre_push.py start", { ref = "gates" }, { ref = "gate-tests" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "check-min-deps" }, "python tools/pre_push.py pass full"], default_item_type = "cmd", help = "The gate before a tag and a release: check with the proofs always run, the scaffold test, the audit and the lowest-dependency run; a pass is remembered for that tree" }
 # The proofs that each gate fails on a known-bad change (marker `gate`: tests that copy the project and write one fault
-# into it). Minutes, so not in `check`; `poe full` and CI run them. `poe check` is enough for a push unless the files
-# listed in [tool.pre-push] changed (tools/pre_push.py then runs this too).
-gate-tests = { cmd = "python tools/run_capped.py -- pytest -q -n auto -m gate", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the gate proofs: each gate rejects a known-bad change" }
+# into it). Minutes, so `check` runs them only when the change touches [tool.gate-proofs]; `poe full` and CI always do.
+# `--dist=loadfile`: a module's fixture (a copy of the workspace, a build folder) is built once, on one worker.
+gate-tests = { cmd = "python tools/run_capped.py -- pytest -q -n auto --dist=loadfile -m gate", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the gate proofs: each gate rejects a known-bad change" }
 # Not part of `check` (about 30 s, and a project environment of its own): `poe new-effect` end to end in a copy of the
 # tree, through `uv sync` and the new effect's own and contract tests (the `rebuild` test of tests/test_scaffold.py).
 # CI runs it on Linux.
@@ -211,35 +214,38 @@ tests = 1500
 [tool.run-capped]
 cap-mb = 14000
 
-# Read by tools/pre_push.py: the files the gate proofs (tests marked `gate`) write a fault into or stand on. A push that
-# changes one of them, or whose changed files git cannot say, runs `poe gate-tests` after `poe check`. A name ending in
-# `/` is a folder. tests/tools/test_pre_push.py checks that every file an offence of test_rust_gates.py edits is listed.
-[tool.pre-push]
-proof-files = [
-    "tools/",
-    "tests/tools/",
-    "tests/conftest.py",
-    "tests/test_scaffold.py",
-    "tests/test_layering.py",
-    "tests/effects/test_no_hidden_tunables.py",
-    "tests/effects/test_contract.py",
-    "src/bullterrier_image/effects/_template/",
-    "src/bullterrier_image/gallery.py",
+# Read by tools/pre_push.py (`poe proofs`, the last step of `poe check`): the gate proofs (tests marked `gate`) run in
+# `check` only when the change touches one of these globs (`*` also crosses `/`), relative to the repository root, or when
+# the base to compare with cannot be read. List every file a proof copies, edits or anchors on; a proof that edits a file
+# nothing here names would go unrun when that file changes (tests/tools/test_pre_push.py checks the offence rows of
+# test_rust_gates.py). `poe full` runs them always.
+[tool.gate-proofs]
+triggers = [
     "pyproject.toml",
-    "Cargo.toml",
-    "Cargo.lock",
+    ".pre-commit-config.yaml",
     "rustfmt.toml",
     "deny.toml",
     "clippy.toml",
     "rust-toolchain.toml",
-    ".github/",
-    "crates/core/Cargo.toml",
+    "Cargo.toml",
+    "Cargo.lock",
+    "crates/*/Cargo.toml",
     "crates/core/build.rs",
     "crates/core/src/lib.rs",
     "crates/core/src/ops.rs",
     "crates/core/src/effects/grade.rs",
     "crates/core/tests/it/main.rs",
     "crates/core/tests/parameters_are_read.rs",
+    "tools/*",
+    "tests/tools/*",
+    "tests/conftest.py",
+    "tests/test_scaffold.py",
+    "tests/test_layering.py",
+    "tests/effects/test_no_hidden_tunables.py",
+    "tests/effects/test_contract.py",
+    "src/bullterrier_image/effects/_template/*",
+    "src/bullterrier_image/gallery.py",
+    ".github/*",
 ]
 
 # Read by tools/check_rust_test_layout.py: the Rust test files that are binaries of their own (path -> why they need a

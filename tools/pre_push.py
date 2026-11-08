@@ -1,10 +1,10 @@
 """The pre-push hook: run the local gate (`uv run poe check`) when `main` or a tag is pushed, or when local `main` has
 commits its remote-tracking branch lacks, and skip it for any other push.
 
-Three tiers (`poe fast`, `poe check`, `poe full`; docs/development.md). A push to `main` runs `check` and, when the
-push changes a file a gate proof edits or stands on (the table `[tool.pre-push]` in pyproject.toml, one list), or git
-cannot say what changed, also `poe gate-tests`: the proofs that each gate fails on a known-bad change. A push of a tag
-runs `full` (`check`, the proofs, the scaffold test, the audit and the minimum-dependency run).
+Two tiers: a push to `main` runs `uv run poe check`; a tag, or a ref this hook cannot classify, runs `uv run poe full`,
+which also runs the gate proofs (the tests marked `gate`, each proving that a gate fails on a known-bad input) and the
+rest that only a release needs (scaffold test, audit, lowest dependencies). `check` runs the proofs only when the change
+touches what they test (`proofs`, below).
 
 Why: a feature branch is checked by CI when its pull request opens, so running the gate on every push to it only slows
 the work down. A direct push to `main` has no pull request in front of it, so the gate runs first, locally, instead of
@@ -25,12 +25,17 @@ PRE_COMMIT_FROM_REF and PRE_COMMIT_TO_REF; when it cannot be read the gate runs.
 the commits of `main` that `<remote>/main` lacks count as well, and any code in them runs the gate. Renames are listed
 as a deletion and an addition (`--no-renames`), so moving code into `docs/` still counts as changing code.
 
-A tier that already passed on exactly the pushed tree is not repeated. `uv run poe check` (and `poe full`) begins with
+A gate that already passed on exactly the pushed tree is not repeated. `uv run poe check` (and `full`) begins with
 `python tools/pre_push.py start` and ends with `python tools/pre_push.py pass TIER`: the second records the tree of
 `HEAD` and the tier in the git folder (never committed) only if the working tree was clean and `HEAD`'s tree was the
-same at both moments, so the record names contents that were checked in full. A push whose tip has that tree and a
-tier at least as high as it needs skips the gate (a `check` pass never satisfies a tag, which needs `full`); any other
-tree runs it. CI checks everything again.
+same at both moments, so the record names contents that were checked in full. A push whose tip has that tree skips the
+gate if the pass was of the tier the push needs or a higher one (`full` covers `check`, never the other way round); any
+other tree runs it. CI checks everything again.
+
+`pre_push.py proofs` is the last gate step of `check`: it runs `poe gate-tests` when a file the change touches matches
+`[tool.gate-proofs] triggers` in pyproject.toml (compared with the merge base with `origin/main`, working tree and
+untracked files included), and when that base cannot be read (no `origin/main`, a shallow clone): skipping is only for a
+change that clearly leaves the proofs' inputs alone.
 
 Limit: besides the first ref and `main`, no ref is looked at. A tag or a branch later in a multi-ref push that holds
 code `main` lacks goes unseen, and the gate may be skipped for it.
@@ -40,6 +45,7 @@ they take). A record left by a gate that died names a dead process, or one that 
 Where `ps` is missing (Windows) nothing is recorded and nothing is refused.
 """
 
+import fnmatch
 import os
 import re
 import shutil
@@ -47,7 +53,6 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path, PurePosixPath
-from typing import NamedTuple
 
 PICTURE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"})
 STARTED, PASSED, RUNNING = (
@@ -56,15 +61,7 @@ STARTED, PASSED, RUNNING = (
     "gate-running",
 )  # files in the git folder: the tree a running gate began on, the tree that passed, the PID of the `poe` running one
 POE = re.compile(r"\bpoe(thepoet)?\b")
-TIERS = ("check", "full")  # in order: a pass of a tier satisfies the tiers before it
-PYPROJECT = Path(__file__).resolve().parents[1] / "pyproject.toml"
-
-
-class Plan(NamedTuple):
-    """What a push must pass: the tier, and whether the gate proofs (`poe gate-tests`) too."""
-
-    tier: str
-    proofs: bool
+TIERS = ("check", "full")  # the gates a pass can be of, lowest first: a `full` pass covers a push that needs `check`
 
 
 def must_run(remote_ref: str, remote: str = "origin") -> bool:
@@ -75,6 +72,12 @@ def must_run(remote_ref: str, remote: str = "origin") -> bool:
     if not remote_ref.startswith("refs/heads/") or remote_ref == "refs/heads/main":
         return True
     return unpushed_main_needs_the_gate(remote)
+
+
+def tier_for(remote_ref: str) -> str:
+    """The gate a push to `remote_ref` needs: `check` for a branch (`main`, or one pushed along with unpushed code on
+    `main`), `full` for a tag or a ref it cannot classify."""
+    return "check" if remote_ref.startswith("refs/heads/") else "full"
 
 
 def unpushed_main_needs_the_gate(remote: str) -> bool:
@@ -163,7 +166,7 @@ def record_gate_start() -> None:
 
 def record_gate_pass(tier: str) -> None:
     """Remember that `tier` passed on the tree of `HEAD`, if it began on that very tree with a clean working tree and
-    the working tree is clean now. The last step of `uv run poe check` and `poe full`, reached only when every step
+    the working tree is clean now. The last step of `uv run poe check` and `full`, reached only when every step
     passed."""
     started, passed = _record_path(STARTED), _record_path(PASSED)
     if started is None or passed is None or not started.exists():
@@ -174,19 +177,48 @@ def record_gate_pass(tier: str) -> None:
     if (running := _record_path(RUNNING)) is not None:
         running.unlink(missing_ok=True)
     if began and began == now and _clean_tree():
-        passed.write_text(f"{tier} {began}", encoding="utf-8")
+        passed.write_text(f"{began} {tier}", encoding="utf-8")
         print(f"gate: {tier} passed on tree {began[:12]}; a push of exactly this tree will not repeat it")
     else:
         print("gate: the tree was not clean and unchanged from start to end, so this pass is not remembered")
 
 
-def tier_passed_on(rev: str) -> str | None:
-    """The tier that passed, as `record_gate_pass` remembers it, on the tree of the commit `rev`; None if none did."""
+def gate_passed_on(rev: str, tier: str = "check") -> bool:
+    """Whether a gate of `tier` or a higher one passed, as `record_gate_pass` remembers it, on the tree of `rev`."""
     passed, tree = _record_path(PASSED), _tree_of(rev)
     if not tree or passed is None or not passed.exists():
+        return False
+    recorded_tree, _, recorded_tier = passed.read_text(encoding="utf-8").partition(" ")
+    return recorded_tree == tree and recorded_tier in TIERS and TIERS.index(recorded_tier) >= TIERS.index(tier)
+
+
+def changed_since_base() -> list[str] | None:
+    """The paths the working tree differs in from the merge base with `origin/main` (committed, staged, unstaged and
+    untracked), None when the base cannot be read."""
+    base = _git("merge-base", "HEAD", "origin/main")
+    if not base:
         return None
-    tier, _, recorded = passed.read_text(encoding="utf-8").partition(" ")
-    return tier if recorded == tree and tier in TIERS else None
+    tracked = _git("diff", "--name-only", "--no-renames", base.strip())
+    untracked = _git("ls-files", "--others", "--exclude-standard")
+    if tracked is None or untracked is None:
+        return None
+    return [*tracked.splitlines(), *untracked.splitlines()]
+
+
+def proofs_needed(changed: list[str] | None, triggers: list[str]) -> bool:
+    """Whether the gate proofs must run for a change of the `changed` paths: when the paths are unknown (None) or any
+    one matches a trigger glob (`*` also crosses `/`)."""
+    return changed is None or any(fnmatch.fnmatchcase(path, glob) for path in changed for glob in triggers)
+
+
+def run_proofs() -> int:
+    """`poe gate-tests` if the change touches what the proofs test; the last gate step of `check`."""
+    config = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    if not proofs_needed(changed_since_base(), config["tool"]["gate-proofs"]["triggers"]):
+        print("proofs: the change touches nothing the gate proofs test, so they are left to `poe full` and CI")
+        return 0
+    print("proofs: the change touches what the gate proofs test (or its base is unknown), so they run", flush=True)
+    return subprocess.run([sys.executable, "-m", "poethepoet", "gate-tests"], check=False).returncode
 
 
 def pushed_files(from_ref: str, to_ref: str) -> list[str] | None:
@@ -211,46 +243,8 @@ def unpushed_main(remote: str) -> list[str] | None:
     return (diff.splitlines() or None) if diff is not None else None
 
 
-def triggers_proofs(path: str) -> bool:
-    """Whether a changed path (relative to the repository, `/`-separated) is one the gate proofs edit or stand on:
-    listed in `[tool.pre-push] proof-files` of pyproject.toml (a name ending in `/` is a folder)."""
-    listed = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["tool"]["pre-push"]["proof-files"]
-    return any(path.startswith(name) if name.endswith("/") else path == name for name in listed)
-
-
-def plan_for(remote_ref: str, remote: str, changed: list[str] | None) -> Plan | None:
-    """What the push of `remote_ref`, whose range changes `changed` (None when git cannot say), must pass first; None
-    when nothing: `full` for a tag, else `check`, and with it the proofs when a changed file triggers them or the
-    changed files are unknown or none (no proof that nothing a proof stands on changed)."""
-    if not must_run(remote_ref, remote):
-        return None
-    on_main = remote_ref == "refs/heads/main"
-    if (
-        changed
-        and all(is_documentation(path) for path in changed)
-        and (on_main or not unpushed_main_needs_the_gate(remote))
-    ):
-        return None
-    if remote_ref.startswith("refs/tags/"):
-        return Plan("full", proofs=False)
-    at_stake = changed
-    if not on_main and at_stake:  # main's unpushed commits are pushed along with a branch
-        unpushed = unpushed_main(remote)
-        at_stake = None if unpushed is None else [*at_stake, *unpushed]
-    return Plan("check", proofs=not at_stake or any(triggers_proofs(path) for path in at_stake))
-
-
-def run_poe(task: str) -> int:
-    """Run `uv run poe TASK`; 1 when uv is missing."""
-    uv = shutil.which("uv")
-    if uv is None:
-        print("pre-push: uv is not on the PATH, so the gate cannot run; install uv (https://docs.astral.sh/uv/)")
-        return 1
-    return subprocess.run([uv, "run", "poe", task], check=False).returncode  # noqa: S603  fixed argv, no input
-
-
 def main() -> int:
-    """Run the tiers the push needs; return the exit status git should see."""
+    """Run the gate when the push needs it; return the exit status git should see."""
     if os.environ.get("BT_IMAGE_GATE_PASSED") == "1":  # set by `poe release`, which has just run `poe full`
         print("pre-push: the gate has just passed (poe release), so it is not run again")
         return 0
@@ -264,21 +258,20 @@ def main() -> int:
         )
         return 0
     changed = pushed_files(os.environ.get("PRE_COMMIT_FROM_REF", ""), os.environ.get("PRE_COMMIT_TO_REF", ""))
-    plan = plan_for(remote_ref, remote, changed)
-    if plan is None:
+    # for a pushed main, the range pre-commit reports is main's own; otherwise main's unpushed commits count as well
+    main_needs_it = remote_ref != "refs/heads/main" and unpushed_main_needs_the_gate(remote)
+    if changed and all(is_documentation(path) for path in changed) and not main_needs_it:
         print("pre-push: only documentation changed, so the gate is skipped (`uv run poe check` runs it now)")
         return 0
-    passed = tier_passed_on(os.environ.get("PRE_COMMIT_TO_REF", ""))
-    steps = [] if passed is not None and TIERS.index(passed) >= TIERS.index(plan.tier) else [plan.tier]
-    if plan.proofs and passed != "full":
-        steps.append("gate-tests")
-    if not steps:
-        print("pre-push: the gate already passed on exactly the pushed tree, so it is not repeated")
+    tier = tier_for(remote_ref)
+    if gate_passed_on(os.environ.get("PRE_COMMIT_TO_REF", ""), tier):
+        print(f"pre-push: `{tier}` (or more) already passed on exactly the pushed tree, so it is not repeated")
         return 0
-    for step in steps:
-        if (code := run_poe(step)) != 0:
-            return code
-    return 0
+    uv = shutil.which("uv")
+    if uv is None:
+        print("pre-push: uv is not on the PATH, so the gate cannot run; install uv (https://docs.astral.sh/uv/)")
+        return 1
+    return subprocess.run([uv, "run", "poe", tier], check=False).returncode  # noqa: S603  fixed argv, no input
 
 
 if __name__ == "__main__":
@@ -287,7 +280,9 @@ if __name__ == "__main__":
             record_gate_start()
         case ["pass", tier] if tier in TIERS:
             record_gate_pass(tier)
+        case ["proofs"]:
+            sys.exit(run_proofs())
         case []:
             sys.exit(main())
         case other:
-            sys.exit(f"usage: pre_push.py [start | pass check | pass full] (the hook gives no argument), got {other}")
+            sys.exit(f"usage: pre_push.py [start | pass TIER | proofs] (the hook gives no argument), got {other}")
