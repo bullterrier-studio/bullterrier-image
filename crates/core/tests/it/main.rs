@@ -105,6 +105,7 @@ mod sharpen;
 mod shift;
 mod spatial;
 mod starburst;
+mod stretch;
 mod svg;
 mod svg_drawing;
 mod swirl;

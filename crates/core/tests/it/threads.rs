@@ -402,6 +402,12 @@ fn cases() -> Vec<Case> {
                     .param("rows", 3)
                     .param("offset_x", 0.37)
                     .param("offset_y", -0.6),
+                Step::new("stretch")
+                    .param("axis", "horizontal")
+                    .param("at", 0.3)
+                    .param("span", 40)
+                    .param("side", "after"),
+                Step::new("stretch"),
                 Step::new("echo").param("copies", 0),
                 Step::new("lenticular"),
                 Step::new("interlace"),
