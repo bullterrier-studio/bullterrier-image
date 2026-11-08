@@ -26,7 +26,7 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
 ///
 /// The picture is divided into cells of `size` px (the last row and column of cells may be cut off by the picture's edge).
 /// `seed` shuffles the cells and the first `count` are the faulty ones, so a larger count keeps every pixel a smaller one
-/// had; the first `round(count x stuck)` of those are stuck. Everything else is the picture, bit for bit.
+/// had; the first `round(count x stuck)` of those are stuck (`count` is capped at the number of cells). Everything else is the picture, bit for bit.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
@@ -41,7 +41,7 @@ pub struct Params {
     #[param(default = 4, unit = px, min = 1, max = 64)]
     pub size: i32,
     /// The share of the faulty pixels that are stuck on `color`; the rest are dead and black. 0 = all dead, 1 = all stuck.
-    /// The number stuck is `count` x `stuck`, rounded to a whole pixel.
+    /// The number stuck is `count` x `stuck`, rounded to a whole pixel (`count` is capped at the number of cells).
     #[param(default = 0.5, unit = fraction, min = 0, max = 1)]
     pub stuck: f32,
     /// The colour a stuck pixel shows whatever the picture is under it: '#rrggbb', '#rgb' or [r, g, b] 0..1. White is the

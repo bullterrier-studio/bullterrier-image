@@ -6,7 +6,7 @@
 //! The check runs on every effect in the registry that says it is less than `Whole`, with its defaults and with each
 //! parameter set alone to its limits, to each choice and to each switch position (the defaults at two size ratios, the rest at the first); the
 //! bands are one at the top of the picture, one at the bottom and one inside. A margin of half the picture or more is
-//! not tried: it proves little for the cost. Known-bad doubles prove that it fails.
+//! clamped to the picture, so that band is the whole and proves little. Known-bad doubles prove that it fails.
 
 #![expect(
     clippy::cast_possible_truncation,

@@ -123,7 +123,7 @@ fn layers(params: &Params, finest: f64) -> Vec<Layer> {
 }
 
 /// A pair of independent standard normal numbers drawn by the hash of `words` (Box-Muller).
-fn normals(seed: u32, words: [u64; 4]) -> [f64; 2] { // constant: the four words are stream, layer, cell and axis
+fn normals(seed: u32, words: [u64; 4]) -> [f64; 2] { // constant: the four words are stream, octave, row and column
     let draw = |part| unit(mix(seed, &[words[0], words[1], words[2], words[3], part])); // constant: the same four words
     // 1 - u lies in (0, 1], so the logarithm is finite
     let radius = (-2.0 * (1.0 - draw(0)).ln()).sqrt(); // constant: Box-Muller (1958)

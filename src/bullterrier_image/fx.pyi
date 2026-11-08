@@ -500,7 +500,7 @@ solarize : Darkroom solarization: the tones rise to the middle grey, then fold b
 
 @_effect
 def dead_pixels(*, count: int = 120, size: int = 4, stuck: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black.  The picture is divided into cells of `size` px (the last row and column of cells may be cut off by the picture's edge). `seed` shuffles the cells and the first `count` are the faulty ones, so a larger count keeps every pixel a smaller one had; the first `round(count x stuck)` of those are stuck. Everything else is the picture, bit for bit.
+    """Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black.  The picture is divided into cells of `size` px (the last row and column of cells may be cut off by the picture's edge). `seed` shuffles the cells and the first `count` are the faulty ones, so a larger count keeps every pixel a smaller one had; the first `round(count x stuck)` of those are stuck (`count` is capped at the number of cells). Everything else is the picture, bit for bit.
 
 Parameters
 ----------
@@ -518,7 +518,7 @@ size : whole number, px, 1 to 64, default 4
 stuck : number, fraction, 0 to 1, default 0.5
     The share of the faulty pixels that are stuck on `color`; the rest are dead and
     black. 0 = all dead, 1 = all stuck. The number stuck is `count` x `stuck`, rounded
-    to a whole pixel.
+    to a whole pixel (`count` is capped at the number of cells).
 color : colour, default '#ffffff'
     The colour a stuck pixel shows whatever the picture is under it: '#rrggbb', '#rgb'
     or [r, g, b] 0..1. White is the usual fault; a red, green or blue is one stuck sub-
