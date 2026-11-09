@@ -681,8 +681,7 @@ def test_the_budget_flags_an_effect_that_holds_more_memory_than_allowed(throwawa
 
 # --- every drivable parameter: a field may vary it pixel by pixel, the effect itself unchanged ------------------------
 
-# (every effect: no effect registered from Python has a drivable parameter now, and the facade must still build, document
-# and render a Drive for the core's)
+# every effect: none registered from Python is drivable now, and the facade must still build and render a core Drive
 DRIVABLE = sorted((name, field) for name in ALL for field in drivable_fields(registry.parameters(name)))
 
 
