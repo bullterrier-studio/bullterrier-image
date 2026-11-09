@@ -494,6 +494,7 @@ fn cyclic_needs(effect: &str, field: &str) -> Setting {
             ("paper", json!("#ffffff")),
             ("offset", json!(5.0)),
         ]),
+        ("dither", "offset_angle") => setting(&[("separation", json!("inks")), ("offset", json!(5.0))]),
         _ => Setting::new(),
     }
 }
