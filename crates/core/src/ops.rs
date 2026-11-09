@@ -36,6 +36,7 @@ pub(crate) mod ramp;
 pub(crate) mod random;
 pub(crate) mod rank;
 pub(crate) mod raster;
+pub(crate) mod reaction;
 pub(crate) mod resample;
 pub(crate) mod rotate;
 pub(crate) mod sample;

@@ -93,6 +93,7 @@ mod presets;
 mod quadtree;
 mod radial_blur;
 mod random;
+mod reaction_diffusion;
 mod recipe_check;
 mod recipe_drive;
 mod recipe_file;
