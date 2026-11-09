@@ -106,6 +106,17 @@ fn a_slope_across_the_picture_does_not_tilt_the_mirror() -> Result<(), Error> {
 }
 
 #[test]
+fn the_slope_across_lengthens_the_normal_of_the_slope_down() -> Result<(), Error> {
+    // rising down and right by 0.005 per px each way: dy = dx = 0.5, so t = 0.5 + 0.5 / (1 + 0.25 + 0.25), not 0.5 + 0.5 / 1.25
+    let diagonal: Vec<f32> = (0..SIZE * SIZE)
+        .flat_map(|index| [0.5 + RISE * ((index / SIZE) + (index % SIZE)) as f32; 3])
+        .collect();
+    let out = run(&params(|_| {}), &diagonal)?;
+    assert_close(&at_row(&out, 10), &chrome(0.5 + 0.5 / 1.5, 0.5), 1e-5, "diagonal ramp");
+    Ok(())
+}
+
+#[test]
 fn a_steeper_normal_tilts_less_than_the_slope_alone() -> Result<(), Error> {
     // relief 400: dy = 2, so t = 0.5 + 2 / (1 + 4) = 0.9, not 0.5 + 2
     let out = run(&params(|p| p.relief = 400.0), &ramp(true, false))?;
