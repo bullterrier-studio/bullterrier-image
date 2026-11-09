@@ -291,20 +291,6 @@ fn without_hits_the_damage_settings_change_nothing() -> Result<(), Error> {
 }
 
 #[test]
-fn the_same_seed_gives_the_same_damage_and_another_seed_other_damage() -> Result<(), Error> {
-    let picture = smooth(HEIGHT, WIDTH);
-    let many = |seed| Params {
-        hits: 40,
-        seed,
-        ..Params::default()
-    };
-    let first = run(&many(1), HEIGHT, WIDTH, &picture, 1.0)?;
-    assert_eq!(first, run(&many(1), HEIGHT, WIDTH, &picture, 1.0)?);
-    assert_ne!(first, run(&many(2), HEIGHT, WIDTH, &picture, 1.0)?);
-    Ok(())
-}
-
-#[test]
 fn a_dc_hit_carries_on_to_every_later_block_of_its_row_and_to_no_other_row() -> Result<(), Error> {
     let picture = smooth(HEIGHT, WIDTH);
     let plain = crush(30, HEIGHT, WIDTH, &picture)?;

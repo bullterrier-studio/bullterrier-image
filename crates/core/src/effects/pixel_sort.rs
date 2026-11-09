@@ -85,8 +85,8 @@ pub struct Params {
 /// A pixel and the key it is sorted by.
 type Keyed = (f32, [f32; 3]);
 
-/// The pixels of one row or column, `line` (as `(key, pixel)` pairs read by `at`), with every run of keys within `low..=high`
-/// put in order, written back by `put`. `scratch` holds a run while it is sorted.
+/// The `length` pixels of one row or column, `(key, pixel)` pairs read by `at`, with every run of keys within `low..=high`
+/// put in order, written back by `put`. `scratch` holds a run while it is gathered.
 fn sort_line(
     length: usize,
     params: &Params,
@@ -94,29 +94,27 @@ fn sort_line(
     at: impl Fn(usize) -> Keyed,
     mut put: impl FnMut(usize, [f32; 3]),
 ) {
-    let inside = |key: f32| key >= params.low && key <= params.high;
-    let mut start = 0;
-    while start < length {
-        if !inside(at(start).0) {
-            start += 1;
-            continue;
-        }
-        scratch.clear();
-        let mut end = start;
-        while end < length && inside(at(end).0) {
-            scratch.push(at(end));
-            end += 1;
-        }
+    // the run in `scratch` ends at `end`: put in order and written back where it was read from
+    let mut flush = |scratch: &mut Vec<Keyed>, end: usize| {
         // a stable sort, so equal keys keep their order
         match params.order {
             Order::Ascending => scratch.sort_by(|a, b| a.0.total_cmp(&b.0)),
             Order::Descending => scratch.sort_by(|a, b| b.0.total_cmp(&a.0)),
         }
         for (offset, &(_, pixel)) in scratch.iter().enumerate() {
-            put(start + offset, pixel);
+            put(end - scratch.len() + offset, pixel);
         }
-        start = end;
+        scratch.clear();
+    };
+    for index in 0..length {
+        let keyed = at(index);
+        if keyed.0 >= params.low && keyed.0 <= params.high {
+            scratch.push(keyed);
+        } else {
+            flush(scratch, index);
+        }
     }
+    flush(scratch, length);
 }
 
 /// The picture with its runs sorted.
