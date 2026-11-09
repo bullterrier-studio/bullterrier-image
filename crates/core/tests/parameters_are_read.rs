@@ -286,6 +286,22 @@ fn conditional() -> Vec<Conditional> {
             effect: "quadtree",
             field: "max_cell",
             with: vec![("min_cell", json!(1.0)), ("threshold", json!(0.2))],
+        // the probe picture has no edge at the default threshold, so nothing is drawn, and nothing shows its colour,
+        // its softness or how far the smoothing reaches
+        Conditional {
+            effect: "edges",
+            field: "softness",
+            with: vec![("method", json!("sobel")), ("threshold", json!(0.01))],
+        },
+        Conditional {
+            effect: "edges",
+            field: "color",
+            with: vec![("method", json!("sobel")), ("threshold", json!(0.01))],
+        },
+        Conditional {
+            effect: "edges",
+            field: "truncate",
+            with: vec![("method", json!("sobel")), ("threshold", json!(0.01))],
         },
         // the clumping blur is run only for specks of more than a pixel
         Conditional {

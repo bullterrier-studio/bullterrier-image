@@ -14,6 +14,7 @@ pub(crate) mod cutout;
 pub(crate) mod cuts;
 pub(crate) mod dither;
 pub(crate) mod edge;
+pub(crate) mod edges;
 pub(crate) mod fft;
 pub(crate) mod frame;
 pub(crate) mod gauss;

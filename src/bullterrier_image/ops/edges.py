@@ -1,8 +1,6 @@
 """Edges: how fast a picture's brightness changes at each pixel."""
 
 import numpy as np
-from scipy import ndimage
-
 from bullterrier_image.ops.blur import NUMPY_PAD, gaussian_blur
 from bullterrier_image.ops.convolve import Edge
 
@@ -37,38 +35,3 @@ def edge_strength(grey: np.ndarray, *, sigma: float, truncate: float, edge: Edge
     """
     smooth = gaussian_blur(grey, sigma, truncate=truncate, edge=edge)
     return np.hypot(*sobel_gradient(smooth, edge=edge))
-
-
-# Four of the eight neighbours as (down, across) offsets, clockwise from "right" in picture terms; the other four are
-# their opposites.
-_AROUND = ((0, 1), (1, 1), (1, 0), (1, -1))  # constant: the neighbours of a pixel, as offsets
-
-
-def ridges(strength: np.ndarray, gx: np.ndarray, gy: np.ndarray) -> np.ndarray:
-    """Where `strength` (height, width) is at its crest across the edge, as a boolean array: the thin lines of Canny's
-    non-maximum suppression.
-
-    `gx`, `gy` are the gradient `strength` is the length of (from `sobel_gradient`). A pixel stays if no neighbour on
-    either side of it, along the gradient's direction (rounded to the nearest of eight), is stronger. Of two equal
-    neighbours across a line one stays, so a step between two pixels leaves a line one pixel wide. Beyond the picture
-    there is no strength, so a border pixel can stay.
-    """
-    # constant: the eight directions are pi/4 apart (a full turn is 2 pi)
-    direction = np.rint(np.arctan2(gy, gx) / (np.pi / 4)).astype(np.int64)
-    padded = np.pad(strength, 1)
-    height, width = strength.shape
-    keep = np.zeros(strength.shape, bool)
-    for axis, (down, across) in enumerate(_AROUND):
-        after = padded[1 + down : 1 + down + height, 1 + across : 1 + across + width]
-        before = padded[1 - down : 1 - down + height, 1 - across : 1 - across + width]
-        along = (direction % 4) == axis  # constant: opposite directions are 4 apart (of 8) and give the same line
-        keep |= along & (strength >= after) & (strength > before)
-    return keep
-
-
-def connected_to(candidates: np.ndarray, seeds: np.ndarray) -> np.ndarray:
-    """The pixels of `candidates` (boolean, height by width) that touch, directly or through other candidates, a pixel
-    of `seeds`: Canny's hysteresis. Touching includes the diagonal. Every seed is a candidate.
-    """
-    labels, _ = ndimage.label(candidates, structure=np.ones((3, 3), bool))  # constant: 3x3 = diagonals touch
-    return np.isin(labels, np.unique(labels[seeds])) & candidates

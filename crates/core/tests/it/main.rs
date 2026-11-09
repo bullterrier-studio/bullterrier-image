@@ -29,6 +29,7 @@ mod dust_scratches;
 mod each;
 mod each_weights;
 mod echo;
+mod edges;
 mod effect;
 mod error;
 mod files_icc;

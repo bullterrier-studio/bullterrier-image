@@ -167,6 +167,17 @@ pub(crate) fn gaussian_filter_rows(lines: &mut [f32], width: usize, sigma: f64, 
 /// range of the map's, a sigma under about `0.5 / truncate` px a copy.
 pub(crate) fn gaussian_filter_plane(
     values: &[f32],
+    dims: (usize, usize),
+    sigma: f64,
+    truncate: f64,
+    edge: Extension,
+) -> Vec<f32> {
+    gaussian_filter_owned(values.to_vec(), dims, sigma, truncate, edge)
+}
+
+/// [`gaussian_filter_plane`] of a map the caller has no further use for: blurred in place, with no copy of it made.
+pub(crate) fn gaussian_filter_owned(
+    values: Vec<f32>,
     (height, width): (usize, usize),
     sigma: f64,
     truncate: f64,
@@ -174,10 +185,10 @@ pub(crate) fn gaussian_filter_plane(
 ) -> Vec<f32> {
     let half = weights(sigma, truncate);
     if half.len() == 1 {
-        return values.to_vec();
+        return values;
     }
     let smoothing = (Smoothing::new(&half, width), Smoothing::new(&half, height));
-    blur_plane(values.to_vec(), (height, width), (&smoothing.0, &smoothing.1), edge)
+    blur_plane(values, (height, width), (&smoothing.0, &smoothing.1), edge)
 }
 
 /// `plane` (`height` x `width`) blurred along its rows by `along`, then down its columns by `down`.

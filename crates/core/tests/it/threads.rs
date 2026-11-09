@@ -458,6 +458,13 @@ fn cases() -> Vec<Case> {
                     .param("rounding", 0.6)
                     .param("gap_color", "#102030"),
                 Step::new("quadtree"),
+                Step::new("edges")
+                    .param("method", "sobel")
+                    .param("radius", 3.5)
+                    .param("edge", "wrap"),
+                Step::new("edges").param("method", "dog").param("threshold", 0.03),
+                Step::new("edges").param("softness", 0.0).param("threshold", 0.04),
+                Step::new("edges"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
