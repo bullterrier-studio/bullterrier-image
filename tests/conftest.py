@@ -25,14 +25,15 @@ from bullterrier_image.core.values import FieldName, Picture
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.fixture(autouse=True)
-def no_enclosing_git(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Run every test as if no git were running it. A git hook (the gate that runs before a push) passes the repository
-    it serves in `GIT_*` variables, `GIT_DIR` among them, which would send the git of a test, in this process or in a
-    subprocess, to that repository instead of the throwaway one: its `git init`, `git config` and `git add` would land
-    in the real repository."""
-    for name in [name for name in os.environ if name.startswith("GIT_")]:
-        monkeypatch.delenv(name)
+@pytest.fixture(autouse=True, scope="session")
+def no_enclosing_git_or_push():
+    """Hide what a git hook hands the process: its repository (GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE; also set by a
+    linked worktree, `rebase -x` and `bisect`) and the push the pre-push gate is running for (PRE_COMMIT_*). A test's
+    git would act on that repository, and the push would decide what tools/pre_push.py does in the tests. Session-wide,
+    so the module fixtures that copy the environment never see them either."""
+    hidden = {name: os.environ.pop(name) for name in list(os.environ) if name.startswith(("GIT_", "PRE_COMMIT_"))}
+    yield
+    os.environ.update(hidden)
 
 
 @pytest.fixture(scope="session")

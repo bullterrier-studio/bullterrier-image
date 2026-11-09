@@ -138,7 +138,13 @@ The runner is given each map by name, as an array (`maps={"subject": alpha}`) or
 from the working picture: framed and sized, before any step) are built in, and `background` is 1 - `subject`; any other map is a recipe's `given` region.
 `bullterrier_image.recipe` binds the default `subject` and `depth` finders when a recipe needs them.
 
-## The rules
+## Rules
+
+@docs/rules.md
+
+Those rules apply here. What follows is image's own, or where it needs a rule differently, with the reason.
+
+## Image's rules
 
 1. **Effects never import other effects.** Shared logic goes to `ops/`, in a module named for its concept (`warp`, `noise`,
    `edges`, `colorspace`...), never `utils`/`common`/`helpers`. Extract when a second effect needs it. An `ops` module arrives
@@ -160,7 +166,7 @@ from the working picture: framed and sized, before any step) are built in, and `
    each also inherits the matching builtin. A broken effect definition (caught at import) is a programming error: plain
    `ValueError`/`TypeError`.
 
-## Rust code
+## Rust code in image
 
 Rust follows the same rules (effects never refer to each other; shared code in `ops/`, arriving with its first user;
 no hidden tunables: a number is a `Params` field, inside a `#[param(..)]` attribute, trivial, or carries `// constant:
@@ -177,7 +183,7 @@ while unported effects use the Python one; delete it with its last Python user. 
 code (`Table::check`, `Recipe::checked`, `Presets`), which Python calls when a `Recipe` is made; running an effect trusts
 its parameters.
 
-## Standards
+## Image's standards
 
 - `src/` holds only code and the data it runs on (presets, looks). Tests, examples and gallery pictures live outside it.
 - **File size:** a source file stays within 1000 lines, a test file within 1500 (`tools/check_file_size.py`, run by the tests;
@@ -185,28 +191,11 @@ its parameters.
   size: it may shrink, never grow; never add an entry.
 - Public API, each with `__all__`: `bullterrier_image`, `.recipe`, `.fx`, `.imageio`, `.plugin`. Everything else, including
   `core` and `ops`, is internal.
-- No backwards-compatibility shims, aliases or re-exports before 1.0 unless the owner asks: change the callers.
 - A public call takes at most one argument by position, the thing itself (`Recipe(steps)`, `Step(effect)`); effect
   parameters and everything else by keyword. What only the library uses is a function of its module, not an attribute
   of a public class.
-- The CLI catches `BullterrierImageError` and never prints a traceback for a user's mistake.
-- The library never prints and never configures logging.
 - Output files carry no EXIF or GPS data from the input.
-- Text is UTF-8 (`encoding="utf-8"` on every open); paths are `pathlib.Path`.
-- Security: ruff `S`, `PGH`, `LOG` run in `poe check` (a subprocess call carries `# noqa: S603  <why its argv is safe>`).
-  `uv run poe audit` (pip-audit on `uv.lock`, cargo-deny advisories on `Cargo.lock`; needs network) runs before a
-  release and in CI, which uses `uv run --locked poe check`.
-- Versions are SemVer (a 0.x minor may break the API), changed only by `uv run poe release VERSION` (the owner picks it: checks,
-  shows the plan, asks, bumps, writes CHANGELOG.md with git-cliff, commits, tags, pushes main and the tag; `docs/releasing.md`).
-  Tests read the version from `pyproject.toml`, never write it.
-- CI: one workflow per concern in `.github/workflows/`, joined by `ci.yml`; checks run in parallel, then `build`, then
-  `release.yml` publishes only what that build made. `ci-ok` is the only required check: a new job goes into its `needs` (a new
-  check also into `build`'s). Actions are pinned by commit SHA, jobs hold minimal permissions; `uv run poe lint-workflows`
-  (in `poe check`) enforces it.
-- The gates are the review: reviewers check behaviour and these rules only. A defect a review finds twice becomes a gate.
-- Design decisions and reasons go in `docs/design-decisions.md`, not here.
-- **Template:** the files `docs/shared-files.md` lists as identical come from the Rust project template (`copier update`; answers in
-  `.copier-answers.yml`). Change one there, not here; an improvement worth sharing goes to the template's owner.
+- A new CI check goes into `ci-ok`'s `needs` and into `build`'s; image's own jobs are in `.github/workflows/project.yml`.
 
 ## The effect contract
 
@@ -308,105 +297,44 @@ works from a map declares a `FieldName` parameter and reads its `Layer` from `In
    commit: no ledger, no mutant runs unless one specific property is in doubt. A ported effect ships Rust tests and no Python
    behaviour test (the shared contract is `crates/core/tests/effects_contract.rs`).
 
-## Fixing defects: structurally, not defensively
+## Fixing defects: image's additions
 
-A fix removes the cause, not the symptom (reasoning in `docs/design-decisions.md`).
-1. **Reproduce first, at the public interface** (failing test, red evidence), then **find where the invalid state is created**,
-   not where it is noticed. Fix it there.
-2. **Make the bad state impossible:** a stricter model (type, range, `Literal`), one source of truth, a function whose result
-   cannot be wrong, or remove the code path. Not a branch that copes afterwards.
-3. **Check the class, not the instance:** `grep` for the same shape elsewhere; fix it the same way or say why not.
-4. **Trust contracts inside the library; validate at the boundary.** Outside input (recipe, parameter, photo, file, model,
-   network) is validated once, where it enters, with a `BullterrierImageError` naming the value. Internal code does not re-check
-   what the layer above guarantees; a broken guarantee fails loudly and its cause is fixed.
-5. **No defensive code:** no fallback or default hiding a missing or invalid value; no `try/except` that continues (`except
-   Exception`, bare `except`, `contextlib.suppress`); no `isinstance`, `None` or range re-checks of internal arguments; no
-   clamping, `np.nan_to_num` or retry "just in case"; no `getattr`/`.get()` with a default for something that must exist; no
-   widening a type to silence an error; no skipped, xfailed or loosened tests. The one clamp that belongs is the effect
-   contract's (output in 0..1), written once.
-6. **A fix that needs a design change says so:** propose it under "Needs from others" instead of patching around the design.
-7. **One decision, one place.** A table, constant, name or rule that exists twice is a defect. Keep one definition in the owning
-   module. For tests: look for existing coverage first; add a row to the existing table; a rule for every effect lives once in
-   `tests/effects/test_contract.py`; setup two files need is a fixture in the nearest `conftest.py`.
-8. **KISS outranks these rules.** If applying one makes the code longer, more indirect or harder to read than the problem, don't:
-   note the finding and move on. Two similar Python declarations beat an abstraction with generated fields (a field's
-   declaration is written once, in Rust, only for an effect the core runs); a three-line repeat beats a helper that hides the case.
-9. Where a skill (`systematic-debugging`'s defence-in-depth, "add validation at every layer") disagrees with this section, this
-   section wins.
+On top of the rules in `docs/rules.md`:
+- Outside input is a recipe, a parameter, a photo, a file, a model or the network; each is validated once, where it enters.
+- The one clamp that belongs is the effect contract's (output in 0..1), written once.
+- A rule for every effect lives once, in `tests/effects/test_contract.py`.
+- Two similar Python declarations beat an abstraction with generated fields (a field's declaration is written once, in Rust,
+  only for an effect the core runs); a three-line repeat beats a helper that hides the case.
 
-## Lint, types and gates
+## Gates: image's additions
 
-Three tiers. `uv run poe fast`: format, lint, types, Rust tests (the inner loop). `uv run poe check`: every static gate, the Rust
-tests and the Python suite (`gate`, `tooling` and `rebuild` tests and the build check left out); run it once before a merge. `uv run poe full`:
-`check` plus `build-check` (the sdist and the wheel), `gate-tests` (marker `gate`: tests that copy the project, write one deliberate mistake and check a gate fails, each
-removing its copy and build folder; marker `tooling`: the shared tools' own tests, the same files in every repo), `check-scaffold`, `audit` and `check-min-deps`; run before a release (`poe release` does, CI
-does). Each step runs once per tier. A gate needs a known-bad row for every kind of source it must see (an effect file pulled in
-by `include!` is one); the rows live in `tests/tools/test_rust_gates.py`, and `[tool.gate-proofs] triggers` lists the files whose
-change since the proofs last passed makes `check` run them. Test and build profile: `[profile.test] opt-level = 1`, `[profile.dev] debug =
-"line-tables-only"`, `split-debuginfo = "off"` (macOS otherwise keeps every object file).
+- `poe fast` also runs the Rust tests (it is not an extension point of the template). `poe full` adds, through `project-full`:
+  `check-scaffold` (`poe new-effect` end to end, the `rebuild` marker), `audit` (needs the network) and `check-min-deps`.
+- A gate needs a known-bad row for every kind of source it must see (an effect file pulled in by `include!` is one); image's rows
+  are in `tests/tools/test_rust_gates.py`, and the files its own proofs copy or match are `[tool.gate-proofs] project-triggers`.
+- Test and build profile: `[profile.test] opt-level = 1`, `[profile.dev] debug = "line-tables-only"`, `split-debuginfo = "off"`
+  (macOS otherwise keeps every object file).
+- The tests include the import contracts, the effect contract at odd sizes and across every number's range, and the
+  hidden-tunable scan of effect packages and `ops`: a number is a `param`, a trivial operand or index, or carries
+  `# constant: <reason>`; a library option never gets a marker.
+- `mypy` does not check the generated `fx.pyi`, so a misspelt `fx.<effect>` or parameter is caught only at run time.
 
-`check` runs every gate, cheapest first, stopping at the first failure: `ruff format --check` and `rust-fmt`;
-`ruff check` (plus `PLW1514` explicit encodings, `BLE` no blind `except`, `PTH` pathlib, `PYI` stubs) and `rust-lint`
-(clippy pedantic, `unwrap`/`expect`/`panic`/print banned, dead code, missing docs, unreachable `pub`; `[workspace.lints]`
-in `Cargo.toml`); `dead-code` (vulture on `src`; exemptions in `[tool.vulture]`); `rust-doc`; `deptry`; `rust-tools` (cargo-shear and cargo-deny at the versions
-`Cargo.toml` pins; `poe setup` installs them), `rust-shear` (unused crates), `rust-deny` (bans, licences, sources;
-`deny.toml`); `poe build-check` (maturin sdist and wheel, twine, check-wheel-contents); `mypy` and `stubtest`
-(`_native/_core.pyi` against the extension); `rust-test`; the tests, in random order (import
-contracts, the effect contract at odd sizes and across every number's range, and the hidden-tunable scan of effect packages and
-`ops`: a number is a `param`, a trivial operand or index, or carries `# constant: <reason>`; a library option never gets a
-marker). Each gate has a test proving it fails on a known-bad input.
+## Testing: image's additions
 
-Every poe task that runs tests (`rust-test`, `test`, `gate-tests`, `check-min-deps`, `check-scaffold`) runs under `tools/run_capped.py`, which
-kills the command's process group and exits 99 when its summed RSS passes the cap (`[tool.run-capped]`), so a runaway fails the
-gate instead of freezing the machine. Mutation runs use it too, 99 counting as killed: `uv run python tools/run_capped.py
---cap-mb 3000 --deadline 120 -- CMD` (deadline exit 98). macOS and Linux; on Windows the cap is not enforced.
-
-`ruff` wants type hints and a docstring on every public function, class, method and module, and no `print` outside the CLI.
-`mypy` checks `src` and `tests` (not the generated `fx.pyi`, so a misspelt `fx.<effect>` or parameter is caught only at run
-time). Fix findings properly; for a false positive use a targeted `# noqa: CODE  (reason)` or `# type: ignore[code]  # reason`
-(a bare or unused one fails). Tests may not reach private names (`SLF001`, `PLC2701`), except architecture tests, with a reason.
-
-## Testing
-
-Follow the `testing-best-practices` skill. A test coupled to implementation or otherwise poor (weak sole assertion, tautology,
-golden file, sleep, mock of our own code) is worse than none: delete it. Reviewers treat such tests as blocking.
-
-- **Rust tests are black-box by default:** a test goes in `crates/*/tests/it/` and uses the public API
-  (`use bullterrier_image::...`); helpers in `crates/core/tests/it/common/`. It stays next to its code (`#[cfg(test)]`)
-  only when no public route reaches the behaviour it checks (a private kernel); never widen an item to `pub` to move a test.
-- **One Rust test binary per crate:** a new Rust test is a new module of `crates/*/tests/it/` (declared in its `main.rs`),
-  never a new `tests/*.rs` (each is an executable that macOS scans on first launch). A file is a binary of its own only when
-  it needs its own process, with the reason in its first line (`//! Own binary: <why>`), and is listed in
-  `[tool.rust-tests.own-binaries]` of `pyproject.toml`; `uv run poe rust-test-layout` (in `check`) fails otherwise.
-  Tests share one process and run in parallel: a registered effect gets a name no other test has (`unique`, a per-module
-  prefix and a counter), and no test asserts the whole registry.
+On top of `docs/rules.md` ("Testing"):
 - **A behaviour is tested once.** Python tests of an effect the core runs keep only the facade (see "Adding an effect", step 4);
   the same property tested in Rust and Python is a defect: delete the Python one.
-- Behaviour through the public contract; **property tests, not golden images**. E.g. `pixel_sort` keeps every column's pixel set;
-  `kaleidoscope` is symmetric about its mirror axes; a blur never leaves the input's range.
-- Expected values come from an independent oracle (standard, hand computation, brute-force reference), never the code's formula.
-- Every checker/validator gets a known-good and a known-bad input. Seeds pin determinism. No sleeps, live network or wall-clock
-  assertions.
-- Tests run in random order (pytest-randomly; rerun with `-p randomly --randomly-seed=N`, disable with `-p no:randomly`); none
-  may depend on another.
+- Property examples: `pixel_sort` keeps every column's pixel set; `kaleidoscope` is symmetric about its mirror axes; a blur never
+  leaves the input's range.
+- A registered effect in a Rust test gets a name no other test has (`unique`, a per-module prefix and a counter), and no test
+  asserts the whole registry.
 - **Mutation-check your tests, lightly:** when a port or change adds logic with weak oracles (boundaries, numeric primitives,
-  parameter checks), break the code on purpose (a sign, a boundary, an ignored argument), about five targeted mutants per
-  new kernel or primitive, once per finished kernel, not per commit, and see a test fail. A survivor gets a test, or is named
-  equivalent or marginal and left. Skip thin kernels whose behaviour tests already compare hand-worked values. Before the crate
-  is published, one separate deeper pass over `ops/` and the parameter checks (`cargo-mutants` or by hand, under `memguard`);
-  not a CI gate. Use `PYTHONDONTWRITEBYTECODE=1` and clear `__pycache__` between mutants.
-- Refactors prove behaviour is preserved by comparing outputs before and after (identical, or equal within float tolerance), in the report, not committed.
-
-**Tests describe behaviour, not implementation:** they must survive any behaviour-preserving refactor.
-- Never import underscore names, read production constants or private attributes, or call private functions. Worth testing means
-  worth a public name; otherwise test it through the behaviour it serves.
-- Never monkeypatch or mock our own code; never assert call counts or order on it. Substitute only true external boundaries
-  (subject-finding model, clock, network, filesystem via `tmp_path`), preferably by injecting through a public parameter
-  (`finders={"subject": Finder("stand-in", ...)}`).
-- No source or AST inspection in behaviour tests (architecture tests are the exception; their docstring says so).
-- Assert observable outputs only: returned arrays (as properties), files written, exceptions raised. For errors, the type plus a
-  short substring naming the argument or value, never the whole sentence.
-- Hard to test through the public interface is a design signal: change the interface, don't reach inside.
+  parameter checks), break the code on purpose, about five targeted mutants per new kernel or primitive, once per finished kernel,
+  not per commit. A survivor gets a test, or is named equivalent or marginal and left. Skip thin kernels whose behaviour tests
+  already compare hand-worked values. Before the crate is published, one separate deeper pass over `ops/` and the parameter
+  checks (`cargo-mutants` or by hand, under `memguard`); not a CI gate. Use `PYTHONDONTWRITEBYTECODE=1`.
+- Substitute only true external boundaries (subject-finding model, clock, network, filesystem via `tmp_path`), by injecting
+  through a public parameter (`finders={"subject": Finder("stand-in", ...)}`).
 - Two internal strategies (sparse and dense path) are tested through the public API on inputs that exercise each, against a
   naive reference in the test, not by forcing a private switch.
 
@@ -417,27 +345,12 @@ When a test reaches inside (`tests/test_suite_rules.py` fails on private imports
 - Own test effects: `throwaway_effects`, or `fresh_registry` for an empty registry (public interface only).
 - "Work was skipped" shows in the files (an untouched sentinel), not in a spy.
 
-Writing a test file:
-- **Parametrise by default:** cases differing by literals are one table (`pytest.param(..., id=...)` or a dict) with good and
-  bad rows together; the id states the rule.
-- **A new test file only for a new module**, at the mirror path (`tests/ops/test_blur.py` for `ops/blur.py`).
-- **Shared helpers are fixtures in the nearest `conftest.py`**: `tests/conftest.py` (`photo`, `subject`, registry helpers,
-  `echo_model`, `tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). A helper one file uses
-  stays there.
-- **DAMP, not DRY:** each case and its expectation are visible; helpers build input or name an assertion, never hide what is
-  checked; a table replaces loops and branches.
-- **No change-detectors:** test a rule with a known-bad input; never restate configuration. Cross-effect rules live only in
-  `tests/effects/test_contract.py`.
-- **Gate proofs are marked `gate`** (`pytestmark = pytest.mark.gate`), a shared tool's tests `tooling`; `poe test` leaves both out,
-  `poe gate-tests` runs them. A test of the project's own code is never `tooling`.
-- **Slow tests in groups:** `--dist=loadfile` (`addopts`) runs a file on one worker, so a module-scoped fixture that spawns tools
-  (ruff, mypy, poe, git) is built once. Never `xdist_group`: with pytest 9.2 and xdist 3.8 it does nothing.
-- **Running:** one file or folder: `uv run pytest tests/ops/test_blur.py -n 0` (`-p no:randomly` for fixed order); everything:
-  `uv run poe test`.
-- **Fast feedback (agents):** the suite is about 14,000 tests and takes minutes. While iterating or doing red-green TDD run only
-  the tests covering your change (mirror file or folder, or `-k <name>`), never the full suite. Run the full gate (`uv run poe
-  check`, then `uv run lint-imports`) once when the feature work is finished, before you report. If it fails, fix and rerun only
-  the failing tests, then the full gate once more.
+Writing a test file: a new file only for a new module, at the mirror path (`tests/ops/test_blur.py` for `ops/blur.py`); shared
+helpers are fixtures in the nearest `conftest.py`: `tests/conftest.py` (`photo`, `subject`, registry helpers, `echo_model`,
+`tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). One file: `uv run pytest tests/ops/test_blur.py -n 0`.
+**Fast feedback (agents):** the suite is about 14,000 tests and takes minutes. While iterating or doing red-green TDD run only the
+tests covering your change, never the full suite; run the full gate (`uv run poe check`, then `uv run lint-imports`) once when
+the feature work is finished, before you report.
 
 ## Skills
 
@@ -447,41 +360,10 @@ modules, no pass-throughs, no information leakage; interface docstrings state pr
 motion: `disperse`).
 `superpowers:*` skills are process aids, not authority: they tend to verbose, over-engineered, over-defensive output. Where one
 asks for more validation, layers, documents or steps than this file, follow this file. Tests follow this file (no goldens); fixes
-follow "Fixing defects"; design follows the skill (no shallow wrappers; per-effect boilerplate is the price of uniformity, so keep
+follow "Fixing defects" in `docs/rules.md`; design follows the skill (no shallow wrappers; per-effect boilerplate is the price of uniformity, so keep
 `apply` bodies substantial).
 
-## Working style
+## Git conventions: image's additions
 
-- **Read narrowly:** your brief's files, `CLAUDE.md`, one reference effect. If you need more, say why in the report.
-- **Propose before refactoring** outside your brief's file scope; inside it, execute (plans are pre-approved). Put needed changes
-  elsewhere under "Needs from others".
-- Report honestly: red/green evidence, exact commands run, anything skipped or unverified.
-- Scratch space for plans, briefs, reports: `.superpowers/` (git-ignored; never commit it).
-
-## Git conventions
-
-Once per clone: `uv run poe setup` (hooks and commit template). While working: `uv run poe fast` (format, lint, types, Rust
-tests) and the tests covering your change. Once, before you report, merge or push: `uv run poe check` (`uv run poe fix` repairs
-what it can). Commit hooks run ruff only; the pre-push hook runs `poe check` for a push to `main` (and for any push while local
-`main` has unpushed code) that changes more than documentation, plus `poe gate-tests` when the push changes a file in
-`[tool.gate-proofs] triggers` or git cannot say what changed; a tag push needs `poe full`. A pass already recorded on exactly the
-pushed tree is not repeated (the record is in the git folder and carries its tier: a `check` pass never satisfies a tag; commit
-before you run `check`, then merge and push).
-- **Trunk-based:** short-lived branch `<type>/<short-description>` (`feat/glow-falloff`), in a worktree only when the owner asks
-  (the brief says so); rebase on `main` before reporting; the controller merges. Never push.
-- **Conventional Commits 1.0:** `type(scope)!: subject`. Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
-  `build`, `ci`, `chore`, `revert`. Scope optional, lowercase: effect name, `core`, `ops`, `cli`, `pipeline`, `docs`, `deps`. `!`
-  or a `BREAKING CHANGE:` footer marks a breaking change.
-- **Subject:** imperative present tense, lowercase start (acronyms and identifiers excepted), no final period, header at most 72
-  characters.
-- **Body** (blank line, wrapped at 100): why, not what. **One logical change per commit.**
-- **Agents** end the message with `Co-Authored-By: <your model name> <noreply@anthropic.com>`.
-- The `commit-msg` hook (`tools/check_commit_message.py`, limits in `[tool.commit-message]`) rejects a malformed message and says
-  which rule failed. Merge, revert and fixup commits git writes pass unchanged.
-- **Never `--no-verify`, skip, silence or loosen a hook:** fix the cause. If a rule is wrong, change it in `pyproject.toml` in its
-  own commit and say why.
-- All Python tooling is configured in `pyproject.toml` (ruff, mypy, pytest, import-linter, commit-message, run-capped, rust-tests,
-  maturin), all Rust tooling in `Cargo.toml` (lints, pinned cargo tools). Do not add `ruff.toml`, `mypy.ini`, `setup.cfg`,
-  `pytest.ini`, `.coveragerc`, `.cargo/config.toml` or similar (a test fails). Other config files:
-  `.pre-commit-config.yaml` (hook wiring only), `.editorconfig`, `.gitmessage`, and, for Rust tools that cannot read
-  `Cargo.toml`, `rust-toolchain.toml`, `rustfmt.toml`, `deny.toml`, `clippy.toml` (root only; lint levels stay in `Cargo.toml`).
+On top of `docs/rules.md`: commit scopes are an effect name, `core`, `ops`, `cli`, `pipeline`, `docs`, `deps`
+(`feat/glow-falloff` for a branch).

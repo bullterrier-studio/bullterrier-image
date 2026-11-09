@@ -899,13 +899,6 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     the picture height) or normalises over the picture is `Whole`; relaxing them needs the frame of reference described under
     "Determinism" (position-hashed noise, the band's offset and the canvas size). No banded renderer exists yet.
 
-- **Test cost: the Rust tests are optimised, the proofs of the gates run when their inputs change (tiers `fast`, `check`, `full`).**
-  The Rust tests render pictures, so the test profile is optimised (`opt-level = 1`: the suite went from 13 min to 33 s with the
-  same assertions; the stack-depth test needs less stack optimised, and a mutant that recurses still fails it). The proofs that a
-  gate fails on bad input cost minutes (they build the workspace in a copy) and prove the gate configuration, not the code, so
-  `check` runs them on a push only when the configuration or the proofs changed, and `full` always (before a release, in CI).
-  Debug builds keep no object files on macOS (`split-debuginfo = "off"`): they were 38 of 52 GB of `target/`.
-
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*
@@ -1141,6 +1134,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 
 ## Testing and gates
 
+The template's decisions (platforms, the core's test binary, the memory cap, the three tiers) are in `template-decisions.md`.
+
 - **Properties, not golden images.** Tests assert the property that defines a behaviour (a blur stays in range, a sort
   keeps each column's pixels) against an independent oracle. *Reason:* a golden image written with the code proves
   nothing and churns binary diffs. *Consequence:* no goldens, no change-detector tests of configuration.
@@ -1151,12 +1146,6 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **The gates are the review.** `uv run poe check` runs format, lint, dead code, dependencies, build, types and tests;
   each gate has a known-bad test proving it can fail. *Reason:* reviews stay light and consistent. *Consequence:* a
   defect a review finds twice becomes a gate.
-- **Tests run under a memory cap, not only a timeout.** `tools/run_capped.py` sums the RSS of the test command's process
-  group and kills the group, exit 99, past `[tool.run-capped] cap-mb`; the poe test tasks use it, so `poe check` and CI have it.
-  *Reason:* a runaway (43, 152 and 57 GB; the last was a mutant) freezes the machine in seconds, far before any timeout
-  fires, and macOS enforces no `RLIMIT_AS`. The tool is polling and `ps`, so it works the same on macOS and Linux; Windows
-  runs uncapped (no process groups or `ps`). *Consequence:* a mutation run counts exit 99 (cap) and 98 (`--deadline`) as
-  killed. A process that leaves the group is not seen.
 - **The Rust integration tests are one binary.** `crates/core/tests/it/main.rs` declares a module per area; only
   `memory.rs` (a counting `#[global_allocator]`) and `parameters_are_read.rs` (it walks every effect in the registry,
   which other tests fill with doubles) are binaries of their own. *Reason:* every `tests/*.rs` is an executable that macOS

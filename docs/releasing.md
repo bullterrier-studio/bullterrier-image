@@ -1,7 +1,7 @@
 # Continuous integration and releasing
 
 How a change is checked on GitHub and how a version reaches PyPI. The short rules for contributors are in
-[CONTRIBUTING.md](../CONTRIBUTING.md); the commands and gates run locally are in [CLAUDE.md](../CLAUDE.md).
+[CONTRIBUTING.md](../CONTRIBUTING.md); the commands and gates run locally are in [rules.md](rules.md).
 
 ## Continuous integration
 

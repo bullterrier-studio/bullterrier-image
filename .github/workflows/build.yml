@@ -2,7 +2,7 @@
 # exactly these files), and prove each works when installed on its own, away from the checkout. Called by ci.yml once
 # every check passed; can also be started by hand (only release.yml publishes, and only what its own CI built).
 #
-# The sdist and one abi3 wheel per platform; which platforms, and why: docs/design-decisions.md, "Platforms". No job
+# The sdist and one abi3 wheel per platform; which platforms, and why: docs/template-decisions.md, "Platforms". No job
 # here restores a build cache: what it builds may be published.
 name: Build
 
@@ -139,12 +139,13 @@ jobs:
           sparse-checkout: tools/check_installed.py
           sparse-checkout-cone-mode: false
       # The environment has the package and its dependencies only. A wheel comes from the artifact alone (`--no-index`:
-      # no release from PyPI; `--only-binary`: no sdist built on the fly), the platform's wheel chosen by uv, then its
-      # dependencies from the index. The sdist is installed from its file and built here (rustup installs the
-      # toolchain its rust-toolchain.toml pins). check_installed.py then names the artifact's file it came from, or
-      # fails. The recipe needs no subject, so no model is downloaded and no matte is given; grade runs in the Rust
-      # core, and onnxruntime (the portable subject finder) must import.
-      - name: Install the ${{ matrix.from }} in a fresh environment and render a picture
+      # no release from PyPI; `--only-binary`: no sdist built on the fly), the platform's wheel chosen by uv; then its
+      # dependencies, as its installed metadata names them, from PyPI (`--no-index` cannot resolve them). The sdist is
+      # installed from its file and built here, with the toolchain its own rust-toolchain.toml pins (installed in the
+      # step before). check_installed.py then names the artifact's file it came from, or fails. The last line is the
+      # project's smoke command, which calls the Rust extension, so its answer proves the installed build runs: the
+      # template's runs the demo `scale`, a project replaces it with its own, and the template never changes that line.
+      - name: Install the ${{ matrix.from }} in a fresh environment and run the extension
         shell: bash
         env:
           FROM: ${{ matrix.from }}
@@ -166,6 +167,7 @@ jobs:
           "$bin/python" -c "import onnxruntime; print('onnxruntime', onnxruntime.__version__)"
           "$bin/bt-image" --version
           "$bin/bt-image" --help
+          # the project's own smoke command (the template never changes this line)
           "$bin/python" -c "from PIL import Image; Image.new('RGB', (96, 64), (200, 120, 40)).save('photo.png')"
           printf 'name = "smoke"\n\n[[step]]\neffect = "grade"\n\n[[step]]\neffect = "halftone"\n' > smoke.toml
           "$bin/bt-image" render photo.png smoke.toml -o out

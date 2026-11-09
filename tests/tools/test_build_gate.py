@@ -7,13 +7,13 @@ An architecture test of the tooling: its subject is the `build-check` task in py
 way `uv run poe check` does, in a copy of the project into which one fault at a time is written.
 """
 
+import hashlib
 import shutil
 import subprocess
 import sys
 import tarfile
 import tomllib
 import zipfile
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -26,19 +26,27 @@ RUST_FILES = ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rustfmt.toml")
 
 
 @pytest.fixture(scope="module")
-def rust_build_folder(tmp_path_factory) -> Iterator[Path]:
-    folder = tmp_path_factory.mktemp("target")
-    yield folder
-    shutil.rmtree(folder)
+def rust_build_folder(build_folder) -> Path:
+    """`build_folder`, one per state of the Rust sources as well: the sdist dates its files 2006, which cargo takes for
+    older than any artifact, so a folder that outlived an edit of the sources would build the wheel from old objects."""
+    digest = hashlib.sha256()
+    for path in sorted(filter(Path.is_file, (ROOT / "crates").rglob("*"))):
+        digest.update(path.relative_to(ROOT).as_posix().encode() + path.read_bytes())
+    return build_folder.with_name(f"{build_folder.name}-{digest.hexdigest()[:12]}")
 
 
 @pytest.fixture
-def project(project_copy, uv_run_env, rust_build_folder) -> Path:
+def build_env(uv_run_env, rust_build_folder) -> dict[str, str]:
+    """The environment `build-check` runs in: the copies share one build of the Rust dependencies."""
+    return {**uv_run_env, "CARGO_TARGET_DIR": str(rust_build_folder)}
+
+
+@pytest.fixture
+def project(project_copy, copy_tree) -> Path:
     copy = project_copy("pyproject.toml", "README.md", "LICENSE", "LICENSE-FONT", *RUST_FILES)
     (copy / "tools").mkdir()
     shutil.copy(ROOT / "tools" / "check_dists.py", copy / "tools")
-    shutil.copytree(ROOT / "crates", copy / "crates")
-    uv_run_env["CARGO_TARGET_DIR"] = str(rust_build_folder)  # the copies share one build of the dependencies
+    copy_tree(ROOT / "crates", copy / "crates")
     return copy
 
 
@@ -47,8 +55,9 @@ def build_check(project: Path, env: dict[str, str]) -> subprocess.CompletedProce
     return subprocess.run(command, cwd=project, env=env, capture_output=True, encoding="utf-8", check=False)
 
 
-def test_the_project_as_it_is_builds_clean_distributions(project, uv_run_env):
-    result = build_check(project, uv_run_env)
+@pytest.mark.control
+def test_the_project_as_it_is_builds_clean_distributions(project, build_env):
+    result = build_check(project, build_env)
     assert result.returncode == 0, result.stdout + result.stderr
     version = tomllib.loads((project / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     [sdist] = (project / "dist" / "check").glob("*.tar.gz")
@@ -68,23 +77,23 @@ def test_the_project_as_it_is_builds_clean_distributions(project, uv_run_env):
         assert f"bullterrier_image-{version}/rust-toolchain.toml" in archive.getnames()
 
 
-def test_a_long_description_pypi_cannot_render_fails_the_gate(project, uv_run_env):
+def test_a_long_description_pypi_cannot_render_fails_the_gate(project, build_env):
     (project / "README.md").unlink()
     (project / "README.rst").write_text("A title\n=====\n\n.. not-a-directive::\n\n`unclosed\n", encoding="utf-8")
     pyproject = project / "pyproject.toml"
     pyproject.write_text(
         pyproject.read_text(encoding="utf-8").replace('readme = "README.md"', 'readme = "README.rst"'), encoding="utf-8"
     )
-    result = build_check(project, uv_run_env)
+    result = build_check(project, build_env)
     assert result.returncode != 0
     assert "long_description" in result.stdout + result.stderr  # twine: "`long_description` has syntax errors"
 
 
-def test_a_wheel_file_that_cannot_be_imported_fails_the_gate(project, uv_run_env):
+def test_a_wheel_file_that_cannot_be_imported_fails_the_gate(project, build_env):
     (project / "src" / "bullterrier_image" / "not-importable.py").write_text(
         '"""A module with a dash."""\n', encoding="utf-8"
     )
-    result = build_check(project, uv_run_env)
+    result = build_check(project, build_env)
     assert result.returncode != 0
     report = result.stdout + result.stderr
     assert "W004" in report  # check-wheel-contents: module is not located at importable path
@@ -107,11 +116,11 @@ def _test_in_the_package(project: Path) -> None:
     (project / "src" / "bullterrier_image" / "test_stray.py").write_text("def test_x(): ...\n", encoding="utf-8")
 
 
-def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_each_file(project, uv_run_env):
+def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_each_file(project, build_env):
     # one build for the three faults (a build takes seconds); each shipped file must be named
     for fault in (_without_the_template_exclusion, _picture_in_the_package, _test_in_the_package):
         fault(project)
-    result = build_check(project, uv_run_env)
+    result = build_check(project, build_env)
     report = result.stdout + result.stderr
     assert result.returncode != 0
     assert "W102" in report  # check-wheel-contents: wheel library contains files not in the package tree
@@ -123,7 +132,7 @@ def test_a_wheel_that_ships_more_than_the_library_code_fails_the_gate_naming_eac
         assert shipped in report
 
 
-def test_a_wheel_without_the_extension_where_the_package_has_it_fails_the_gate(project, uv_run_env):
+def test_a_wheel_without_the_extension_where_the_package_has_it_fails_the_gate(project, build_env):
     pyproject = project / "pyproject.toml"
     text = pyproject.read_text(encoding="utf-8")
     assert 'module-name = "bullterrier_image._native._core"' in text
@@ -132,7 +141,7 @@ def test_a_wheel_without_the_extension_where_the_package_has_it_fails_the_gate(p
     )
     (project / "src" / "bullterrier_image" / "native").mkdir()
     (project / "src" / "bullterrier_image" / "native" / "__init__.py").write_text('"""Native."""\n', encoding="utf-8")
-    result = build_check(project, uv_run_env)
+    result = build_check(project, build_env)
     report = result.stdout + result.stderr
     assert result.returncode != 0
     assert "W101" in report  # check-wheel-contents: wheel library is missing files in the package tree
