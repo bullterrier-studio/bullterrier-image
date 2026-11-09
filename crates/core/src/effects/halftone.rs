@@ -182,7 +182,12 @@ fn amounts(params: &Params, inks: &Inks, ink_is_bright: bool, sampled: [f32; 3])
     match params.separation {
         Separation::None => {
             let tone = luminance(sampled);
-            [(if ink_is_bright { tone } else { 1.0 - tone }).clamp(0.0, 1.0), 0.0, 0.0, 0.0]
+            [
+                (if ink_is_bright { tone } else { 1.0 - tone }).clamp(0.0, 1.0),
+                0.0,
+                0.0,
+                0.0,
+            ]
         }
         Separation::Cmyk => inks.cmyk_amounts(sampled),
         Separation::Spot => inks.coverages(sampled),
@@ -249,7 +254,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                         remembered.sampled = sampled;
                         remembered.amounts = amounts(params, &inks, ink_is_bright, sampled);
                     }
-                    let amount = remembered.amounts[if params.separation == Separation::None { 0 } else { index }];
+                    let amount = remembered.amounts[if params.separation == Separation::None {
+                        0
+                    } else {
+                        index
+                    }];
                     // the distance from the mark's centre, and its radius (half its width): a dot's area follows the
                     // ink and a dot of full ink reaches the corners of its cell; a line of full ink fills its row
                     let (distance, radius) = match params.shape {
