@@ -1,5 +1,5 @@
 //! Colour ramps: a position from 0 to 1 looked up in a list of colours, the same way for every effect that colours by a
-//! scalar (the Rust twin of `bullterrier_image.ops.ramp`).
+//! scalar.
 
 /// The colour at position `t` (0..1) along `stops`, a list of at least one colour.
 ///

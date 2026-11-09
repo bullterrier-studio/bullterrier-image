@@ -901,8 +901,8 @@ FIELD_PARAMETERS = [(name, field) for name in PYTHON for field in field_name_fie
 
 
 @pytest.mark.parametrize(("name", "field"), FIELD_PARAMETERS)
-# Not `light`: the hand-made brightness differs from the runner's by float32 rounding, which steep contour lines
-# (topographic) amplify past any tolerance worth having; the probe test above covers `light`.
+# Not `light`: the hand-made brightness differs from the runner's by float32 rounding, which a steep response can
+# amplify past any tolerance worth having; the probe test above covers `light`.
 @pytest.mark.parametrize("selection", ["depth", "subject", "background", "g", "middle"])
 def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_a_named_field_and_the_equal_array(
     name, field, selection, photo, subject, apply_as_rendered
