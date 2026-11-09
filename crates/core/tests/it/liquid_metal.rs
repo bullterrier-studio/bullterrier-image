@@ -128,11 +128,15 @@ fn a_steeper_normal_tilts_less_than_the_slope_alone() -> Result<(), Error> {
 fn the_picture_enters_by_its_brightness_alone() -> Result<(), Error> {
     // adding (0.7152, -0.2126, 0) x a leaves the Rec. 709 brightness (0.2126, 0.7152, 0.0722) unchanged
     let grey: Vec<f32> = varied(SIZE, SIZE)
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .flat_map(|p| [p[0] * 0.5 + 0.25; 3])
         .collect();
     let shifted: Vec<f32> = grey
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .enumerate()
         .flat_map(|(index, pixel)| {
             let amount = 0.15 * (index % 7) as f32 / 7.0;
@@ -155,7 +159,12 @@ fn the_picture_enters_by_its_brightness_alone() -> Result<(), Error> {
 
 #[test]
 fn smoothing_is_a_gaussian_blur_of_the_brightness() -> Result<(), Error> {
-    let grey: Vec<f32> = varied(SIZE, SIZE).chunks_exact(3).flat_map(|p| [p[1]; 3]).collect();
+    let grey: Vec<f32> = varied(SIZE, SIZE)
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .flat_map(|p| [p[1]; 3])
+        .collect();
     let blurred = run_picture(
         &gaussian_blur::Params {
             radius: 2.0,

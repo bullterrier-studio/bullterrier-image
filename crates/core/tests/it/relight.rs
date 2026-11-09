@@ -46,7 +46,7 @@ fn plane(direction: f32) -> Vec<f32> {
 }
 
 /// The gain of a surface rising `slope_x` px per px to the right and `slope_y` down, from the geometry: its unit normal
-/// (-slope_x, -slope_y, 1) / length dotted with the unit vector towards the light (x right, y down, z up), over what a
+/// (-dx, -dy, 1) / length dotted with the unit vector towards the light (x right, y down, z up), over what a
 /// flat surface (normal (0, 0, 1)) catches.
 fn hand_gain(slope_x: f32, slope_y: f32, angle: f32, elevation: f32) -> f32 {
     let (a, e) = (angle.to_radians(), elevation.to_radians());
