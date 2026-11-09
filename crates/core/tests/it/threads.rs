@@ -173,6 +173,18 @@ fn cases() -> Vec<Case> {
                     .param("field", "light")
                     .param("radius", 3)
                     .param("edge", "mirror"),
+                Step::new("relight")
+                    .param("field", "light")
+                    .param("height", 20)
+                    .param("blur", 3)
+                    .param("edge", "wrap"),
+                Step::new("relight")
+                    .param("field", "light")
+                    .param("height", 20)
+                    .param("blur", 14)
+                    .param("edge", "nearest"),
+                Step::new("liquid_metal").param("smoothing", 3).param("edge", "mirror"),
+                Step::new("liquid_metal").param("smoothing", 14).param("edge", "wrap"),
                 Step::new("ambient_occlusion")
                     .param("field", "light")
                     .param("radius", 14)
