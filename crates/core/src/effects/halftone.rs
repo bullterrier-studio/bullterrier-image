@@ -117,7 +117,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     par::rows(&mut pixels, width, |first, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
             let y = cast::single(float(first + offset));
-                        for (column, out) in line.iter_mut().enumerate() {
+            for (column, out) in line.iter_mut().enumerate() {
                 let x = cast::single(float(column));
                 // the pixel in the rotated grid, in cells, and the centre of the dot it belongs to
                 let (u, v) = ((x * cos + y * sin) * inv_cell, (y * cos - x * sin) * inv_cell);

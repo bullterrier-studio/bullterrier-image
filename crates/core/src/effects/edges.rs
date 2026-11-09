@@ -107,8 +107,17 @@ fn steepest(params: &Params) -> f32 {
     gaussian_filter_rows(&mut narrow, 2 * reach, radius, truncate, Extension::Nearest);
     if params.method == Method::Dog {
         let mut wide = step;
-        gaussian_filter_rows(&mut wide, 2 * reach, radius * f64::from(DOG_RATIO), truncate, Extension::Nearest);
-        wide.iter().zip(&narrow).map(|(wide, narrow)| wide - narrow).fold(0.0, f32::max)
+        gaussian_filter_rows(
+            &mut wide,
+            2 * reach,
+            radius * f64::from(DOG_RATIO),
+            truncate,
+            Extension::Nearest,
+        );
+        wide.iter()
+            .zip(&narrow)
+            .map(|(wide, narrow)| wide - narrow)
+            .fold(0.0, f32::max)
     } else {
         sobel_of_line(&narrow)
     }
@@ -138,7 +147,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         }
     };
     let (background, color) = (params.background.0, params.color.0);
-    let paint = |amount: f32| [0, 1, 2].map(|channel| background[channel] + (color[channel] - background[channel]) * amount);
+    let paint =
+        |amount: f32| [0, 1, 2].map(|channel| background[channel] + (color[channel] - background[channel]) * amount);
     let mut pixels = vec![[0.0; 3]; height * width];
     match params.method {
         Method::Dog => {
@@ -166,7 +176,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                     for (column, out) in line.iter_mut().enumerate() {
                         let cell = at(width, first + offset, column);
                         let amount = drawn(slopes[cell].strength);
-                        *out = paint(if kept.as_ref().is_none_or(|kept| kept[cell]) { amount } else { 0.0 });
+                        *out = paint(if kept.as_ref().is_none_or(|kept| kept[cell]) {
+                            amount
+                        } else {
+                            0.0
+                        });
                     }
                 }
             });
