@@ -117,7 +117,10 @@ fn tracking_bands(height: usize, params: &Params) -> Vec<Band> {
         .map(|_| {
             let rows = whole(tallest / 2.0 + rng.uniform() * tallest / 2.0).clamp(1, height);
             let top = rng.below(height - rows + 1);
-            #[expect(clippy::cast_possible_truncation, reason = "a slide of at most 2000 px, rounded to whole px")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "a slide of at most 2000 px, rounded to whole px"
+            )]
             let distance = (-furthest + rng.uniform() * 2.0 * furthest).round_ties_even() as i64;
             Band { top, rows, distance }
         })
@@ -246,13 +249,9 @@ fn wear_signal(pixels: &mut [[f32; 3]], (height, width): (usize, usize), params:
     let bleed = f64::from(params.bleed);
     let planes = (bleed > 0.0).then(|| smeared(pixels, (height, width), bleed, (bleed, truncate), edge));
     let grain = (params.noise > 0.0).then(|| {
-        clumped(
-            (height, width),
-            f64::from(params.noise_size),
-            truncate,
-            edge,
-            |at| standard_normal(params.seed, NOISE, at),
-        )
+        clumped((height, width), f64::from(params.noise_size), truncate, edge, |at| {
+            standard_normal(params.seed, NOISE, at)
+        })
     });
     par::rows(pixels, width, |first_row, band| {
         for (at, line) in band.chunks_exact_mut(width).enumerate() {
