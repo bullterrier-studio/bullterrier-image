@@ -83,6 +83,7 @@ mod picture;
 mod pieces;
 mod pinch_bulge;
 mod pixel_grid;
+mod pixel_sort;
 mod polar;
 mod presets;
 mod radial_blur;
