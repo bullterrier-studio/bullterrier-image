@@ -27,6 +27,9 @@ allow-wildcard-paths = true  # the workspace's own crates depend on each other b
 deny = [
     { crate = "pyo3", wrappers = ["bullterrier-image-python", "numpy"] },
     { crate = "numpy", wrappers = ["bullterrier-image-python"] },
+    # pyo3's FFI layer and build script; the numpy crate also builds against the build script
+    { crate = "pyo3-ffi", wrappers = ["pyo3"] },
+    { crate = "pyo3-build-config", wrappers = ["pyo3", "pyo3-ffi", "numpy"] },
 ]
 
 [sources]

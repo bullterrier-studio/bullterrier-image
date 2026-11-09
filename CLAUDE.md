@@ -205,6 +205,8 @@ its parameters.
   (in `poe check`) enforces it.
 - The gates are the review: reviewers check behaviour and these rules only. A defect a review finds twice becomes a gate.
 - Design decisions and reasons go in `docs/design-decisions.md`, not here.
+- **Template:** the files `docs/shared-files.md` lists as identical come from the Rust project template (`copier update`; answers in
+  `.copier-answers.yml`). Change one there, not here; an improvement worth sharing goes to the template's owner.
 
 ## The effect contract
 
@@ -426,8 +428,8 @@ Writing a test file:
   checked; a table replaces loops and branches.
 - **No change-detectors:** test a rule with a known-bad input; never restate configuration. Cross-effect rules live only in
   `tests/effects/test_contract.py`.
-- **Slow tests in groups:** a module whose module-scoped fixture spawns tools (ruff, mypy, poe, git) carries
-  `pytestmark = pytest.mark.xdist_group("<module>")`.
+- **Slow tests in groups:** `--dist=loadfile` (`addopts`) runs a file on one worker, so a module-scoped fixture that spawns tools
+  (ruff, mypy, poe, git) is built once. Never `xdist_group`: with pytest 9.2 and xdist 3.8 it does nothing.
 - **Running:** one file or folder: `uv run pytest tests/ops/test_blur.py -n 0` (`-p no:randomly` for fixed order); everything:
   `uv run poe test`.
 - **Fast feedback (agents):** the suite is about 14,000 tests and takes minutes. While iterating or doing red-green TDD run only

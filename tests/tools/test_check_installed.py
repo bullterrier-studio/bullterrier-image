@@ -103,6 +103,15 @@ def test_an_install_not_from_the_artifact_is_refused_saying_why(tmp_path, artifa
         check_installed.installed_from(distribution, artifact, kind)
 
 
+def test_an_extension_found_in_two_wheels_names_neither(tmp_path, artifact):
+    # the same build in a second wheel: which file the install came from is not known
+    linux = artifact / "bullterrier_image-1.0-cp312-abi3-manylinux_2_28_x86_64.whl"
+    (artifact / "bullterrier_image-1.0-cp312-abi3-manylinux_2_28_aarch64.whl").write_bytes(linux.read_bytes())
+    distribution = installed(tmp_path / "site", b"built for linux")
+    with pytest.raises(check_installed.InstallError, match="2 wheels"):
+        check_installed.installed_from(distribution, artifact, "wheel")
+
+
 def test_the_command_fails_visibly_for_this_environments_editable_install(artifact):
     # the suite runs on an editable install of the checkout: from no file of any artifact
     done = subprocess.run(

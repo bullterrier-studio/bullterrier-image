@@ -21,8 +21,7 @@ from packaging.utils import parse_sdist_filename, parse_wheel_filename
 from packaging.version import Version
 
 ROOT = Path(__file__).resolve().parents[2]
-# one xdist worker runs this module, so the Rust build folder its builds share is reused across its tests
-pytestmark = [pytest.mark.xdist_group("build-gate"), pytest.mark.gate]
+pytestmark = [pytest.mark.gate]
 RUST_FILES = ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rustfmt.toml")
 
 

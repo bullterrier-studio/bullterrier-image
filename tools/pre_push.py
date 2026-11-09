@@ -2,9 +2,8 @@
 commits its remote-tracking branch lacks, and skip it for any other push.
 
 Two tiers: a push to `main` runs `uv run poe check`; a tag, or a ref this hook cannot classify, runs `uv run poe full`,
-which also runs the gate proofs (the tests marked `gate`, each proving that a gate fails on a known-bad input) and the
-rest that only a release needs (scaffold test, audit, lowest dependencies). `check` runs the proofs only when the change
-touches what they test (`proofs`, below).
+which also runs the gate proofs (the tests marked `gate`, each proving that a gate fails on a known-bad input).
+`check` runs the proofs only when the change touches what they test (`proofs`, below).
 
 Why: a feature branch is checked by CI when its pull request opens, so running the gate on every push to it only slows
 the work down. A direct push to `main` has no pull request in front of it, so the gate runs first, locally, instead of
@@ -26,11 +25,11 @@ the commits of `main` that `<remote>/main` lacks count as well, and any code in 
 as a deletion and an addition (`--no-renames`), so moving code into `docs/` still counts as changing code.
 
 A gate that already passed on exactly the pushed tree is not repeated. `uv run poe check` (and `full`) begins with
-`python tools/pre_push.py start` and ends with `python tools/pre_push.py pass TIER`: the second records the tree of
-`HEAD` and the tier in the git folder (never committed) only if the working tree was clean and `HEAD`'s tree was the
-same at both moments, so the record names contents that were checked in full. A push whose tip has that tree skips the
-gate if the pass was of the tier the push needs or a higher one (`full` covers `check`, never the other way round); any
-other tree runs it. CI checks everything again.
+`uv run python tools/pre_push.py start` and ends with `uv run python tools/pre_push.py pass TIER`: the second records
+the tree of `HEAD` and the tier in the git folder (never committed) only if the working tree was clean and `HEAD`'s
+tree was the same at both moments, so the record names contents that were checked in full. A push whose tip has that
+tree skips the gate if the pass was of the tier the push needs or a higher one (`full` covers `check`, never the other
+way round); any other tree runs it. CI checks everything again.
 
 `pre_push.py proofs` is the last gate step of `check`: it runs `poe gate-tests` when a file the change touches matches
 `[tool.gate-proofs] triggers` in pyproject.toml (compared with the merge base with `origin/main`, working tree and
