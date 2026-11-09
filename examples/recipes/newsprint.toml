@@ -1,25 +1,21 @@
-# A newspaper clipping: black and white dots on off-white paper with a torn edge. Would gain CMYK dots (batch 7) and a faded sepia (the sepia preset of gradient_map).
+# A newspaper clipping: a four-colour (CMYK) dot print on off-white paper with a torn edge. Would gain a faded sepia (the sepia preset of gradient_map).
 name = "newsprint"
 size = 768
 
 [[step]]
-effect = "channel_mixer"
-preset = "black_and_white"
-
-[[step]]
 effect = "sharpen"
 preset = "clarity"
-amount = 0.8
+amount = 0.5
 
 [[step]]
 effect = "levels"
-gamma = 0.7
+gamma = 1.2
 
 [[step]]
 effect = "halftone"
 cell = 3
-angle = 45
-ink = "#141414"
+angle = 0
+separation = "cmyk"
 paper = "#f2ead8"
 
 [[step]]
