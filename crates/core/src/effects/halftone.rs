@@ -158,7 +158,7 @@ fn pixel(value: f32, last: usize) -> usize {
 /// The screens of the inks: each turned by `angle` and the ink's own extra angle, and moved by its share of the offset.
 fn screens(params: &Params, count: usize) -> Vec<Screen> {
     // a full turn is exactly the first, so min and max of the angle give the same screen
-    let travel = f64::from(params.offset_angle).to_radians(); // constant: degrees to radians
+    let travel = f64::from(params.offset_angle).rem_euclid(360.0).to_radians(); // constant: a full turn in degrees
     (0..count)
         .map(|ink| {
             let extra = match params.separation {

@@ -486,10 +486,15 @@ fn the_same_seed_gives_the_same_picture_and_another_seed_another() -> Outcome {
 
 /// What an effect needs for its angle to show: at its defaults it changes nothing, so any angle would look cyclic.
 fn cyclic_needs(effect: &str, field: &str) -> Setting {
-    if (effect, field) == ("selective_color", "hue") {
-        setting(&[("hue_shift", json!(90.0)), ("width", json!(120.0))])
-    } else {
-        Setting::new()
+    match (effect, field) {
+        ("selective_color", "hue") => setting(&[("hue_shift", json!(90.0)), ("width", json!(120.0))]),
+        // a direction of nothing: the inks must be offset, on a paper that shows them
+        ("halftone", "offset_angle") => setting(&[
+            ("separation", json!("cmyk")),
+            ("paper", json!("#ffffff")),
+            ("offset", json!(5.0)),
+        ]),
+        _ => Setting::new(),
     }
 }
 
