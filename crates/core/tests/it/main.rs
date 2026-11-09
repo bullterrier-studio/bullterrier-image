@@ -50,6 +50,7 @@ mod hsv;
 mod hue_range;
 mod inputs;
 mod interlace;
+mod jpeg_crush;
 mod kaleidoscope;
 mod lens_blur;
 mod lens_distortion;

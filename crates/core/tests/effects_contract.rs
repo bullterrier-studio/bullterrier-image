@@ -449,6 +449,8 @@ fn a_constant_picture_stays_constant_and_each_interpolation_reads_its_own_way() 
 fn seed_needs(effect: &str) -> Setting {
     if effect == "starburst" {
         setting(&[("spacing", json!(3.0))])
+    } else if effect == "jpeg_crush" {
+        setting(&[("hits", json!(40))])
     } else {
         Setting::new()
     }

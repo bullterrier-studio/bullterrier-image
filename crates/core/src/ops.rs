@@ -18,6 +18,7 @@ pub(crate) mod gauss;
 pub(crate) mod gradient;
 pub(crate) mod grid;
 pub(crate) mod guided;
+pub(crate) mod jpeg;
 pub(crate) mod length;
 pub(crate) mod levels;
 pub(crate) mod light;

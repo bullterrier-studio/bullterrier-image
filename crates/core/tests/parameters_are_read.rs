@@ -175,6 +175,22 @@ fn conditional() -> Vec<Conditional> {
             field: "edge",
             with: vec![("patch", json!(3))],
         },
+        // the damage is drawn, placed and sized only for the coefficients that are hit
+        Conditional {
+            effect: "jpeg_crush",
+            field: "seed",
+            with: vec![("hits", json!(40))],
+        },
+        Conditional {
+            effect: "jpeg_crush",
+            field: "dc_share",
+            with: vec![("hits", json!(40))],
+        },
+        Conditional {
+            effect: "jpeg_crush",
+            field: "magnitude",
+            with: vec![("hits", json!(40))],
+        },
         // the seed draws the points of a bright area and their brightness, which the defaults leave all alike
         Conditional {
             effect: "starburst",

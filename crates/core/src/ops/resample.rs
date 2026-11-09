@@ -19,6 +19,8 @@ enum Filter {
     Lanczos,
     /// The cubic convolution kernel of Keys with `a = -0.5` within 2 of the centre: smooth, for a growth.
     Bicubic,
+    /// 1 for every pixel the taps reach: the mean of the input pixels an output pixel covers.
+    Box,
 }
 
 impl Filter {
@@ -26,6 +28,7 @@ impl Filter {
     const fn support(self) -> f64 {
         match self {
             Self::Lanczos => 3.0, // constant: Lanczos a = 3, Pillow's `LANCZOS` support
+            Self::Box => 0.5,     // constant: Pillow's `BOX` support
             Self::Bicubic => 2.0, // constant: the cubic convolution kernel is zero from 2 on, Pillow's `BICUBIC` support
         }
     }
@@ -39,6 +42,8 @@ impl Filter {
             Self::Bicubic if x < 1.0 => ((KEYS + 2.0) * x - (KEYS + 3.0)) * x * x + 1.0,
             // constant: the coefficients of Keys' cubic convolution kernel, as Pillow writes them
             Self::Bicubic if x < self.support() => (((x - 5.0) * x + 8.0) * x - 4.0) * KEYS,
+            // the taps of a box reach exactly the pixels whose centres lie in it (the right edge's included, as Pillow's do)
+            Self::Box => 1.0,
             Self::Lanczos | Self::Bicubic => 0.0,
         }
     }
@@ -134,6 +139,16 @@ impl Resize {
             to,
             filter,
         }))
+    }
+
+    /// The change of a `height` x `width` thing to `to` (rows, columns) by averaging the input pixels each output pixel
+    /// covers (Pillow's `BOX`). Both sizes are at least 1.
+    pub(crate) const fn averaging(height: usize, width: usize, to: (usize, usize)) -> Self {
+        Self {
+            from: (height, width),
+            to,
+            filter: Filter::Box,
+        }
     }
 
     /// The number of rows after the change.

@@ -568,6 +568,20 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "a codec by rows of blocks, damage, and sorted runs by rows and by columns",
+            Recipe::new([
+                Step::new("jpeg_crush")
+                    .param("quality", 40)
+                    .param("hits", 25)
+                    .param("seed", 3),
+                Step::new("pixel_sort").param("by", "hue"),
+                Step::new("pixel_sort")
+                    .param("axis", "vertical")
+                    .param("order", "descending"),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "the guided filter and the minimum filter, on the rows and the columns turned into rows",
             Recipe::new([
                 Step::new("tone_map").param("radius", 5).param("amount", 1.0),

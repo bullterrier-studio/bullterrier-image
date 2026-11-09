@@ -121,6 +121,32 @@ pub(crate) fn hsv_to_rgb([hue, saturation, value]: [f32; 3]) -> [f32; 3] {
     })
 }
 
+// JFIF full-range YCbCr (ITU-T T.871), as fractions of the 8-bit range: Y the Rec. 601 luma, Cb and Cr the blue and red
+// differences, centred on 128 of 255.
+const CHROMA_CENTRE: f32 = 128.0 / 255.0; // constant: JFIF centres Cb and Cr on 128 of 255
+
+/// Convert sRGB to JFIF YCbCr (ITU-T T.871), each a fraction of the 8-bit range. Nothing is clipped: red's Cr and blue's Cb
+/// reach 255.5/255.
+pub(crate) fn rgb_to_ycbcr([red, green, blue]: [f32; 3]) -> [f32; 3] {
+    // constant: the JFIF matrix, ITU-T T.871
+    [
+        0.299 * red + 0.587 * green + 0.114 * blue,
+        -0.168_736 * red - 0.331_264 * green + 0.5 * blue + CHROMA_CENTRE,
+        0.5 * red - 0.418_688 * green - 0.081_312 * blue + CHROMA_CENTRE,
+    ]
+}
+
+/// Convert JFIF YCbCr back to sRGB; the inverse of [`rgb_to_ycbcr`], not clipped.
+pub(crate) fn ycbcr_to_rgb([luma, blue, red]: [f32; 3]) -> [f32; 3] {
+    let (blue, red) = (blue - CHROMA_CENTRE, red - CHROMA_CENTRE);
+    // constant: the JFIF matrix from YCbCr to RGB, ITU-T T.871
+    [
+        luma + 1.402 * red,
+        luma - 0.344_136 * blue - 0.714_136 * red,
+        luma + 1.772 * blue,
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     //! YIQ against the FCC's published matrix and its known inverse. The conversions are `pub(crate)`, so no public route
