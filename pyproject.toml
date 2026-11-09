@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT AND OFL-1.1"
 license-files = ["LICENSE", "LICENSE-FONT"]
 authors = [
-    { name = "jcakstins", email = "janis.cakstins@gmail.com" }
+    { name = "Janis Cakstins", email = "janis.cakstins@gmail.com" }
 ]
 # 3.12 is the oldest version the code needs (PEP 695 generics are its newest syntax); the suite is green on 3.12, 3.13
 # and 3.14. 3.15 is not listed until onnxruntime has wheels for it.
