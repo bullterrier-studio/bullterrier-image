@@ -33,6 +33,7 @@ const LEVELS: f32 = 255.0; // constant: the 8-bit range the standard's tables an
 
 /// The example quantisation table of ITU-T T.81 Annex K, table K.1 (luma).
 #[rustfmt::skip]
+// constant: the quantisation table of ITU-T T.81 Annex K, table K.1
 const LUMA_TABLE: [u32; AREA] = [
     16, 11, 10, 16, 24, 40, 51, 61,
     12, 12, 14, 19, 26, 58, 60, 55,
@@ -46,6 +47,7 @@ const LUMA_TABLE: [u32; AREA] = [
 
 /// The example quantisation table of ITU-T T.81 Annex K, table K.2 (chroma).
 #[rustfmt::skip]
+// constant: the quantisation table of ITU-T T.81 Annex K, table K.2
 const CHROMA_TABLE: [u32; AREA] = [
     17, 18, 24, 47, 99, 99, 99, 99,
     18, 21, 26, 66, 99, 99, 99, 99,
@@ -143,12 +145,14 @@ fn inverse(coefficients: &[f32; AREA], d: &[[f32; BLOCK]; BLOCK]) -> [f32; AREA]
 /// quality below 50 and 200 - 2 quality from 50 up; each step is (table x scale + 50) / 100 rounded down, held to 1..255.
 #[expect(clippy::cast_precision_loss, reason = "steps are at most 255")]
 fn steps(table: &[u32; AREA], quality: u32) -> [f32; AREA] {
+    // constant: the IJG quality rule switches at quality 50
     let scale = if quality < 50 {
-        5000 / quality
+        5000 / quality // constant: the IJG quality rule below quality 50
     } else {
-        200 - 2 * quality
-    }; // constant: the IJG quality rule
-    table.map(|entry| ((entry * scale + 50) / 100).clamp(1, 255) as f32) // constant: the IJG rule holds a step to 1..255
+        200 - 2 * quality // constant: the IJG quality rule from quality 50 up
+    };
+    // constant: the IJG rule rounds each scaled entry and holds it to 1..255
+    table.map(|entry| ((entry * scale + 50) / 100).clamp(1, 255) as f32)
 }
 
 /// A coefficient as the float it is multiplied as.
@@ -183,13 +187,16 @@ pub(crate) fn encode(pixels: &[[f32; 3]], height: usize, width: usize, quality: 
                     let across = (column * SIDE + at % SIDE).min(width - 1);
                     *sample = rgb_to_ycbcr(pixels[row * width + across]).map(|level| level * LEVELS - LEVEL);
                 }
+                // constant: four luma blocks to an MCU
                 for slot in 0..4 {
                     let (top, left) = ((slot / 2) * BLOCK, (slot % 2) * BLOCK);
                     let block = std::array::from_fn(|at| patch[(top + at / BLOCK) * SIDE + left + at % BLOCK][0]);
                     quantise(&block, &steps[0], &mut mcu[slot * AREA..][..AREA]);
                 }
+                // constant: Cb and Cr are the fifth and sixth blocks of an MCU, channels 1 and 2 of a sample
                 for (slot, channel) in [(4, 1), (5, 2)] {
                     // each chroma sample is the mean of a 2 x 2 patch
+                    // constant: a 2 x 2 patch of samples is the pixels (2 row, 2 column) to (2 row + 1, 2 column + 1)
                     let block = std::array::from_fn(|at| {
                         let first = (2 * (at / BLOCK)) * SIDE + 2 * (at % BLOCK);
                         (patch[first][channel]
@@ -233,9 +240,9 @@ pub(crate) fn decode(coefficients: &Coefficients) -> Vec<[f32; 3]> {
         for mcu_row in first / SIDE..=(last - 1) / SIDE {
             for column in 0..columns {
                 let mcu = &coefficients.values[(mcu_row * columns + column) * MCU..][..MCU];
-                let luma: [[f32; AREA]; 4] = std::array::from_fn(|slot| samples(mcu, slot, &coefficients.steps[0]));
-                let blue = samples(mcu, 4, &coefficients.steps[1]);
-                let red = samples(mcu, 5, &coefficients.steps[1]);
+                let luma: [[f32; AREA]; 4] = std::array::from_fn(|slot| samples(mcu, slot, &coefficients.steps[0])); // constant: four luma blocks to an MCU
+                let blue = samples(mcu, 4, &coefficients.steps[1]); // constant: Cb is the fifth block of an MCU
+                let red = samples(mcu, 5, &coefficients.steps[1]); // constant: Cr is the sixth block of an MCU
                 for at in 0..SIDE * SIDE {
                     let (y, x) = (at / SIDE, at % SIDE);
                     let block = &luma[(y / BLOCK) * 2 + x / BLOCK];

@@ -87,7 +87,7 @@ fn damage(coded: &mut Coefficients, params: &Params) {
         )]
         let steps = (1 + rng.below(params.magnitude.unsigned_abs() as usize)) as i32;
         let change = steps * if rng.uniform() < 0.5 { -1 } else { 1 }; // constant: a hit is as likely down as up
-        let mut which = 0;
+        let mut which = 0; // constant: the search for the pick's plane starts at the first
         while pick >= grids[which].0 * grids[which].1 {
             pick -= grids[which].0 * grids[which].1;
             which += 1;
