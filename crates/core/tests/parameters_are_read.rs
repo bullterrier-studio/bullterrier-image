@@ -110,6 +110,11 @@ fn conditional() -> Vec<Conditional> {
             field: "constant_value",
             with: vec![("edge", json!("constant"))],
         },
+        Conditional {
+            effect: "halftone",
+            field: "constant_value",
+            with: vec![("edge", json!("constant"))],
+        },
         // a table that is none is the identity, which the amount mixes in without change
         Conditional {
             effect: "lut",

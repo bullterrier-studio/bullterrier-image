@@ -47,6 +47,7 @@ mod gradient;
 mod gradient_map;
 mod grain;
 mod grid_shift;
+mod halftone;
 mod highpass;
 mod hsv;
 mod hue_range;

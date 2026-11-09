@@ -772,9 +772,6 @@ CYCLIC_NEEDS = {
     ("selective_color", "hue"): {"hue_shift": 90.0, "width": 120.0},
 }
 
-# The share of pixels allowed to differ a turn apart: a hard-edged screen flips the dots that sit on an exact cell edge.
-EDGE_FLIPS = {("halftone", "angle"): 0.1}
-
 
 @pytest.mark.parametrize(("name", "field"), _cyclic())
 def test_a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real(name, field, photo):
@@ -789,7 +786,7 @@ def test_a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real
     at_45 = registry.apply(name, small, **needs, **{field: low + 45}, **_inputs(name, small))
     assert np.abs(at_45 - at_low).max() > 1e-3, f"{name}.{field} shows nothing: the test would pass for any field"
     differing = (np.abs(at_low - at_high).max(axis=-1) > 1e-3).mean()
-    assert differing <= EDGE_FLIPS.get((name, field), 0), f"{name}.{field}: min and max are a turn apart"
+    assert differing == 0, f"{name}.{field}: min and max are a turn apart"
     # four turns and a degree past the bottom of the turn is the same direction as one degree past it
     beyond = registry.apply(name, small, **needs, **{field: low + 4 * 360 + 1}, **_inputs(name, small))
     inside = registry.apply(name, small, **needs, **{field: low + 1}, **_inputs(name, small))

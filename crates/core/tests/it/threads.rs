@@ -465,6 +465,14 @@ fn cases() -> Vec<Case> {
                 Step::new("edges").param("method", "dog").param("threshold", 0.03),
                 Step::new("edges").param("softness", 0.0).param("threshold", 0.04),
                 Step::new("edges"),
+                Step::new("halftone")
+                    .param("cell", 9)
+                    .param("angle", 33.0)
+                    .param("sigma", 1.5)
+                    .param("edge", "constant")
+                    .param("constant_value", 0.7),
+                Step::new("halftone").param("ink", "#ff8000").param("paper", "#e0e0d0"),
+                Step::new("halftone"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
