@@ -91,7 +91,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `truncate` | number | count | 0.5 to 10 | `4.0` | Where the smear's Gaussian is cut off, in sigmas, 0.5 to 10: the colour spreads over about this many sigmas on either side. Lower is faster and gives a slightly sharper tail. |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the smear's Gaussian is cut off, in sigmas, 1 to 10: the colour spreads over about this many sigmas on either side. Lower is faster and gives a slightly sharper tail. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What colour is smeared in from beyond the left and right edges: 'reflect' the picture mirrored (edge pixel repeated), 'nearest' its edge pixel repeated, 'mirror' mirrored about the edge pixel, 'wrap' the opposite side. |
 
 </details>
@@ -138,8 +138,8 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `band_height` | number | px | 0 to 2000 | `19.2` | The tallest a tracking band can be, in px, 0 to 2000, tuned for a picture about 480 px high; each band is between half this and this tall (never under 1 px, never taller than the picture). |
 | `noise_size` | number | px | 0.5 to 50 | `1.5` | How wide a speck of tape noise is, 0.5 to 50 px (up to 1 px every pixel is its own speck), tuned for a picture about 480 px high. Raising it gives coarser grain. |
 | `wobble_size` | number | px | 0.5 to 500 | `12.0` | How many rows one wander of the wobble spans, 0.5 to 500 px, tuned for a picture about 480 px high: small is a jitter from row to row, large a slow sway. |
-| `truncate` | number | count | 0.5 to 10 | `4.0` | Where the blurs of the bleed, the noise and the wobble are cut off, in sigmas, 0.5 to 10. Lower is faster and gives slightly sharper tails. |
-| `edge` | one of 'nearest', 'wrap', 'reflect', 'mirror' |  |  | `'nearest'` | What lies beyond the picture's left and right edges for everything that moves or blurs sideways: 'nearest' the edge pixel repeated (a worn tape smears its edge rather than bringing the far side round), 'wrap' the opposite side, 'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel. For the noise and wobble the rules act on the rows and columns of their own fields. |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the blurs of the bleed, the noise and the wobble are cut off, in sigmas, 1 to 10. Lower is faster and gives slightly sharper tails. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'nearest'` | What lies beyond the picture's left and right edges for everything that moves or blurs sideways: 'nearest' the edge pixel repeated (a worn tape smears its edge rather than bringing the far side round), 'wrap' the opposite side, 'reflect' the picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel. For the noise and wobble the rules act on the rows and columns of their own fields. |
 
 </details>
 
