@@ -5,6 +5,9 @@
 //! or with the lattice's fineness. The lattice is fixed in the frame: its spacing is a share of the picture's long side, so
 //! the same picture at twice the size has the same noise, sampled at twice as many places.
 
+use super::blur::gaussian_filter_plane;
+use super::edge::Extension;
+use super::par;
 use super::random::{mix, unit};
 use super::{cast, length};
 
@@ -96,6 +99,39 @@ pub(crate) fn field(height: usize, width: usize, noise: &Fractal, stream: u64) -
         weight *= noise.persistence;
     }
     standardised(sum)
+}
+
+/// One standard-normal value (mean 0, deviation 1) of the noise number `stream` at place `at`: a pure function of its
+/// arguments, so a field of them does not depend on how its rows are cut into bands.
+pub(crate) fn standard_normal(seed: u32, stream: u64, at: usize) -> f32 {
+    let word = |part: u64| unit(mix(seed, &[stream, at as u64, part]));
+    // Box-Muller (1958): two independent uniforms make a standard normal; 1 - u is in (0, 1], so its log is finite
+    let radius = (-2.0 * (1.0 - word(0)).ln()).sqrt();
+    cast::single(radius * (std::f64::consts::TAU * word(1)).cos())
+}
+
+/// A `height` x `width` field of mean 0 and deviation 1 whose value at place `at` (row after row) is `draw(at)`, clumped
+/// into specks about `size` px wide: up to 1 px every pixel is its own value; above 1 the values are blurred by a
+/// Gaussian of sigma `size / 2` (cut off at `truncate` sigmas, `edge` beyond the field) and scaled back to deviation 1,
+/// so the strength does not depend on `size`. `draw` gives values of mean 0 and deviation 1, from any thread.
+pub(crate) fn clumped(
+    (height, width): (usize, usize),
+    size: f64,
+    truncate: f64,
+    edge: Extension,
+    draw: impl Fn(usize) -> f32 + Sync,
+) -> Vec<f32> {
+    let mut plane = vec![0.0; height * width];
+    par::rows(&mut plane, width, |first_row, band| {
+        for (offset, value) in band.iter_mut().enumerate() {
+            *value = draw(first_row * width + offset);
+        }
+    });
+    // a speck of 1 px or less is a single pixel: nothing to clump
+    if size <= 1.0 {
+        return plane;
+    }
+    standardised(gaussian_filter_plane(&plane, (height, width), size / 2.0, truncate, edge))
 }
 
 /// `sum` shifted to mean 0 and scaled to standard deviation 1; all zeros if it has no variation.

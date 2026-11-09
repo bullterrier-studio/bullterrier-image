@@ -1,6 +1,6 @@
 //! Moving a picture by a distance in pixels, whole or not, with a rule for what the move uncovers at the edge.
 
-use super::edge::Extension;
+use super::edge::{Extension, Source};
 use super::par;
 use super::sample::{Interpolation, Sampler};
 
@@ -39,6 +39,39 @@ pub(crate) fn shifted(
         }
     });
     out
+}
+
+/// `row` moved `distance` px right (left if negative) into `out` (as long as `row`, not empty): the row of [`shifted`] for
+/// a move of 0 down and `distance` across, made without a sampler, for many rows each moved by a distance of its own.
+///
+/// Pixel `x` of `out` is the row at `x - distance`, read linearly between the two pixels that lies between, `edge` beyond
+/// the row; a whole distance copies pixels exactly. `distance` is finite.
+pub(crate) fn slide_row(row: &[[f32; 3]], distance: f64, edge: Extension, out: &mut [[f32; 3]]) {
+    let width = row.len();
+    let source = -distance;
+    let first = source.floor();
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a distance is far below 2**63 px; the fraction is kept in f32 precision, like a picture"
+    )]
+    let (base, fraction) = (first as isize, (source - first) as f32);
+    let read = |index: isize| match edge.locate(width, index) {
+        Source::Sample(at) => row[at],
+        Source::Value(value) => [value; 3],
+    };
+    for (x, pixel) in out.iter_mut().enumerate() {
+        let at = base.wrapping_add_unsigned(x);
+        // the reading is made from the row itself wherever both pixels lie inside it
+        let (near, far) = match usize::try_from(at) {
+            Ok(inside) if inside + 1 < width => (row[inside], row[inside + 1]),
+            _ => (read(at), read(at.wrapping_add(1))),
+        };
+        *pixel = if fraction == 0.0 {
+            near
+        } else {
+            std::array::from_fn(|channel| near[channel] * (1.0 - fraction) + far[channel] * fraction)
+        };
+    }
 }
 
 /// A run of whole rows to slide sideways: `rows` rows from row `top` (a band reaching below the picture slides the rows it
@@ -92,7 +125,8 @@ mod tests {
         reason = "tiny whole numbers carried in a float channel"
     )]
 
-    use super::{Band, slide_bands};
+    use super::{Band, slide_bands, slide_row};
+    use crate::ops::edge::Edge;
 
     /// `rows` rows of 5 pixels numbered 0..5 in red.
     fn numbered(rows: usize) -> Vec<[f32; 3]> {
@@ -151,5 +185,23 @@ mod tests {
         );
         let reversed = [bands[1], bands[0]];
         assert_eq!(slide_bands(&numbered(3), 3, 5, &reversed), out);
+    }
+
+    #[test]
+    fn a_row_slid_by_a_distance_reads_between_pixels_and_beyond_its_ends_by_each_rule() {
+        let row: Vec<[f32; 3]> = (0..5).map(|at| [at as f32; 3]).collect();
+        let slid = |distance, edge: Edge| {
+            let mut out = vec![[0.0; 3]; 5];
+            slide_row(&row, distance, edge.extension(), &mut out);
+            out.iter().map(|pixel| pixel[0]).collect::<Vec<f32>>()
+        };
+        // out[x] is the row at x - distance, linearly between the two pixels it lies between
+        assert_eq!(slid(1.5, Edge::Nearest), [0.0, 0.0, 0.5, 1.5, 2.5]);
+        assert_eq!(slid(1.5, Edge::Wrap), [3.5, 2.0, 0.5, 1.5, 2.5]);
+        assert_eq!(slid(1.5, Edge::Reflect), [0.5, 0.0, 0.5, 1.5, 2.5]);
+        assert_eq!(slid(1.5, Edge::Mirror), [1.5, 0.5, 0.5, 1.5, 2.5]);
+        assert_eq!(slid(-2.0, Edge::Nearest), [2.0, 3.0, 4.0, 4.0, 4.0]);
+        assert_eq!(slid(0.0, Edge::Wrap), [0.0, 1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(slid(-12.0, Edge::Wrap), [2.0, 3.0, 4.0, 0.0, 1.0]);
     }
 }

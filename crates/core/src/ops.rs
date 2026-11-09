@@ -5,6 +5,7 @@ pub(crate) mod blend;
 pub(crate) mod blur;
 pub(crate) mod cast;
 pub(crate) mod centre;
+pub(crate) mod chroma;
 pub(crate) mod color;
 pub(crate) mod colorspace;
 pub(crate) mod convolve;

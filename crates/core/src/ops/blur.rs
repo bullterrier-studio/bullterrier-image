@@ -151,6 +151,17 @@ pub(crate) fn gaussian_filter(picture: &Picture<'_>, sigma: f64, truncate: f64, 
     blurred
 }
 
+/// The rows of `width` values that `lines` holds, one after the other, each blurred in place by a Gaussian of `sigma` px
+/// along itself only, as [`gaussian_filter`] does along the rows and nothing down the columns: same kernel, same `edge`,
+/// a sigma under about `0.5 / truncate` px leaving the rows as they are. Rows are independent, so the result is the same at
+/// any thread count.
+pub(crate) fn gaussian_filter_rows(lines: &mut [f32], width: usize, sigma: f64, truncate: f64, edge: Extension) {
+    let half = weights(sigma, truncate);
+    if half.len() > 1 {
+        Smoothing::new(&half, width).smooth(lines, width, edge);
+    }
+}
+
 /// The `height` x `width` map `values` (row after row) blurred as one channel of [`gaussian_filter`] is, with the same
 /// promises: a Gaussian of `sigma` px cut off at `truncate` sigmas, `edge` beyond the map, every value kept within the
 /// range of the map's, a sigma under about `0.5 / truncate` px a copy.

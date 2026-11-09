@@ -4,12 +4,10 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Meta};
-use crate::ops::blur::gaussian_filter_plane;
 use crate::ops::cast;
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
-use crate::ops::noise::standardised;
-use crate::ops::par;
+use crate::ops::noise::{clumped, standard_normal};
 use crate::ops::random::{mix, unit};
 use crate::params::{Choice, Params};
 use crate::{Image, Inputs, Picture};
@@ -80,41 +78,21 @@ pub struct Params {
     pub edge: Edge,
 }
 
-/// One value of the unit-deviation noise of channel `stream` at pixel `at`: a pure function of its arguments, so the noise does
-/// not depend on how the rows are cut into bands.
-fn draw(params: &Params, stream: u64, at: usize) -> f32 {
-    let word = |part: u64| unit(mix(params.seed, &[stream, at as u64, part]));
-    match params.distribution {
-        // Box-Muller (1958): two independent uniforms make a standard normal; 1 - u is in (0, 1], so its log is finite
-        Distribution::Gaussian => {
-            let radius = (-2.0 * (1.0 - word(0)).ln()).sqrt();
-            cast::single(radius * (std::f64::consts::TAU * word(1)).cos())
-        }
-        // uniform on -b..b has deviation b / sqrt(3), so b = sqrt(3) gives 1
-        Distribution::Uniform => cast::single((2.0 * word(0) - 1.0) * 3.0_f64.sqrt()), // constant: the uniform's deviation
-    }
-}
-
 /// The noise of channel `stream`, `height` x `width`: mean 0 and deviation 1, clumped into specks about `size` px wide.
 fn noise(height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32> {
-    let mut plane = vec![0.0; height * width];
-    par::rows(&mut plane, width, |first_row, band| {
-        for (offset, value) in band.iter_mut().enumerate() {
-            *value = draw(params, stream, first_row * width + offset);
-        }
-    });
-    // a speck of 1 px or less is a single pixel: nothing to clump
-    if params.size <= 1.0 {
-        return plane;
-    }
-    let blurred = gaussian_filter_plane(
-        &plane,
+    clumped(
         (height, width),
-        f64::from(params.size) / 2.0,
+        f64::from(params.size),
         f64::from(params.truncate),
         params.edge.extension(),
-    );
-    standardised(blurred)
+        |at| match params.distribution {
+            Distribution::Gaussian => standard_normal(params.seed, stream, at),
+            // uniform on -b..b has deviation b / sqrt(3), so b = sqrt(3) gives 1
+            Distribution::Uniform => cast::single(
+                (2.0 * unit(mix(params.seed, &[stream, at as u64, 0])) - 1.0) * 3.0_f64.sqrt(), // constant: the uniform's deviation
+            ),
+        },
+    )
 }
 
 /// The picture with the grain laid over it.
