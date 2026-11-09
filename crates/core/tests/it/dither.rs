@@ -521,7 +521,9 @@ fn an_ordered_dither_does_not_depend_on_the_order_the_colours_are_listed_in() ->
     // and it really mixes: at least two of the colours appear
     assert!(
         sorted
-            .chunks_exact(3)
+            .as_chunks::<3>()
+            .0
+            .iter()
             .any(|pixel| near([pixel[0], pixel[1], pixel[2]], mid))
     );
     Ok(())
