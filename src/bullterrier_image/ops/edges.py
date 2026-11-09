@@ -1,6 +1,7 @@
 """Edges: how fast a picture's brightness changes at each pixel."""
 
 import numpy as np
+
 from bullterrier_image.ops.blur import NUMPY_PAD, gaussian_blur
 from bullterrier_image.ops.convolve import Edge
 
