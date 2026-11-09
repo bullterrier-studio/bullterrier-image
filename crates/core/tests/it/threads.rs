@@ -522,6 +522,25 @@ fn cases() -> Vec<Case> {
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
         case(
+            "a simulation and contours",
+            Recipe::new([
+                Step::new("reaction_diffusion")
+                    .param("steps", 40)
+                    .param("cell", 3.5)
+                    .param("threshold", 0.3)
+                    .param("resampling", "bicubic")
+                    .param("edge", "wrap"),
+                Step::new("reaction_diffusion").param("steps", 25).param("cell", 1),
+                Step::new("topographic")
+                    .param("levels", 12)
+                    .param("smoothing", 9.5)
+                    .param("fill", "bands")
+                    .param("edge", "mirror"),
+                Step::new("topographic"),
+            ]),
+            &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
+        ),
+        case(
             "generated pictures",
             Recipe::new([
                 Step::new("noise_field").param("kind", "value").param("warp", 20),

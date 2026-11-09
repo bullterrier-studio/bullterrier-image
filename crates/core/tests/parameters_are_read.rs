@@ -309,6 +309,49 @@ fn conditional() -> Vec<Conditional> {
             field: "truncate",
             with: vec![("method", json!("sobel")), ("threshold", json!(0.01))],
         },
+        // the tiny picture is a single default cell, which the model cannot spread or read differently, and a long run can leave nothing to tell
+        Conditional {
+            effect: "reaction_diffusion",
+            field: "feed",
+            with: vec![("cell", json!(1.5)), ("threshold", json!(0.5))],
+        },
+        Conditional {
+            effect: "reaction_diffusion",
+            field: "kill",
+            with: vec![("cell", json!(1.5)), ("threshold", json!(0.5)), ("steps", json!(8))],
+        },
+        Conditional {
+            effect: "reaction_diffusion",
+            field: "steps",
+            with: vec![("cell", json!(1.5)), ("threshold", json!(0.5))],
+        },
+        Conditional {
+            effect: "reaction_diffusion",
+            field: "resampling",
+            with: vec![("cell", json!(1.5)), ("threshold", json!(0.5)), ("steps", json!(8))],
+        },
+        Conditional {
+            effect: "reaction_diffusion",
+            field: "edge",
+            with: vec![("cell", json!(1.5)), ("threshold", json!(0.5)), ("steps", json!(8))],
+        },
+        // the default smoothing flattens the tiny picture's field, so no contour is left to count or colour
+        Conditional {
+            effect: "topographic",
+            field: "levels",
+            with: vec![("smoothing", json!(0.0))],
+        },
+        Conditional {
+            effect: "topographic",
+            field: "line",
+            with: vec![("smoothing", json!(0.0))],
+        },
+        // the colours of the bands are used only when the fill says so
+        Conditional {
+            effect: "topographic",
+            field: "colors",
+            with: vec![("fill", json!("bands"))],
+        },
         // the clumping blur is run only for specks of more than a pixel
         Conditional {
             effect: "grain",
