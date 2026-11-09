@@ -1,0 +1,26 @@
+# A risograph print: the photo split into three spot inks, each a screen of its own slightly off register, on warm paper with grain.
+name = "risograph"
+size = 768
+
+[[step]]
+effect = "levels"
+gamma = 0.9
+black = 0.05
+
+[[step]]
+effect = "halftone"
+separation = "spot"
+inks = ["#ff4d6d", "#2b59ff", "#ffd400"]
+paper = "#f4efe4"
+cell = 5
+angle = 15
+offset = 2.5
+offset_angle = 40
+
+[[step]]
+effect = "paper_texture"
+amount = 0.12
+
+[[step]]
+effect = "grain"
+amount = 0.15
