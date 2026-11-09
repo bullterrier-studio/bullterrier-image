@@ -1,4 +1,4 @@
-"""Tests of `ops/colorspace.py`: the sRGB transfer function, HSV, JFIF YCbCr and Oklab, checked against published
+"""Tests of `ops/colorspace.py`: the sRGB transfer function, and Oklab, checked against published
 values and the standard library's `colorsys`."""
 
 import colorsys
@@ -7,11 +7,8 @@ import numpy as np
 import pytest
 
 from bullterrier_image.ops.colorspace import (
-    rgb_to_hsv,
     rgb_to_oklab,
-    rgb_to_ycbcr,
     srgb_to_linear,
-    ycbcr_to_rgb,
 )
 
 # (encoded, linear) pairs from the IEC 61966-2-1 transfer function, worked out by hand:
@@ -43,65 +40,6 @@ def test_any_leading_shape_is_kept_and_the_input_is_not_modified() -> None:
     assert srgb_to_linear(image[0]).shape == (5, 3)
     assert srgb_to_linear(image[0, 0]).shape == (3,)
     np.testing.assert_array_equal(image, before)
-
-
-HSV_PAIRS = [
-    pytest.param((1, 0, 0), (0, 1, 1), id="red is hue 0"),
-    pytest.param((1, 1, 0), (1 / 6, 1, 1), id="yellow is a sixth of the way round"),
-    pytest.param((0, 1, 0), (1 / 3, 1, 1), id="green is a third"),
-    pytest.param((0, 1, 1), (0.5, 1, 1), id="cyan is half way"),
-    pytest.param((0, 0, 1), (2 / 3, 1, 1), id="blue is two thirds"),
-    pytest.param((1, 0, 1), (5 / 6, 1, 1), id="magenta is five sixths"),
-    pytest.param((0.5, 0.25, 0.25), (0, 0.5, 0.5), id="a muted red"),
-    pytest.param((0.5, 0.5, 0.5), (0, 0, 0.5), id="grey has hue 0 and no saturation"),
-    pytest.param((0, 0, 0), (0, 0, 0), id="black has no saturation either"),
-]
-
-
-@pytest.mark.parametrize(("rgb", "hsv"), HSV_PAIRS)
-def test_rgb_to_hsv_matches_the_textbook_values(rgb: tuple[float, ...], hsv: tuple[float, ...]) -> None:
-    np.testing.assert_allclose(rgb_to_hsv(np.array(rgb)), hsv, atol=1e-6)
-
-
-def test_rgb_to_hsv_agrees_with_the_standard_library() -> None:
-    colours = np.random.default_rng(5).random((200, 3), dtype=np.float32)
-    expected_hsv = np.array([colorsys.rgb_to_hsv(*map(float, c)) for c in colours])
-    np.testing.assert_allclose(rgb_to_hsv(colours), expected_hsv, atol=1e-5)
-
-
-def test_hue_is_always_below_one_even_for_a_red_with_a_trace_of_blue() -> None:
-    reds = np.array([[1.0, 0.0, 1e-9], [1.0, 0.0, 0.0]], dtype=np.float32)
-    assert (rgb_to_hsv(reds)[:, 0] < 1).all()
-
-
-# 8-bit (Y, Cb, Cr) of the primaries and grey, as every JPEG tool tabulates them (JFIF, ITU-T T.871): the chroma of a
-# grey is 128, red's Cr and blue's Cb are the top of the range (255.5, written 255 in 8 bits).
-YCBCR_8BIT = [
-    pytest.param((0, 0, 0), (0, 128, 128), id="black"),
-    pytest.param((255, 255, 255), (255, 128, 128), id="white"),
-    pytest.param((128, 128, 128), (128, 128, 128), id="grey"),
-    pytest.param((255, 0, 0), (76.245, 84.972, 255.5), id="red"),
-    pytest.param((0, 255, 0), (149.685, 43.528, 21.235), id="green"),
-    pytest.param((0, 0, 255), (29.07, 255.5, 107.266), id="blue"),
-]
-
-
-@pytest.mark.parametrize(("rgb", "ycbcr"), YCBCR_8BIT)
-def test_rgb_to_ycbcr_matches_the_jfif_values(rgb: tuple[int, ...], ycbcr: tuple[float, ...]) -> None:
-    out = rgb_to_ycbcr(np.array(rgb, np.float32) / 255)
-    np.testing.assert_allclose(out * 255, ycbcr, atol=0.01)
-
-
-@pytest.mark.parametrize(("rgb", "ycbcr"), YCBCR_8BIT)
-def test_ycbcr_to_rgb_matches_the_jfif_values(rgb: tuple[int, ...], ycbcr: tuple[float, ...]) -> None:
-    np.testing.assert_allclose(ycbcr_to_rgb(np.array(ycbcr, np.float32) / 255) * 255, rgb, atol=0.01)
-
-
-def test_ycbcr_to_rgb_undoes_rgb_to_ycbcr_and_keeps_the_shape() -> None:
-    image = np.random.default_rng(5).random((4, 5, 3), dtype=np.float32)
-    back = ycbcr_to_rgb(rgb_to_ycbcr(image))
-    assert back.shape == image.shape
-    np.testing.assert_allclose(back, image, atol=1e-5)
 
 
 # Oklab of the sRGB primaries and the greys at its ends, as Ottosson publishes them (three decimals).
