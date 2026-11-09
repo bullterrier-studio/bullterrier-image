@@ -852,7 +852,10 @@ def the_field(name: str, photo: np.ndarray, maps: dict[str, np.ndarray]) -> np.n
         "depth": maps["depth"],
         "subject": maps["subject"],
         "background": 1 - maps["subject"],
-        "light": photo @ LUMA,
+        # Rounded in the order the core sums in (red, then green, then blue, each product rounded to float32): `photo @
+        # LUMA` runs in BLAS, whose order and fused multiply-add differ by platform, and an ulp of light is
+        # amplified by effects such as relight to 4e-6, past this test's tolerance.
+        "light": photo[..., 0] * LUMA[0] + photo[..., 1] * LUMA[1] + photo[..., 2] * LUMA[2],
         "g": maps["g"],
         "middle": (maps["depth"] > 0.3) & (maps["depth"] < 0.7),
     }[name].astype(np.float32)
