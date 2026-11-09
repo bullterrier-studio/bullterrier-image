@@ -135,6 +135,7 @@ mod threads_rows;
 mod tile;
 mod tone;
 mod tone_map;
+mod topographic;
 mod torn;
 mod torn_edge;
 mod trace;
