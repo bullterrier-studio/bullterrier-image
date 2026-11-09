@@ -4,7 +4,7 @@
 //! flat area keeps its mean, an ordered pattern repeats.
 
 use bullterrier_image::Error;
-use bullterrier_image::effects::dither::{Init, Method, Palette, Params, Space};
+use bullterrier_image::effects::dither::{Init, Method, Palette, Params, Separation, Space};
 use bullterrier_image::params::Color;
 
 use crate::common::pictures::varied;
@@ -539,6 +539,176 @@ fn blue_noise_uses_every_level_of_its_tile_once_so_a_grey_of_k_sixteenths_lights
             .filter(|&&v| v > 0.5)
             .count();
         assert_eq!(lit, usize::from(whites) * 256, "{whites}/16");
+    }
+    Ok(())
+}
+
+// ---- inks ---------------------------------------------------------------------------------------------------------------
+
+const PAPER: [f32; 3] = [0.95, 0.93, 0.88];
+const PINK: [f32; 3] = [1.0, 0.3, 0.45];
+const BLUE: [f32; 3] = [0.17, 0.35, 1.0];
+const YELLOW: [f32; 3] = [1.0, 0.9, 0.1];
+
+fn inked(method: Method, inks: &[[f32; 3]]) -> Params {
+    Params {
+        method,
+        separation: Separation::Inks,
+        inks: inks.iter().map(|&ink| Color(ink)).collect(),
+        paper: Color(PAPER),
+        ..Params::default()
+    }
+}
+
+/// The colour of the inks whose bits are set in `mask` laid over the paper: each full ink multiplies a channel by its ratio
+/// to the paper (an ink lighter than the paper in a channel leaves it as it is).
+fn laid(inks: &[[f32; 3]], mask: usize) -> [f32; 3] {
+    [0, 1, 2].map(|c| {
+        (0..inks.len())
+            .filter(|ink| mask >> ink & 1 == 1)
+            .fold(PAPER[c], |light, ink| light * (inks[ink][c] / PAPER[c]).min(1.0))
+    })
+}
+
+/// Which inks (as bits) landed on each pixel, read from its colour; none of the combinations may be missed.
+fn landed(inks: &[[f32; 3]], picture: &[f32]) -> Vec<usize> {
+    pixels(picture)
+        .into_iter()
+        .map(|pixel| {
+            (0..1 << inks.len())
+                .find(|&mask| near(pixel, laid(inks, mask)))
+                .unwrap_or(usize::MAX)
+        })
+        .collect()
+}
+
+#[test]
+fn every_pixel_is_the_paper_under_some_combination_of_the_full_inks() -> Result<(), Error> {
+    let picture = (32, 32, varied(32, 32));
+    for inks in [vec![PINK], vec![PINK, BLUE], vec![PINK, BLUE, YELLOW]] {
+        for method in [
+            Method::FloydSteinberg,
+            Method::Atkinson,
+            Method::Bayer,
+            Method::BlueNoise,
+        ] {
+            let params = Params {
+                cell: 2.0,
+                ..inked(method, &inks)
+            };
+            let out = run(&params, &picture)?;
+            let layers = landed(&inks, &out);
+            assert!(
+                layers.iter().all(|&mask| mask != usize::MAX),
+                "{} inks, {method:?}",
+                inks.len()
+            );
+            // and the combinations are used: every ink lands somewhere
+            for ink in 0..inks.len() {
+                assert!(layers.iter().any(|mask| mask >> ink & 1 == 1), "ink {ink} never lands");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_share_of_pixels_an_ink_lands_on_is_its_unmixed_coverage() -> Result<(), Error> {
+    // 0.3 of pink and 0.6 of blue, printed as the flat colour to redraw
+    let flat =
+        [0, 1, 2].map(|c| PAPER[c] * (PINK[c] / PAPER[c]).min(1.0).powf(0.3) * (BLUE[c] / PAPER[c]).min(1.0).powf(0.6));
+    let picture = (64, 64, flat.repeat(64 * 64));
+    // Atkinson drops a quarter of the error, so it is left out: its tones are lighter or darker by design. The ordered
+    // methods work in sixteenths, so they are off by up to a thirty-second.
+    for method in [Method::FloydSteinberg, Method::Bayer, Method::BlueNoise] {
+        let out = run(&inked(method, &[PINK, BLUE]), &picture)?;
+        let layers = landed(&[PINK, BLUE], &out);
+        for (ink, coverage) in [(0, 0.3), (1, 0.6)] {
+            let landing = layers.iter().filter(|mask| *mask >> ink & 1 == 1).count();
+            let share = f32::from(u16::try_from(landing).unwrap_or(0)) / 4096.0;
+            assert!((share - coverage).abs() < 0.04, "{method:?} ink {ink}: {share}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn paper_stays_paper_and_a_full_ink_stays_that_ink() -> Result<(), Error> {
+    for method in [
+        Method::FloydSteinberg,
+        Method::Atkinson,
+        Method::Bayer,
+        Method::BlueNoise,
+    ] {
+        let on = |colour: [f32; 3]| -> Result<Vec<[f32; 3]>, Error> {
+            let picture = (16, 16, colour.repeat(256));
+            Ok(pixels(&run(&inked(method, &[PINK, BLUE]), &picture)?))
+        };
+        assert!(on(PAPER)?.iter().all(|&pixel| pixel == PAPER), "{method:?}");
+        assert!(
+            on(PINK)?.iter().all(|&pixel| near(pixel, laid(&[PINK, BLUE], 1))),
+            "{method:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn the_inks_matter_only_with_a_separation() -> Result<(), Error> {
+    let picture = (24, 24, varied(24, 24));
+    let plain = run(&Params::default(), &picture)?;
+    let with_unused = Params {
+        inks: vec![Color(YELLOW)],
+        paper: Color(PAPER),
+        offset: 9.0,
+        offset_angle: 33.0,
+        ..Params::default()
+    };
+    assert_eq!(plain, run(&with_unused, &picture)?);
+    Ok(())
+}
+
+#[test]
+fn ink_k_lands_k_offsets_away_along_the_angle_and_no_offset_leaves_the_angle_unused() -> Result<(), Error> {
+    let picture = (30, 30, varied(30, 30));
+    let inks = [PINK, BLUE, YELLOW];
+    let base = inked(Method::FloydSteinberg, &inks);
+    let in_register = landed(&inks, &run(&base, &picture)?);
+    let turned = Params {
+        offset_angle: 70.0,
+        ..base.clone()
+    };
+    assert_eq!(in_register, landed(&inks, &run(&turned, &picture)?), "offset 0");
+    // (right, down) of one offset, as whole pixels
+    for (offset, angle, step) in [
+        (3.0, 0.0, (3, 0)),
+        (2.0, 90.0, (0, 2)),
+        (2.0, 180.0, (-2, 0)),
+        (4.0, 360.0, (4, 0)),
+    ] {
+        let moved = Params {
+            offset,
+            offset_angle: angle,
+            ..base.clone()
+        };
+        let got = landed(&inks, &run(&moved, &picture)?);
+        for row in 0..30_isize {
+            for column in 0..30_isize {
+                for ink in 0..3_isize {
+                    let (from_row, from_column) = (row - step.1 * ink, column - step.0 * ink);
+                    let expected = if (0..30).contains(&from_row) && (0..30).contains(&from_column) {
+                        in_register[(from_row * 30 + from_column).cast_unsigned()] >> ink & 1
+                    } else {
+                        0
+                    };
+                    assert_eq!(
+                        got[(row * 30 + column).cast_unsigned()] >> ink & 1,
+                        expected,
+                        "ink {ink} at {row},{column}, offset {offset} at {angle}"
+                    );
+                }
+            }
+        }
     }
     Ok(())
 }

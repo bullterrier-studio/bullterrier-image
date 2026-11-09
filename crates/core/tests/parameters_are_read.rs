@@ -287,6 +287,27 @@ fn conditional() -> Vec<Conditional> {
             field: "custom",
             with: vec![("palette", json!("custom"))],
         },
+        // the inks, the paper and the offset matter only while the inks print
+        Conditional {
+            effect: "dither",
+            field: "inks",
+            with: vec![("separation", json!("inks"))],
+        },
+        Conditional {
+            effect: "dither",
+            field: "paper",
+            with: vec![("separation", json!("inks"))],
+        },
+        Conditional {
+            effect: "dither",
+            field: "offset",
+            with: vec![("separation", json!("inks"))],
+        },
+        Conditional {
+            effect: "dither",
+            field: "offset_angle",
+            with: vec![("separation", json!("inks")), ("offset", json!(5.0))],
+        },
         // the k-means rounds change the colours only when the starting colours are not yet the answer
         Conditional {
             effect: "dither",

@@ -10,6 +10,7 @@ use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start, kmeans, mean, nearest};
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{ATKINSON, FLOYD_STEINBERG, Tile, diffuse, ordered};
+use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
 use crate::ops::par;
 use crate::ops::random::{Rng, mix};
@@ -69,6 +70,15 @@ pub enum Palette {
     Custom,
 }
 
+/// How the colours are chosen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
+pub enum Separation {
+    /// From `palette`.
+    None,
+    /// One layer of dots per ink in `inks`, printed over `paper`.
+    Inks,
+}
+
 /// The colour space in which dots are matched to palette colours, the `photo` colours are searched, and errors are measured.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum Space {
@@ -93,7 +103,13 @@ pub enum Init {
 /// The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar
 /// the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in
 /// the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat
-/// colours. Colours are matched, and errors measured, in `space`.
+/// colours. Colours are matched, and errors measured, in `space`. `separation` 'inks' prints the `inks` instead (one to four
+/// colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours
+/// split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers
+/// printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`,
+/// `custom`, `colors`, `space`, `init`, `iterations`, `tolerance`, `sample` and `seed` are used only with no
+/// `separation`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
+/// misregistered on a press.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
@@ -157,6 +173,25 @@ pub struct Params {
     /// the same picture, another seed may find slightly different colours.
     #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
     pub seed: u32,
+    /// How the colours are chosen: 'none' (from `palette`) or 'inks' (one layer of dots per colour of `inks`, printed over
+    /// `paper` like transparent layers).
+    #[param(default = None)]
+    pub separation: Separation,
+    /// With 'inks' separation: the one to four ink colours ('#rrggbb', '#rgb' or three numbers 0..1), in the order they are
+    /// offset; ignored otherwise. Each pixel's colour is split into amounts of these inks.
+    #[param(default = ["#ff4d6d", "#2b59ff"], min_length = 1, max_length = 4)]
+    pub inks: Vec<Color>,
+    /// With 'inks' separation: the paper colour the inks are printed over, where no ink lands. Use a light one: inks only
+    /// darken it.
+    #[param(default = "#ffffff")]
+    pub paper: Color,
+    /// With 'inks' separation: how far in px the second ink's layer is moved from the first (the third twice as far, the
+    /// fourth three times), as ink misregistered on a press; 0 = all layers in register.
+    #[param(default = 0.0, unit = px, min = 0, max = 100)]
+    pub offset: f32,
+    /// With an `offset`: the direction of the move, in degrees clockwise on screen from the x axis (90 is downward).
+    #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)]
+    pub offset_angle: f32,
 }
 
 /// The name of the stream that picks the sample dots; the k-means starts from the stream of the seed itself.
@@ -316,22 +351,92 @@ fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
         .collect()
 }
 
+/// The `chosen` method on `values` (`size` dots), as a pattern of palette indices.
+fn pattern(method: Method, values: &[Point], size: (usize, usize), palette: &[Point], amount: f32) -> Vec<u8> {
+    match method {
+        Method::FloydSteinberg => diffuse(values, size, palette, &FLOYD_STEINBERG, amount),
+        Method::Atkinson => diffuse(values, size, palette, &ATKINSON, amount),
+        Method::Bayer => ordered(values, size, palette, Tile::Bayer, amount),
+        Method::BlueNoise => ordered(values, size, palette, Tile::BlueNoise, amount),
+    }
+}
+
+/// The inks printed: each ink's coverage of the dots is dithered to a layer of 0 and 1 (the layers in the order of the
+/// inks), moved by its share of the offset, and every pixel gets the print of the inks that land on it.
+fn printed(
+    dots: &[Point],
+    (rows, columns): (usize, usize),
+    cell: usize,
+    (height, width): (usize, usize),
+    params: &Params,
+) -> Image {
+    let colours: Vec<[f32; 3]> = params.inks.iter().map(|ink| ink.0).collect();
+    let inks = Inks::new(params.paper.0, &colours);
+    let count = colours.len().min(MOST_INKS);
+    let mut needed = vec![[0.0; MOST_INKS]; dots.len()];
+    par::rows(&mut needed, 1, |first, band| {
+        for (out, dot) in band.iter_mut().zip(&dots[first..]) {
+            *out = inks.coverages(*dot);
+        }
+    });
+    // an ink is the first channel of a dot; its two choices are no ink and full ink
+    let (none, full) = ([0.0; 3], [1.0, 0.0, 0.0]);
+    let mut plane = vec![none; dots.len()];
+    let layers: Vec<Vec<u8>> = (0..count)
+        .map(|ink| {
+            for (value, coverage) in plane.iter_mut().zip(&needed) {
+                value[0] = coverage[ink];
+            }
+            pattern(params.method, &plane, (rows, columns), &[none, full], params.pattern)
+        })
+        .collect();
+    // the print of every combination of inks, by the bits of the inks that land
+    let table: Vec<[f32; 3]> = (0..1_usize << count)
+        .map(|mask| inks.print(&std::array::from_fn(|ink| if mask >> ink & 1 == 1 { 1.0 } else { 0.0 })))
+        .collect();
+    // whole pixels: the nearest to the move
+    let whole_move = |away: f32| {
+        let pixels = whole(f64::from(away.abs())).cast_signed();
+        if away < 0.0 { -pixels } else { pixels }
+    };
+    let moves: Vec<[isize; 2]> = (0..count)
+        .map(|ink| shift(params.offset, params.offset_angle, ink).map(whole_move))
+        .collect();
+    let mut out = vec![[0.0; 3]; height * width];
+    par::rows(&mut out, width, |first_row, band| {
+        for (offset, line) in band.chunks_exact_mut(width).enumerate() {
+            let y = first_row + offset;
+            for (x, pixel) in line.iter_mut().enumerate() {
+                let mut mask = 0; // constant: no ink has landed yet
+                for (ink, (layer, by)) in layers.iter().zip(&moves).enumerate() {
+                    // where the layer comes from; none where that is off the picture
+                    let from =
+                        |at: usize, away: isize, size: usize| at.checked_add_signed(-away).filter(|&at| at < size);
+                    if let (Some(row), Some(column)) = (from(y, by[1], height), from(x, by[0], width)) {
+                        mask |= usize::from(layer[row / cell * columns + column / cell]) << ink;
+                    }
+                }
+                *pixel = table[mask];
+            }
+        }
+    });
+    Image::from_pixels(height, width, out)
+}
+
 /// The picture redrawn.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     let cell = whole(f64::from(params.cell)).max(1);
     let (rows, columns) = (height.div_ceil(cell), width.div_ceil(cell));
     let dots = averaged(picture.pixels(), (height, width), cell);
+    if params.separation == Separation::Inks {
+        return printed(&dots, (rows, columns), cell, (height, width), params);
+    }
     let matched = in_space(&dots, params.space);
     let palette = colours(&dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
     let size = (rows, columns);
-    let chosen = match params.method {
-        Method::FloydSteinberg => diffuse(&matched, size, &matched_palette, &FLOYD_STEINBERG, params.pattern),
-        Method::Atkinson => diffuse(&matched, size, &matched_palette, &ATKINSON, params.pattern),
-        Method::Bayer => ordered(&matched, size, &matched_palette, Tile::Bayer, params.pattern),
-        Method::BlueNoise => ordered(&matched, size, &matched_palette, Tile::BlueNoise, params.pattern),
-    };
+    let chosen = pattern(params.method, &matched, size, &matched_palette, params.pattern);
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {

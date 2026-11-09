@@ -455,6 +455,18 @@ fn cases() -> Vec<Case> {
                     .param("custom", json!(["#0b1026", "#ff5a36", "#f7e7c6"]))
                     .param("cell", 3),
                 Step::new("dither")
+                    .param("separation", "inks")
+                    .param("inks", json!(["#ff4d6d", "#2b59ff", "#ffd400"]))
+                    .param("paper", "#f4efe4")
+                    .param("method", "atkinson")
+                    .param("cell", 2)
+                    .param("offset", 3.5)
+                    .param("offset_angle", 30.0),
+                Step::new("dither")
+                    .param("separation", "inks")
+                    .param("paper", "#f4efe4")
+                    .param("method", "blue_noise"),
+                Step::new("dither")
                     .param("method", "atkinson")
                     .param("colors", 5)
                     .param("sample", 500),
