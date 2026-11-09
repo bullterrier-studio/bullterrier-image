@@ -49,8 +49,8 @@ fn blocks_of_grey(levels: &[u8], across: usize) -> (Vec<f32>, usize, usize) {
 }
 
 /// A gentle colour gradient inside 0.3..0.7, so that damage never runs into the ends of the range and hides.
+#[expect(clippy::cast_precision_loss, reason = "a test picture is small")]
 fn smooth(height: usize, width: usize) -> Vec<f32> {
-    #[expect(clippy::cast_precision_loss, reason = "a test picture is small")]
     let (h, w) = (height as f32, width as f32);
     (0..height)
         .flat_map(|y| (0..width).map(move |x| (y as f32, x as f32)))
