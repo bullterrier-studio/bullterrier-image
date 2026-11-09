@@ -5,7 +5,6 @@ An architecture test of the tooling: its subject is the `[tool.deptry]` configur
 deptry the way `uv run poe check` does, on a copy of the package into which the offending import is written.
 """
 
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -49,10 +48,9 @@ def test_a_declared_dependency_nothing_imports_fails_naming_it(project_copy):
     checkout = project_copy("pyproject.toml")
     pyproject = checkout / "pyproject.toml"
     text = pyproject.read_text(encoding="utf-8")
-    # `dependencies = []` in the template's demo; a project that has some gets one more at the start of its list
-    declared = re.sub(r"^dependencies = \[", 'dependencies = ["pluggy", ', text, count=1, flags=re.MULTILINE)
-    assert declared != text
-    pyproject.write_text(declared, encoding="utf-8")
+    # first in the project's own list, whatever it holds already (`[]`, or runtime dependencies such as numpy)
+    assert "\ndependencies = [" in text
+    pyproject.write_text(text.replace("\ndependencies = [", '\ndependencies = ["pluggy", ', 1), encoding="utf-8")
     result = deptry(checkout)
     report = result.stdout + result.stderr
     assert result.returncode != 0, report
