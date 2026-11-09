@@ -8,7 +8,7 @@ use crate::ops::blur::gaussian_filter;
 use crate::ops::cast;
 use crate::ops::color::luminance;
 use crate::ops::edge::EdgeOrConstant;
-use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, SPOT_SCREEN_STEP};
+use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, SPOT_SCREEN_STEP, shift};
 use crate::ops::length::{float, whole};
 use crate::ops::par;
 use crate::params::{Choice, Color, Params};
@@ -157,8 +157,6 @@ fn pixel(value: f32, last: usize) -> usize {
 
 /// The screens of the inks: each turned by `angle` and the ink's own extra angle, and moved by its share of the offset.
 fn screens(params: &Params, count: usize) -> Vec<Screen> {
-    // a full turn is exactly the first, so min and max of the angle give the same screen
-    let travel = f64::from(params.offset_angle).rem_euclid(360.0).to_radians(); // constant: a full turn in degrees
     (0..count)
         .map(|ink| {
             let extra = match params.separation {
@@ -167,11 +165,10 @@ fn screens(params: &Params, count: usize) -> Vec<Screen> {
                 Separation::Spot => SPOT_SCREEN_STEP * float(ink),
             };
             let turn = (f64::from(params.angle) + extra).rem_euclid(360.0).to_radians(); // constant: a full turn in degrees
-            let away = f64::from(params.offset) * float(ink);
             Screen {
                 sin: cast::single(turn.sin()),
                 cos: cast::single(turn.cos()),
-                shift: [cast::single(away * travel.cos()), cast::single(away * travel.sin())],
+                shift: shift(params.offset, params.offset_angle, ink),
             }
         })
         .collect()

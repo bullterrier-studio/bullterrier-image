@@ -29,6 +29,14 @@ pub(crate) const CMYK_SCREEN_ANGLES: [f64; MOST_INKS] = [15.0, 75.0, 0.0, 45.0];
 /// 90 degrees after which a square grid repeats.
 pub(crate) const SPOT_SCREEN_STEP: f64 = 30.0; // constant: 90 / 3, see above
 
+/// Where ink `ink` is moved from the first ink (misregistration): `ink` times `offset` px along `angle` degrees clockwise
+/// on screen from the x axis, as (right, down). A full turn of `angle` is the same as none.
+pub(crate) fn shift(offset: f32, angle: f32, ink: usize) -> [f32; 2] {
+    let travel = f64::from(angle).rem_euclid(360.0).to_radians(); // constant: a full turn in degrees
+    let away = f64::from(offset) * crate::ops::length::float(ink);
+    [away * travel.cos(), away * travel.sin()].map(crate::ops::cast::single)
+}
+
 /// Up to four inks over a paper.
 #[derive(Debug, Clone)]
 pub(crate) struct Inks {
@@ -292,5 +300,13 @@ mod tests {
         // half as light as the paper in red and blue, a quarter in green: black takes the common half, magenta the rest
         let found = inks.cmyk_amounts([PAPER[0] * 0.5, PAPER[1] * 0.25, PAPER[2] * 0.5]);
         assert!(close(&found, &[0.0, 0.5, 0.0, 0.5], 1e-5), "{found:?}");
+    }
+
+    #[test]
+    fn the_shift_of_ink_k_is_k_offsets_along_the_angle_and_a_full_turn_is_none() {
+        assert_eq!(shift(5.0, 0.0, 0), [0.0, 0.0]);
+        assert_eq!(shift(5.0, 0.0, 2), [10.0, 0.0]);
+        assert!(close(&shift(2.0, 90.0, 3), &[0.0, 6.0], 1e-5));
+        assert_eq!(shift(5.0, 360.0, 1), shift(5.0, 0.0, 1));
     }
 }
