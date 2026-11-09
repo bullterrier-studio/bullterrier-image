@@ -65,6 +65,7 @@ mod lut_effect;
 mod melt;
 mod motion_blur;
 mod noise;
+mod ntsc;
 mod noise_field;
 mod paper_texture;
 mod parallax;
