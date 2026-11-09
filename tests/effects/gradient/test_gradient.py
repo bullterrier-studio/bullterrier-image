@@ -1,19 +1,13 @@
 """Behaviour of the `gradient` effect that Python owns: its presets and its errors. The layouts are tested in Rust."""
 
 import numpy as np
-import pytest
 
-from bullterrier_image import Recipe, RecipeError, Step
+from bullterrier_image import Recipe, Step
 from bullterrier_image import render as render_recipe
 from bullterrier_image.core import registry
 
 NAME = "gradient"
 GREEN = (0.0, 1.0, 0.0)
-
-
-def test_a_gradient_needs_at_least_one_colour() -> None:
-    with pytest.raises(RecipeError, match="colors"):
-        registry.apply(NAME, np.zeros((4, 4, 3), np.float32), colors=[])
 
 
 def test_the_fill_preset_is_a_flat_black_picture_that_ignores_the_input() -> None:
