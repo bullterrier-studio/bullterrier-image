@@ -34,10 +34,10 @@ pub(crate) fn linear_to_srgb(value: f32) -> f32 {
 /// The NTSC YIQ of television (FCC 47 CFR 73.682): row 0 gives Y, the luma (the Rec. 601 weights), row 1 I, the
 /// orange-cyan axis of the colour, row 2 Q, its green-magenta axis; a grey has I = Q = 0.
 const RGB_TO_YIQ: [[f64; 3]; 3] = [
-    [0.299, 0.587, 0.114],
-    [0.5959, -0.2746, -0.3213],
-    [0.2115, -0.5227, 0.3112],
-]; // constant: the FCC YIQ matrix, as four-digit coefficients
+    [0.299, 0.587, 0.114],      // constant: the FCC YIQ matrix, as four-digit coefficients (Y row)
+    [0.5959, -0.2746, -0.3213], // constant: the FCC YIQ matrix (I row)
+    [0.2115, -0.5227, 0.3112],  // constant: the FCC YIQ matrix (Q row)
+];
 
 /// The cofactor of entry (`a`, `b`) of the 3 x 3 matrix `m`: the determinant of what is left without its row and column,
 /// the rows and columns taken in a cycle so that the sign is right.
@@ -51,9 +51,9 @@ const fn cofactor(m: &[[f64; 3]; 3], a: usize, b: usize) -> f64 {
 const fn inverse(m: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
     let determinant = m[0][0] * cofactor(m, 0, 0) + m[0][1] * cofactor(m, 0, 1) + m[0][2] * cofactor(m, 0, 2);
     let mut out = [[0.0; 3]; 3];
-    let mut row = 0;
+    let mut row = 0; // constant: a counter starts at the first row
     while row < 3 {
-        let mut column = 0;
+        let mut column = 0; // constant: a counter starts at the first column
         while column < 3 {
             out[row][column] = cofactor(m, column, row) / determinant;
             column += 1;
