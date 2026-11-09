@@ -17,4826 +17,3669 @@ class _Effect[**P](Protocol):
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Step: ...
 
 def _effect[**P](function: collections.abc.Callable[P, Step]) -> _Effect[P]: ...
+
 @_effect
-def ambient_occlusion(
-    *,
-    field: str = "depth",
-    radius: float = 10.0,
-    gain: float = 4.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 0.6,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def ambient_occlusion(*, field: str = 'depth', radius: float = 10.0, gain: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """An ambient occlusion: each pixel darkened by `gain` times how much farther it lies than the depth around it, within `radius`.  Darken the places the depth says are sheltered: creases, and the ground or wall right beside something nearer. Screen-space, from the depth alone: a pixel's cavity is the depth averaged by a Gaussian of sigma `radius` minus its own depth, positive where it lies farther than its surroundings. It is darkened by clip(gain x cavity, 0, 1), one grey factor on every channel, so the colour ratios are kept and nothing is brightened. Flat and evenly sloping depths are left as they are. A depth step at a subject's outline darkens its farther side (a contact shadow) and leaves the nearer side alone; raising `radius` widens that shadow. The step's `opacity` sets how much is mixed in.
 
-    Parameters
-    ----------
-    field : field name, default 'depth'
-        The field read as how near each pixel is, 1 = nearest: `depth` (the scene's depth),
-        `light` (bright parts stand nearer, so dark creases between them darken), `subject`
-        (a contact shadow around the subject), or a region of the recipe.
-    radius : number, px, 1 to 200, default 10.0
-        The size of the neighbourhood that counts as shelter, the Gaussian sigma in px at
-        the recipe's size over which the surrounding depth is averaged. Raising it darkens
-        wider areas around nearer things; lowering it keeps the darkening to fine creases.
-    gain : number, ratio, 1 to 100, default 4.0
-        How strongly a depth difference darkens: a pixel lying d farther than its
-        surroundings (depth 0..1) is darkened by gain x d, at most to black. Raising it
-        darkens shallow creases more and turns deep ones black sooner.
+Parameters
+----------
+field : field name, default 'depth'
+    The field read as how near each pixel is, 1 = nearest: `depth` (the scene's depth),
+    `light` (bright parts stand nearer, so dark creases between them darken), `subject`
+    (a contact shadow around the subject), or a region of the recipe.
+radius : number, px, 1 to 200, default 10.0
+    The size of the neighbourhood that counts as shelter, the Gaussian sigma in px at
+    the recipe's size over which the surrounding depth is averaged. Raising it darkens
+    wider areas around nearer things; lowering it keeps the darkening to fine creases.
+gain : number, ratio, 1 to 100, default 4.0
+    How strongly a depth difference darkens: a pixel lying d farther than its
+    surroundings (depth 0..1) is darkened by gain x d, at most to black. Raising it
+    darkens shallow creases more and turns deep ones black sooner.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the averaging Gaussian is cut off, in sigmas: it reaches truncate x radius px.
-        Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the averaging sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated) or 'wrap' (the opposite edge, so a tileable picture darkens without a
-        seam).
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the averaging Gaussian is cut off, in sigmas: it reaches truncate x radius px.
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the averaging sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge, so a tileable picture darkens without a
+    seam).
 
-    Step opacity
-    ------------
-    0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
+Step opacity
+------------
+0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
     ...
 
 @_effect
-def anamorphic_streaks(
-    *,
-    length: float = 168.0,
-    threshold: float = 0.7,
-    amount: float = 6.0,
-    color: str | list[float] | tuple[float, float, float] = "#8fb8ff",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def anamorphic_streaks(*, length: float = 168.0, threshold: float = 0.7, amount: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#8fb8ff', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened over the picture by `amount`.  The smear is a two-sided exponential, exp(-|distance| / s) with s = `length` px, scaled to add up to 1: a sharp bright core with long tails, which is what a streak looks like (a Gaussian would not carry far enough). It runs along the rows only, so nothing leaks up or down, and no light comes in from beyond the picture's edge. The picture only ever gets brighter, and black stays black.
 
-    Parameters
-    ----------
-    length : number, px, 0.5 to 480, default 168.0
-        How far the streaks reach sideways, in px tuned for a picture about 480 px high: the
-        distance over which a streak fades to 37% of its brightness (the faint tail runs on,
-        to the picture's edge). Raising it makes longer, fainter streaks.
-    threshold : number, fraction, 0 to 0.99, default 0.7
-        The brightness (0..1, per channel) where a streak starts: only values above it light
-        the streaks, rising to full at 1. Raising it limits the streaks to the brightest
-        highlights.
-    amount : number, ratio, 0 to 10, default 6.0
-        How strongly the streaks are screened over the picture: 0 = off; the streak is
-        spread thin along its length, so a long one needs a high amount (above 1 it
-        saturates to white sooner).
-    color : colour, default '#8fb8ff'
-        The tint of the streaks: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the
-        cool blue of coated anamorphic lenses; white keeps the colour of the light that
-        makes them."""
+Parameters
+----------
+length : number, px, 0.5 to 480, default 168.0
+    How far the streaks reach sideways, in px tuned for a picture about 480 px high: the
+    distance over which a streak fades to 37% of its brightness (the faint tail runs on,
+    to the picture's edge). Raising it makes longer, fainter streaks.
+threshold : number, fraction, 0 to 0.99, default 0.7
+    The brightness (0..1, per channel) where a streak starts: only values above it light
+    the streaks, rising to full at 1. Raising it limits the streaks to the brightest
+    highlights.
+amount : number, ratio, 0 to 10, default 6.0
+    How strongly the streaks are screened over the picture: 0 = off; the streak is
+    spread thin along its length, so a long one needs a high amount (above 1 it
+    saturates to white sooner).
+color : colour, default '#8fb8ff'
+    The tint of the streaks: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the
+    cool blue of coated anamorphic lenses; white keeps the colour of the light that
+    makes them."""
     ...
 
 @_effect
-def ascii(
-    *,
-    cell: int = 10,
-    chars: str = " .:-=+*#%@",
-    ink: str | list[float] | tuple[float, float, float] | None = None,
-    ink_floor: float = 0.35,
-    paper: str | list[float] | tuple[float, float, float] = "#000000",
-    paper_threshold: float = 0.5,
-    gamma: float = 1.0,
-    photo: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def ascii(*, cell: int = 10, chars: str = ' .:-=+*#%@', ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, gamma: float = 1.0, photo: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.
 
-    Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's
-    tones survive as denser and lighter characters.
+Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's
+tones survive as denser and lighter characters.
 
-    Parameters
-    ----------
-    cell : whole number, px, 1 to 200, default 10
-        Width of one character, 1 to 200 px; the height follows from the font. Smaller =
-        finer detail, more characters.
-    chars : text, default ' .:-=+*#%@'
-        The character palette, in any order, at least two different characters. It is sorted
-        by how much ink each glyph puts down, so the densest is used for the brightest areas
-        on dark paper and the darkest on light paper (see `paper`). Try ' .:-=+*#%@', '
-        .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the Latin letters and the
-        block elements, not braille.
-    ink : colour or none, default None
-        The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the
-        default) colours each character from the average colour of the photo under it,
-        brightened so thin strokes stay readable: scaled until its strongest channel is
-        full, by at most 1 / `ink_floor` (never darkened).
-    ink_floor : number, fraction, 0.01 to 1, default 0.35
-        With no `ink`: the most a character's colour is brightened, as a floor 0.01 to 1 on
-        its strongest channel: a colour whose strongest channel is below it is scaled by 1 /
-        ink_floor instead of up to full, so dark areas stay dark. Lowering it brightens dark
-        colours more (and their noise); 1 = colours as they are.
-    paper : colour, default '#000000'
-        The paper colour behind the characters. Dark paper (Rec. 709 luminance below
-        `paper_threshold`) puts dense characters on bright areas; lighter paper puts them on
-        dark areas.
-    paper_threshold : number, fraction, 0 to 1, default 0.5
-        The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (dense characters
-        on bright areas) rather than light (dense characters on dark areas); 0.5 = mid grey.
-        Raising it lets lighter paper count as dark: 0 treats every paper as light, 1 every
-        paper but white as dark.
-    gamma : number, ratio, 0.1 to 10, default 1.0
-        Exponent on the amount of ink each character puts down, 0.1 to 10: 1 = linear, above
-        1 lighter midtones (less ink), below 1 more ink.
-    photo : number, fraction, 0 to 1, default 0.0
-        How much of the original picture shows through the paper behind the characters, 0 to
-        1: 0 = text on flat `paper` (fine detail is lost to the grid), 1 = text laid over
-        the untouched photo."""
+Parameters
+----------
+cell : whole number, px, 1 to 200, default 10
+    Width of one character, 1 to 200 px; the height follows from the font. Smaller =
+    finer detail, more characters.
+chars : text, default ' .:-=+*#%@'
+    The character palette, in any order, at least two different characters. It is sorted
+    by how much ink each glyph puts down, so the densest is used for the brightest areas
+    on dark paper and the darkest on light paper (see `paper`). Try ' .:-=+*#%@', '
+    .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the Latin letters and the
+    block elements, not braille.
+ink : colour or none, default None
+    The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the
+    default) colours each character from the average colour of the photo under it,
+    brightened so thin strokes stay readable: scaled until its strongest channel is
+    full, by at most 1 / `ink_floor` (never darkened).
+ink_floor : number, fraction, 0.01 to 1, default 0.35
+    With no `ink`: the most a character's colour is brightened, as a floor 0.01 to 1 on
+    its strongest channel: a colour whose strongest channel is below it is scaled by 1 /
+    ink_floor instead of up to full, so dark areas stay dark. Lowering it brightens dark
+    colours more (and their noise); 1 = colours as they are.
+paper : colour, default '#000000'
+    The paper colour behind the characters. Dark paper (Rec. 709 luminance below
+    `paper_threshold`) puts dense characters on bright areas; lighter paper puts them on
+    dark areas.
+paper_threshold : number, fraction, 0 to 1, default 0.5
+    The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (dense characters
+    on bright areas) rather than light (dense characters on dark areas); 0.5 = mid grey.
+    Raising it lets lighter paper count as dark: 0 treats every paper as light, 1 every
+    paper but white as dark.
+gamma : number, ratio, 0.1 to 10, default 1.0
+    Exponent on the amount of ink each character puts down, 0.1 to 10: 1 = linear, above
+    1 lighter midtones (less ink), below 1 more ink.
+photo : number, fraction, 0 to 1, default 0.0
+    How much of the original picture shows through the paper behind the characters, 0 to
+    1: 0 = text on flat `paper` (fine detail is lost to the grid), 1 = text laid over
+    the untouched photo."""
     ...
 
 @_effect
-def aurora(
-    *,
-    colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ("#2bff9a", "#7a2cff"),
-    sky: str | list[float] | tuple[float, float, float] = "#02050f",
-    base: float = 0.75,
-    height: float = 336.0,
-    falloff: float = 0.8,
-    waviness: float = 40.0,
-    scale: float = 200.0,
-    rays: float = 0.7,
-    ray_width: float = 10.0,
-    octaves: int = 3,
-    persistence: float = 0.5,
-    lacunarity: float = 2.0,
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def aurora(*, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#2bff9a', '#7a2cff'), sky: str | list[float] | tuple[float, float, float] = '#02050f', base: float = 0.75, height: float = 336.0, falloff: float = 0.8, waviness: float = 40.0, scale: float = 200.0, rays: float = 0.7, ray_width: float = 10.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky.  A generated background: the input is used only for its height and width, its content is ignored. In column x the curtain's base is the row `base` x height + `waviness` x ripple(x), the ripple being fractal noise of unit deviation along the picture (`scale`). A pixel d = (rows above the base) / `height` up the curtain has brightness (1 - d)^`falloff`, 0 below the base (a 1 px anti-aliased edge) and above d = 1, times the column's ray, 1 - `rays` x (1 - r) with r in 0..1 the rank of a second fractal noise along the picture (`ray_width`). Its colour is `colors` at d, mixed into `sky` by that brightness.
 
-    Parameters
-    ----------
-    colors : list of colours, default ('#2bff9a', '#7a2cff')
-        The curtain's colours from its base to its top, evenly spaced along the way up; at
-        least two. The classic aurora is green at the base turning violet or red higher up.
-    sky : colour, default '#02050f'
-        The colour of the night sky, seen below the curtain's base, above its top and
-        between its rays: '#rrggbb', '#rgb' or [r, g, b] 0..1. A very dark blue looks better
-        than pure black.
-    base : number, fraction, 0 to 1, default 0.75
-        Where the curtain's bright lower edge lies, as a fraction of the picture's height
-        from the top (0 = the top edge, 1 = the bottom edge). Below it the sky is dark.
-        Waviness moves it up and down along the picture.
-    height : number, px, 1 to 4000, default 336.0
-        How far up from its base the curtain reaches before it has faded out completely, in
-        pixels; tuned for a picture about 480 px high (the default is 0.7 of that). Larger =
-        a taller curtain.
-    waviness : number, px, 0 to 500, default 40.0
-        How far the curtain's base wanders up and down across the picture, in pixels: the
-        typical distance from the `base` line (the standard deviation of the ripple); tuned
-        for a picture about 480 px high. 0 = a straight, level base.
-    rays : number, fraction, 0 to 1, default 0.7
-        How strongly the curtain is broken into vertical rays: each ray has a brightness of
-        its own and this is how far the dimmest drop below the brightest. 0 = a smooth, even
-        curtain, 1 = rays separated by dark sky.
-    octaves : whole number, count, 1 to 8, default 3
-        How many layers of noise are summed for the base's wobble and for the rays, each
-        finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth,
-        more = more ragged detail. Layers finer than one pixel are dropped.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same curtain (its folds and its rays),
-        another seed a different one.
+Parameters
+----------
+colors : list of colours, default ('#2bff9a', '#7a2cff')
+    The curtain's colours from its base to its top, evenly spaced along the way up; at
+    least two. The classic aurora is green at the base turning violet or red higher up.
+sky : colour, default '#02050f'
+    The colour of the night sky, seen below the curtain's base, above its top and
+    between its rays: '#rrggbb', '#rgb' or [r, g, b] 0..1. A very dark blue looks better
+    than pure black.
+base : number, fraction, 0 to 1, default 0.75
+    Where the curtain's bright lower edge lies, as a fraction of the picture's height
+    from the top (0 = the top edge, 1 = the bottom edge). Below it the sky is dark.
+    Waviness moves it up and down along the picture.
+height : number, px, 1 to 4000, default 336.0
+    How far up from its base the curtain reaches before it has faded out completely, in
+    pixels; tuned for a picture about 480 px high (the default is 0.7 of that). Larger =
+    a taller curtain.
+waviness : number, px, 0 to 500, default 40.0
+    How far the curtain's base wanders up and down across the picture, in pixels: the
+    typical distance from the `base` line (the standard deviation of the ripple); tuned
+    for a picture about 480 px high. 0 = a straight, level base.
+rays : number, fraction, 0 to 1, default 0.7
+    How strongly the curtain is broken into vertical rays: each ray has a brightness of
+    its own and this is how far the dimmest drop below the brightest. 0 = a smooth, even
+    curtain, 1 = rays separated by dark sky.
+octaves : whole number, count, 1 to 8, default 3
+    How many layers of noise are summed for the base's wobble and for the rays, each
+    finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth,
+    more = more ragged detail. Layers finer than one pixel are dropped.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same curtain (its folds and its rays),
+    another seed a different one.
 
-    Advanced parameters
-    -------------------
-    falloff : number, ratio, 0.2 to 8, default 0.8
-        How fast the light fades going up: the brightness at a height h above the base, as a
-        fraction of the curtain's height, is (1 - h) to this power. 1 = a straight fade,
-        above 1 = a bright edge with the glow quickly falling away, below 1 = light that
-        reaches high before dimming.
-    scale : number, px, 2 to 2048, default 200.0
-        Size in pixels, along the picture, of the curtain's coarsest ripples: the spacing of
-        the first noise lattice of the base's wobble. Larger = long, slow folds; small = a
-        quickly rippling hem.
-    ray_width : number, px, 1 to 256, default 10.0
-        Width in pixels of the broadest rays, the spacing of the first noise lattice across
-        the picture; tuned for a picture about 480 px high. Larger = a few wide shafts;
-        small = a fine comb of streaks.
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weaker each finer layer of the wobble and the rays is than the one before:
-        each layer's weight is this to the power of its number. 0 = only the coarsest layer,
-        1 = every layer equally strong.
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer is than the one before: the lattice spacing is divided by
-        this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
-        detail drops off faster in size."""
+Advanced parameters
+-------------------
+falloff : number, ratio, 0.2 to 8, default 0.8
+    How fast the light fades going up: the brightness at a height h above the base, as a
+    fraction of the curtain's height, is (1 - h) to this power. 1 = a straight fade,
+    above 1 = a bright edge with the glow quickly falling away, below 1 = light that
+    reaches high before dimming.
+scale : number, px, 2 to 2048, default 200.0
+    Size in pixels, along the picture, of the curtain's coarsest ripples: the spacing of
+    the first noise lattice of the base's wobble. Larger = long, slow folds; small = a
+    quickly rippling hem.
+ray_width : number, px, 1 to 256, default 10.0
+    Width in pixels of the broadest rays, the spacing of the first noise lattice across
+    the picture; tuned for a picture about 480 px high. Larger = a few wide shafts;
+    small = a fine comb of streaks.
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer of the wobble and the rays is than the one before:
+    each layer's weight is this to the power of its number. 0 = only the coarsest layer,
+    1 = every layer equally strong.
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before: the lattice spacing is divided by
+    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
+    detail drops off faster in size."""
     ...
 
 @_effect
-def auto_levels(
-    *,
-    clip: float = 0.005,
-    mode: Literal["linked", "per_channel"] = "per_channel",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def auto_levels(*, clip: float = 0.005, mode: Literal['linked', 'per_channel'] = 'per_channel', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end.  The black and white points are read from the picture itself: the `clip` share of the darkest values and of the brightest values (counted per channel, or over all channels together when `mode` is `linked`) end up saturated, and the rest is spread linearly between. A channel with no range (every value equal) is left as it is.
 
-    Parameters
-    ----------
-    clip : number, fraction, 0 to 0.45, default 0.005
-        The share of values (0..0.45) that end up saturated at each end, pure black and pure
-        white: 0.005 is 0.5 percent, 0 stretches exactly from the darkest to the brightest
-        value. Raising it gives more contrast and ignores stray dark or bright pixels, at
-        the cost of detail in the extremes.
-    mode : one of 'linked', 'per_channel', default 'per_channel'
-        What is stretched: `per_channel` stretches red, green and blue separately, which
-        also removes a colour cast but shifts colours (Photoshop's Enhance Per Channel
-        Contrast); `linked` finds one black and one white point over all channels together
-        and stretches them alike, so colours keep their relationships (Enhance Monochromatic
-        Contrast)."""
+Parameters
+----------
+clip : number, fraction, 0 to 0.45, default 0.005
+    The share of values (0..0.45) that end up saturated at each end, pure black and pure
+    white: 0.005 is 0.5 percent, 0 stretches exactly from the darkest to the brightest
+    value. Raising it gives more contrast and ignores stray dark or bright pixels, at
+    the cost of detail in the extremes.
+mode : one of 'linked', 'per_channel', default 'per_channel'
+    What is stretched: `per_channel` stretches red, green and blue separately, which
+    also removes a colour cast but shifts colours (Photoshop's Enhance Per Channel
+    Contrast); `linked` finds one black and one white point over all channels together
+    and stretches them alike, so colours keep their relationships (Enhance Monochromatic
+    Contrast)."""
     ...
 
 @_effect
-def blend(
-    *,
-    image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = "#808080",
-    mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "multiply",
-    fit: Literal["cover", "contain", "stretch", "width", "tile"] = "cover",
-    at: Literal[
-        "top_left", "top", "top_right", "left", "center", "right", "bottom_left", "bottom", "bottom_right"
-    ] = "center",
-    scale: float = 1.0,
-    margin: float = 0.0,
-    resample: Literal["nearest", "bilinear", "bicubic", "lanczos"] = "lanczos",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["overlay"] | None = None,
-) -> Step:
+def blend(*, image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#808080', mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'width', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['overlay'] | None = None) -> Step:
     """Lay a second picture over the photo with a blend mode (overlay a logo, double exposure), fitted by cover,
-    contain, stretch, width or tile.
+contain, stretch, width or tile.
 
-    Parameters
-    ----------
-    image : picture, default '#808080'
-        The picture laid over the photo (a texture, a light leak): a path in a recipe file
-        (relative to the file), a colour such as '#808080' (a flat picture) or, in Python, a
-        Picture or an array. Its own transparency is respected.
-    mode : one of 'normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color', default 'multiply'
-        How the picture combines with the photo, as the W3C Compositing and Blending Level 1
-        modes: 'normal' shows the picture, 'multiply' darkens, 'screen' lightens, 'overlay'
-        deepens contrast by the photo's tones, 'soft_light' does so gently by the picture's,
-        'difference' subtracts, 'color' gives the photo the picture's hue and saturation and
-        keeps its brightness. Mid grey leaves the photo unchanged under 'overlay' and
-        'soft_light'.
-    fit : one of 'cover', 'contain', 'stretch', 'width', 'tile', default 'cover'
-        How the picture is fitted to the photo: 'cover' fills it keeping the aspect and
-        crops the overhang, 'contain' fits inside it keeping the aspect (the rest of the
-        photo is untouched), 'stretch' fills it ignoring the aspect, 'width' keeps the
-        aspect and makes the picture as wide as the photo times `scale` (a logo or sticker),
-        'tile' repeats that picture over the photo.
-    at : one of 'top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right', default 'center'
-        Where the fitted picture sits, or which tile sits there: 'top_left', 'top',
-        'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom' or 'bottom_right'.
-        It decides what 'cover' crops.
-    scale : number, ratio, 0.01 to 2, default 1.0
-        The fitted picture's size as a multiple of the size `fit` gives it: 1 as fitted, 0.5
-        half as wide and tall. With 'width' it is the picture's width as a share of the
-        photo's (0.2 a fifth); with 'tile', 0.25 puts four tiles across the photo.
-    margin : number, px, 0 to 216, default 0.0
-        Space kept clear around the fitted picture on every side, 0 to 216 px (never more
-        than leaves a pixel of the shorter side). Raising it shrinks what 'cover', 'contain'
-        and 'stretch' fill and moves a smaller picture at an edge or corner inward.
+Parameters
+----------
+image : picture, default '#808080'
+    The picture laid over the photo (a texture, a light leak): a path in a recipe file
+    (relative to the file), a colour such as '#808080' (a flat picture) or, in Python, a
+    Picture or an array. Its own transparency is respected.
+mode : one of 'normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color', default 'multiply'
+    How the picture combines with the photo, as the W3C Compositing and Blending Level 1
+    modes: 'normal' shows the picture, 'multiply' darkens, 'screen' lightens, 'overlay'
+    deepens contrast by the photo's tones, 'soft_light' does so gently by the picture's,
+    'difference' subtracts, 'color' gives the photo the picture's hue and saturation and
+    keeps its brightness. Mid grey leaves the photo unchanged under 'overlay' and
+    'soft_light'.
+fit : one of 'cover', 'contain', 'stretch', 'width', 'tile', default 'cover'
+    How the picture is fitted to the photo: 'cover' fills it keeping the aspect and
+    crops the overhang, 'contain' fits inside it keeping the aspect (the rest of the
+    photo is untouched), 'stretch' fills it ignoring the aspect, 'width' keeps the
+    aspect and makes the picture as wide as the photo times `scale` (a logo or sticker),
+    'tile' repeats that picture over the photo.
+at : one of 'top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right', default 'center'
+    Where the fitted picture sits, or which tile sits there: 'top_left', 'top',
+    'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom' or 'bottom_right'.
+    It decides what 'cover' crops.
+scale : number, ratio, 0.01 to 2, default 1.0
+    The fitted picture's size as a multiple of the size `fit` gives it: 1 as fitted, 0.5
+    half as wide and tall. With 'width' it is the picture's width as a share of the
+    photo's (0.2 a fifth); with 'tile', 0.25 puts four tiles across the photo.
+margin : number, px, 0 to 216, default 0.0
+    Space kept clear around the fitted picture on every side, 0 to 216 px (never more
+    than leaves a pixel of the shorter side). Raising it shrinks what 'cover', 'contain'
+    and 'stretch' fill and moves a smaller picture at an edge or corner inward.
 
-    Advanced parameters
-    -------------------
-    resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
-        The filter that sizes the picture: 'nearest' keeps hard pixels, 'bilinear' is soft,
-        'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking.
+Advanced parameters
+-------------------
+resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
+    The filter that sizes the picture: 'nearest' keeps hard pixels, 'bilinear' is soft,
+    'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking.
 
-    Presets
-    -------
-    overlay : An overlay: a logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency."""
+Presets
+-------
+overlay : An overlay: a logo or sticker in the bottom right corner, a fifth of the photo's width, with its own transparency."""
     ...
 
 @_effect
-def bloom(
-    *,
-    radius: float | Drive = 32.0,
-    threshold: float = 0.6,
-    amount: float | Drive = 0.7,
-    color: str | list[float] | tuple[float, float, float] | None = None,
-    octaves: int = 4,
-    persistence: float = 0.5,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = "reflect",
-    constant_value: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["soft_focus", "halation", "glow"] | None = None,
-) -> Step:
+def bloom(*, radius: float | Drive = 32.0, threshold: float = 0.6, amount: float | Drive = 0.7, color: str | list[float] | tuple[float, float, float] | None = None, octaves: int = 4, persistence: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['soft_focus', 'halation', 'glow'] | None = None) -> Step:
     """Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at `octaves` scales and screened over the picture.  The highlights are blurred with sigma `radius`, `radius` / 2, `radius` / 4... (`octaves` of them), weighted by `persistence` per octave and averaged, then screened over the picture by `amount`. It only ever brightens and leaves black black. Each channel blooms on its own, so the light keeps its colour; with `color` the brightest channel sets the strength and the halo takes that colour instead, as film halation does: light that bounces back through the film base exposes one layer whatever the colour of the highlight.
 
-    Parameters
-    ----------
-    radius : number (drivable), px, 0 to 500, default 32.0
-        Gaussian sigma of the widest halo in px at the recipe's size: larger spreads the
-        light further; 0 keeps the light on the highlights themselves. Each further octave
-        is half as wide.
-    threshold : number, fraction, 0 to 0.99, default 0.6
-        The brightness (0..1) where the bloom starts, judged on each channel on its own (on
-        the brightest of the three when `color` is set): only values above it give light,
-        rising to full at 1. Raising it limits the bloom to the brightest highlights.
-    amount : number (drivable), ratio, 0 to 10, default 0.7
-        How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
-        brightness; above 1 it saturates to white sooner.
-    color : colour or none, default None
-        The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default)
-        lets each highlight keep its own colour. A colour makes every highlight bloom in it,
-        whatever its own colour is, with the strength of its brightest channel: '#ff4a14' is
-        the red-orange of film halation, white a neutral glow.
-    octaves : whole number, count, 1 to 8, default 4
-        How many scales the halo is built from: octave 1 has the sigma `radius`, each next
-        one half of the one before (`radius` / 2, `radius` / 4...). 1 = a single Gaussian;
-        more adds a tighter, brighter core around the highlights.
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weight each octave gets relative to the wider one before it (the weights
-        are persistence^0, persistence^1... scaled to add up to 1): 0 = the widest octave
-        alone, 1 = every octave equally. Lower values give a softer, more diffuse bloom;
-        higher values a tighter, more concentrated one.
+Parameters
+----------
+radius : number (drivable), px, 0 to 500, default 32.0
+    Gaussian sigma of the widest halo in px at the recipe's size: larger spreads the
+    light further; 0 keeps the light on the highlights themselves. Each further octave
+    is half as wide.
+threshold : number, fraction, 0 to 0.99, default 0.6
+    The brightness (0..1) where the bloom starts, judged on each channel on its own (on
+    the brightest of the three when `color` is set): only values above it give light,
+    rising to full at 1. Raising it limits the bloom to the brightest highlights.
+amount : number (drivable), ratio, 0 to 10, default 0.7
+    How strongly the halo is screened over the picture: 0 = off, 1 = the halo at full
+    brightness; above 1 it saturates to white sooner.
+color : colour or none, default None
+    The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default)
+    lets each highlight keep its own colour. A colour makes every highlight bloom in it,
+    whatever its own colour is, with the strength of its brightest channel: '#ff4a14' is
+    the red-orange of film halation, white a neutral glow.
+octaves : whole number, count, 1 to 8, default 4
+    How many scales the halo is built from: octave 1 has the sigma `radius`, each next
+    one half of the one before (`radius` / 2, `radius` / 4...). 1 = a single Gaussian;
+    more adds a tighter, brighter core around the highlights.
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weight each octave gets relative to the wider one before it (the weights
+    are persistence^0, persistence^1... scaled to add up to 1): 0 = the widest octave
+    alone, 1 = every octave equally. Lower values give a softer, more diffuse bloom;
+    higher values a tighter, more concentrated one.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where each octave's Gaussian is cut off, in sigmas: it reaches truncate x its sigma
-        px. Larger is more exact and slower.
-    edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge) or 'constant' (`constant_value`, so the bloom
-        fades toward the edge when it is 0).
-    constant_value : number, fraction, 0 to 1, default 0.0
-        The highlight (0..1) assumed beyond the edge when `edge` is 'constant'; ignored
-        otherwise.
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where each octave's Gaussian is cut off, in sigmas: it reaches truncate x its sigma
+    px. Larger is more exact and slower.
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the halo's blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge) or 'constant' (`constant_value`, so the bloom
+    fades toward the edge when it is 0).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The highlight (0..1) assumed beyond the edge when `edge` is 'constant'; ignored
+    otherwise.
 
-    Presets
-    -------
-    soft_focus : Orton soft focus: a blurred copy of the whole picture, half-strength, screened over the sharp one.
-    halation : Film halation: a red-orange glow around the brightest highlights, from light bouncing back through the film base.
-    glow : A glow: the bright parts blurred into one soft halo and screened over the sharp picture."""
+Presets
+-------
+soft_focus : Orton soft focus: a blurred copy of the whole picture, half-strength, screened over the sharp one.
+halation : Film halation: a red-orange glow around the brightest highlights, from light bouncing back through the film base.
+glow : A glow: the bright parts blurred into one soft halo and screened over the sharp picture."""
     ...
 
 @_effect
-def channel_mixer(
-    *,
-    red_from_red: float = 1.0,
-    red_from_green: float = 0.0,
-    red_from_blue: float = 0.0,
-    green_from_red: float = 0.0,
-    green_from_green: float = 1.0,
-    green_from_blue: float = 0.0,
-    blue_from_red: float = 0.0,
-    blue_from_green: float = 0.0,
-    blue_from_blue: float = 1.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["infrared", "black_and_white"] | None = None,
-) -> Step:
+def channel_mixer(*, red_from_red: float = 1.0, red_from_green: float = 0.0, red_from_blue: float = 0.0, green_from_red: float = 0.0, green_from_green: float = 1.0, green_from_blue: float = 0.0, blue_from_red: float = 0.0, blue_from_green: float = 0.0, blue_from_blue: float = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['infrared', 'black_and_white'] | None = None) -> Step:
     """Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights: black and white, infrared, colour swaps.  The weights are named `<output>_from_<input>`, so a row of the matrix is one output channel: each output is the sum of the three input channels, each times its weight in that row. The defaults are the identity matrix. A row summing to 1 keeps greys at their brightness in that channel. The sum is made on the gamma-encoded values, as in Photoshop's Channel Mixer, not in linear light, and the result is clipped to 0..1.
 
-    Parameters
-    ----------
-    red_from_red : number, ratio, -3 to 3, default 1.0
-        Weight of input red in output red (-3..3): 1 keeps it as it is (the default), 0
-        removes it, above 1 amplifies it, a negative weight inverts it.
-    red_from_green : number, ratio, -3 to 3, default 0.0
-        Weight of input green in output red (-3..3): 1 passes it through, 0 leaves it out, a
-        negative weight subtracts it.
-    red_from_blue : number, ratio, -3 to 3, default 0.0
-        Weight of input blue in output red (-3..3): 1 passes it through, 0 leaves it out, a
-        negative weight subtracts it.
-    green_from_red : number, ratio, -3 to 3, default 0.0
-        Weight of input red in output green (-3..3): 1 passes it through, 0 leaves it out, a
-        negative weight subtracts it.
-    green_from_green : number, ratio, -3 to 3, default 1.0
-        Weight of input green in output green (-3..3): 1 keeps it as it is (the default), 0
-        removes it, above 1 amplifies it, a negative weight inverts it.
-    green_from_blue : number, ratio, -3 to 3, default 0.0
-        Weight of input blue in output green (-3..3): 1 passes it through, 0 leaves it out,
-        a negative weight subtracts it.
-    blue_from_red : number, ratio, -3 to 3, default 0.0
-        Weight of input red in output blue (-3..3): 1 passes it through, 0 leaves it out, a
-        negative weight subtracts it.
-    blue_from_green : number, ratio, -3 to 3, default 0.0
-        Weight of input green in output blue (-3..3): 1 passes it through, 0 leaves it out,
-        a negative weight subtracts it.
-    blue_from_blue : number, ratio, -3 to 3, default 1.0
-        Weight of input blue in output blue (-3..3): 1 keeps it as it is (the default), 0
-        removes it, above 1 amplifies it, a negative weight inverts it.
+Parameters
+----------
+red_from_red : number, ratio, -3 to 3, default 1.0
+    Weight of input red in output red (-3..3): 1 keeps it as it is (the default), 0
+    removes it, above 1 amplifies it, a negative weight inverts it.
+red_from_green : number, ratio, -3 to 3, default 0.0
+    Weight of input green in output red (-3..3): 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+red_from_blue : number, ratio, -3 to 3, default 0.0
+    Weight of input blue in output red (-3..3): 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+green_from_red : number, ratio, -3 to 3, default 0.0
+    Weight of input red in output green (-3..3): 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+green_from_green : number, ratio, -3 to 3, default 1.0
+    Weight of input green in output green (-3..3): 1 keeps it as it is (the default), 0
+    removes it, above 1 amplifies it, a negative weight inverts it.
+green_from_blue : number, ratio, -3 to 3, default 0.0
+    Weight of input blue in output green (-3..3): 1 passes it through, 0 leaves it out,
+    a negative weight subtracts it.
+blue_from_red : number, ratio, -3 to 3, default 0.0
+    Weight of input red in output blue (-3..3): 1 passes it through, 0 leaves it out, a
+    negative weight subtracts it.
+blue_from_green : number, ratio, -3 to 3, default 0.0
+    Weight of input green in output blue (-3..3): 1 passes it through, 0 leaves it out,
+    a negative weight subtracts it.
+blue_from_blue : number, ratio, -3 to 3, default 1.0
+    Weight of input blue in output blue (-3..3): 1 keeps it as it is (the default), 0
+    removes it, above 1 amplifies it, a negative weight inverts it.
 
-    Presets
-    -------
-    infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale.
-    black_and_white : Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter."""
+Presets
+-------
+infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale.
+black_and_white : Black and white by Rec. 709 luma: every channel is the picture's brightness. Set the rows to your own shares (summing to 1) for a colour filter."""
     ...
 
 @_effect
-def chromatic_aberration(
-    *,
-    amount: float | Drive = 4.0,
-    samples: int = 3,
-    x: float = 0.5,
-    y: float = 0.5,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["prism"] | None = None,
-) -> Step:
+def chromatic_aberration(*, amount: float | Drive = 4.0, samples: int = 3, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['prism'] | None = None) -> Step:
     """Lens colour fringes or a prism rainbow: add up `samples` copies of the picture, scaled about the centre `x`, `y` and coloured as a spectrum.  Copy k stands for the colour k / (samples - 1) of the way from red to blue and shows each pixel d px from the centre read at d x (1 - e x (1 - 2k / (samples - 1))), with e = `amount` / R, R the distance of the farthest corner (red is shifted outward, blue inward, the middle copy stays). A channel of the result is the weighted average of that channel in the copies, the weights following the simple spectrum (red from the red and yellow copies, green from yellow to cyan, blue from cyan and blue) and adding up to 1, so a flat picture and the centre are unchanged and the result never leaves 0..1. With 3 samples red is the red copy, green the picture itself and blue the blue copy. Each copy is read by `interpolation`.
 
-    Parameters
-    ----------
-    amount : number (drivable), px, 0 to 100, default 4.0
-        How far red and blue are pulled apart, in pixels at the farthest corner of the
-        picture: there the red copy is shifted this far outward from the centre and the blue
-        copy this far inward, while the middle one stays where it is. The shift grows in
-        proportion to the distance from the centre, so it is half as much halfway out and
-        nothing at the centre. A larger amount is wider fringes; 0 leaves the picture
-        unchanged. A shift larger than the distance to the farthest corner is limited to it.
-    samples : whole number, count, 3 to 32, default 3
-        How many copies make the spectrum, from red to blue in equal steps of scale: 3 gives
-        a red, a green and a blue copy, as a lens's colour fringe does; more copies fill in
-        yellow and cyan between them and turn the fringe into a smooth rainbow, but cost
-        more time. Fewer copies than the amount needs show as separate ghosts.
-    x : number, fraction, 0 to 1, default 0.5
-        The centre's horizontal position as a fraction of the way across the picture: 0 =
-        the first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.5
-        The centre's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last.
+Parameters
+----------
+amount : number (drivable), px, 0 to 100, default 4.0
+    How far red and blue are pulled apart, in pixels at the farthest corner of the
+    picture: there the red copy is shifted this far outward from the centre and the blue
+    copy this far inward, while the middle one stays where it is. The shift grows in
+    proportion to the distance from the centre, so it is half as much halfway out and
+    nothing at the centre. A larger amount is wider fringes; 0 leaves the picture
+    unchanged. A shift larger than the distance to the farthest corner is limited to it.
+samples : whole number, count, 3 to 32, default 3
+    How many copies make the spectrum, from red to blue in equal steps of scale: 3 gives
+    a red, a green and a blue copy, as a lens's colour fringe does; more copies fill in
+    yellow and cyan between them and turn the fringe into a smooth rainbow, but cost
+    more time. Fewer copies than the amount needs show as separate ghosts.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from a copy: 'nearest' takes the closest pixel
-        (fastest, but the fringes step), 'bilinear' blends the four pixels around it
-        (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels
-        (sharpest, a little slower, and may ring beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the copies see beyond the picture's edge (the bluer ones read from farther out
-        than they show): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
-        the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from a copy: 'nearest' takes the closest pixel
+    (fastest, but the fringes step), 'bilinear' blends the four pixels around it
+    (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels
+    (sharpest, a little slower, and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the copies see beyond the picture's edge (the bluer ones read from farther out
+    than they show): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
+    the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
 
-    Presets
-    -------
-    prism : Rainbow dispersion: seven copies of the picture fan out into a smooth spectrum fringe on every edge."""
+Presets
+-------
+prism : Rainbow dispersion: seven copies of the picture fan out into a smooth spectrum fringe on every edge."""
     ...
 
 @_effect
-def color_balance(
-    *,
-    shadows: str | list[float] | tuple[float, float, float] = "#3a1bff",
-    midtones: str | list[float] | tuple[float, float, float] = "#808080",
-    highlights: str | list[float] | tuple[float, float, float] = "#ff2bd6",
-    amount: float | Drive = 0.3,
-    balance: float | Drive = 0.5,
-    softness: float = 1.0,
-    preserve_luminosity: bool = True,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["teal_orange", "split_tone", "color_balance"] | None = None,
-) -> Step:
+def color_balance(*, shadows: str | list[float] | tuple[float, float, float] = '#3a1bff', midtones: str | list[float] | tuple[float, float, float] = '#808080', highlights: str | list[float] | tuple[float, float, float] = '#ff2bd6', amount: float | Drive = 0.3, balance: float | Drive = 0.5, softness: float = 1.0, preserve_luminosity: bool = True, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['teal_orange', 'split_tone', 'color_balance'] | None = None) -> Step:
     """Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading.  Three colour pushes, one for the dark, middle and bright tones, that by default leave brightness alone.  A pixel's tone is its Rec. 709 luma L of the sRGB-encoded picture. The shadow/midtone and midtone/highlight hand-overs are centred on `balance` / 2 and (1 + `balance`) / 2, each `softness` / 2 wide, and run along the smoothstep s(x) = 3x^2 - 2x^3 of their argument held to 0..1. Its weights are shadows 1 - lower, midtones lower - upper and highlights upper, so black is all shadows, mid grey (at the defaults) all midtones, white all highlights, and the three always add up to 1. Each channel moves by `amount` times the sum, over the three ranges, of the weight times (the range's colour - 0.5); the result is held to 0..1. With `preserve_luminosity` the luma the pushes changed is then restored by adding the same amount to every channel (before the hold).
 
-    Parameters
-    ----------
-    shadows : colour, default '#3a1bff'
-        The colour the dark parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-        Mid grey '#808080' leaves them alone; a lighter or darker colour than that also
-        lightens or darkens them unless `preserve_luminosity` is on.
-    midtones : colour, default '#808080'
-        The colour the middle tones are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-        Mid grey '#808080' leaves them alone.
-    highlights : colour, default '#ff2bd6'
-        The colour the bright parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-        Mid grey '#808080' leaves them alone.
-    amount : number (drivable), fraction, 0 to 1, default 0.3
-        How far each range is pushed toward its colour: 0 = off, 0.2 a hint, 0.6 strong, 1
-        moves a range by the full distance from mid grey to its colour.
-    balance : number (drivable), fraction, 0 to 1, default 0.5
-        Where the three ranges sit on the brightness scale (0..1): 0.5 splits it evenly,
-        shadows below a quarter and highlights above three quarters. Raising it lets the
-        shadows reach higher up and shrinks the highlights; lowering it does the reverse.
-    softness : number, fraction, 0.01 to 1, default 1.0
-        How far neighbouring ranges overlap (0.01..1): 1 blends each into the next over half
-        the brightness scale, with no pure midtones except at the centre; smaller makes
-        sharper hand-overs and a wider band of pure midtones.
+Parameters
+----------
+shadows : colour, default '#3a1bff'
+    The colour the dark parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Mid grey '#808080' leaves them alone; a lighter or darker colour than that also
+    lightens or darkens them unless `preserve_luminosity` is on.
+midtones : colour, default '#808080'
+    The colour the middle tones are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Mid grey '#808080' leaves them alone.
+highlights : colour, default '#ff2bd6'
+    The colour the bright parts are pushed toward: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    Mid grey '#808080' leaves them alone.
+amount : number (drivable), fraction, 0 to 1, default 0.3
+    How far each range is pushed toward its colour: 0 = off, 0.2 a hint, 0.6 strong, 1
+    moves a range by the full distance from mid grey to its colour.
+balance : number (drivable), fraction, 0 to 1, default 0.5
+    Where the three ranges sit on the brightness scale (0..1): 0.5 splits it evenly,
+    shadows below a quarter and highlights above three quarters. Raising it lets the
+    shadows reach higher up and shrinks the highlights; lowering it does the reverse.
+softness : number, fraction, 0.01 to 1, default 1.0
+    How far neighbouring ranges overlap (0.01..1): 1 blends each into the next over half
+    the brightness scale, with no pure midtones except at the centre; smaller makes
+    sharper hand-overs and a wider band of pure midtones.
 
-    Advanced parameters
-    -------------------
-    preserve_luminosity : true or false, default True
-        Keep each pixel's Rec. 709 luma while pushing colours: on, the brightness a push
-        adds or removes is taken off or put back on all three channels, so only the colour
-        changes (Photoshop's 'Preserve Luminosity'); off, a push toward a lighter or darker
-        colour also lightens or darkens. Where a channel reaches 0 or 1 the luma is only
-        kept as far as the clipping allows.
+Advanced parameters
+-------------------
+preserve_luminosity : true or false, default True
+    Keep each pixel's Rec. 709 luma while pushing colours: on, the brightness a push
+    adds or removes is taken off or put back on all three channels, so only the colour
+    changes (Photoshop's 'Preserve Luminosity'); off, a push toward a lighter or darker
+    colour also lightens or darkens. Where a channel reaches 0 or 1 the luma is only
+    kept as far as the clipping allows.
 
-    Presets
-    -------
-    teal_orange : The blockbuster colour grade: teal in the shadows, orange in the highlights, olive between.
-    split_tone : Split toning, duotone style: violet shadows and pink highlights, the two blended through the midtones.
-    color_balance : A starting point for colour balancing: cool shadows, untouched midtones, warm highlights."""
+Presets
+-------
+teal_orange : The blockbuster colour grade: teal in the shadows, orange in the highlights, olive between.
+split_tone : Split toning, duotone style: violet shadows and pink highlights, the two blended through the midtones.
+color_balance : A starting point for colour balancing: cool shadows, untouched midtones, warm highlights."""
     ...
 
 @_effect
-def curves(
-    *,
-    black: float = 0.0,
-    shadows: float = 0.25,
-    midtones: float = 0.5,
-    highlights: float = 0.75,
-    white: float = 1.0,
-    red_shadows: float = 0.25,
-    red_midtones: float = 0.5,
-    red_highlights: float = 0.75,
-    green_shadows: float = 0.25,
-    green_midtones: float = 0.5,
-    green_highlights: float = 0.75,
-    blue_shadows: float = 0.25,
-    blue_midtones: float = 0.5,
-    blue_highlights: float = 0.75,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["cross_process", "solarize"] | None = None,
-) -> Step:
+def curves(*, black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize'] | None = None) -> Step:
     """Bend tones along smooth curves through control points: a master curve, then one per colour channel (cross process, solarize).  The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`, `white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed black and white. A curve passes exactly through its points and is a monotone cubic (PCHIP): it never overshoots its neighbouring points, so rising points never darken a brighter tone. The defaults are the straight line.
 
-    Parameters
-    ----------
-    black : number, fraction, 0 to 1, default 0.0
-        The master curve's output for pure black, on the input axis at 0 (0..1): raising it
-        lifts the blacks to a matte grey.
-    shadows : number, fraction, 0 to 1, default 0.25
-        The master curve's output for the input a quarter of the way up (0..1; 0.25 =
-        unchanged): lower darkens the shadows, higher opens them up.
-    midtones : number, fraction, 0 to 1, default 0.5
-        The master curve's output for the middle input, 0.5 (0..1; 0.5 = unchanged): lower
-        darkens the midtones, higher brightens them.
-    highlights : number, fraction, 0 to 1, default 0.75
-        The master curve's output for the input three quarters of the way up (0..1; 0.75 =
-        unchanged): lower dims the highlights, higher makes them brighter.
-    white : number, fraction, 0 to 1, default 1.0
-        The master curve's output for pure white, at 1 on the input axis (0..1): lowering it
-        dims the whites.
+Parameters
+----------
+black : number, fraction, 0 to 1, default 0.0
+    The master curve's output for pure black, on the input axis at 0 (0..1): raising it
+    lifts the blacks to a matte grey.
+shadows : number, fraction, 0 to 1, default 0.25
+    The master curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged): lower darkens the shadows, higher opens them up.
+midtones : number, fraction, 0 to 1, default 0.5
+    The master curve's output for the middle input, 0.5 (0..1; 0.5 = unchanged): lower
+    darkens the midtones, higher brightens them.
+highlights : number, fraction, 0 to 1, default 0.75
+    The master curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged): lower dims the highlights, higher makes them brighter.
+white : number, fraction, 0 to 1, default 1.0
+    The master curve's output for pure white, at 1 on the input axis (0..1): lowering it
+    dims the whites.
 
-    Advanced parameters
-    -------------------
-    red_shadows : number, fraction, 0 to 1, default 0.25
-        The red curve's output for the input a quarter of the way up (0..1; 0.25 =
-        unchanged), applied after the master curve: raising it adds red to the shadows,
-        lowering it takes red away. Its ends stay at black and white.
-    red_midtones : number, fraction, 0 to 1, default 0.5
-        The red curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
-        applied after the master curve: raising it adds red to the midtones, lowering it
-        takes red away. Its ends stay at black and white.
-    red_highlights : number, fraction, 0 to 1, default 0.75
-        The red curve's output for the input three quarters of the way up (0..1; 0.75 =
-        unchanged), applied after the master curve: raising it adds red to the highlights,
-        lowering it takes red away. Its ends stay at black and white.
-    green_shadows : number, fraction, 0 to 1, default 0.25
-        The green curve's output for the input a quarter of the way up (0..1; 0.25 =
-        unchanged), applied after the master curve: raising it adds green to the shadows,
-        lowering it takes green away. Its ends stay at black and white.
-    green_midtones : number, fraction, 0 to 1, default 0.5
-        The green curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
-        applied after the master curve: raising it adds green to the midtones, lowering it
-        takes green away. Its ends stay at black and white.
-    green_highlights : number, fraction, 0 to 1, default 0.75
-        The green curve's output for the input three quarters of the way up (0..1; 0.75 =
-        unchanged), applied after the master curve: raising it adds green to the highlights,
-        lowering it takes green away. Its ends stay at black and white.
-    blue_shadows : number, fraction, 0 to 1, default 0.25
-        The blue curve's output for the input a quarter of the way up (0..1; 0.25 =
-        unchanged), applied after the master curve: raising it adds blue to the shadows,
-        lowering it takes blue away. Its ends stay at black and white.
-    blue_midtones : number, fraction, 0 to 1, default 0.5
-        The blue curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
-        applied after the master curve: raising it adds blue to the midtones, lowering it
-        takes blue away. Its ends stay at black and white.
-    blue_highlights : number, fraction, 0 to 1, default 0.75
-        The blue curve's output for the input three quarters of the way up (0..1; 0.75 =
-        unchanged), applied after the master curve: raising it adds blue to the highlights,
-        lowering it takes blue away. Its ends stay at black and white.
+Advanced parameters
+-------------------
+red_shadows : number, fraction, 0 to 1, default 0.25
+    The red curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged), applied after the master curve: raising it adds red to the shadows,
+    lowering it takes red away. Its ends stay at black and white.
+red_midtones : number, fraction, 0 to 1, default 0.5
+    The red curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
+    applied after the master curve: raising it adds red to the midtones, lowering it
+    takes red away. Its ends stay at black and white.
+red_highlights : number, fraction, 0 to 1, default 0.75
+    The red curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged), applied after the master curve: raising it adds red to the highlights,
+    lowering it takes red away. Its ends stay at black and white.
+green_shadows : number, fraction, 0 to 1, default 0.25
+    The green curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged), applied after the master curve: raising it adds green to the shadows,
+    lowering it takes green away. Its ends stay at black and white.
+green_midtones : number, fraction, 0 to 1, default 0.5
+    The green curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
+    applied after the master curve: raising it adds green to the midtones, lowering it
+    takes green away. Its ends stay at black and white.
+green_highlights : number, fraction, 0 to 1, default 0.75
+    The green curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged), applied after the master curve: raising it adds green to the highlights,
+    lowering it takes green away. Its ends stay at black and white.
+blue_shadows : number, fraction, 0 to 1, default 0.25
+    The blue curve's output for the input a quarter of the way up (0..1; 0.25 =
+    unchanged), applied after the master curve: raising it adds blue to the shadows,
+    lowering it takes blue away. Its ends stay at black and white.
+blue_midtones : number, fraction, 0 to 1, default 0.5
+    The blue curve's output for the input the middle, 0.5 (0..1; 0.5 = unchanged),
+    applied after the master curve: raising it adds blue to the midtones, lowering it
+    takes blue away. Its ends stay at black and white.
+blue_highlights : number, fraction, 0 to 1, default 0.75
+    The blue curve's output for the input three quarters of the way up (0..1; 0.75 =
+    unchanged), applied after the master curve: raising it adds blue to the highlights,
+    lowering it takes blue away. Its ends stay at black and white.
 
-    Presets
-    -------
-    cross_process : Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows.
-    solarize : Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet."""
+Presets
+-------
+cross_process : Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows.
+solarize : Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet."""
     ...
 
 @_effect
-def dead_pixels(
-    *,
-    count: int = 120,
-    size: int = 4,
-    stuck: float = 0.5,
-    color: str | list[float] | tuple[float, float, float] = "#ffffff",
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def dead_pixels(*, count: int = 120, size: int = 4, stuck: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black.  The picture is divided into cells of `size` px (the last row and column of cells may be cut off by the picture's edge). `seed` shuffles the cells and the first `count` are the faulty ones, so a larger count keeps every pixel a smaller one had; the first `round(count x stuck)` of those are stuck (`count` is capped at the number of cells). Everything else is the picture, bit for bit.
 
-    Parameters
-    ----------
-    count : whole number, count, 0 to 100000, default 120
-        How many faulty pixels there are, each a square of `size` px: 0 leaves the picture
-        unchanged. They lie on a grid of `size` px cells, so none overlaps another, and each
-        is a different one. A count larger than the number of cells fills every cell.
-        Raising it adds faulty pixels and never moves one already there. A count, not a
-        density: the pixels' size is in design px, so the same count covers the same share
-        of any picture size.
-    size : whole number, px, 1 to 64, default 4
-        The width and height in px of one faulty pixel, tuned for a picture about 480 px
-        high: 1 is a single pixel of the picture, larger is a screen with bigger pixels, a
-        block at the edge being cut off by it.
-    stuck : number, fraction, 0 to 1, default 0.5
-        The share of the faulty pixels that are stuck on `color`; the rest are dead and
-        black. 0 = all dead, 1 = all stuck. The number stuck is `count` x `stuck`, rounded
-        to a whole pixel (`count` is capped at the number of cells).
-    color : colour, default '#ffffff'
-        The colour a stuck pixel shows whatever the picture is under it: '#rrggbb', '#rgb'
-        or [r, g, b] 0..1. White is the usual fault; a red, green or blue is one stuck sub-
-        pixel.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Chooses where the faulty pixels are and which of them are stuck; the same seed and
-        count give the same picture, another seed another one."""
+Parameters
+----------
+count : whole number, count, 0 to 100000, default 120
+    How many faulty pixels there are, each a square of `size` px: 0 leaves the picture
+    unchanged. They lie on a grid of `size` px cells, so none overlaps another, and each
+    is a different one. A count larger than the number of cells fills every cell.
+    Raising it adds faulty pixels and never moves one already there. A count, not a
+    density: the pixels' size is in design px, so the same count covers the same share
+    of any picture size.
+size : whole number, px, 1 to 64, default 4
+    The width and height in px of one faulty pixel, tuned for a picture about 480 px
+    high: 1 is a single pixel of the picture, larger is a screen with bigger pixels, a
+    block at the edge being cut off by it.
+stuck : number, fraction, 0 to 1, default 0.5
+    The share of the faulty pixels that are stuck on `color`; the rest are dead and
+    black. 0 = all dead, 1 = all stuck. The number stuck is `count` x `stuck`, rounded
+    to a whole pixel (`count` is capped at the number of cells).
+color : colour, default '#ffffff'
+    The colour a stuck pixel shows whatever the picture is under it: '#rrggbb', '#rgb'
+    or [r, g, b] 0..1. White is the usual fault; a red, green or blue is one stuck sub-
+    pixel.
+seed : whole number, count, 0 to 4294967295, default 0
+    Chooses where the faulty pixels are and which of them are stuck; the same seed and
+    count give the same picture, another seed another one."""
     ...
 
 @_effect
-def dehaze(
-    *,
-    amount: float = 0.9,
-    patch: int = 15,
-    radius: float = 30.0,
-    edge_threshold: float = 0.03,
-    transmission_floor: float = 0.1,
-    airlight_fraction: float = 0.001,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def dehaze(*, amount: float = 0.9, patch: int = 15, radius: float = 30.0, edge_threshold: float = 0.03, transmission_floor: float = 0.1, airlight_fraction: float = 0.001, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009).  The dark channel of a haze-free outdoor picture is nearly 0: in any patch of `patch` x `patch` px some pixel has a channel near black. Haze lifts it, so the dark channel of I / A measures 1 - t, the haze at that place. The steps are - the airlight A: the `airlight_fraction` of pixels with the highest dark channel (the haziest) are looked at, and   the colour of the brightest of them (largest red + green + blue) is A, a per channel colour; - the transmission t = 1 - `amount` x dark channel of I / A, refined by a guided filter (`radius`,   `edge_threshold`), guided by the picture's luma, so it follows the edges of the picture, then held between   `transmission_floor` and 1; - the scene J = (I - A) / t + A, held to 0..1.  A picture without haze (a dark channel of 0) comes out as it went in. `edge` says what the patch search sees beyond the picture's border. Colours are those of the sRGB-encoded picture.
 
-    Parameters
-    ----------
-    amount : number, fraction, 0 to 1, default 0.9
-        How much of the haze is taken out (He, Sun and Tang's omega): 0 = off, 1 = all of it
-        that the dark channel finds, which also flattens real distance cues; a little below
-        1 keeps the picture natural.
-    patch : whole number, px, 1 to 201, default 15
-        Side of the square patch in which the darkest value is taken to find the haze, in px
-        at the recipe's size (an even size is centred half a pixel off). Larger patches
-        estimate the haze more reliably but blur it over bigger areas and miss thin haze; 1
-        judges every pixel by its own darkest channel.
-    radius : number, px, 0 to 500, default 30.0
-        Radius of the guided filter that refines the haze estimate to follow the picture's
-        edges, in px at the recipe's size (rounded to whole px). Larger gives a smoother
-        haze with fewer halos far from edges; 0 keeps the blocky patch estimate.
-    airlight_fraction : number, fraction, 0.0001 to 0.1, default 0.001
-        The share of the picture's pixels, those with the highest dark channel (the
-        haziest), among which the brightest one is taken as the colour of the haze (He, Sun
-        and Tang use 0.1 percent = 0.001; at least one pixel is always used). Raising it
-        makes the estimate less sensitive to a single odd pixel but can pick a bright object
-        instead of the sky.
+Parameters
+----------
+amount : number, fraction, 0 to 1, default 0.9
+    How much of the haze is taken out (He, Sun and Tang's omega): 0 = off, 1 = all of it
+    that the dark channel finds, which also flattens real distance cues; a little below
+    1 keeps the picture natural.
+patch : whole number, px, 1 to 201, default 15
+    Side of the square patch in which the darkest value is taken to find the haze, in px
+    at the recipe's size (an even size is centred half a pixel off). Larger patches
+    estimate the haze more reliably but blur it over bigger areas and miss thin haze; 1
+    judges every pixel by its own darkest channel.
+radius : number, px, 0 to 500, default 30.0
+    Radius of the guided filter that refines the haze estimate to follow the picture's
+    edges, in px at the recipe's size (rounded to whole px). Larger gives a smoother
+    haze with fewer halos far from edges; 0 keeps the blocky patch estimate.
+airlight_fraction : number, fraction, 0.0001 to 0.1, default 0.001
+    The share of the picture's pixels, those with the highest dark channel (the
+    haziest), among which the brightest one is taken as the colour of the haze (He, Sun
+    and Tang use 0.1 percent = 0.001; at least one pixel is always used). Raising it
+    makes the estimate less sensitive to a single odd pixel but can pick a bright object
+    instead of the sky.
 
-    Advanced parameters
-    -------------------
-    edge_threshold : number, fraction, 0.001 to 1, default 0.03
-        The brightness step (0..1, Rec. 709 luma) that counts as an edge the refined haze
-        estimate must not blur across: steps above it keep the haze of their own side, steps
-        below it are smoothed. Raising it gives a smoother estimate and halos around edges;
-        lowering it follows ever smaller edges.
-    transmission_floor : number, fraction, 0.01 to 1, default 0.1
-        The lowest transmission (He, Sun and Tang's t0), the share of a pixel's light that
-        reaches the camera: colours are stretched by at most 1 / `transmission_floor`, so a
-        low floor clears thick haze but amplifies noise and clips; 1 allows no stretch at
-        all.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What the darkest-value search sees beyond the picture's edge, which sets the haze
-        estimate along the border (dehaze filters by local darkest values rather than
-        warping, so the default is 'nearest', not 'reflect'): 'nearest' (the edge pixel
-        repeated), 'reflect' (mirrored, edge pixel repeated) and 'mirror' (mirrored about
-        the edge pixel) look only at pixels of the patch inside the picture, and for an odd
-        patch give the same result; 'wrap' (the opposite edge) lets the far side's darkest
-        values set the haze at the border."""
+Advanced parameters
+-------------------
+edge_threshold : number, fraction, 0.001 to 1, default 0.03
+    The brightness step (0..1, Rec. 709 luma) that counts as an edge the refined haze
+    estimate must not blur across: steps above it keep the haze of their own side, steps
+    below it are smoothed. Raising it gives a smoother estimate and halos around edges;
+    lowering it follows ever smaller edges.
+transmission_floor : number, fraction, 0.01 to 1, default 0.1
+    The lowest transmission (He, Sun and Tang's t0), the share of a pixel's light that
+    reaches the camera: colours are stretched by at most 1 / `transmission_floor`, so a
+    low floor clears thick haze but amplifies noise and clips; 1 allows no stretch at
+    all.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What the darkest-value search sees beyond the picture's edge, which sets the haze
+    estimate along the border (dehaze filters by local darkest values rather than
+    warping, so the default is 'nearest', not 'reflect'): 'nearest' (the edge pixel
+    repeated), 'reflect' (mirrored, edge pixel repeated) and 'mirror' (mirrored about
+    the edge pixel) look only at pixels of the patch inside the picture, and for an odd
+    patch give the same result; 'wrap' (the opposite edge) lets the far side's darkest
+    values set the haze at the border."""
     ...
 
 @_effect
-def disperse(
-    *,
-    field: str = "subject",
-    cell: int = 5,
-    progress: float = 0.0,
-    top: float = 1.0,
-    outline: float = 1.0,
-    sweep: float = 0.0,
-    reach: float = 1.0,
-    wind: float = 96.0,
-    angle: float = 350.0,
-    hover: float = 0.0,
-    outward: float = 0.0,
-    ambient: float = 0.0,
-    seed: int = 0,
-    outline_depth: float = 72.0,
-    jitter: float = 0.2,
-    anticipation: float = 0.06,
-    pullback: float = 0.15,
-    flight: float = 0.2,
-    flight_variation: float = 0.4,
-    finish: float = 0.98,
-    hover_spread: float = 0.45,
-    bob: float = 2.0,
-    bob_cycles: float = 3.0,
-    angle_spread: float = 12.0,
-    distance_minimum: float = 0.35,
-    outward_distance: float = 58.0,
-    acceleration: float = 0.5,
-    sway: float = 6.0,
-    sway_cycles: float = 1.5,
-    falloff: float = 1.5,
-    flare: float = 0.4,
-    flare_span: float = 0.2,
-    ambient_phase: float = 0.0,
-    ambient_wavelength: float = 96.0,
-    open_bottom: bool = True,
-    normal_smoothing: float = 1.0,
-    normal_truncate: float = 4.0,
-    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = "reflect",
-    field_threshold: float = 0.5,
-    background_threshold: float = 0.02,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["evaporate", "halo", "windblown", "disintegrate"] | None = None,
-) -> Step:
+def disperse(*, field: str = 'subject', cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 96.0, angle: float = 350.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 72.0, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 2.0, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 58.0, acceleration: float = 0.5, sway: float = 6.0, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 96.0, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', field_threshold: float = 0.5, background_threshold: float = 0.02, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
     """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).
 
-    `progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
-    of those looks, part-way through. The picture is cut into character-sized pieces. Black is background, so use it
-    on a cut-out on black. Each piece
-    has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows,
-    fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.
+`progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
+of those looks, part-way through. The picture is cut into character-sized pieces. Black is background, so use it
+on a cut-out on black. Each piece
+has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows,
+fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.
 
-    When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the
-    figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
-    makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
+When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the
+figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
+makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
 
-    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
-    Parameters
-    ----------
-    field : field name, default 'subject'
-        The figure that `outline` and `hover` work from: `subject` (the subject's
-        silhouette), `light` (the bright parts), `depth` (the near parts), or a region of
-        the recipe (text, a logo, a drawn shape). A piece belongs to it when the field's
-        average over the piece is above `field_threshold`.
-    cell : whole number, px, 1 to 64, default 5
-        Character width in px; a piece is one character (its height comes from the bundled
-        font). Use the same value as the ascii step before this one, so whole characters
-        move.
-    progress : number, fraction, 0 to 1, default 0.0
-        The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone).
-    top : number, ratio, 0 to 10, default 1.0
-        Weight of height in the order pieces leave: higher pieces go first. 0 = height does
-        not matter.
-    outline : number, ratio, 0 to 10, default 1.0
-        Weight of closeness to the outline (and the left, right and top borders) in the
-        order: pieces near the edge go before the middle. 0 = closeness does not matter.
-    sweep : number, ratio, -1 to 1, default 0.0
-        Weight of side in the order: positive starts at the left, negative at the right; its
-        size is how much it matters next to `top` and `outline`.
-    reach : number, fraction, 0 to 1, default 1.0
-        How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses
-        and the rest stays, 1 = everything goes.
-    wind : number, px, -480 to 480, default 96.0
-        The farthest any piece is carried by the time it vanishes, in px: positive blows
-        right, negative left. Keep it under a third of the picture width (160 px at the
-        design size 480), or pieces cross too much of the picture in one go.
-    angle : number (cyclic), degrees, 0 to 360, default 350.0
-        Direction the wind blows, in degrees clockwise from right: 0 = right, 90 = down, 180
-        = left, 270 = up (the default 350 is 10 degrees above level). A negative `wind`
-        mirrors it left to right: the same tilt, blowing left.
-    seed : whole number, count, 0 to 2147483647, default 0
-        Random seed: each piece's fate is fixed by it, so one seed always gives the same
-        pieces the same fates.
+Parameters
+----------
+field : field name, default 'subject'
+    The figure that `outline` and `hover` work from: `subject` (the subject's
+    silhouette), `light` (the bright parts), `depth` (the near parts), or a region of
+    the recipe (text, a logo, a drawn shape). A piece belongs to it when the field's
+    average over the piece is above `field_threshold`.
+cell : whole number, px, 1 to 64, default 5
+    Character width in px; a piece is one character (its height comes from the bundled
+    font). Use the same value as the ascii step before this one, so whole characters
+    move.
+progress : number, fraction, 0 to 1, default 0.0
+    The moment shown: 0 = untouched, 1 = finished (every piece that goes has gone).
+top : number, ratio, 0 to 10, default 1.0
+    Weight of height in the order pieces leave: higher pieces go first. 0 = height does
+    not matter.
+outline : number, ratio, 0 to 10, default 1.0
+    Weight of closeness to the outline (and the left, right and top borders) in the
+    order: pieces near the edge go before the middle. 0 = closeness does not matter.
+sweep : number, ratio, -1 to 1, default 0.0
+    Weight of side in the order: positive starts at the left, negative at the right; its
+    size is how much it matters next to `top` and `outline`.
+reach : number, fraction, 0 to 1, default 1.0
+    How much of the figure ever goes, in leaving order: 0.4 = the first 40% disperses
+    and the rest stays, 1 = everything goes.
+wind : number, px, -480 to 480, default 96.0
+    The farthest any piece is carried by the time it vanishes, in px: positive blows
+    right, negative left. Keep it under a third of the picture width (160 px at the
+    design size 480), or pieces cross too much of the picture in one go.
+angle : number (cyclic), degrees, 0 to 360, default 350.0
+    Direction the wind blows, in degrees clockwise from right: 0 = right, 90 = down, 180
+    = left, 270 = up (the default 350 is 10 degrees above level). A negative `wind`
+    mirrors it left to right: the same tilt, blowing left.
+seed : whole number, count, 0 to 2147483647, default 0
+    Random seed: each piece's fate is fixed by it, so one seed always gives the same
+    pieces the same fates.
 
-    Advanced parameters
-    -------------------
-    hover : number, fraction, 0 to 1, default 0.0
-        Share of its journey a piece floats slowly along the wind before it goes (about
-        0..0.3 looks right). The outline starts at once, deeper pieces later (see
-        `hover_spread`). 0 = off.
-    outward : number, fraction, 0 to 1, default 0.0
-        How much a piece is also thrown away from the edge it came from (by up to
-        `outward_distance`); pieces then fly in different directions, so leave it at 0 when
-        everything should travel together on the wind.
-    ambient : number, ratio, 0 to 1, default 0.0
-        Depth of the slow shimmer of the pieces that stay, as a share of their brightness
-        (about 0..0.1 looks right; brightening stops at white). 0 = off.
-    outline_depth : number, px, 5 to 480, default 72.0
-        Distance from the outline, in px, beyond which a piece counts as fully inside, for
-        `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper
-        in.
-    jitter : number, fraction, 0 to 1, default 0.2
-        Random share of each piece's place in the leaving order: 0 = a clean front, raising
-        it makes it ragged.
-    anticipation : number, fraction, 0.01 to 0.2, default 0.06
-        Wind-up time before a piece goes, as a share of `progress`: it eases back by
-        `pullback` over this time. The first piece goes only after it, so every piece has
-        one.
-    pullback : number, fraction, 0 to 1, default 0.15
-        How far a piece eases back against its journey before it goes (anticipation), as a
-        share of the journey. 0 = no wind-up.
-    flight : number, fraction, 0.01 to 0.5, default 0.2
-        Average time from detaching to vanishing, as a share of `progress`. Shorter flights
-        keep fewer pieces in the air at once (about 0.1 keeps it to a third on a side-to-
-        side sweep).
-    flight_variation : number, fraction, 0 to 0.9, default 0.4
-        How much each piece's flight differs from `flight`: 0.4 = from 0.6x to 1.4x. 0 = all
-        the same.
-    finish : number, fraction, 0.5 to 1, default 0.98
-        The progress by which the last piece has vanished (a little under 1 leaves nothing
-        behind at the end). If `anticipation` and the longest flight do not fit before it,
-        all pieces go at once.
-    hover_spread : number, fraction, 0 to 1, default 0.45
-        With `hover`: how far into `progress` a piece `outline_depth` inside starts to float
-        (the outline starts at 0). 0 = everything floats at once.
-    bob : number, px, 0 to 24, default 2.0
-        Height of the gentle up-and-down of a hovering piece, in px.
-    bob_cycles : number, cycles, 0 to 20, default 3.0
-        Number of ups and downs while a piece hovers.
-    angle_spread : number, degrees, 0 to 180, default 12.0
-        Range of each piece's own direction around the wind's `angle`, in degrees (it
-        differs by up to half of this). Not a direction itself.
-    distance_minimum : number, fraction, 0 to 1, default 0.35
-        The shortest journey as a share of the longest (`wind`), so speeds differ; 1 = all
-        travel equally far.
-    outward_distance : number, px, 0 to 480, default 58.0
-        How far `outward` 1 throws a piece away from its edge, in px.
-    acceleration : number, ratio, 0 to 10, default 0.5
-        How a piece speeds up on its way (an exit accelerates): it ends 1 + 2 x acceleration
-        times as fast as it starts. 0 = steady speed.
-    sway : number, px, 0 to 96, default 6.0
-        Largest sideways wobble of a flying piece, in px; it grows during the flight. 0 =
-        none.
-    sway_cycles : number, cycles, 0 to 20, default 1.5
-        Number of wobbles during a piece's flight.
-    falloff : number, ratio, 0 to 10, default 1.5
-        How a flying piece fades: brightness is (1 - share of flight)^falloff. 0 = no fade
-        (it just vanishes at the end), 1 = even, above 1 fades quickly at first.
-    flare : number, ratio, 0 to 2, default 0.4
-        Extra brightness at the peak of the glow as a piece leaves (0.4 = 1.4x); brightening
-        stops at white. 0 = no glow.
-    flare_span : number, fraction, 0.01 to 1, default 0.2
-        Share of a piece's flight that the glow lasts; it peaks halfway through that.
-    ambient_phase : number, cycles, 0 to 1, default 0.0
-        Where the shimmer wave is in its cycle: 0 and 1 are the same picture, 0.5 is half a
-        cycle on. Raising it moves the wave against the wind; with `ambient` at 0 it does
-        nothing.
-    ambient_wavelength : number, px, 5 to 960, default 96.0
-        Length of one shimmer wave, in px; a shorter one packs more waves across the
-        picture.
-    open_bottom : true or false, default True
-        True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut
-        off there). False: it counts like the other borders.
-    normal_smoothing : number, count, 0 to 10, default 1.0
-        Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its
-        direction: raising it makes neighbouring pieces fly in more similar directions; 0
-        uses the raw outline.
-    normal_truncate : number, ratio, 1 to 10, default 4.0
-        Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times
-        `normal_smoothing` characters from the outline, so the pieces' direction `outward`
-        is read from that far out. Larger is more exact and slower, smaller shortens the
-        reach. Nothing changes with `normal_smoothing` at 0.
-    edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the `normal_smoothing` blur sees beyond the picture's border: 'reflect'
-        (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about
-        the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
-        'constant' (open space, as if nothing were there, which blurs the outline toward the
-        border).
-    field_threshold : number, fraction, 0 to 1, default 0.5
-        The field's average over a piece, 0 to 1, above which the piece belongs to the
-        figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes
-        in more of a soft edge (hair, fur), raising it less.
-    background_threshold : number, fraction, 0 to 1, default 0.02
-        How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
-        rather than black background: a piece no brighter never flies and is drawn black
-        once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces.
+Advanced parameters
+-------------------
+hover : number, fraction, 0 to 1, default 0.0
+    Share of its journey a piece floats slowly along the wind before it goes (about
+    0..0.3 looks right). The outline starts at once, deeper pieces later (see
+    `hover_spread`). 0 = off.
+outward : number, fraction, 0 to 1, default 0.0
+    How much a piece is also thrown away from the edge it came from (by up to
+    `outward_distance`); pieces then fly in different directions, so leave it at 0 when
+    everything should travel together on the wind.
+ambient : number, ratio, 0 to 1, default 0.0
+    Depth of the slow shimmer of the pieces that stay, as a share of their brightness
+    (about 0..0.1 looks right; brightening stops at white). 0 = off.
+outline_depth : number, px, 5 to 480, default 72.0
+    Distance from the outline, in px, beyond which a piece counts as fully inside, for
+    `outline` and `hover_spread`. Raising it makes closeness to the edge matter deeper
+    in.
+jitter : number, fraction, 0 to 1, default 0.2
+    Random share of each piece's place in the leaving order: 0 = a clean front, raising
+    it makes it ragged.
+anticipation : number, fraction, 0.01 to 0.2, default 0.06
+    Wind-up time before a piece goes, as a share of `progress`: it eases back by
+    `pullback` over this time. The first piece goes only after it, so every piece has
+    one.
+pullback : number, fraction, 0 to 1, default 0.15
+    How far a piece eases back against its journey before it goes (anticipation), as a
+    share of the journey. 0 = no wind-up.
+flight : number, fraction, 0.01 to 0.5, default 0.2
+    Average time from detaching to vanishing, as a share of `progress`. Shorter flights
+    keep fewer pieces in the air at once (about 0.1 keeps it to a third on a side-to-
+    side sweep).
+flight_variation : number, fraction, 0 to 0.9, default 0.4
+    How much each piece's flight differs from `flight`: 0.4 = from 0.6x to 1.4x. 0 = all
+    the same.
+finish : number, fraction, 0.5 to 1, default 0.98
+    The progress by which the last piece has vanished (a little under 1 leaves nothing
+    behind at the end). If `anticipation` and the longest flight do not fit before it,
+    all pieces go at once.
+hover_spread : number, fraction, 0 to 1, default 0.45
+    With `hover`: how far into `progress` a piece `outline_depth` inside starts to float
+    (the outline starts at 0). 0 = everything floats at once.
+bob : number, px, 0 to 24, default 2.0
+    Height of the gentle up-and-down of a hovering piece, in px.
+bob_cycles : number, cycles, 0 to 20, default 3.0
+    Number of ups and downs while a piece hovers.
+angle_spread : number, degrees, 0 to 180, default 12.0
+    Range of each piece's own direction around the wind's `angle`, in degrees (it
+    differs by up to half of this). Not a direction itself.
+distance_minimum : number, fraction, 0 to 1, default 0.35
+    The shortest journey as a share of the longest (`wind`), so speeds differ; 1 = all
+    travel equally far.
+outward_distance : number, px, 0 to 480, default 58.0
+    How far `outward` 1 throws a piece away from its edge, in px.
+acceleration : number, ratio, 0 to 10, default 0.5
+    How a piece speeds up on its way (an exit accelerates): it ends 1 + 2 x acceleration
+    times as fast as it starts. 0 = steady speed.
+sway : number, px, 0 to 96, default 6.0
+    Largest sideways wobble of a flying piece, in px; it grows during the flight. 0 =
+    none.
+sway_cycles : number, cycles, 0 to 20, default 1.5
+    Number of wobbles during a piece's flight.
+falloff : number, ratio, 0 to 10, default 1.5
+    How a flying piece fades: brightness is (1 - share of flight)^falloff. 0 = no fade
+    (it just vanishes at the end), 1 = even, above 1 fades quickly at first.
+flare : number, ratio, 0 to 2, default 0.4
+    Extra brightness at the peak of the glow as a piece leaves (0.4 = 1.4x); brightening
+    stops at white. 0 = no glow.
+flare_span : number, fraction, 0.01 to 1, default 0.2
+    Share of a piece's flight that the glow lasts; it peaks halfway through that.
+ambient_phase : number, cycles, 0 to 1, default 0.0
+    Where the shimmer wave is in its cycle: 0 and 1 are the same picture, 0.5 is half a
+    cycle on. Raising it moves the wave against the wind; with `ambient` at 0 it does
+    nothing.
+ambient_wavelength : number, px, 5 to 960, default 96.0
+    Length of one shimmer wave, in px; a shorter one packs more waves across the
+    picture.
+open_bottom : true or false, default True
+    True: the bottom border is not an edge for `outline` and `hover` (a portrait is cut
+    off there). False: it counts like the other borders.
+normal_smoothing : number, count, 0 to 10, default 1.0
+    Blur, in characters (a Gaussian sigma), of the outline before `outward` reads its
+    direction: raising it makes neighbouring pieces fly in more similar directions; 0
+    uses the raw outline.
+normal_truncate : number, ratio, 1 to 10, default 4.0
+    Where the `normal_smoothing` blur is cut off, in sigmas: it reaches this many times
+    `normal_smoothing` characters from the outline, so the pieces' direction `outward`
+    is read from that far out. Larger is more exact and slower, smaller shortens the
+    reach. Nothing changes with `normal_smoothing` at 0.
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the `normal_smoothing` blur sees beyond the picture's border: 'reflect'
+    (mirrored, border row repeated; a border stays an edge), 'mirror' (mirrored about
+    the border row), 'nearest' (the border row repeated), 'wrap' (the opposite border),
+    'constant' (open space, as if nothing were there, which blurs the outline toward the
+    border).
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's average over a piece, 0 to 1, above which the piece belongs to the
+    figure that `outline` and `hover` work from; 0.5 = more than half. Lowering it takes
+    in more of a soft edge (hair, fur), raising it less.
+background_threshold : number, fraction, 0 to 1, default 0.02
+    How bright, 0 to 1, some pixel of a piece must be for the piece to count as picture
+    rather than black background: a piece no brighter never flies and is drawn black
+    once the dispersal (or the shimmer) has begun. Raising it drops dim, noisy pieces.
 
-    Presets
-    -------
-    evaporate : The top of the figure dissolves into pieces that rise like smoke, thin out and fade.
-    halo : The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces.
-    windblown : The edges dissolve and everything is blown to the right, like dust in a wind.
-    disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
+Presets
+-------
+evaporate : The top of the figure dissolves into pieces that rise like smoke, thin out and fade.
+halo : The top of the head and the sides shed outward, symmetric: a halo of dissolving pieces.
+windblown : The edges dissolve and everything is blown to the right, like dust in a wind.
+disintegrate : Heavy: the whole outline and the top come apart, in long plumes in every direction."""
     ...
 
 @_effect
-def displace(
-    *,
-    amount: float | Drive = 12.0,
-    scale: float = 80.0,
-    octaves: int = 3,
-    persistence: float = 0.5,
-    lacunarity: float = 2.0,
-    seed: int = 0,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["scatter"] | None = None,
-) -> Step:
+def displace(*, amount: float | Drive = 12.0, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['scatter'] | None = None) -> Step:
     """Move every pixel by two independent noise fields (down and right), the longest move being `amount` px: warp, tearing, scatter, frosted glass.  Each pixel shows the picture at its own place plus a move (down, right) from two fractal noise fields of the same `scale`, `octaves`, `persistence` and `lacunarity`, drawn from `seed` independently of each other. The moves are scaled together, by one number, so that the longest of them is `amount` px: no pixel reads from farther than that, so the `edge` rule only matters within `amount` px of the border.
 
-    Parameters
-    ----------
-    amount : number (drivable), px, 0 to 500, default 12.0
-        The farthest any pixel's move is, in pixels: the moves are scaled so that the
-        largest one, wherever the noise is strongest, is exactly this far. Raising it tears
-        the picture up more; 0 leaves it unchanged.
-    scale : number, px, 1 to 1024, default 80.0
-        Size of the coarsest waves of the displacement in pixels, the spacing of the first
-        noise lattice. Larger = broad, slow wobbles that bend the picture; small = fine,
-        jittery tearing; 1 (with 1 octave and 'nearest') = every pixel moves on its own,
-        frosted glass.
-    octaves : whole number, count, 1 to 8, default 3
-        How many layers of noise are summed, each finer than the last (by `lacunarity`) and
-        weaker (by `persistence`). 1 = smooth waves, more = more fine, ragged detail. Layers
-        finer than one pixel are dropped.
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weaker each finer layer is than the one before: each layer's weight is this
-        to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
-        strong (very rough).
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer is than the one before: the lattice spacing is divided by
-        this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
-        detail drops off faster in size.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same displacement, another seed a
-        different one.
+Parameters
+----------
+amount : number (drivable), px, 0 to 500, default 12.0
+    The farthest any pixel's move is, in pixels: the moves are scaled so that the
+    largest one, wherever the noise is strongest, is exactly this far. Raising it tears
+    the picture up more; 0 leaves it unchanged.
+scale : number, px, 1 to 1024, default 80.0
+    Size of the coarsest waves of the displacement in pixels, the spacing of the first
+    noise lattice. Larger = broad, slow wobbles that bend the picture; small = fine,
+    jittery tearing; 1 (with 1 octave and 'nearest') = every pixel moves on its own,
+    frosted glass.
+octaves : whole number, count, 1 to 8, default 3
+    How many layers of noise are summed, each finer than the last (by `lacunarity`) and
+    weaker (by `persistence`). 1 = smooth waves, more = more fine, ragged detail. Layers
+    finer than one pixel are dropped.
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer is than the one before: each layer's weight is this
+    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
+    strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before: the lattice spacing is divided by
+    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
+    detail drops off faster in size.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same displacement, another seed a
+    different one.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What a pixel near the border sees when its move reads from beyond the picture:
-        'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-        'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a pixel near the border sees when its move reads from beyond the picture:
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
 
-    Presets
-    -------
-    scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges break into grain and the picture looks seen through ground glass."""
+Presets
+-------
+scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges break into grain and the picture looks seen through ground glass."""
     ...
 
 @_effect
-def dither(
-    *,
-    method: Literal["floyd_steinberg", "atkinson", "bayer", "blue_noise"] = "floyd_steinberg",
-    palette: Literal[
-        "photo", "gameboy", "cga", "ega", "pico8", "cube2", "cube3", "cube4", "cube5", "cube6", "custom"
-    ] = "photo",
-    custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ("#000000", "#ffffff"),
-    colors: int = 8,
-    cell: float = 0.0,
-    pattern: float = 1.0,
-    space: Literal["oklab", "rgb"] = "oklab",
-    init: Literal["spread", "random"] = "spread",
-    iterations: int = 20,
-    tolerance: float = 0.001,
-    sample: int = 10000,
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["posterize", "threshold", "palette_quantize"] | None = None,
-) -> Step:
-    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`.
+def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'bayer', 'blue_noise'] = 'floyd_steinberg', palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'inks'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
+    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'inks' prints the `inks` instead (one to four colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance`, `sample` and `seed` are used only with no `separation`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
 
-    Parameters
-    ----------
-    method : one of 'floyd_steinberg', 'atkinson', 'bayer', 'blue_noise', default 'floyd_steinberg'
-        How tones become a pattern of dots. `floyd_steinberg` and 'atkinson' pass each
-        pixel's error on to its neighbours (organic grain; Floyd-Steinberg keeps every tone,
-        Atkinson drops a quarter of the error, so highlights and shadows go clean and the
-        contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix.
-        `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile, the one
-        with no visible pattern. Both of those mix colours of any palette, in steps of a
-        sixteenth.
-    palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom', default 'photo'
-        Where the colours come from. 'photo' finds `colors` colours in the picture itself
-        (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
-        (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8' (the 16
-        PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2
-        to 6 evenly spaced levels of red, green and blue: 8 to 216 colours) are fixed
-        palettes; 'custom' takes your own list, `custom`.
-    custom : list of colours, default ('#000000', '#ffffff')
-        Your own colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1), at least
-        two, used when `palette` is 'custom' (ignored for any other palette).
-    colors : whole number, count, 2 to 256, default 8
-        How many colours to find when `palette` is 'photo' (ignored for any other palette).
-        Raising it keeps more detail and gradation; fewer than this many are used if the
-        picture has fewer distinct colours. 'bayer' and `blue_noise` take longer with more
-        colours.
-    cell : number, px, 0 to 48, default 0.0
-        The size of one dot in px at the recipe's size (rounded to whole pixels): the
-        picture is dithered on a grid of this size and shown with hard square dots. 0, the
-        default, is one dot per pixel at any render size (so a `pattern` of 0 recolours
-        pixel by pixel); 4 is a chunky dot on a 480 px picture and 10 or more a pixel-art
-        look. Raising it gives coarser, larger dots.
-    pattern : number, fraction, 0 to 1, default 1.0
-        How much of the dot pattern is used: 1 = the method as designed; lower passes less
-        error on (`floyd_steinberg`, atkinson) or mixes fewer colours per dot (bayer,
-        `blue_noise`), so flatter areas; 0 gives each dot its nearest palette colour, plain
-        flat colours with no pattern, whatever the method.
+Parameters
+----------
+method : one of 'floyd_steinberg', 'atkinson', 'bayer', 'blue_noise', default 'floyd_steinberg'
+    How tones become a pattern of dots. `floyd_steinberg` and 'atkinson' pass each
+    pixel's error on to its neighbours (organic grain; Floyd-Steinberg keeps every tone,
+    Atkinson drops a quarter of the error, so highlights and shadows go clean and the
+    contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix.
+    `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile, the one
+    with no visible pattern. Both of those mix colours of any palette, in steps of a
+    sixteenth.
+palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom', default 'photo'
+    Where the colours come from. 'photo' finds `colors` colours in the picture itself
+    (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
+    (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8' (the 16
+    PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2
+    to 6 evenly spaced levels of red, green and blue: 8 to 216 colours) are fixed
+    palettes; 'custom' takes your own list, `custom`.
+custom : list of colours, default ('#000000', '#ffffff')
+    Your own colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1), at least
+    two, used when `palette` is 'custom' (ignored for any other palette).
+colors : whole number, count, 2 to 256, default 8
+    How many colours to find when `palette` is 'photo' (ignored for any other palette).
+    Raising it keeps more detail and gradation; fewer than this many are used if the
+    picture has fewer distinct colours. 'bayer' and `blue_noise` take longer with more
+    colours.
+cell : number, px, 0 to 48, default 0.0
+    The size of one dot in px at the recipe's size (rounded to whole pixels): the
+    picture is dithered on a grid of this size and shown with hard square dots. 0, the
+    default, is one dot per pixel at any render size (so a `pattern` of 0 recolours
+    pixel by pixel); 4 is a chunky dot on a 480 px picture and 10 or more a pixel-art
+    look. Raising it gives coarser, larger dots.
+pattern : number, fraction, 0 to 1, default 1.0
+    How much of the dot pattern is used: 1 = the method as designed; lower passes less
+    error on (`floyd_steinberg`, atkinson) or mixes fewer colours per dot (bayer,
+    `blue_noise`), so flatter areas; 0 gives each dot its nearest palette colour, plain
+    flat colours with no pattern, whatever the method.
+separation : one of 'none', 'inks', default 'none'
+    How the colours are chosen: 'none' (from `palette`) or 'inks' (one layer of dots per
+    colour of `inks`, printed over `paper` like transparent layers).
+inks : list of colours, default ('#ff4d6d', '#2b59ff')
+    With 'inks' separation: the one to four ink colours ('#rrggbb', '#rgb' or three
+    numbers 0..1), in the order they are offset; ignored otherwise. Each pixel's colour
+    is split into amounts of these inks.
+paper : colour, default '#ffffff'
+    With 'inks' separation: the paper colour the inks are printed over, where no ink
+    lands. Use a light one: inks only darken it.
+offset : number, px, 0 to 100, default 0.0
+    With 'inks' separation: how far in px the second ink's layer is moved from the first
+    (the third twice as far, the fourth three times), as ink misregistered on a press; 0
+    = all layers in register.
+offset_angle : number (cyclic), degrees, 0 to 360, default 0.0
+    With an `offset`: the direction of the move, in degrees clockwise on screen from the
+    x axis (90 is downward).
 
-    Advanced parameters
-    -------------------
-    space : one of 'oklab', 'rgb', default 'oklab'
-        The colour space in which dots are matched to palette colours, the 'photo' colours
-        are searched, and errors are measured. 'oklab' is where equal distances look equally
-        different, so colours match as the eye sees them; 'rgb' is the picture's own red,
-        green and blue values, where each channel is matched on its own: with a 'cube'
-        palette and `pattern` 0 it snaps every channel to a few levels, hard colour
-        separations.
-    init : one of 'spread', 'random', default 'spread'
-        How the search for colours starts (palette 'photo'): 'spread' spreads the starting
-        colours out (k-means++, Arthur and Vassilvitskii, 2007) and usually finds a better
-        set; 'random' starts from `colors` random pixels.
-    iterations : whole number, count, 1 to 100, default 20
-        The most k-means rounds to run when `palette` is 'photo'. Each round moves every
-        colour to the average of the pixels nearest to it; raising it lets the search settle
-        further.
-    tolerance : number, fraction, 0 to 1, default 0.001
-        Stop the k-means rounds early once no colour has moved farther than this in `space`
-        (in Oklab black to white is 1). 0 runs all `iterations`; raising it stops sooner
-        with a rougher result.
-    sample : whole number, count, 1 to 1000000, default 10000
-        How many randomly chosen dots the colours are searched on when `palette` is 'photo';
-        every dot is still repainted. A picture with fewer dots is searched whole. Raising
-        it costs time and can find rare colours; lowering it is faster but may miss small
-        areas of colour.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed for the choice of sample dots and starting colours when `palette` is
-        'photo': the same seed always gives the same picture, another seed may find slightly
-        different colours.
+Advanced parameters
+-------------------
+space : one of 'oklab', 'rgb', default 'oklab'
+    The colour space in which dots are matched to palette colours, the 'photo' colours
+    are searched, and errors are measured. 'oklab' is where equal distances look equally
+    different, so colours match as the eye sees them; 'rgb' is the picture's own red,
+    green and blue values, where each channel is matched on its own: with a 'cube'
+    palette and `pattern` 0 it snaps every channel to a few levels, hard colour
+    separations.
+init : one of 'spread', 'random', default 'spread'
+    How the search for colours starts (palette 'photo'): 'spread' spreads the starting
+    colours out (k-means++, Arthur and Vassilvitskii, 2007) and usually finds a better
+    set; 'random' starts from `colors` random pixels.
+iterations : whole number, count, 1 to 100, default 20
+    The most k-means rounds to run when `palette` is 'photo'. Each round moves every
+    colour to the average of the pixels nearest to it; raising it lets the search settle
+    further.
+tolerance : number, fraction, 0 to 1, default 0.001
+    Stop the k-means rounds early once no colour has moved farther than this in `space`
+    (in Oklab black to white is 1). 0 runs all `iterations`; raising it stops sooner
+    with a rougher result.
+sample : whole number, count, 1 to 1000000, default 10000
+    How many randomly chosen dots the colours are searched on when `palette` is 'photo';
+    every dot is still repainted. A picture with fewer dots is searched whole. Raising
+    it costs time and can find rare colours; lowering it is faster but may miss small
+    areas of colour.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for the choice of sample dots and starting colours when `palette` is
+    'photo': the same seed always gives the same picture, another seed may find slightly
+    different colours.
 
-    Presets
-    -------
-    posterize : Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels.
-    threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `custom` for other inks.
-    palette_quantize : Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8)."""
+Presets
+-------
+posterize : Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels.
+threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `custom` for other inks.
+palette_quantize : Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8)."""
     ...
 
 @_effect
-def drop_shadow(
-    *,
-    field: str = "subject",
-    copies: int = 1,
-    offset: float = 22.0,
-    angle: float = 56.0,
-    blur: float = 24.0,
-    color: str | list[float] | tuple[float, float, float] = "#000000",
-    end_color: str | list[float] | tuple[float, float, float] = "#000000",
-    copy_opacity: float = 1.0,
-    fade: float = 0.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 0.6,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["long_shadow", "layered_cutouts"] | None = None,
-) -> Step:
+def drop_shadow(*, field: str = 'subject', copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow', 'layered_cutouts'] | None = None) -> Step:
     """Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by
-    `blur`: a drop shadow, layered paper cutouts or a long shadow.
+`blur`: a drop shadow, layered paper cutouts or a long shadow.
 
-    One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
-    at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour
-    from `color` (nearest the shape) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
-    `copy_opacity` falling by `fade`, and the shape on top of all of them, so the shape itself is never changed.
+One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
+at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour
+from `color` (nearest the shape) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
+`copy_opacity` falling by `fade`, and the shape on top of all of them, so the shape itself is never changed.
 
-    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
-    Parameters
-    ----------
-    field : field name, default 'subject'
-        The shape that casts the copies: `subject` (the subject's silhouette), `light`,
-        `depth`, or a region of the recipe (text, a logo, a drawn shape), its value 0..1 how
-        much of a pixel belongs to it.
-    copies : whole number, count, 1 to 400, default 1
-        How many copies of the shape are stacked behind it: 1 = a single shadow, more = a
-        deeper stack of layers.
-    offset : number, px, 0 to 1000, default 22.0
-        How far each copy lies beyond the one before it, in px, tuned for a picture about
-        480 px high: the first is `offset` from the shape, the last `copies` x `offset`. 0 =
-        every copy hidden behind the shape, leaving only what `blur` spreads past its edge.
-    angle : number (cyclic), degrees, 0 to 360, default 56.0
-        The direction the copies step away in, in degrees clockwise from pointing right on
-        the screen, 0 to 360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to
-        the left, 270 = up.
-    blur : number, px, 0 to 200, default 24.0
-        Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger
-        and fainter at their edge; 0 = hard-edged silhouettes.
-    color : colour, default '#000000'
-        The colour of the copy nearest the shape: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black
-        darkens what lies behind the shape; another colour tints it.
-    end_color : colour, default '#000000'
-        The colour of the farthest copy; the copies between step evenly from `color` to it.
-        With one copy only `color` is used.
-    copy_opacity : number, fraction, 0 to 1, default 1.0
-        How much of what lies behind each copy it covers: 1 = fully, below 1 the copies show
-        through each other and the picture; 0 = no copies. Overlapping copies compound (two
-        copies at 0.5 cover 0.75); the step's `opacity` mixes the finished stack in once.
-    fade : number, fraction, 0 to 1, default 0.0
-        How much of `copy_opacity` the farthest copy loses, falling in a straight line along
-        the copies: 0 = all copies alike, 0.5 = the farthest half as opaque, 1 = it
-        vanishes. With one copy nothing fades.
+Parameters
+----------
+field : field name, default 'subject'
+    The shape that casts the copies: `subject` (the subject's silhouette), `light`,
+    `depth`, or a region of the recipe (text, a logo, a drawn shape), its value 0..1 how
+    much of a pixel belongs to it.
+copies : whole number, count, 1 to 400, default 1
+    How many copies of the shape are stacked behind it: 1 = a single shadow, more = a
+    deeper stack of layers.
+offset : number, px, 0 to 1000, default 22.0
+    How far each copy lies beyond the one before it, in px, tuned for a picture about
+    480 px high: the first is `offset` from the shape, the last `copies` x `offset`. 0 =
+    every copy hidden behind the shape, leaving only what `blur` spreads past its edge.
+angle : number (cyclic), degrees, 0 to 360, default 56.0
+    The direction the copies step away in, in degrees clockwise from pointing right on
+    the screen, 0 to 360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to
+    the left, 270 = up.
+blur : number, px, 0 to 200, default 24.0
+    Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger
+    and fainter at their edge; 0 = hard-edged silhouettes.
+color : colour, default '#000000'
+    The colour of the copy nearest the shape: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black
+    darkens what lies behind the shape; another colour tints it.
+end_color : colour, default '#000000'
+    The colour of the farthest copy; the copies between step evenly from `color` to it.
+    With one copy only `color` is used.
+copy_opacity : number, fraction, 0 to 1, default 1.0
+    How much of what lies behind each copy it covers: 1 = fully, below 1 the copies show
+    through each other and the picture; 0 = no copies. Overlapping copies compound (two
+    copies at 0.5 cover 0.75); the step's `opacity` mixes the finished stack in once.
+fade : number, fraction, 0 to 1, default 0.0
+    How much of `copy_opacity` the farthest copy loses, falling in a straight line along
+    the copies: 0 = all copies alike, 0.5 = the farthest half as opaque, 1 = it
+    vanishes. With one copy nothing fades.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where each copy's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
-        Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What the copies see beyond the picture's edge, when moved and softened: 'nearest'
-        (the outermost row repeated, so a shape cut off by the border casts its copies on
-        without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
-        the edge pixel) or 'wrap' (the opposite edge).
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where each copy's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What the copies see beyond the picture's edge, when moved and softened: 'nearest'
+    (the outermost row repeated, so a shape cut off by the border casts its copies on
+    without a gap), 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
+    the edge pixel) or 'wrap' (the opposite edge).
 
-    Step opacity
-    ------------
-    0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this.
+Step opacity
+------------
+0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this.
 
-    Presets
-    -------
-    long_shadow : The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. Shows on light backgrounds; set color for dark ones.
-    layered_cutouts : Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple."""
+Presets
+-------
+long_shadow : The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. Shows on light backgrounds; set color for dark ones.
+layered_cutouts : Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple."""
     ...
 
 @_effect
-def droste(
-    *,
-    scale: float = 0.5,
-    turn: float = 20.0,
-    repeats: int = 4,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def droste(*, scale: float = 0.5, turn: float = 20.0, repeats: int = 4, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Show the picture again in its own middle, `scale` times as large and turned by `turn`, up to `repeats` times.  A Droste effect: a picture that contains a smaller copy of itself, which contains a smaller copy. Measure each pixel's distance from the middle as a share of the picture's half-width or half-height, whichever is larger (1 at the edge, so the picture and its copies are rectangles of the picture's shape). A pixel nearer than `scale` is inside a copy: it shows the picture at 1 / `scale` times its own distance, turned by `turn`, and if that is nearer than `scale` again, it is inside a copy of the copy, and so on, `repeats` times at most. The outside of the picture is the picture as it is. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    scale : number, ratio, 0.1 to 0.9, default 0.5
-        How much smaller each copy is than the one around it, strictly between 0 and 1: 0.5
-        = each copy is half the size of the last, 0.9 = a slow shrink with many copies close
-        together, 0.1 = one small copy. The copy has the picture's own shape and sits in its
-        middle.
-    turn : number (cyclic), degrees, -180 to 180, default 20.0
-        How far each copy is turned from the one around it, in degrees: positive turns the
-        copies clockwise as the picture is seen, negative anticlockwise, 0 leaves them
-        upright (nested frames); other values make the copies spiral into the middle.
-    repeats : whole number, count, 1 to 12, default 4
-        How many copies are drawn inside one another at most, 1 to 12: the copy this deep
-        shows the picture's middle instead of a further copy. Raising it adds ever smaller
-        copies towards the middle.
+Parameters
+----------
+scale : number, ratio, 0.1 to 0.9, default 0.5
+    How much smaller each copy is than the one around it, strictly between 0 and 1: 0.5
+    = each copy is half the size of the last, 0.9 = a slow shrink with many copies close
+    together, 0.1 = one small copy. The copy has the picture's own shape and sits in its
+    middle.
+turn : number (cyclic), degrees, -180 to 180, default 20.0
+    How far each copy is turned from the one around it, in degrees: positive turns the
+    copies clockwise as the picture is seen, negative anticlockwise, 0 leaves them
+    upright (nested frames); other values make the copies spiral into the middle.
+repeats : whole number, count, 1 to 12, default 4
+    How many copies are drawn inside one another at most, 1 to 12: the copy this deep
+    shows the picture's middle instead of a further copy. Raising it adds ever smaller
+    copies towards the middle.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but the small copies turn
-        blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-        'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
-        and may ring beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What a turned copy shows where it reads from beyond the picture (a turned copy's
-        corners reach past the edge): 'reflect' (mirrored, edge pixel repeated), 'mirror'
-        (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the
-        opposite edge)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but the small copies turn
+    blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
+    and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a turned copy shows where it reads from beyond the picture (a turned copy's
+    corners reach past the edge): 'reflect' (mirrored, edge pixel repeated), 'mirror'
+    (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the
+    opposite edge)."""
     ...
 
 @_effect
-def dust_scratches(
-    *,
-    density: float = 0.6,
-    size: float = 8.0,
-    hairs: float = 0.15,
-    scratches: int = 2,
-    angle: float = 4.0,
-    width: float = 1.0,
-    light: str | list[float] | tuple[float, float, float] = "#ffffff",
-    dark: str | list[float] | tuple[float, float, float] = "#000000",
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 0.8,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def dust_scratches(*, density: float = 0.6, size: float = 8.0, hairs: float = 0.15, scratches: int = 2, angle: float = 4.0, width: float = 1.0, light: str | list[float] | tuple[float, float, float] = '#ffffff', dark: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Draw light and dark specks, hairs and scratches at random places over the picture.  `density` marks per 1000 px² are specks (random radius up to `size` / 2, mostly small) or, for a share `hairs` of them, one-pixel hairs up to `size` px long; `scratches` long lines lean up to `angle` from vertical and are `width` wide. Each mark is `light` or `dark` with equal chance, solid inside, with antialiased edges (where a light mark crosses a dark one the light one lies on top). A higher `density` keeps every mark of a lower one and adds more; the same `seed` always gives the same marks.
 
-    Parameters
-    ----------
-    density : number, density, 0 to 5, default 0.6
-        How many specks and hairs there are: marks per 1000 design px² (a 32 x 32 px area at
-        the recipe's size), so any picture size looks alike. 0 = none, 0.6 is a light
-        dusting, 3 is filthy.
-    size : number, px, 1 to 50, default 8.0
-        The size of the biggest dust mark in px: a speck's diameter or a hair's length. Most
-        marks are smaller (speck radii are random, with many tiny ones); larger = bigger
-        blotches and longer hairs.
-    scratches : whole number, count, 0 to 100, default 2
-        How many scratches: thin, long, nearly vertical lines, each running over half to all
-        of the picture's height. 0 = none. A count, not a density: their width is in design
-        px, so the same count looks alike at any picture size.
-    light : colour, default '#ffffff'
-        The colour of the light marks (dust on a dark print, scratches into the emulsion):
-        '#rrggbb', '#rgb' or [r, g, b] 0..1. Each mark is light or dark with equal chance.
-    dark : colour, default '#000000'
-        The colour of the dark marks (dust on the scanner glass): '#rrggbb', '#rgb' or [r,
-        g, b] 0..1.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always puts the same marks in the same places, another
-        seed others.
+Parameters
+----------
+density : number, density, 0 to 5, default 0.6
+    How many specks and hairs there are: marks per 1000 design px² (a 32 x 32 px area at
+    the recipe's size), so any picture size looks alike. 0 = none, 0.6 is a light
+    dusting, 3 is filthy.
+size : number, px, 1 to 50, default 8.0
+    The size of the biggest dust mark in px: a speck's diameter or a hair's length. Most
+    marks are smaller (speck radii are random, with many tiny ones); larger = bigger
+    blotches and longer hairs.
+scratches : whole number, count, 0 to 100, default 2
+    How many scratches: thin, long, nearly vertical lines, each running over half to all
+    of the picture's height. 0 = none. A count, not a density: their width is in design
+    px, so the same count looks alike at any picture size.
+light : colour, default '#ffffff'
+    The colour of the light marks (dust on a dark print, scratches into the emulsion):
+    '#rrggbb', '#rgb' or [r, g, b] 0..1. Each mark is light or dark with equal chance.
+dark : colour, default '#000000'
+    The colour of the dark marks (dust on the scanner glass): '#rrggbb', '#rgb' or [r,
+    g, b] 0..1.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same marks in the same places, another
+    seed others.
 
-    Advanced parameters
-    -------------------
-    hairs : number, fraction, 0 to 1, default 0.15
-        The share of the dust marks drawn as hairs (short thin lines in any direction)
-        instead of round specks: 0 = only specks, 1 = only hairs.
-    angle : number, degrees, 0 to 45, default 4.0
-        The most a scratch may lean away from vertical, in degrees: each scratch gets a
-        random lean up to this, to either side. 0 = all exactly vertical.
-    width : number, px, 0.5 to 10, default 1.0
-        How wide a scratch is in px. Larger = bolder scratches.
+Advanced parameters
+-------------------
+hairs : number, fraction, 0 to 1, default 0.15
+    The share of the dust marks drawn as hairs (short thin lines in any direction)
+    instead of round specks: 0 = only specks, 1 = only hairs.
+angle : number, degrees, 0 to 45, default 4.0
+    The most a scratch may lean away from vertical, in degrees: each scratch gets a
+    random lean up to this, to either side. 0 = all exactly vertical.
+width : number, px, 0.5 to 10, default 1.0
+    How wide a scratch is in px. Larger = bolder scratches.
 
-    Step opacity
-    ------------
-    0.8: a step of this effect is mixed in at 0.8 unless it sets its own `opacity`, which replaces this."""
+Step opacity
+------------
+0.8: a step of this effect is mixed in at 0.8 unless it sets its own `opacity`, which replaces this."""
     ...
 
 @_effect
-def echo(
-    *,
-    copies: int = 4,
-    dx: float = 14.0,
-    dy: float = 0.0,
-    fade: float = 0.5,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def echo(*, copies: int = 4, dx: float = 14.0, dy: float = 0.0, fade: float = 0.5, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`.  The result is the weighted average of the picture (weight 1) and copy k, the picture moved by k times (`dx`, `dy`) (weight (1 - `fade`)^k), so the weights add up to one: the picture's brightness is kept, a flat picture stays flat and nothing leaves the range 0..1. What a copy shows where it moved off the picture is set by `edge`.
 
-    Parameters
-    ----------
-    copies : whole number, count, 0 to 32, default 4
-        How many copies are laid over the picture, 0 to 32; 0 leaves the picture unchanged.
-        More copies make a longer smear along the step, and cost more.
-    dx : number, px, -500 to 500, default 14.0
-        How far each copy lies to the right of the one before it, in pixels, -500 to 500
-        (negative is to the left); copy k is k times this far from the picture. A fraction
-        of a pixel blends the two pixels it lies between.
-    dy : number, px, -500 to 500, default 0.0
-        How far each copy lies below the one before it, in pixels, -500 to 500 (negative is
-        above); copy k is k times this far from the picture. With dx and dy both 0 the
-        copies lie on the picture and change nothing.
-    fade : number, fraction, 0 to 1, default 0.5
-        How much weaker each copy is than the one before it, 0 to 1: the original counts 1,
-        copy k counts (1 - fade) to the power k. 0 gives every copy the strength of the
-        original; 0.5 halves each; 1 makes the copies vanish and leaves the picture
-        unchanged.
+Parameters
+----------
+copies : whole number, count, 0 to 32, default 4
+    How many copies are laid over the picture, 0 to 32; 0 leaves the picture unchanged.
+    More copies make a longer smear along the step, and cost more.
+dx : number, px, -500 to 500, default 14.0
+    How far each copy lies to the right of the one before it, in pixels, -500 to 500
+    (negative is to the left); copy k is k times this far from the picture. A fraction
+    of a pixel blends the two pixels it lies between.
+dy : number, px, -500 to 500, default 0.0
+    How far each copy lies below the one before it, in pixels, -500 to 500 (negative is
+    above); copy k is k times this far from the picture. With dx and dy both 0 the
+    copies lie on the picture and change nothing.
+fade : number, fraction, 0 to 1, default 0.5
+    How much weaker each copy is than the one before it, 0 to 1: the original counts 1,
+    copy k counts (1 - fade) to the power k. 0 gives every copy the strength of the
+    original; 0.5 halves each; 1 makes the copies vanish and leaves the picture
+    unchanged.
 
-    Advanced parameters
-    -------------------
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What a copy shows where it has moved off the picture's edge: 'nearest' repeats the
-        picture's edge pixels (a smear along the edge), 'wrap' brings back what left on the
-        other side, 'reflect' mirrors the picture (the edge line repeated once), 'mirror'
-        mirrors it about the edge line."""
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What a copy shows where it has moved off the picture's edge: 'nearest' repeats the
+    picture's edge pixels (a smear along the edge), 'wrap' brings back what left on the
+    other side, 'reflect' mirrors the picture (the edge line repeated once), 'mirror'
+    mirrors it about the edge line."""
     ...
 
 @_effect
-def edges(
-    *,
-    method: Literal["sobel", "canny", "dog"] = "canny",
-    radius: float = 1.5,
-    threshold: float = 0.1,
-    softness: float = 0.5,
-    color: str | list[float] | tuple[float, float, float] = "#ffffff",
-    background: str | list[float] | tuple[float, float, float] = "#000000",
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def edges(*, method: Literal['sobel', 'canny', 'dog'] = 'canny', radius: float = 1.5, threshold: float = 0.1, softness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#000000', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Edge detection and sketch ink lines in `color` on `background`, by Sobel, Canny or difference of Gaussians.  The picture's brightness (Rec. 709 luminance) is smoothed by `radius`, and how strongly a pixel reads as an edge (a black-to-white step reads 1, whichever method and radius) decides how fully it is drawn: not at all below `threshold` x (1 - `softness`), fully from threshold x (1 + softness), faded between. 'sobel' and 'canny' read the steepness (the Sobel gradient); 'canny' keeps only the crest of each edge, one or two pixels wide, and drops the weak ones that join no strong one. 'dog' reads the difference between two Gaussians (`radius` and 1.6 times that) itself, not its steepness, so it draws one ink line along each dark stroke and on the dark side of each edge, of features of about that size. Flat areas are always `background`. Screened over the picture (a step's `blend_mode = "screen"`) it lights up the edges; a dark `color` on a light `background` is line art.
 
-    Parameters
-    ----------
-    method : one of 'sobel', 'canny', 'dog', default 'canny'
-        How edges are found: 'sobel' (the steepness of the brightness: wide, soft bands that
-        follow the picture's gradients), 'canny' (the same steepness reduced to thin
-        connected lines: the weakest lines are dropped unless they join a strong one) or
-        'dog' (sketch ink lines: the difference of Gaussians itself, so one line along each
-        dark stroke and on the dark side of each edge, from features between `radius` and
-        1.6 times `radius` in size; slow gradients and fine texture fall away).
-    radius : number, px, 0.5 to 50, default 1.5
-        How far the picture is smoothed before edges are looked for, as the Gaussian sigma
-        in px at the recipe's size ('dog': the finer of its two Gaussians). Raising it drops
-        fine detail and noise and makes broader, smoother edges.
-    threshold : number, fraction, 0.01 to 1, default 0.1
-        How strong an edge must be to show, as a share of the strongest edge there can be
-        after smoothing (black straight to white = 1; a faint edge is near 0.05). Raising it
-        keeps only the strongest edges.
-    softness : number, fraction, 0 to 1, default 0.5
-        How gradually edges fade in around `threshold`: they are fully drawn from threshold
-        x (1 + softness) and not at all below threshold x (1 - softness), and 'canny' also
-        keeps a line down to that lower value if it touches one above the upper. 0 = every
-        edge fully drawn or not at all; raising it adds weaker edges as faint lines.
-    color : colour, default '#ffffff'
-        The colour of the edges: '#rrggbb', '#rgb' or [r, g, b] 0..1. Laid over a picture
-        with the blend mode 'screen' only the edges light up; dark on a light `background`
-        it is line art.
-    background : colour, default '#000000'
-        The colour where there is no edge: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black suits
-        'screen' blending, a light colour with a dark `color` gives a drawing.
+Parameters
+----------
+method : one of 'sobel', 'canny', 'dog', default 'canny'
+    How edges are found: 'sobel' (the steepness of the brightness: wide, soft bands that
+    follow the picture's gradients), 'canny' (the same steepness reduced to thin
+    connected lines: the weakest lines are dropped unless they join a strong one) or
+    'dog' (sketch ink lines: the difference of Gaussians itself, so one line along each
+    dark stroke and on the dark side of each edge, from features between `radius` and
+    1.6 times `radius` in size; slow gradients and fine texture fall away).
+radius : number, px, 0.5 to 50, default 1.5
+    How far the picture is smoothed before edges are looked for, as the Gaussian sigma
+    in px at the recipe's size ('dog': the finer of its two Gaussians). Raising it drops
+    fine detail and noise and makes broader, smoother edges.
+threshold : number, fraction, 0.01 to 1, default 0.1
+    How strong an edge must be to show, as a share of the strongest edge there can be
+    after smoothing (black straight to white = 1; a faint edge is near 0.05). Raising it
+    keeps only the strongest edges.
+softness : number, fraction, 0 to 1, default 0.5
+    How gradually edges fade in around `threshold`: they are fully drawn from threshold
+    x (1 + softness) and not at all below threshold x (1 - softness), and 'canny' also
+    keeps a line down to that lower value if it touches one above the upper. 0 = every
+    edge fully drawn or not at all; raising it adds weaker edges as faint lines.
+color : colour, default '#ffffff'
+    The colour of the edges: '#rrggbb', '#rgb' or [r, g, b] 0..1. Laid over a picture
+    with the blend mode 'screen' only the edges light up; dark on a light `background`
+    it is line art.
+background : colour, default '#000000'
+    The colour where there is no edge: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black suits
+    'screen' blending, a light colour with a dark `color` gives a drawing.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the Gaussians are cut off, in sigmas: they reach truncate x radius px. Larger
-        is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the smoothing and the gradient see beyond the picture's border: 'reflect'
-        (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
-        (the edge pixel repeated) or 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the Gaussians are cut off, in sigmas: they reach truncate x radius px. Larger
+    is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing and the gradient see beyond the picture's border: 'reflect'
+    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
+    (the edge pixel repeated) or 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def equalize(
-    *,
-    tiles: int = 8,
-    limit: float = 3.0,
-    bins: int = 256,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def equalize(*, tiles: int = 8, limit: float = 3.0, bins: int = 256, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour.  The brightness is the value V = max(R, G, B) of the sRGB-encoded picture (the V of HSV). Every pixel's red, green and blue are multiplied by new V / old V, so hue and HSV saturation are unchanged and no channel can leave 0..1; black stays black. Each of the `tiles` x `tiles` regions gets a histogram of V in `bins` bins, clipped so no bin is taller than `limit` times the flat height (the clipped counts are spread evenly over all bins, repeatedly, until none exceeds it), and its mapping is the cumulative histogram: a pixel in bin k goes to the share of the tile's pixels in bins 0..k. A pixel takes the bilinear blend of the mappings of the four tiles whose centres surround it (the nearest tiles at the borders), so there are no seams. With one tile and a limit of `bins` or more this is classic histogram equalisation.
 
-    Parameters
-    ----------
-    tiles : whole number, count, 1 to 64, default 8
-        Tiles per side: the picture is cut into tiles x tiles regions, each equalised by its
-        own histogram and blended smoothly into its neighbours. 1 = one histogram for the
-        whole picture (classic equalisation); raising it adapts to smaller regions and
-        brings out local contrast. A picture with fewer pixel rows or columns than tiles
-        gets one tile per row or column.
-    limit : number, ratio, 1 to 256, default 3.0
-        Clip limit, as a multiple of the height every bin would have if a tile's histogram
-        were flat: no bin may be taller, so no tone range is stretched more than this many
-        times. 1 = the histogram is made flat, which leaves tones evenly spread (a gentle
-        lift of the darkest bin by one step); raising it allows more contrast and amplifies
-        noise in flat areas. A limit of `bins` or more never clips (classic equalisation).
-    bins : whole number, count, 2 to 256, default 256
-        Histogram bins over the brightness range 0..1: fewer bins give a coarser mapping and
-        fewer distinct brightnesses in the result (2 = every tile ends up with two
-        brightnesses), 256 matches 8-bit pictures."""
+Parameters
+----------
+tiles : whole number, count, 1 to 64, default 8
+    Tiles per side: the picture is cut into tiles x tiles regions, each equalised by its
+    own histogram and blended smoothly into its neighbours. 1 = one histogram for the
+    whole picture (classic equalisation); raising it adapts to smaller regions and
+    brings out local contrast. A picture with fewer pixel rows or columns than tiles
+    gets one tile per row or column.
+limit : number, ratio, 1 to 256, default 3.0
+    Clip limit, as a multiple of the height every bin would have if a tile's histogram
+    were flat: no bin may be taller, so no tone range is stretched more than this many
+    times. 1 = the histogram is made flat, which leaves tones evenly spread (a gentle
+    lift of the darkest bin by one step); raising it allows more contrast and amplifies
+    noise in flat areas. A limit of `bins` or more never clips (classic equalisation).
+bins : whole number, count, 2 to 256, default 256
+    Histogram bins over the brightness range 0..1: fewer bins give a coarser mapping and
+    fewer distinct brightnesses in the result (2 = every tile ends up with two
+    brightnesses), 256 matches 8-bit pictures."""
     ...
 
 @_effect
-def flow_lines(
-    *,
-    density: float = 2.0,
-    length: float = 120.0,
-    step: float = 1.0,
-    thickness: float = 1.5,
-    scale: float = 120.0,
-    octaves: int = 2,
-    persistence: float = 0.5,
-    lacunarity: float = 2.0,
-    twist: float = 180.0,
-    seed: int = 0,
-    line: str | list[float] | tuple[float, float, float] = "#ffd84a",
-    background: str | list[float] | tuple[float, float, float] = "#12002b",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def flow_lines(*, density: float = 2.0, length: float = 120.0, step: float = 1.0, thickness: float = 1.5, scale: float = 120.0, octaves: int = 2, persistence: float = 0.5, lacunarity: float = 2.0, twist: float = 180.0, seed: int = 0, line: str | list[float] | tuple[float, float, float] = '#ffd84a', background: str | list[float] | tuple[float, float, float] = '#12002b', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.  A generated background: the input is used only for its height and width, its content is ignored. The flow's direction at each pixel is `twist` times a fractal noise field. Each of the `density` per 1000 px² lines starts at a random point and follows the flow for `length` px in steps of `step` px (the direction read at the pixel the line is in; the steps are `length` / `step` rounded), ending early where it would leave the picture. A soft disc `thickness` px across is stamped at every point; where discs overlap the strongest counts, so lines stay as bold as one.
 
-    Parameters
-    ----------
-    density : number, density, 0 to 50, default 2.0
-        How many lines: lines started per 1000 design px² (a 32 x 32 px area at the recipe's
-        size), so any picture size looks alike; a 480 x 384 picture at 2 has about 370. 0
-        draws none. More = a denser weave; lines cross freely.
-    length : number, px, 1 to 2000, default 120.0
-        How far each line follows the flow, in px along the line, tuned for a picture about
-        480 px high. It is drawn in steps of `step`. A line also ends where it reaches the
-        edge of the picture.
-    thickness : number, px, 0.5 to 16, default 1.5
-        The width of the lines in px (a soft disc of this diameter is stamped at every
-        step). Tuned for a picture about 480 px high.
-    scale : number, px, 4 to 1024, default 120.0
-        The size of the flow's coarsest swirls in px, the spacing of the first noise
-        lattice. Larger = broader, gentler bends. Tuned for a picture about 480 px high.
-    octaves : whole number, count, 1 to 8, default 2
-        How many layers of noise are summed for the flow, each finer than the last (by
-        `lacunarity`) and weaker (by `persistence`). 1 = smooth sweeping lines, more =
-        wigglier ones.
-    twist : number, degrees, 0 to 720, default 180.0
-        How far the flow turns for each standard deviation of the noise: a line's direction
-        is the noise times this, measured clockwise on screen from the right. 0 = every line
-        runs straight to the right; larger = tighter, more varied swirls.
-    seed : whole number, count, 0 to 2147483647, default 0
-        Seeds the flow and the line starts: the same seed gives the same picture. The starts
-        and the flow are independent random streams of it.
-    line : colour, default '#ffd84a'
-        The colour of the lines.
-    background : colour, default '#12002b'
-        The colour behind the lines.
+Parameters
+----------
+density : number, density, 0 to 50, default 2.0
+    How many lines: lines started per 1000 design px² (a 32 x 32 px area at the recipe's
+    size), so any picture size looks alike; a 480 x 384 picture at 2 has about 370. 0
+    draws none. More = a denser weave; lines cross freely.
+length : number, px, 1 to 2000, default 120.0
+    How far each line follows the flow, in px along the line, tuned for a picture about
+    480 px high. It is drawn in steps of `step`. A line also ends where it reaches the
+    edge of the picture.
+thickness : number, px, 0.5 to 16, default 1.5
+    The width of the lines in px (a soft disc of this diameter is stamped at every
+    step). Tuned for a picture about 480 px high.
+scale : number, px, 4 to 1024, default 120.0
+    The size of the flow's coarsest swirls in px, the spacing of the first noise
+    lattice. Larger = broader, gentler bends. Tuned for a picture about 480 px high.
+octaves : whole number, count, 1 to 8, default 2
+    How many layers of noise are summed for the flow, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth sweeping lines, more =
+    wigglier ones.
+twist : number, degrees, 0 to 720, default 180.0
+    How far the flow turns for each standard deviation of the noise: a line's direction
+    is the noise times this, measured clockwise on screen from the right. 0 = every line
+    runs straight to the right; larger = tighter, more varied swirls.
+seed : whole number, count, 0 to 2147483647, default 0
+    Seeds the flow and the line starts: the same seed gives the same picture. The starts
+    and the flow are independent random streams of it.
+line : colour, default '#ffd84a'
+    The colour of the lines.
+background : colour, default '#12002b'
+    The colour behind the lines.
 
-    Advanced parameters
-    -------------------
-    step : number, px, 0.5 to 16, default 1.0
-        The distance in px a line moves each step. Keep it at or below the line's thickness
-        for a solid line; larger steps leave dotted lines.
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weaker each finer layer of the flow is than the one before. 0 = only the
-        coarsest layer.
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer of the flow is than the one before: the lattice spacing is
-        divided by this."""
+Advanced parameters
+-------------------
+step : number, px, 0.5 to 16, default 1.0
+    The distance in px a line moves each step. Keep it at or below the line's thickness
+    for a solid line; larger steps leave dotted lines.
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer of the flow is than the one before. 0 = only the
+    coarsest layer.
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer of the flow is than the one before: the lattice spacing is
+    divided by this."""
     ...
 
 @_effect
-def flow_warp(
-    *,
-    amount: float = 20.0,
-    steps: int = 6,
-    scale: float = 80.0,
-    octaves: int = 3,
-    persistence: float = 0.5,
-    lacunarity: float = 2.0,
-    seed: int = 0,
-    angle: float = 0.0,
-    variation: float = 60.0,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def flow_warp(*, amount: float = 20.0, steps: int = 6, scale: float = 80.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, seed: int = 0, angle: float = 0.0, variation: float = 60.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise.  The flow at each pixel points `angle` degrees clockwise from pointing right, turned by a noise field (`scale`, `octaves`, `persistence`, `lacunarity`, standardised to mean 0 and standard deviation 1, then scaled to `variation` degrees of spread). The picture is moved along it in `steps` equal steps of `amount` / `steps` px, each step moving what is at a pixel one step along the flow there, so a pixel's content follows the bends of the flow and piles up into streaks where currents meet. The path of any content is `amount` px long. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    amount : number, px, 0 to 500, default 20.0
-        How far in pixels the picture is carried along the flow in all, the length of the
-        path each pixel's content travels in `steps` equal steps (the path bends with the
-        flow, so it ends nearer than this where it turns). Raising it makes longer streaks;
-        0 leaves the picture unchanged.
-    scale : number, px, 1 to 1024, default 80.0
-        Size of the coarsest swirls of the flow in pixels, the spacing of the first noise
-        lattice. Larger = broad, sweeping currents; small = fine, busy eddies.
-    octaves : whole number, count, 1 to 8, default 3
-        How many layers of noise are summed to make the flow, each finer than the last (by
-        `lacunarity`) and weaker (by `persistence`). 1 = smooth currents, more = more fine,
-        ragged detail. Layers finer than one pixel are dropped.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same flow, another seed a different one.
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        The direction the flow runs in on average, in degrees clockwise from pointing right:
-        0 carries the picture to the right, 90 down, 180 to the left, 270 up. With
-        `variation` 0 the whole picture is carried this way.
-    variation : number, degrees, 0 to 360, default 60.0
-        How far the noise turns the flow away from `angle`: the typical turn, in degrees,
-        either way (the noise's standard deviation). 0 = one straight current; 60 = streaks
-        that wander about the angle; 360 = currents running every way, with eddies where
-        they meet.
+Parameters
+----------
+amount : number, px, 0 to 500, default 20.0
+    How far in pixels the picture is carried along the flow in all, the length of the
+    path each pixel's content travels in `steps` equal steps (the path bends with the
+    flow, so it ends nearer than this where it turns). Raising it makes longer streaks;
+    0 leaves the picture unchanged.
+scale : number, px, 1 to 1024, default 80.0
+    Size of the coarsest swirls of the flow in pixels, the spacing of the first noise
+    lattice. Larger = broad, sweeping currents; small = fine, busy eddies.
+octaves : whole number, count, 1 to 8, default 3
+    How many layers of noise are summed to make the flow, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth currents, more = more fine,
+    ragged detail. Layers finer than one pixel are dropped.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same flow, another seed a different one.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The direction the flow runs in on average, in degrees clockwise from pointing right:
+    0 carries the picture to the right, 90 down, 180 to the left, 270 up. With
+    `variation` 0 the whole picture is carried this way.
+variation : number, degrees, 0 to 360, default 60.0
+    How far the noise turns the flow away from `angle`: the typical turn, in degrees,
+    either way (the noise's standard deviation). 0 = one straight current; 60 = streaks
+    that wander about the angle; 360 = currents running every way, with eddies where
+    they meet.
 
-    Advanced parameters
-    -------------------
-    steps : whole number, count, 1 to 32, default 6
-        How many equal steps the journey is made in, the picture being resampled once per
-        step: with 1 every pixel moves straight `amount` px in the direction of the flow
-        where it stands; more steps follow the bends of the flow and smear the picture into
-        streaks along it, a little softer each time. Raising it costs time in proportion.
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weaker each finer layer is than the one before: each layer's weight is this
-        to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
-        strong (very rough).
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer is than the one before: the lattice spacing is divided by
-        this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
-        detail drops off faster in size.
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What a pixel near the border sees when the flow carries it in from beyond the
-        picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
-        edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+steps : whole number, count, 1 to 32, default 6
+    How many equal steps the journey is made in, the picture being resampled once per
+    step: with 1 every pixel moves straight `amount` px in the direction of the flow
+    where it stands; more steps follow the bends of the flow and smear the picture into
+    streaks along it, a little softer each time. Raising it costs time in proportion.
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer is than the one before: each layer's weight is this
+    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
+    strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before: the lattice spacing is divided by
+    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
+    detail drops off faster in size.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a pixel near the border sees when the flow carries it in from beyond the
+    picture: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
+    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def focus_blur(
-    *,
-    field: str = "depth",
-    focus: float = 0.8,
-    width: float = 0.15,
-    feather: float = 0.4,
-    radius: float = 10.0,
-    levels: int = 6,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def focus_blur(*, field: str = 'depth', focus: float = 0.8, width: float = 0.15, feather: float = 0.4, radius: float = 10.0, levels: int = 6, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A shallow depth of field, or a tilt-shift miniature: pixels whose `field` value lies near `focus` stay sharp, and the farther a value lies from it, higher or lower, the more the pixel is blurred, up to `radius`.  Each pixel is blurred by w x `radius`, w = clip((|field - focus| - width / 2) / feather, 0, 1), so the pixels whose field lies within `width` / 2 of `focus` are returned exactly as they are. The blur is `levels` copies of the picture with sigma radius x k / levels, and a pixel mixes the two copies (the sharp picture being copy 0) either side of w x `levels`. `field` is the selection the recipe names (`depth`, a linear gradient...), 0..1: `depth` gives a lens focused in the scene, a linear gradient a sharp band across the picture.
 
-    Parameters
-    ----------
-    field : field name, default 'depth'
-        The selection the focus is measured on: `depth` (1 = nearest: a lens focused in the
-        scene), `light`, `subject`, or a region of the recipe such as a linear gradient (a
-        band of focus across the picture, the miniature look) or a radial one. Its value at
-        a pixel is compared with `focus`.
-    focus : number, fraction, 0 to 1, default 0.8
-        The value of the field that stays sharp, as a fraction of its range: for `depth` 1 =
-        the nearest and 0 = the farthest. Raising it moves the focus towards the field's
-        high values; driving it moves the focus through the scene.
-    width : number, fraction, 0 to 1, default 0.15
-        How wide a band of the field's values around the focus stays exactly as it is, as a
-        fraction of its range. Raising it keeps more of the picture sharp.
-    feather : number, fraction, 0.01 to 1, default 0.4
-        How far in the field's values beyond the band's edge the blur takes to reach its
-        full radius, as a fraction of its range: the blur grows evenly across it. Raising it
-        makes a gentler fall-off, lowering it an abrupt one.
-    radius : number, px, 0 to 100, default 10.0
-        The Gaussian sigma in px at the recipe's size that the blur reaches at the full
-        distance from the focus (a further `feather` from the band's edge): larger blurs the
-        out-of-focus picture more; 0 = no blur.
+Parameters
+----------
+field : field name, default 'depth'
+    The selection the focus is measured on: `depth` (1 = nearest: a lens focused in the
+    scene), `light`, `subject`, or a region of the recipe such as a linear gradient (a
+    band of focus across the picture, the miniature look) or a radial one. Its value at
+    a pixel is compared with `focus`.
+focus : number, fraction, 0 to 1, default 0.8
+    The value of the field that stays sharp, as a fraction of its range: for `depth` 1 =
+    the nearest and 0 = the farthest. Raising it moves the focus towards the field's
+    high values; driving it moves the focus through the scene.
+width : number, fraction, 0 to 1, default 0.15
+    How wide a band of the field's values around the focus stays exactly as it is, as a
+    fraction of its range. Raising it keeps more of the picture sharp.
+feather : number, fraction, 0.01 to 1, default 0.4
+    How far in the field's values beyond the band's edge the blur takes to reach its
+    full radius, as a fraction of its range: the blur grows evenly across it. Raising it
+    makes a gentler fall-off, lowering it an abrupt one.
+radius : number, px, 0 to 100, default 10.0
+    The Gaussian sigma in px at the recipe's size that the blur reaches at the full
+    distance from the focus (a further `feather` from the band's edge): larger blurs the
+    out-of-focus picture more; 0 = no blur.
 
-    Advanced parameters
-    -------------------
-    levels : whole number, count, 1 to 16, default 6
-        How many blurred copies of the picture the blur is built from: copy k has the sigma
-        radius x k / levels, and each pixel mixes the two copies (or the sharp picture and
-        the first) nearest its distance from the focus. More is smoother between levels and
-        slower; 1 mixes the sharp picture with one blur.
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its
-        sigma px. Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated) or 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+levels : whole number, count, 1 to 16, default 6
+    How many blurred copies of the picture the blur is built from: copy k has the sigma
+    radius x k / levels, and each pixel mixes the two copies (or the sharp picture and
+    the first) nearest its distance from the focus. More is smoother between levels and
+    slower; 1 mixes the sharp picture with one blur.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where each blurred copy's Gaussian is cut off, in sigmas: it reaches truncate x its
+    sigma px. Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated) or 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def fog(
-    *,
-    amount: float | Drive = 0.77,
-    color: str | list[float] | tuple[float, float, float] = "#cfd8e3",
-    gradient: float = 0.7,
-    coverage: float = 0.93,
-    feather: float = 1.0,
-    floor: float = 0.5,
-    scale: float = 150.0,
-    rise: float = 1.0,
-    turbulence: float = 0.0,
-    octaves: int = 4,
-    persistence: float = 0.5,
-    lacunarity: float = 2.0,
-    resampling: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["smoke"] | None = None,
-) -> Step:
+def fog(*, amount: float | Drive = 0.77, color: str | list[float] | tuple[float, float, float] = '#cfd8e3', gradient: float = 0.7, coverage: float = 0.93, feather: float = 1.0, floor: float = 0.5, scale: float = 150.0, rise: float = 1.0, turbulence: float = 0.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['smoke'] | None = None) -> Step:
     """Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom. Fog, mist, haze, steam and smoke are settings of it.  The clouds are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped when it is read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise` (so the clouds are drawn out `rise` times upward from the bottom edge), pushed `turbulence` px along two more noise fields. The warped field is standardised and passed through the normal cumulative distribution, giving u spread evenly over 0..1; the cloud shape is smoothstep((u - (1 - `coverage`)) / `feather`), so about `coverage` of the picture has cloud and the shape climbs from 0 to 1 across the `feather` share of pixels above the cut. The opacity at a pixel is `amount` x (1 - `gradient` x (1 - t)) x (`floor` + (1 - `floor`) x shape), where t is how far down the frame the pixel's row centre is (0 at the top edge, 1 at the bottom edge). Each pixel becomes picture + opacity x (color - picture), so the fog lowers contrast as well as tinting.
 
-    Parameters
-    ----------
-    amount : number (drivable), fraction, 0 to 1, default 0.77
-        How opaque the fog is where it is thickest (the bottom of the frame, in the densest
-        cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.5 =
-        see-through, 1 = the colour itself, hiding the picture. Fog also lowers contrast,
-        since every pixel moves toward the same colour.
-    color : colour, default '#cfd8e3'
-        The colour of the fog: '#rrggbb', '#rgb' or [r, g, b] 0..1. A pale blue-grey is a
-        cool morning mist, white a thick cloud, a warm grey smog, a dark grey or black a
-        heavy, sooty plume.
-    gradient : number, fraction, 0 to 1, default 0.7
-        How much thicker the fog is at the bottom of the frame than at the top, as a share
-        of its opacity: the opacity falls in a straight line from the bottom row up, to 1 -
-        gradient of its value at the top row. 0 = the same all the way up, 1 = no fog at the
-        very top, as for mist lying on the ground.
-    coverage : number, fraction, 0 to 1, default 0.93
-        About the share of the picture that has any cloud in it: 0 = none, 0.45 = clouds
-        with clear air between them, 1 = cloud everywhere, in thicker and thinner places.
-        The clouds are the highest parts of a noise field, so raising it widens them and
-        joins them up.
-    scale : number, px, 1 to 1024, default 150.0
-        Size of the biggest clouds across, in pixels, the spacing of the first noise lattice
-        before `rise` stretches it; tuned for a picture about 480 px high. Larger = broad
-        banks of fog; small = fine, wispy mottling.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same clouds, another seed a different
-        bank of fog.
+Parameters
+----------
+amount : number (drivable), fraction, 0 to 1, default 0.77
+    How opaque the fog is where it is thickest (the bottom of the frame, in the densest
+    cloud): the share of the fog colour mixed into the picture there. 0 = no fog, 0.5 =
+    see-through, 1 = the colour itself, hiding the picture. Fog also lowers contrast,
+    since every pixel moves toward the same colour.
+color : colour, default '#cfd8e3'
+    The colour of the fog: '#rrggbb', '#rgb' or [r, g, b] 0..1. A pale blue-grey is a
+    cool morning mist, white a thick cloud, a warm grey smog, a dark grey or black a
+    heavy, sooty plume.
+gradient : number, fraction, 0 to 1, default 0.7
+    How much thicker the fog is at the bottom of the frame than at the top, as a share
+    of its opacity: the opacity falls in a straight line from the bottom row up, to 1 -
+    gradient of its value at the top row. 0 = the same all the way up, 1 = no fog at the
+    very top, as for mist lying on the ground.
+coverage : number, fraction, 0 to 1, default 0.93
+    About the share of the picture that has any cloud in it: 0 = none, 0.45 = clouds
+    with clear air between them, 1 = cloud everywhere, in thicker and thinner places.
+    The clouds are the highest parts of a noise field, so raising it widens them and
+    joins them up.
+scale : number, px, 1 to 1024, default 150.0
+    Size of the biggest clouds across, in pixels, the spacing of the first noise lattice
+    before `rise` stretches it; tuned for a picture about 480 px high. Larger = broad
+    banks of fog; small = fine, wispy mottling.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same clouds, another seed a different
+    bank of fog.
 
-    Advanced parameters
-    -------------------
-    feather : number, fraction, 0.01 to 1, default 1.0
-        How soft the edge of a cloud is, as the share of the picture over which the fog
-        thickens from its thinnest to full `amount` just above the coverage cut. Small =
-        crisp, billowing outlines; 1 = clouds that melt into the air with no clear outline.
-    floor : number, fraction, 0 to 1, default 0.5
-        How much of the `amount` is left between the clouds, as a share: the opacity where
-        there is no cloud is `amount` x `floor`. 0 = open gaps of clear air, like plumes of
-        smoke; 1 = an even veil with no clouds at all; 0.5 = a haze that thins between
-        drifts but never clears.
-    rise : number, ratio, 1 to 8, default 1.0
-        How much the clouds are drawn out upward, anchored at the bottom edge: 1 = round
-        puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney.
-    turbulence : number, px, 0 to 500, default 0.0
-        How far in pixels two more noise fields (with the same `scale`, `octaves`,
-        `persistence` and `lacunarity`) push the clouds sideways and up and down: the
-        typical displacement (their standard deviation). 0 = smooth, regular clouds; larger
-        = twisting, curling smoke; much larger than `scale` tears the clouds into scattered
-        wisps.
-    octaves : whole number, count, 1 to 8, default 4
-        How many layers of noise are summed to make the clouds, each finer than the last (by
-        `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
-        detail. Layers finer than one pixel are dropped.
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weaker each finer layer is than the one before: each layer's weight is this
-        to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
-        strong (very rough).
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer is than the one before: the lattice spacing is divided by
-        this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
-        detail drops off faster in size.
-    resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How the noise is read where `rise` and `turbulence` have moved it between pixels:
-        'nearest' takes the closest value (fastest, a little jagged), 'bilinear' blends the
-        four around it (smooth), 'bicubic' fits a cubic spline through the neighbours
-        (smoothest, a little slower). It matters only where something moves. Named
-        `resampling`, not `interpolation`, because it reads a generated noise field, never
-        the picture.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the noise is beyond the picture's border when `turbulence` pushes a cloud in
-        from outside: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
-        the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
+Advanced parameters
+-------------------
+feather : number, fraction, 0.01 to 1, default 1.0
+    How soft the edge of a cloud is, as the share of the picture over which the fog
+    thickens from its thinnest to full `amount` just above the coverage cut. Small =
+    crisp, billowing outlines; 1 = clouds that melt into the air with no clear outline.
+floor : number, fraction, 0 to 1, default 0.5
+    How much of the `amount` is left between the clouds, as a share: the opacity where
+    there is no cloud is `amount` x `floor`. 0 = open gaps of clear air, like plumes of
+    smoke; 1 = an even veil with no clouds at all; 0.5 = a haze that thins between
+    drifts but never clears.
+rise : number, ratio, 1 to 8, default 1.0
+    How much the clouds are drawn out upward, anchored at the bottom edge: 1 = round
+    puffs, 2 = twice as tall as wide, 8 = long columns, like smoke from a chimney.
+turbulence : number, px, 0 to 500, default 0.0
+    How far in pixels two more noise fields (with the same `scale`, `octaves`,
+    `persistence` and `lacunarity`) push the clouds sideways and up and down: the
+    typical displacement (their standard deviation). 0 = smooth, regular clouds; larger
+    = twisting, curling smoke; much larger than `scale` tears the clouds into scattered
+    wisps.
+octaves : whole number, count, 1 to 8, default 4
+    How many layers of noise are summed to make the clouds, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth blobs, more = more wispy
+    detail. Layers finer than one pixel are dropped.
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer is than the one before: each layer's weight is this
+    to the power of its number. 0 = only the coarsest layer, 1 = every layer equally
+    strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before: the lattice spacing is divided by
+    this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
+    detail drops off faster in size.
+resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How the noise is read where `rise` and `turbulence` have moved it between pixels:
+    'nearest' takes the closest value (fastest, a little jagged), 'bilinear' blends the
+    four around it (smooth), 'bicubic' fits a cubic spline through the neighbours
+    (smoothest, a little slower). It matters only where something moves. Named
+    `resampling`, not `interpolation`, because it reads a generated noise field, never
+    the picture.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the noise is beyond the picture's border when `turbulence` pushes a cloud in
+    from outside: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
+    the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
 
-    Presets
-    -------
-    smoke : Rising smoke or steam: soft plumes that thicken toward the bottom and curl as they rise; raise amount or change color for denser smoke."""
+Presets
+-------
+smoke : Rising smoke or steam: soft plumes that thicken toward the bottom and curl as they rise; raise amount or change color for denser smoke."""
     ...
 
 @_effect
-def fractal(
-    *,
-    kind: Literal["mandelbrot", "julia"] = "julia",
-    zoom: float = 1.0,
-    x: float = 0.0,
-    y: float = 0.0,
-    c_real: float = -0.8,
-    c_imag: float = 0.156,
-    iterations: int = 64,
-    period: float = 24.0,
-    colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = (
-        "#12002b",
-        "#6a1bff",
-        "#ff2bd6",
-        "#ffd84a",
-    ),
-    interior: str | list[float] | tuple[float, float, float] = "#000000",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def fractal(*, kind: Literal['mandelbrot', 'julia'] = 'julia', zoom: float = 1.0, x: float = 0.0, y: float = 0.0, c_real: float = -0.8, c_imag: float = 0.156, iterations: int = 64, period: float = 24.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a'), interior: str | list[float] | tuple[float, float, float] = '#000000', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with the Mandelbrot set or a Julia set, coloured by how fast each point escapes.  An escape-time fractal: the plane's points z (or c) iterated through z -> z^2 + c until they run away. A generated background: the input is used only for its height and width. A point escapes when |z| exceeds 256 after n steps; its colour is then `colors` at the smooth escape count n + 1 - log2(log|z| / log 256) over `period` (a continuous count, so no steps between bands), and a point that has not escaped after `iterations` steps takes `interior`. The orbits are iterated in single precision.
 
-    Parameters
-    ----------
-    kind : one of 'mandelbrot', 'julia', default 'julia'
-        Which set: 'mandelbrot' (every point is the constant c, z starts at 0; centre it
-        with x = -0.5 to see the whole set) or 'julia' (every point is the start z, with the
-        one constant `c_real` + i `c_imag`).
-    zoom : number, ratio, 0.1 to 10000, default 1.0
-        Magnification. At 1 the picture's shorter side shows 4 units of the complex plane,
-        enough for the whole Mandelbrot set or any Julia set; 2 shows 2 units.
-    x : number, ratio, -2 to 2, default 0.0
-        The real part of the point at the centre of the picture, in units of the complex
-        plane. 0 centres a Julia set; -0.5 centres the Mandelbrot set.
-    y : number, ratio, -2 to 2, default 0.0
-        The imaginary part of the point at the centre of the picture, in units of the
-        complex plane; positive moves the view up.
-    c_real : number, ratio, -2 to 2, default -0.8
-        Julia only: the real part of the constant c in z -> z^2 + c. It decides the shape: a
-        point inside the Mandelbrot set gives a connected Julia set, one outside a dust.
-        Ignored by 'mandelbrot'.
-    c_imag : number, ratio, -2 to 2, default 0.156
-        Julia only: the imaginary part of the constant c. Ignored by 'mandelbrot'.
-    iterations : whole number, count, 1 to 2000, default 64
-        How many times z -> z^2 + c is applied before a point is taken to stay for ever (the
-        interior). More reveals finer detail at the set's edge and costs time in proportion;
-        zooming in needs more.
-    colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')
-        The colours of the bands, evenly spaced; at least two. Points that escape early (far
-        from the set) take the first colours.
+Parameters
+----------
+kind : one of 'mandelbrot', 'julia', default 'julia'
+    Which set: 'mandelbrot' (every point is the constant c, z starts at 0; centre it
+    with x = -0.5 to see the whole set) or 'julia' (every point is the start z, with the
+    one constant `c_real` + i `c_imag`).
+zoom : number, ratio, 0.1 to 10000, default 1.0
+    Magnification. At 1 the picture's shorter side shows 4 units of the complex plane,
+    enough for the whole Mandelbrot set or any Julia set; 2 shows 2 units.
+x : number, ratio, -2 to 2, default 0.0
+    The real part of the point at the centre of the picture, in units of the complex
+    plane. 0 centres a Julia set; -0.5 centres the Mandelbrot set.
+y : number, ratio, -2 to 2, default 0.0
+    The imaginary part of the point at the centre of the picture, in units of the
+    complex plane; positive moves the view up.
+c_real : number, ratio, -2 to 2, default -0.8
+    Julia only: the real part of the constant c in z -> z^2 + c. It decides the shape: a
+    point inside the Mandelbrot set gives a connected Julia set, one outside a dust.
+    Ignored by 'mandelbrot'.
+c_imag : number, ratio, -2 to 2, default 0.156
+    Julia only: the imaginary part of the constant c. Ignored by 'mandelbrot'.
+iterations : whole number, count, 1 to 2000, default 64
+    How many times z -> z^2 + c is applied before a point is taken to stay for ever (the
+    interior). More reveals finer detail at the set's edge and costs time in proportion;
+    zooming in needs more.
+colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')
+    The colours of the bands, evenly spaced; at least two. Points that escape early (far
+    from the set) take the first colours.
 
-    Advanced parameters
-    -------------------
-    period : number, count, 1 to 1000, default 24.0
-        How many iterations of escape time take the colours from the first to the last of
-        `colors`; they then run back, so the bands cycle without a seam. Smaller = more,
-        thinner bands.
-    interior : colour, default '#000000'
-        The colour of the points that never escape: the inside of the set."""
+Advanced parameters
+-------------------
+period : number, count, 1 to 1000, default 24.0
+    How many iterations of escape time take the colours from the first to the last of
+    `colors`; they then run back, so the bands cycle without a seam. Smaller = more,
+    thinner bands.
+interior : colour, default '#000000'
+    The colour of the points that never escape: the inside of the set."""
     ...
 
 @_effect
-def gaussian_blur(
-    *,
-    radius: float | Drive = 4.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = "reflect",
-    constant_value: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def gaussian_blur(*, radius: float | Drive = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Soften the picture with a Gaussian blur of standard deviation `radius` px.  Each colour channel is blurred on its own. Every pixel becomes a weighted average of its neighbours, the weights a bell curve: the blur keeps flat areas flat and never leaves the picture's range.
 
-    Parameters
-    ----------
-    radius : number (drivable), px, 0 to 500, default 4.0
-        The Gaussian's standard deviation (sigma) in px at the recipe's size: larger is
-        softer and spreads detail further; 0 leaves the picture unchanged.
+Parameters
+----------
+radius : number (drivable), px, 0 to 500, default 4.0
+    The Gaussian's standard deviation (sigma) in px at the recipe's size: larger is
+    softer and spreads detail further; 0 leaves the picture unchanged.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px.
-        Larger is more exact and slower; below 3 the blur turns visibly boxy.
-    edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`, so the edge
-        fades toward it).
-    constant_value : number, fraction, 0 to 1, default 0.0
-        The brightness (0..1, every channel) assumed beyond the edge when `edge` is
-        'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the Gaussian is cut off, in sigmas: the blur reaches truncate x radius px.
+    Larger is more exact and slower; below 3 the blur turns visibly boxy.
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`, so the edge
+    fades toward it).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The brightness (0..1, every channel) assumed beyond the edge when `edge` is
+    'constant': 0 darkens the edge, 1 lightens it; ignored otherwise."""
     ...
 
 @_effect
-def grade(
-    *,
-    temperature: float | Drive = 0.0,
-    tint: float | Drive = 0.0,
-    exposure: float | Drive = 0.0,
-    contrast: float | Drive = 1.0,
-    pivot: float = 0.5,
-    saturation: float | Drive = 1.0,
-    vibrance: float | Drive = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["white_balance"] | None = None,
-) -> Step:
+def grade(*, temperature: float | Drive = 0.0, tint: float | Drive = 0.0, exposure: float | Drive = 0.0, contrast: float | Drive = 1.0, pivot: float = 0.5, saturation: float | Drive = 1.0, vibrance: float | Drive = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['white_balance'] | None = None) -> Step:
     """White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first.  Order: colour balance, `exposure`, `contrast` around `pivot`, `saturation`, `vibrance`.  The colour balance is von Kries scaling: the picture is decoded to linear light (sRGB, IEC 61966-2-1), each channel is multiplied by a gain, and it is encoded again. The gains are red 2**(temperature/2), green 2**-tint and blue 2**(-temperature/2), divided by the largest of the three, so the balance never brightens or clips and white keeps one full channel instead of turning into a cast. Temperature and tint at 0 leave the picture as it was.  The result is clipped to 0..1 after the contrast (before measuring brightness for the saturation), after the saturation (before the vibrance) and at the end.  `vibrance` works on HSV saturation s = (max - min) / max of the gamma-encoded values. Each colour's saturation becomes s + vibrance * s * (1 - s), which never exceeds 1. The strongest channel (HSV value) is kept and every other channel moves away from it by the same factor, so the hue is the input's (up to float rounding) and a grey, whose saturation is 0, is unchanged.
 
-    Parameters
-    ----------
-    temperature : number (drivable), stops, -2 to 2, default 0.0
-        Warm-cool shift in stops (-2..2): the difference in stops between the red and the
-        blue gain, shared evenly (red up and blue down by half of it each). Positive warms
-        the picture (more orange), negative cools it (more blue), 0 leaves the colour
-        balance alone. Use a negative value to correct a picture shot under warm light.
-    tint : number (drivable), stops, -1 to 1, default 0.0
-        Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power
-        of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the
-        balance alone.
-    exposure : number (drivable), stops, -10 to 10, default 0.0
-        Brightness in photographic stops: +1 doubles every value, -1 halves it.
-    contrast : number (drivable), ratio, 0 to 5, default 1.0
-        How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 =
-        flat at the pivot.
-    pivot : number, fraction, 0 to 1, default 0.5
-        The brightness (0..1) that contrast leaves where it is; values above it brighten,
-        below it darken.
-    saturation : number (drivable), ratio, 0 to 5, default 1.0
-        Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more
-        vivid.
-    vibrance : number (drivable), fraction, 0 to 1, default 0.0
-        How far muted colours are pushed toward full saturation (0..1), after `saturation`:
-        0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour
-        at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated
-        colours stay as they are; colours are never made duller.
+Parameters
+----------
+temperature : number (drivable), stops, -2 to 2, default 0.0
+    Warm-cool shift in stops (-2..2): the difference in stops between the red and the
+    blue gain, shared evenly (red up and blue down by half of it each). Positive warms
+    the picture (more orange), negative cools it (more blue), 0 leaves the colour
+    balance alone. Use a negative value to correct a picture shot under warm light.
+tint : number (drivable), stops, -1 to 1, default 0.0
+    Green-magenta shift in stops (-1..1): the green gain is multiplied by 2 to the power
+    of minus tint. Positive adds magenta (less green), negative adds green, 0 leaves the
+    balance alone.
+exposure : number (drivable), stops, -10 to 10, default 0.0
+    Brightness in photographic stops: +1 doubles every value, -1 halves it.
+contrast : number (drivable), ratio, 0 to 5, default 1.0
+    How far values are pushed away from the pivot: 1 = unchanged, 2 = twice as far, 0 =
+    flat at the pivot.
+pivot : number, fraction, 0 to 1, default 0.5
+    The brightness (0..1) that contrast leaves where it is; values above it brighten,
+    below it darken.
+saturation : number (drivable), ratio, 0 to 5, default 1.0
+    Colourfulness: 1 = unchanged, 0 = grey (Rec. 709 brightness kept), above 1 more
+    vivid.
+vibrance : number (drivable), fraction, 0 to 1, default 0.0
+    How far muted colours are pushed toward full saturation (0..1), after `saturation`:
+    0 changes nothing, 1 raises a colour's saturation s to s + s * (1 - s), so a colour
+    at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated
+    colours stay as they are; colours are never made duller.
 
-    Presets
-    -------
-    white_balance : White balance: corrects a warm (orange) cast and a slight magenta tint. For a cool cast use a positive temperature."""
+Presets
+-------
+white_balance : White balance: corrects a warm (orange) cast and a slight magenta tint. For a cool cast use a positive temperature."""
     ...
 
 @_effect
-def gradient(
-    *,
-    kind: Literal["linear", "radial", "conic"] = "linear",
-    colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ("#12002b", "#ff2bd6"),
-    angle: float = 90.0,
-    x: float = 0.5,
-    y: float = 0.5,
-    radius: float = 0.75,
-    repeat: int = 1,
-    reflect: bool = False,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["fill"] | None = None,
-) -> Step:
+def gradient(*, kind: Literal['linear', 'radial', 'conic'] = 'linear', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#ff2bd6'), angle: float = 90.0, x: float = 0.5, y: float = 0.5, radius: float = 0.75, repeat: int = 1, reflect: bool = False, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['fill'] | None = None) -> Step:
     """Replace the picture with a gradient (linear, radial or conic), or with a flat colour fill (preset `fill`: black; set colors for another); to replace the background: mask = "background".  A generated background: the input is used only for its height and width, its content is ignored. A gradient through a list of colours, laid out as a straight band, rings round a centre or a sweep round it. Sizes are fractions of the picture, so the look does not depend on its resolution. For example `colors` = "#12002b" and "#ff2bd6" with `kind` = "radial" is a magenta glow on deep violet. A single colour is a flat fill.
 
-    Parameters
-    ----------
-    kind : one of 'linear', 'radial', 'conic', default 'linear'
-        The layout: 'linear' (colours run in a straight band across the whole picture, at
-        `angle`), 'radial' (rings round the centre `x`, `y`, the last colour `radius` away)
-        or 'conic' (a clockwise sweep round the centre, starting at `angle`; the last colour
-        meets the first at a hard seam).
-    colors : list of colours, default ('#12002b', '#ff2bd6')
-        The gradient's colours in order, evenly spaced; at least one. Linear: from the start
-        of the band to its end. Radial: from the centre outwards. Conic: round the turn. One
-        colour is a flat fill of the whole picture, and every other parameter is then
-        ignored.
-    angle : number (cyclic), degrees, 0 to 360, default 90.0
-        Linear: the direction the colours run, measured clockwise on screen from the right:
-        0 = left to right, 90 = top to bottom. Conic: where the sweep starts, on the same
-        scale (0 = right of the centre, 90 = below it). Ignored by 'radial'.
-    x : number, fraction, 0 to 1, default 0.5
-        Horizontal position of the centre as a fraction of the width (0 = left edge, 1 =
-        right edge). Used by 'radial' and 'conic'; 'linear' is always centred.
-    y : number, fraction, 0 to 1, default 0.5
-        Vertical position of the centre as a fraction of the height (0 = top edge, 1 =
-        bottom edge). Used by 'radial' and 'conic'; 'linear' is always centred.
-    radius : number, fraction, 0.01 to 4, default 0.75
-        Radial only: the distance from the centre at which the last colour is reached, as a
-        fraction of the picture's shorter side; farther out stays on the last colour. Larger
-        = a wider, softer glow. Ignored by 'linear' and 'conic'.
-    repeat : whole number, count, 1 to 64, default 1
-        How many times the list of colours is fitted along the gradient (the band, the
-        radius, one turn): 1 = once, 2 = twice as fast. Radial stays on the last colour
-        beyond the radius.
-    reflect : true or false, default False
-        Run every second repeat backwards, so neighbouring repeats meet on the same colour
-        instead of jumping from the last colour back to the first. Has no effect with
-        `repeat` 1.
+Parameters
+----------
+kind : one of 'linear', 'radial', 'conic', default 'linear'
+    The layout: 'linear' (colours run in a straight band across the whole picture, at
+    `angle`), 'radial' (rings round the centre `x`, `y`, the last colour `radius` away)
+    or 'conic' (a clockwise sweep round the centre, starting at `angle`; the last colour
+    meets the first at a hard seam).
+colors : list of colours, default ('#12002b', '#ff2bd6')
+    The gradient's colours in order, evenly spaced; at least one. Linear: from the start
+    of the band to its end. Radial: from the centre outwards. Conic: round the turn. One
+    colour is a flat fill of the whole picture, and every other parameter is then
+    ignored.
+angle : number (cyclic), degrees, 0 to 360, default 90.0
+    Linear: the direction the colours run, measured clockwise on screen from the right:
+    0 = left to right, 90 = top to bottom. Conic: where the sweep starts, on the same
+    scale (0 = right of the centre, 90 = below it). Ignored by 'radial'.
+x : number, fraction, 0 to 1, default 0.5
+    Horizontal position of the centre as a fraction of the width (0 = left edge, 1 =
+    right edge). Used by 'radial' and 'conic'; 'linear' is always centred.
+y : number, fraction, 0 to 1, default 0.5
+    Vertical position of the centre as a fraction of the height (0 = top edge, 1 =
+    bottom edge). Used by 'radial' and 'conic'; 'linear' is always centred.
+radius : number, fraction, 0.01 to 4, default 0.75
+    Radial only: the distance from the centre at which the last colour is reached, as a
+    fraction of the picture's shorter side; farther out stays on the last colour. Larger
+    = a wider, softer glow. Ignored by 'linear' and 'conic'.
+repeat : whole number, count, 1 to 64, default 1
+    How many times the list of colours is fitted along the gradient (the band, the
+    radius, one turn): 1 = once, 2 = twice as fast. Radial stays on the last colour
+    beyond the radius.
+reflect : true or false, default False
+    Run every second repeat backwards, so neighbouring repeats meet on the same colour
+    instead of jumping from the last colour back to the first. Has no effect with
+    `repeat` 1.
 
-    Presets
-    -------
-    fill : Flat colour fill (black; set colors for another). To replace the background: mask = "background"."""
+Presets
+-------
+fill : Flat colour fill (black; set colors for another). To replace the background: mask = "background"."""
     ...
 
 @_effect
-def gradient_map(
-    *,
-    stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ("#000000", "#ffffff"),
-    shadow_clip: float = 0.01,
-    highlight_clip: float = 0.01,
-    quantile_method: Literal[
-        "linear",
-        "lower",
-        "higher",
-        "nearest",
-        "midpoint",
-        "inverted_cdf",
-        "averaged_inverted_cdf",
-        "closest_observation",
-        "interpolated_inverted_cdf",
-        "hazen",
-        "weibull",
-        "median_unbiased",
-        "normal_unbiased",
-    ] = "linear",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["sepia", "cyanotype", "thermal", "night_vision", "xray"] | None = None,
-) -> Step:
+def gradient_map(*, stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray'] | None = None) -> Step:
     """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.  A gradient that brightness is mapped onto, after an automatic contrast stretch. Two stops make a duotone, three a tritone; for example the stops "#0b0020", "#ff2bd6" and "#00f0ff" make a neon scheme. The picture is first stretched to use its full tonal range (cutting `shadow_clip` and `highlight_clip` off its ends), so the whole gradient is always visible.
 
-    Parameters
-    ----------
-    stops : list of colours, default ('#000000', '#ffffff')
-        The gradient's colours from darkest to brightest, evenly spaced; at least two. Two
-        make a duotone, three a tritone.
-    shadow_clip : number, fraction, 0 to 0.5, default 0.01
-        Share of the darkest pixels (0..0.5) that the contrast stretch pushes onto the first
-        stop; 0 maps only the darkest pixel there. Larger gives deeper shadows.
-    highlight_clip : number, fraction, 0 to 0.5, default 0.01
-        Share of the brightest pixels (0..0.5) that the contrast stretch pushes onto the
-        last stop. Larger gives brighter highlights.
+Parameters
+----------
+stops : list of colours, default ('#000000', '#ffffff')
+    The gradient's colours from darkest to brightest, evenly spaced; at least two. Two
+    make a duotone, three a tritone.
+shadow_clip : number, fraction, 0 to 0.5, default 0.01
+    Share of the darkest pixels (0..0.5) that the contrast stretch pushes onto the first
+    stop; 0 maps only the darkest pixel there. Larger gives deeper shadows.
+highlight_clip : number, fraction, 0 to 0.5, default 0.01
+    Share of the brightest pixels (0..0.5) that the contrast stretch pushes onto the
+    last stop. Larger gives brighter highlights.
 
-    Advanced parameters
-    -------------------
-    quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased', default 'linear'
-        How the stretch's clip points are read from the picture's brightness (numpy's
-        quantile methods): `linear` interpolates between the two nearest pixels; `lower`,
-        `higher`, `nearest` and `midpoint` take the darker, the brighter, the nearer pixel
-        or their mean; `inverted_cdf`, `averaged_inverted_cdf`, `closest_observation`,
-        `interpolated_inverted_cdf`, `hazen`, `weibull`, `median_unbiased` and
-        `normal_unbiased` are the textbook sample-quantile definitions (Hyndman and Fan).
-        Only visible on small or flat pictures.
+Advanced parameters
+-------------------
+quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased', default 'linear'
+    How the stretch's clip points are read from the picture's brightness (numpy's
+    quantile methods): `linear` interpolates between the two nearest pixels; `lower`,
+    `higher`, `nearest` and `midpoint` take the darker, the brighter, the nearer pixel
+    or their mean; `inverted_cdf`, `averaged_inverted_cdf`, `closest_observation`,
+    `interpolated_inverted_cdf`, `hazen`, `weibull`, `median_unbiased` and
+    `normal_unbiased` are the textbook sample-quantile definitions (Hyndman and Fan).
+    Only visible on small or flat pictures.
 
-    Presets
-    -------
-    sepia : Warm brown monochrome, from dark chocolate to cream, like an aged print.
-    cyanotype : Prussian-blue monochrome fading to pale cyan, like a blueprint print.
-    thermal : Heat-camera false colour: indigo for the coldest, through red and orange, to white-hot.
-    night_vision : Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette).
-    xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."""
+Presets
+-------
+sepia : Warm brown monochrome, from dark chocolate to cream, like an aged print.
+cyanotype : Prussian-blue monochrome fading to pale cyan, like a blueprint print.
+thermal : Heat-camera false colour: indigo for the coldest, through red and orange, to white-hot.
+night_vision : Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette).
+xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."""
     ...
 
 @_effect
-def grain(
-    *,
-    amount: float | Drive = 0.08,
-    balance: float | Drive = 0.0,
-    size: float = 1.0,
-    color: bool = False,
-    distribution: Literal["gaussian", "uniform"] = "gaussian",
-    seed: int = 0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["film_grain", "noise"] | None = None,
-) -> Step:
+def grain(*, amount: float | Drive = 0.08, balance: float | Drive = 0.0, size: float = 1.0, color: bool = False, distribution: Literal['gaussian', 'uniform'] = 'gaussian', seed: int = 0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['film_grain', 'noise'] | None = None) -> Step:
     """Film grain or sensor noise: noise of standard deviation `amount` at mid-grey, clumped to `size` px, heavier where `balance` says.  The noise, Gaussian or uniform by `distribution` (zero mean, unit standard deviation either way), is multiplied by the deviation at the pixel's brightness, its Rec. 709 luminance L: `amount` x (1 + `balance` x (2 L - 1)). It is the same in all channels (grey grain) unless `color`, which gives each channel its own. The result is clipped to 0..1; the same `seed` always gives the same grain.
 
-    Parameters
-    ----------
-    amount : number (drivable), fraction, 0 to 1, default 0.08
-        Standard deviation of the grain at mid-grey, in 0..1 picture units: 0 = none, 0.08
-        is visible, 0.2 is heavy. With `balance` the grain at black and at white is up to 2
-        x this.
-    balance : number (drivable), ratio, -1 to 1, default 0.0
-        Where the grain is heavier, from -1 to 1: -1 = only in the shadows, 0 = even, 1 =
-        only in the highlights. The grain at brightness L (0 black, 1 white) is `amount` x
-        (1 + `balance` x (2 L - 1)), so the shadows get `amount` x (1 - `balance`) and the
-        highlights `amount` x (1 + `balance`). Real film is grainiest in the shadows (a
-        negative balance).
-    size : number, px, 0 to 50, default 1.0
-        Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is
-        blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its
-        standard deviation. Larger = coarser, softer grain.
-    color : true or false, default False
-        True gives every channel its own grain (coloured speckle, like a high-ISO sensor);
-        False adds the same grain to all three (brightness only, grey speckle).
-    distribution : one of 'gaussian', 'uniform', default 'gaussian'
-        Where the noise values come from: 'gaussian' (bell curve: most values small, a few
-        large) or 'uniform' (every value up to a limit of about 1.7 x the deviation equally
-        likely: an even, bounded speckle). Both have the standard deviation set by `amount`
-        and `balance`, and both are clumped by `size`.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same grain, another seed a different
-        pattern.
+Parameters
+----------
+amount : number (drivable), fraction, 0 to 1, default 0.08
+    Standard deviation of the grain at mid-grey, in 0..1 picture units: 0 = none, 0.08
+    is visible, 0.2 is heavy. With `balance` the grain at black and at white is up to 2
+    x this.
+balance : number (drivable), ratio, -1 to 1, default 0.0
+    Where the grain is heavier, from -1 to 1: -1 = only in the shadows, 0 = even, 1 =
+    only in the highlights. The grain at brightness L (0 black, 1 white) is `amount` x
+    (1 + `balance` x (2 L - 1)), so the shadows get `amount` x (1 - `balance`) and the
+    highlights `amount` x (1 + `balance`). Real film is grainiest in the shadows (a
+    negative balance).
+size : number, px, 0 to 50, default 1.0
+    Grain size in px: up to 1 every pixel varies on its own; above 1 the noise is
+    blurred (Gaussian sigma = size / 2) into specks about this wide, keeping its
+    standard deviation. Larger = coarser, softer grain.
+color : true or false, default False
+    True gives every channel its own grain (coloured speckle, like a high-ISO sensor);
+    False adds the same grain to all three (brightness only, grey speckle).
+distribution : one of 'gaussian', 'uniform', default 'gaussian'
+    Where the noise values come from: 'gaussian' (bell curve: most values small, a few
+    large) or 'uniform' (every value up to a limit of about 1.7 x the deviation equally
+    likely: an even, bounded speckle). Both have the standard deviation set by `amount`
+    and `balance`, and both are clumped by `size`.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same grain, another seed a different
+    pattern.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1).
-        Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the clumping blur sees beyond the picture's edge (only when size > 1):
-        'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-        'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
-        seamlessly).
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the clumping blur's Gaussian is cut off, in sigmas (only when size > 1).
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the clumping blur sees beyond the picture's edge (only when size > 1):
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
+    seamlessly).
 
-    Presets
-    -------
-    film_grain : Film grain: grey speckle that is heaviest in the shadows and lightest in the highlights, as on a photographic negative.
-    noise : Plain sensor noise: independent colour speckle of the same strength in shadows and highlights."""
+Presets
+-------
+film_grain : Film grain: grey speckle that is heaviest in the shadows and lightest in the highlights, as on a photographic negative.
+noise : Plain sensor noise: independent colour speckle of the same strength in shadows and highlights."""
     ...
 
 @_effect
-def halftone(
-    *,
-    cell: int = 14,
-    angle: float = 45.0,
-    ink: str | list[float] | tuple[float, float, float] | None = None,
-    ink_floor: float = 0.35,
-    paper: str | list[float] | tuple[float, float, float] = "#000000",
-    paper_threshold: float = 0.5,
-    sigma: float = 0.5,
-    feather: float = 1.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = "reflect",
-    constant_value: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
-    """A print-style dot screen: tone becomes dot size.  A rotated square grid of dots, `cell` px apart, turned `angle` degrees. Each dot looks up the picture, blurred by a Gaussian of `sigma` cells, at its centre, and is as large as the ink that tone needs: the area of a dot is proportional to the ink, so the screen keeps the picture's tones, dots touch at half tone and fill their cell at full tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The dot's edge is a ramp `feather` px wide, centred on its radius and faded in with the dot so that a dot narrower than the ramp prints about its own area, and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.
+def halftone(*, shape: Literal['dot', 'line'] = 'dot', separation: Literal['none', 'cmyk', 'spot'] = 'none', cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), offset: float = 0.0, offset_angle: float = 0.0, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """A print-style dot screen: tone becomes dot size.  A rotated square grid of dots, `cell` px apart, turned `angle` degrees. Each dot looks up the picture, blurred by a Gaussian of `sigma` cells, at its centre, and is as large as the ink that tone needs: the area of a dot is proportional to the ink, so the screen keeps the picture's tones, dots touch at half tone and fill their cell at full tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The dot's edge is a ramp `feather` px wide, centred on its radius and faded in with the dot so that a dot narrower than the ramp prints about its own area, and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.  `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink (a line as wide as `cell` fills it), so the screen keeps the tones the same way. `separation` prints several inks, each its own screen, subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`; the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0 and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four colours), finding how much of each makes the photo's colour (the nearest in optical density), with the screens `angle` + 30 degrees apart (45, 75, 105, 135 by default). `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`. `offset` px moves the second ink's screen that far from the first along `offset_angle`, the third twice as far and the fourth three times, as a misregistered press does.
 
-    Parameters
-    ----------
-    cell : whole number, px, 1 to 200, default 14
-        Distance between neighbouring dots in px (the screen's pitch). Larger = fewer,
-        bigger dots, a coarser print.
-    angle : number (cyclic), degrees, 0 to 360, default 45.0
-        Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many
-        degrees below the x axis (340 tilts them 20 degrees above it). The grid is square,
-        so 90 degrees on looks the same; 45 is the classic screen angle for one ink.
-    ink : colour or none, default None
-        The ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave
-        it out to give each dot the colour of the photo under it, brightened so small dots
-        stay visible (by at most 1 / `ink_floor`).
-    ink_floor : number, fraction, 0.01 to 1, default 0.35
-        With no `ink`: the most a dot's colour is brightened, as a floor 0.01 to 1 on its
-        strongest channel: a colour whose strongest channel is below it is scaled by 1 /
-        `ink_floor` instead of up to full, so dark areas stay dark. Lowering it brightens
-        dark colours more; 1 = colours as they are.
-    paper : colour, default '#000000'
-        The paper colour between the dots. On a dark paper (Rec. 709 luminance below
-        `paper_threshold`) bright tones get the ink; on a light one, dark tones.
-    paper_threshold : number, fraction, 0 to 1, default 0.5
-        The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (bright tones get
-        the ink) rather than light (dark tones get it); 0.5 = mid grey. Raising it lets
-        lighter paper count as dark: 0 treats every paper as light, 1 every paper but white
-        as dark.
-    sigma : number, ratio, 0 to 5, default 0.5
-        Gaussian sigma, in cells, of the blur that averages the tone each dot stands for: 0
-        = each dot sees only the pixel at its centre (detail, but noisy), larger = smoother
-        tone that spreads into neighbouring dots.
-    feather : number, px, 0.1 to 50, default 1.0
-        Width of each dot's soft edge in px (anti-aliasing): small = crisp dots, larger =
-        blurrier dots. The ink stays the same.
+Parameters
+----------
+shape : one of 'dot', 'line', default 'dot'
+    What a dot is: 'dot' (a round dot per cell), 'line' (a line per cell row, as wide as
+    the ink needs).
+separation : one of 'none', 'cmyk', 'spot', default 'none'
+    How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta,
+    yellow and black) or 'spot' (the colours in `inks`). Several inks print over `paper`
+    like transparent layers, each in its own screen.
+cell : whole number, px, 1 to 200, default 14
+    Distance between neighbouring dots in px (the screen's pitch). Larger = fewer,
+    bigger dots, a coarser print.
+angle : number (cyclic), degrees, 0 to 360, default 45.0
+    Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many
+    degrees below the x axis (340 tilts them 20 degrees above it). The grid is square,
+    so 90 degrees on looks the same; 45 is the classic screen angle for one ink.
+ink : colour or none, default None
+    The ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave
+    it out to give each dot the colour of the photo under it, brightened so small dots
+    stay visible (by at most 1 / `ink_floor`).
+ink_floor : number, fraction, 0.01 to 1, default 0.35
+    With no `ink`: the most a dot's colour is brightened, as a floor 0.01 to 1 on its
+    strongest channel: a colour whose strongest channel is below it is scaled by 1 /
+    `ink_floor` instead of up to full, so dark areas stay dark. Lowering it brightens
+    dark colours more; 1 = colours as they are.
+paper : colour, default '#000000'
+    The paper colour between the dots. On a dark paper (Rec. 709 luminance below
+    `paper_threshold`) bright tones get the ink; on a light one, dark tones.
+paper_threshold : number, fraction, 0 to 1, default 0.5
+    The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (bright tones get
+    the ink) rather than light (dark tones get it); 0.5 = mid grey. Raising it lets
+    lighter paper count as dark: 0 treats every paper as light, 1 every paper but white
+    as dark.
+inks : list of colours, default ('#ff4d6d', '#2b59ff')
+    With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three
+    numbers 0..1), in the order they are offset and turned; ignored otherwise. Each
+    pixel's colour is split into amounts of these inks.
+offset : number, px, 0 to 100, default 0.0
+    With 'cmyk' or 'spot' separation: how far in px the second ink's screen is moved
+    from the first (the third twice as far, the fourth three times), as ink
+    misregistered on a press; 0 = all screens in register.
+offset_angle : number (cyclic), degrees, 0 to 360, default 0.0
+    With an `offset`: the direction of the move, in degrees clockwise on screen from the
+    x axis (90 is downward).
+sigma : number, ratio, 0 to 5, default 0.5
+    Gaussian sigma, in cells, of the blur that averages the tone each dot stands for: 0
+    = each dot sees only the pixel at its centre (detail, but noisy), larger = smoother
+    tone that spreads into neighbouring dots.
+feather : number, px, 0.1 to 50, default 1.0
+    Width of each dot's soft edge in px (anti-aliasing): small = crisp dots, larger =
+    blurrier dots. The ink stays the same.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the tone blur's Gaussian is cut off, in sigmas: it reaches truncate x sigma
-        cells. Larger is more exact and slower.
-    edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`).
-    constant_value : number, fraction, 0 to 1, default 0.0
-        The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
-        otherwise."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the tone blur's Gaussian is cut off, in sigmas: it reaches truncate x sigma
+    cells. Larger is more exact and slower.
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
+    otherwise."""
     ...
 
 @_effect
-def highpass(
-    *,
-    radius: float = 4.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def highpass(*, radius: float = 4.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A high-pass filter: the picture minus a blurred copy of it, shown around mid-grey.  Keep only the detail finer than `radius` px: the picture minus its Gaussian blur, centred on mid-grey. A flat area becomes mid-grey, an edge a dark line on its dark side and a bright one on its bright side. Each colour channel is filtered on its own and the result is kept within 0..1.
 
-    Parameters
-    ----------
-    radius : number, px, 0 to 100, default 4.0
-        Gaussian sigma of the blurred copy in px at the recipe's size: detail finer than
-        this is kept, coarser tones are removed. Small radii keep only the finest texture,
-        large ones keep edges and local contrast; 0 keeps nothing but mid-grey.
+Parameters
+----------
+radius : number, px, 0 to 100, default 4.0
+    Gaussian sigma of the blurred copy in px at the recipe's size: detail finer than
+    this is kept, coarser tones are removed. Small radii keep only the finest texture,
+    large ones keep edges and local contrast; 0 keeps nothing but mid-grey.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
-        px. Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
+    px. Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def interlace(
-    *,
-    offset: float = 6.0,
-    field: Literal["odd", "even"] = "odd",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def interlace(*, offset: float = 6.0, field: Literal['odd', 'even'] = 'odd', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Slide every other row of the picture sideways by `offset` px, leaving the rows between untouched.  The two fields of an interlaced frame are the odd and the even rows; when the picture moved between them, every vertical edge breaks into a comb. Here one field (`field`) is moved by `offset` and the other stays, which gives that comb on a still picture. What the slide uncovers at the side is set by `edge`.
 
-    Parameters
-    ----------
-    offset : number, px, -500 to 500, default 6.0
-        How far the slid field moves sideways, -500 to 500 px, tuned for a picture about 480
-        px high: positive moves its rows right, negative left, 0 leaves the picture
-        unchanged. A distance between two pixels blends them. Raising it widens the teeth of
-        the comb along every vertical edge.
-    field : one of 'odd', 'even', default 'odd'
-        Which field slides: 'odd' the second, fourth, sixth... row (counting from the top as
-        the first), 'even' the first, third, fifth... row. The other field stays where it
-        was.
+Parameters
+----------
+offset : number, px, -500 to 500, default 6.0
+    How far the slid field moves sideways, -500 to 500 px, tuned for a picture about 480
+    px high: positive moves its rows right, negative left, 0 leaves the picture
+    unchanged. A distance between two pixels blends them. Raising it widens the teeth of
+    the comb along every vertical edge.
+field : one of 'odd', 'even', default 'odd'
+    Which field slides: 'odd' the second, fourth, sixth... row (counting from the top as
+    the first), 'even' the first, third, fifth... row. The other field stays where it
+    was.
 
-    Advanced parameters
-    -------------------
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What fills the gap the slide opens at the side: 'nearest' holds the row's last pixel
-        there, 'wrap' brings back what left on the other side, 'reflect' mirrors the row
-        (the edge pixel repeated once), 'mirror' mirrors it about the edge pixel."""
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What fills the gap the slide opens at the side: 'nearest' holds the row's last pixel
+    there, 'wrap' brings back what left on the other side, 'reflect' mirrors the row
+    (the edge pixel repeated once), 'mirror' mirrors it about the edge pixel."""
     ...
 
 @_effect
-def jpeg_crush(
-    *,
-    quality: int = 6,
-    hits: int = 0,
-    seed: int = 0,
-    dc_share: float = 0.3,
-    magnitude: int = 8,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["byte_corrupt"] | None = None,
-) -> Step:
+def jpeg_crush(*, quality: int = 6, hits: int = 0, seed: int = 0, dc_share: float = 0.3, magnitude: int = 8, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['byte_corrupt'] | None = None) -> Step:
     """Blocky JPEG artefacts, or a corrupted file: compress the picture with a JPEG codec written as maths at `quality`, damage `hits` coefficients, and decode it.  The steps are the standard's (ITU-T T.81 with JFIF): sRGB to YCbCr, the two colour planes halved in each direction (4:2:0), 8 x 8 blocks through the DCT, every coefficient rounded to a multiple of its quantisation step, then all of it undone. There is no file and no byte: the result does not depend on any image library, so it is alike on every platform. A picture whose sides are not multiples of 16 is extended by repeating its last row and column and cropped back.  Each hit picks a block at random from all those of the brightness and the two colour planes, and a coefficient in it (the DC value with chance `dc_share`, otherwise one of the 63 others), and adds or subtracts between 1 and `magnitude` quantisation steps before the decoding. A hit on a DC value also moves the DC value of every later block of its row in that plane, as a damaged difference does in the file.  The blocks are 8 design px, so the damage looks the same at any size while the fine detail stays. The picture is shrunk to its design size by averaging, crushed and damaged there, and the damage (crushed minus shrunk) is added back to the full picture, each design pixel's damage repeated over the working pixels it covers so block edges stay hard.
 
-    Parameters
-    ----------
-    quality : whole number, count, 1 to 100, default 6
-        The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG
-        Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows
-        blocks 8 px wide, ringing round edges and colour bleed, 1 is a few flat blocks.
-        Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is also a
-        larger jump in the picture.
-    hits : whole number, count, 0 to 5000, default 0
-        How many coefficients are damaged after the compression, 0 to 5000, each at a random
-        place in a random 8 x 8 block of the brightness or one of the two colour planes, as
-        a corrupted file shows. 0 leaves the plain crushed picture, and then `seed`,
-        `dc_share` and `magnitude` do nothing. Raising it spreads more damage over the
-        picture.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed for where the hits land and how large they are: the same seed always
-        gives the same damage, any other a different one.
+Parameters
+----------
+quality : whole number, count, 1 to 100, default 6
+    The JPEG quality, 1 to 100, on the scale JPEG tools use (the Independent JPEG
+    Group's): 100 keeps almost everything, about 75 is a normal photo, about 6 shows
+    blocks 8 px wide, ringing round edges and colour bleed, 1 is a few flat blocks.
+    Lowering it coarsens the quantisation of every 8 x 8 block, so each hit is also a
+    larger jump in the picture.
+hits : whole number, count, 0 to 5000, default 0
+    How many coefficients are damaged after the compression, 0 to 5000, each at a random
+    place in a random 8 x 8 block of the brightness or one of the two colour planes, as
+    a corrupted file shows. 0 leaves the plain crushed picture, and then `seed`,
+    `dc_share` and `magnitude` do nothing. Raising it spreads more damage over the
+    picture.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for where the hits land and how large they are: the same seed always
+    gives the same damage, any other a different one.
 
-    Advanced parameters
-    -------------------
-    dc_share : number, fraction, 0 to 1, default 0.3
-        The share of hits, 0 to 1, that land on a block's DC value (its average) rather than
-        on one of its 63 detail coefficients. A DC hit shifts the block and, as JPEG stores
-        each average as a difference from the block before, every later block of its row: a
-        streak to the right edge. A detail hit only marks its own block with a pattern.
-    magnitude : whole number, count, 1 to 100, default 8
-        The largest change a hit makes to a coefficient, 1 to 100 quantisation steps: each
-        hit adds or subtracts a whole number of steps between 1 and this. Raising it makes
-        the damage louder.
+Advanced parameters
+-------------------
+dc_share : number, fraction, 0 to 1, default 0.3
+    The share of hits, 0 to 1, that land on a block's DC value (its average) rather than
+    on one of its 63 detail coefficients. A DC hit shifts the block and, as JPEG stores
+    each average as a difference from the block before, every later block of its row: a
+    streak to the right edge. A detail hit only marks its own block with a pattern.
+magnitude : whole number, count, 1 to 100, default 8
+    The largest change a hit makes to a coefficient, 1 to 100 quantisation steps: each
+    hit adds or subtracts a whole number of steps between 1 and this. Raising it makes
+    the damage louder.
 
-    Presets
-    -------
-    byte_corrupt : A corrupted JPEG: a moderate-quality picture with 40 damaged coefficients, showing as smeared blocks, colour streaks and stripes."""
+Presets
+-------
+byte_corrupt : A corrupted JPEG: a moderate-quality picture with 40 damaged coefficients, showing as smeared blocks, colour streaks and stripes."""
     ...
 
 @_effect
-def kaleidoscope(
-    *,
-    segments: int = 6,
-    angle: float = 0.0,
-    x: float = 0.5,
-    y: float = 0.5,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["mirror"] | None = None,
-) -> Step:
+def kaleidoscope(*, segments: int = 6, angle: float = 0.0, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['mirror'] | None = None) -> Step:
     """Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a kaleidoscope, or with one segment a plain mirror.  A wedge of the picture and its mirror image repeated round a centre. A pixel at angle a about the centre (clockwise from pointing right) and distance d shows the picture at the same distance d and the angle that a folds to: a less `angle`, taken modulo the sector 360 / `segments`, and if that passes half a sector, mirrored to what it falls short of the sector by, then `angle` added back. The wedge from `angle` for half a sector is the picture as it is, the next half a sector its mirror image, and so on round the centre, which keeps its own pixel. One segment is a single mirror axis: the half of the picture clockwise from `angle` is kept, its reflection replaces the other half. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    segments : whole number, count, 1 to 64, default 6
-        How many times the pattern repeats round the centre: the full circle is cut into
-        this many equal sectors, each holding a wedge of the picture (half a sector wide)
-        and its mirror image, so every wedge borders its own reflection and the seams
-        between them do not show. 1 = one line through the centre: the half of the picture
-        clockwise from `angle` is kept and its reflection replaces the other half (a face
-        made symmetric, a reflection in water); 2 = mirrored across that line and again
-        across the line at right angles (the kept quarter copied into the other three);
-        raising it makes more, narrower wedges.
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        Where the pattern starts, as the direction in degrees, clockwise from pointing right
-        (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts
-        an axis along the line right of the centre; turning it turns the mirror axes, and
-        shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90
-        the left, 180 the top and 270 the right. The pattern repeats every 360 / segments
-        degrees.
-    x : number, fraction, 0 to 1, default 0.5
-        The centre's horizontal position as a fraction of the way across the picture: 0 =
-        the first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.5
-        The centre's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last.
+Parameters
+----------
+segments : whole number, count, 1 to 64, default 6
+    How many times the pattern repeats round the centre: the full circle is cut into
+    this many equal sectors, each holding a wedge of the picture (half a sector wide)
+    and its mirror image, so every wedge borders its own reflection and the seams
+    between them do not show. 1 = one line through the centre: the half of the picture
+    clockwise from `angle` is kept and its reflection replaces the other half (a face
+    made symmetric, a reflection in water); 2 = mirrored across that line and again
+    across the line at right angles (the kept quarter copied into the other three);
+    raising it makes more, narrower wedges.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    Where the pattern starts, as the direction in degrees, clockwise from pointing right
+    (as CSS rotate), of the first mirror axis and of the wedge that follows it: 0 puts
+    an axis along the line right of the centre; turning it turns the mirror axes, and
+    shows a different wedge of the picture. With 1 segment, 0 keeps the bottom half, 90
+    the left, 180 the top and 270 the right. The pattern repeats every 360 / segments
+    degrees.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges). With 'nearest' every output pixel is an input pixel, so a mirror
-        (1 or 2 segments through the middle) is exact and exactly symmetric; the other two
-        blend, and a mirror then differs from an exact reflection by rounding error only.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the kaleidoscope sees beyond the picture's edge (a wedge reaches past it in the
-        corners, and wherever the centre is off to one side): 'reflect' (mirrored, edge
-        pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge).
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges). With 'nearest' every output pixel is an input pixel, so a mirror
+    (1 or 2 segments through the middle) is exact and exactly symmetric; the other two
+    blend, and a mirror then differs from an exact reflection by rounding error only.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the kaleidoscope sees beyond the picture's edge (a wedge reaches past it in the
+    corners, and wherever the centre is off to one side): 'reflect' (mirrored, edge
+    pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge).
 
-    Presets
-    -------
-    mirror : A mirror: the left half copied, reflected, onto the right (a symmetric face). Turn `angle` to keep another half."""
+Presets
+-------
+mirror : A mirror: the left half copied, reflected, onto the right (a symmetric face). Turn `angle` to keep another half."""
     ...
 
 @_effect
-def lens_blur(
-    *,
-    radius: float = 8.0,
-    highlights: float = 0.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def lens_blur(*, radius: float = 8.0, highlights: float = 0.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels.  Every pixel becomes the average of the pixels within `radius` px of it (one on the rim counts for the share of it inside the disc, a linear ramp one pixel wide), each weighted by 1 + `highlights` x its brightness. Flat areas stay flat and the result never leaves the picture's own range. The cost hardly grows with the radius.
 
-    Parameters
-    ----------
-    radius : number, px, 0 to 100, default 8.0
-        The radius of the disc in px at the recipe's size: larger is further out of focus
-        and spreads each point into a bigger circle; 0 leaves the picture unchanged.
-    highlights : number, ratio, 0 to 50, default 0.0
-        How much brighter pixels count in the average: a pixel of brightness b (0..1) counts
-        1 + highlights x b times as much as a black one, so with 0 every pixel counts the
-        same (a plain average), and raising it turns bright lights into distinct, luminous
-        discs (bokeh) while dark areas hardly bleed into them.
+Parameters
+----------
+radius : number, px, 0 to 100, default 8.0
+    The radius of the disc in px at the recipe's size: larger is further out of focus
+    and spreads each point into a bigger circle; 0 leaves the picture unchanged.
+highlights : number, ratio, 0 to 50, default 0.0
+    How much brighter pixels count in the average: a pixel of brightness b (0..1) counts
+    1 + highlights x b times as much as a black one, so with 0 every pixel counts the
+    same (a plain average), and raising it turns bright lights into distinct, luminous
+    discs (bokeh) while dark areas hardly bleed into them.
 
-    Advanced parameters
-    -------------------
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def lens_distortion(
-    *,
-    model: Literal["brown_conrady", "fisheye"] = "brown_conrady",
-    amount: float = 0.2,
-    fit: Literal["frame", "centre"] = "frame",
-    x: float = 0.5,
-    y: float = 0.5,
-    border: str | list[float] | tuple[float, float, float] | None = None,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["fisheye"] | None = None,
-) -> Step:
+def lens_distortion(*, model: Literal['brown_conrady', 'fisheye'] = 'brown_conrady', amount: float = 0.2, fit: Literal['frame', 'centre'] = 'frame', x: float = 0.5, y: float = 0.5, border: str | list[float] | tuple[float, float, float] | None = None, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['fisheye'] | None = None) -> Step:
     """Bend the picture as a lens does, barrel, pincushion or fisheye, with the curve `model` and strength `amount` about the axis `x`, `y`.  Lens distortion: the picture bent about the lens axis, by the radial polynomial of the Brown-Conrady model or as through a fisheye lens, so straight lines bow outward (barrel) or inward (pincushion). Each pixel at distance d from the axis shows the picture on the same ray at d x s(d / R), R the distance of the farthest corner. s is 1 at the axis and 1 + `amount` at the farthest corner: for 'brown_conrady' 1 + `amount` x (d / R)^2 (the Brown-Conrady radial term, k1 only); for 'fisheye' tan(u d / R) / (u d / R), the equidistant fisheye for a half field of view u (the arctangent, its inverse, for a negative `amount`). With `fit` 'frame' s is divided by 1 + `amount` so that the corner stays put (a barrel then reads only inside the picture). The axis never moves, and the result never leaves 0..1. What the bend reads from beyond the picture is the `edge` rule's, or `border` where that is set.
 
-    Parameters
-    ----------
-    model : one of 'brown_conrady', 'fisheye', default 'brown_conrady'
-        The curve of the bend, with the same `amount` giving the same stretch at the
-        farthest corner: 'brown_conrady' is the radial polynomial of the Brown-Conrady lens
-        model (k1 only), which bends evenly from the axis out, as an ordinary lens does;
-        'fisheye' is an equidistant fisheye, a pixel's distance from the axis proportional
-        to the angle it sees, which keeps the middle almost flat and bends the edges
-        hardest, and for a negative `amount` is its inverse, an arctangent curve.
-    amount : number, ratio, -0.3 to 3.5, default 0.2
-        How strongly the lens bends: at the farthest corner each pixel's source lies 1 +
-        amount times as far from the axis as the pixel's own place, where at the axis it
-        lies at its own place (0.2 is 20% farther; 'fit' then scales it back). The distance
-        from the axis is measured in units of the farthest corner's. Positive is barrel:
-        straight lines bow outward, the middle swells and the picture looks wrapped around a
-        ball. Negative is pincushion: lines bow inward and the corners are pulled out; -0.3
-        is the most the 'brown_conrady' curve can have without folding the picture over. 0
-        leaves the picture unchanged. For a fisheye, 0.4 is about a 103 degree lens, 1 a 134
-        degree one and 3.5 a 162 degree one.
-    fit : one of 'frame', 'centre', default 'frame'
-        How the picture is scaled back after the bend: 'frame' keeps the farthest corner in
-        its corner, so the picture fills the frame (a barrel is zoomed in and loses its
-        sides, and nothing beyond the picture is shown; a pincushion is zoomed out toward
-        the middle and pulls in what lies beyond the middle of each edge, which the edge
-        rule fills); 'centre' keeps the scale at the lens axis, so a barrel shrinks toward
-        the middle, and the edge rule fills the corners it exposes.
-    x : number, fraction, 0 to 1, default 0.5
-        The lens axis's horizontal position as a fraction of the way across the picture: 0 =
-        the first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.5
-        The lens axis's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last.
-    border : colour or none, default None
-        The colour shown where the bend reads from beyond the picture (with fit 'centre', or
-        a pincushion): '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default) fills it by
-        the `edge` rule instead. A source less than a pixel beyond the picture is blended
-        into the border, so its edge is smooth. A black border is a bezel round a curved
-        screen.
+Parameters
+----------
+model : one of 'brown_conrady', 'fisheye', default 'brown_conrady'
+    The curve of the bend, with the same `amount` giving the same stretch at the
+    farthest corner: 'brown_conrady' is the radial polynomial of the Brown-Conrady lens
+    model (k1 only), which bends evenly from the axis out, as an ordinary lens does;
+    'fisheye' is an equidistant fisheye, a pixel's distance from the axis proportional
+    to the angle it sees, which keeps the middle almost flat and bends the edges
+    hardest, and for a negative `amount` is its inverse, an arctangent curve.
+amount : number, ratio, -0.3 to 3.5, default 0.2
+    How strongly the lens bends: at the farthest corner each pixel's source lies 1 +
+    amount times as far from the axis as the pixel's own place, where at the axis it
+    lies at its own place (0.2 is 20% farther; 'fit' then scales it back). The distance
+    from the axis is measured in units of the farthest corner's. Positive is barrel:
+    straight lines bow outward, the middle swells and the picture looks wrapped around a
+    ball. Negative is pincushion: lines bow inward and the corners are pulled out; -0.3
+    is the most the 'brown_conrady' curve can have without folding the picture over. 0
+    leaves the picture unchanged. For a fisheye, 0.4 is about a 103 degree lens, 1 a 134
+    degree one and 3.5 a 162 degree one.
+fit : one of 'frame', 'centre', default 'frame'
+    How the picture is scaled back after the bend: 'frame' keeps the farthest corner in
+    its corner, so the picture fills the frame (a barrel is zoomed in and loses its
+    sides, and nothing beyond the picture is shown; a pincushion is zoomed out toward
+    the middle and pulls in what lies beyond the middle of each edge, which the edge
+    rule fills); 'centre' keeps the scale at the lens axis, so a barrel shrinks toward
+    the middle, and the edge rule fills the corners it exposes.
+x : number, fraction, 0 to 1, default 0.5
+    The lens axis's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The lens axis's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+border : colour or none, default None
+    The colour shown where the bend reads from beyond the picture (with fit 'centre', or
+    a pincushion): '#rrggbb', '#rgb' or [r, g, b] 0..1; none (the default) fills it by
+    the `edge` rule instead. A source less than a pixel beyond the picture is blended
+    into the border, so its edge is smooth. A black border is a bezel round a curved
+    screen.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but lines turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What shows where the bend reads from beyond the picture (with fit 'centre', or a
-        pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
-        edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). With a
-        `border`, only what the bend reads from within a pixel of the edge, which blends
-        into the border.
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but lines turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What shows where the bend reads from beyond the picture (with fit 'centre', or a
+    pincushion): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
+    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). With a
+    `border`, only what the bend reads from within a pixel of the edge, which blends
+    into the border.
 
-    Presets
-    -------
-    fisheye : A fisheye lens: the middle swells and the edges squeeze in, like a 108 degree equidistant lens."""
+Presets
+-------
+fisheye : A fisheye lens: the middle swells and the edges squeeze in, like a 108 degree equidistant lens."""
     ...
 
 @_effect
-def lens_drops(
-    *,
-    count: int = 14,
-    radius: float = 24.0,
-    size_variation: float = 0.5,
-    refraction: float = 1.5,
-    blur: float = 1.5,
-    highlight: float = 0.0,
-    seed: int = 0,
-    truncate: float = 4.0,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def lens_drops(*, count: int = 14, radius: float = 24.0, size_variation: float = 0.5, refraction: float = 1.5, blur: float = 1.5, highlight: float = 0.0, seed: int = 0, truncate: float = 4.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.  A drop at a random place has a random radius from (1 - `size_variation`) x `radius` to all of it. The pixel at offset d from its middle shows the picture, blurred by `blur`, at offset -`refraction` x d from it, read by `interpolation` and `edge`, and the drop's edge is antialiased over a pixel. The `highlight` is white screened over the drop, `highlight` x (distance / radius)^2 x (1 - dy / distance) / 2 with dy the pixel's row below the middle. Later drops cover earlier ones. Pixels outside every drop are exactly as they were; the same `seed` always gives the same drops. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    count : whole number, count, 0 to 200, default 14
-        How many drops there are, whatever the size of the picture (a number, not a density:
-        the drops' size is in design px, so the same count looks alike at any size). 0 =
-        none (the picture unchanged).
-    radius : number, px, 1 to 200, default 24.0
-        The radius in px of the biggest drops; the smallest are smaller by `size_variation`.
-        Tuned for a picture about 480 px high. Larger = bigger drops.
-    size_variation : number, fraction, 0 to 1, default 0.5
-        How much the drops differ in size: each has a random share of `radius` from 1 -
-        `size_variation` to 1. 0 = every drop alike, 1 = from the full radius down to
-        specks.
-    refraction : number, ratio, 0.25 to 4, default 1.5
-        How strongly a drop bends the scene: it shows the picture turned upside down about
-        the drop's middle and this many times as wide. 1 = the same scale, turned round;
-        above 1 a wider view in miniature, as in a real drop; below 1 a magnified view.
-    blur : number, px, 0 to 20, default 1.5
-        How much the scene inside a drop is blurred, the sigma of a Gaussian in px, as a
-        drop is never quite in focus. 0 = sharp.
-    highlight : number, fraction, 0 to 1, default 0.0
-        How bright the drops' shine is: white light screened along the rim of each drop,
-        strongest at its top (light from above) and fading to nothing at its bottom and in
-        its middle. 0 = none, so a flat picture stays flat; 0.5 is a soft glint.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always puts the same drops in the same places, another
-        seed others.
+Parameters
+----------
+count : whole number, count, 0 to 200, default 14
+    How many drops there are, whatever the size of the picture (a number, not a density:
+    the drops' size is in design px, so the same count looks alike at any size). 0 =
+    none (the picture unchanged).
+radius : number, px, 1 to 200, default 24.0
+    The radius in px of the biggest drops; the smallest are smaller by `size_variation`.
+    Tuned for a picture about 480 px high. Larger = bigger drops.
+size_variation : number, fraction, 0 to 1, default 0.5
+    How much the drops differ in size: each has a random share of `radius` from 1 -
+    `size_variation` to 1. 0 = every drop alike, 1 = from the full radius down to
+    specks.
+refraction : number, ratio, 0.25 to 4, default 1.5
+    How strongly a drop bends the scene: it shows the picture turned upside down about
+    the drop's middle and this many times as wide. 1 = the same scale, turned round;
+    above 1 a wider view in miniature, as in a real drop; below 1 a magnified view.
+blur : number, px, 0 to 20, default 1.5
+    How much the scene inside a drop is blurred, the sigma of a Gaussian in px, as a
+    drop is never quite in focus. 0 = sharp.
+highlight : number, fraction, 0 to 1, default 0.0
+    How bright the drops' shine is: white light screened along the rim of each drop,
+    strongest at its top (light from above) and fading to nothing at its bottom and in
+    its middle. 0 = none, so a flat picture stays flat; 0.5 is a soft glint.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same drops in the same places, another
+    seed others.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the blur's Gaussian is cut off, in sigmas (only when blur > 0). Larger is more
-        exact and slower.
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture inside a drop: 'nearest' takes
-        the closest pixel (fastest, keeps every value exactly as it is but edges turn
-        jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-        'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
-        and may ring beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What a drop sees beyond the picture's edge (a drop near the border or a strong
-        refraction reads from outside it), and the blur with it: 'reflect' (mirrored, edge
-        pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas (only when blur > 0). Larger is more
+    exact and slower.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture inside a drop: 'nearest' takes
+    the closest pixel (fastest, keeps every value exactly as it is but edges turn
+    jagged), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
+    and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a drop sees beyond the picture's edge (a drop near the border or a strong
+    refraction reads from outside it), and the blur with it: 'reflect' (mirrored, edge
+    pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def lens_flare(
-    *,
-    x: float = 0.75,
-    y: float = 0.25,
-    ghosts: int = 5,
-    spacing: float = 0.45,
-    size: float = 30.0,
-    halo: float = 120.0,
-    ring: float = 72.0,
-    ring_width: float = 12.0,
-    amount: float = 0.8,
-    color: str | list[float] | tuple[float, float, float] = "#ffe2b8",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def lens_flare(*, x: float = 0.75, y: float = 0.25, ghosts: int = 5, spacing: float = 0.45, size: float = 30.0, halo: float = 120.0, ring: float = 72.0, ring_width: float = 12.0, amount: float = 0.8, color: str | list[float] | tuple[float, float, float] = '#ffe2b8', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Add a halo and a ring round the light at (`x`, `y`) and `ghosts` soft discs along the line from it through the picture's centre, tinted `color` and screened over the picture by `amount`.  Every feature is a smooth bump of brightness, 1 where it is strongest and falling (1 - t^2)^2 to nothing at its radius (`halo`, `size`) or half-width (`ring_width`), in px, drawn straight from its formula with no blur or warp. Ghost i is centred at light + i x `spacing` x (picture centre - light) and has the brightness (ghosts - i + 1) / ghosts. The picture only ever gets brighter.
 
-    Parameters
-    ----------
-    x : number, fraction, 0 to 1, default 0.75
-        The light's horizontal position as a fraction of the way across the picture: 0 = the
-        first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.25
-        The light's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last.
-    ghosts : whole number, count, 0 to 12, default 5
-        How many ghosts (soft discs, the lens's reflections of the light) lie along the line
-        from the light through the picture's centre; each is dimmer than the one before, the
-        last 1/ghosts as bright as the first. 0 = none.
-    size : number, px, 1 to 300, default 30.0
-        The radius in px of each ghost, tuned for a picture about 480 px high: the disc is
-        brightest at its middle and falls smoothly to nothing at this distance. Raising it
-        makes bigger, softer ghosts.
-    halo : number, px, 0 to 600, default 120.0
-        The radius in px of the soft glow round the light, tuned for a picture about 480 px
-        high: brightest at the light and falling smoothly to nothing at this distance. 0 =
-        no halo.
-    ring : number, px, 0 to 600, default 72.0
-        The radius in px of the thin ring round the light, tuned for a picture about 480 px
-        high: the distance from the light at which the ring is brightest. 0 = no ring.
-    amount : number, ratio, 0 to 10, default 0.8
-        How strongly the flare is screened over the picture: 0 = off, 1 = the light at full
-        brightness where it is brightest (the light itself and the first ghost); above 1 it
-        saturates to white sooner.
-    color : colour, default '#ffe2b8'
-        The tint of the flare: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
-        white; white keeps the flare colourless.
+Parameters
+----------
+x : number, fraction, 0 to 1, default 0.75
+    The light's horizontal position as a fraction of the way across the picture: 0 = the
+    first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.25
+    The light's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
+ghosts : whole number, count, 0 to 12, default 5
+    How many ghosts (soft discs, the lens's reflections of the light) lie along the line
+    from the light through the picture's centre; each is dimmer than the one before, the
+    last 1/ghosts as bright as the first. 0 = none.
+size : number, px, 1 to 300, default 30.0
+    The radius in px of each ghost, tuned for a picture about 480 px high: the disc is
+    brightest at its middle and falls smoothly to nothing at this distance. Raising it
+    makes bigger, softer ghosts.
+halo : number, px, 0 to 600, default 120.0
+    The radius in px of the soft glow round the light, tuned for a picture about 480 px
+    high: brightest at the light and falling smoothly to nothing at this distance. 0 =
+    no halo.
+ring : number, px, 0 to 600, default 72.0
+    The radius in px of the thin ring round the light, tuned for a picture about 480 px
+    high: the distance from the light at which the ring is brightest. 0 = no ring.
+amount : number, ratio, 0 to 10, default 0.8
+    How strongly the flare is screened over the picture: 0 = off, 1 = the light at full
+    brightness where it is brightest (the light itself and the first ghost); above 1 it
+    saturates to white sooner.
+color : colour, default '#ffe2b8'
+    The tint of the flare: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
+    white; white keeps the flare colourless.
 
-    Advanced parameters
-    -------------------
-    spacing : number, ratio, 0 to 3, default 0.45
-        Where the ghosts lie on that line, as multiples of the distance from the light to
-        the picture's centre: ghost number i sits i x spacing of the way from the light
-        toward the centre. 1 puts the first on the centre, 2 mirrors the light through it,
-        more goes beyond; 0 piles them on the light. A light at the centre gives them no
-        line, so they sit on it.
-    ring_width : number, px, 1 to 300, default 12.0
-        How far each side of its radius the ring reaches, in px tuned for a picture about
-        480 px high: it falls smoothly from full brightness on the radius to nothing this
-        far off. Raising it makes a wider, softer ring."""
+Advanced parameters
+-------------------
+spacing : number, ratio, 0 to 3, default 0.45
+    Where the ghosts lie on that line, as multiples of the distance from the light to
+    the picture's centre: ghost number i sits i x spacing of the way from the light
+    toward the centre. 1 puts the first on the centre, 2 mirrors the light through it,
+    more goes beyond; 0 piles them on the light. A light at the centre gives them no
+    line, so they sit on it.
+ring_width : number, px, 1 to 300, default 12.0
+    How far each side of its radius the ring reaches, in px tuned for a picture about
+    480 px high: it falls smoothly from full brightness on the radius to nothing this
+    far off. Raising it makes a wider, softer ring."""
     ...
 
 @_effect
-def lenticular(
-    *,
-    strip: int = 6,
-    shift: float = 5.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def lenticular(*, strip: int = 6, shift: float = 5.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px, as a lenticular print is seen off-centre.  The strips keep their places; what changes is what they show: the 1st, 3rd, ... strips show the picture as it is and the 2nd, 4th, ... show the whole picture moved sideways by `shift`, so the two views are interlaced as under a lenticular lens. A strip shows the moved picture at the strip's own columns.
 
-    Parameters
-    ----------
-    strip : whole number, px, 1 to 500, default 6
-        The width of each vertical strip in pixels, counted from the left edge; a last strip
-        at the right edge may be narrower. Narrow strips make a fine comb, wide ones a
-        coarse stagger; a strip wider than the picture leaves it whole. Tuned for a picture
-        about 480 px high.
-    shift : number, px, -500 to 500, default 5.0
-        How far every second strip (the 2nd, 4th, ... from the left) is slid sideways, in
-        pixels: positive moves its picture right, negative left, 0 leaves the picture
-        unchanged. A distance that is not a whole number blends the two pixels it lies
-        between. Raising it separates the two interleaved views further.
+Parameters
+----------
+strip : whole number, px, 1 to 500, default 6
+    The width of each vertical strip in pixels, counted from the left edge; a last strip
+    at the right edge may be narrower. Narrow strips make a fine comb, wide ones a
+    coarse stagger; a strip wider than the picture leaves it whole. Tuned for a picture
+    about 480 px high.
+shift : number, px, -500 to 500, default 5.0
+    How far every second strip (the 2nd, 4th, ... from the left) is slid sideways, in
+    pixels: positive moves its picture right, negative left, 0 leaves the picture
+    unchanged. A distance that is not a whole number blends the two pixels it lies
+    between. Raising it separates the two interleaved views further.
 
-    Advanced parameters
-    -------------------
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What a slid strip shows where its picture has moved off the picture's side:
-        'nearest' (the outermost column repeated), 'wrap' (the opposite side comes round),
-        'reflect' (mirrored, edge column repeated), 'mirror' (mirrored about the edge
-        column)."""
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What a slid strip shows where its picture has moved off the picture's side:
+    'nearest' (the outermost column repeated), 'wrap' (the opposite side comes round),
+    'reflect' (mirrored, edge column repeated), 'mirror' (mirrored about the edge
+    column)."""
     ...
 
 @_effect
-def levels(
-    *,
-    black: float = 0.0,
-    white: float = 1.0,
-    gamma: float = 1.0,
-    output_black: float | Drive = 0.0,
-    output_white: float = 1.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["invert", "fade"] | None = None,
-) -> Step:
+def levels(*, black: float = 0.0, white: float = 1.0, gamma: float = 1.0, output_black: float | Drive = 0.0, output_white: float = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['invert', 'fade'] | None = None) -> Step:
     """Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch, faded blacks, or the negative (invert).  Each channel is normalised between `black` and `white` and clipped to 0..1, raised to `1 / gamma`, and placed between `output_black` and `output_white`. The defaults change nothing.
 
-    Parameters
-    ----------
-    black : number, fraction, 0 to 1, default 0.0
-        The input black point (0..1): values at or below it become the output black. Raising
-        it darkens shadows and adds contrast.
-    white : number, fraction, 0 to 1, default 1.0
-        The input white point (0..1): values at or above it become the output white.
-        Lowering it brightens highlights and adds contrast. At or below `black` the picture
-        is cut at `black` into the two output ends.
-    gamma : number, ratio, 0.1 to 10, default 1.0
-        The midtone gamma: 1 = linear, above 1 brightens the midtones, below 1 darkens them;
-        black and white stay where they are (output = input ** (1 / gamma), as in
-        Photoshop).
-    output_black : number (drivable), fraction, 0 to 1, default 0.0
-        The darkest value that can be output (0..1): raising it lifts the blacks to a matte
-        grey, the faded-film look (0.1 = gentle, 1 = everything white). Above `output_white`
-        the tones are reversed.
-    output_white : number, fraction, 0 to 1, default 1.0
-        The brightest value that can be output (0..1): lowering it dims the whites.
+Parameters
+----------
+black : number, fraction, 0 to 1, default 0.0
+    The input black point (0..1): values at or below it become the output black. Raising
+    it darkens shadows and adds contrast.
+white : number, fraction, 0 to 1, default 1.0
+    The input white point (0..1): values at or above it become the output white.
+    Lowering it brightens highlights and adds contrast. At or below `black` the picture
+    is cut at `black` into the two output ends.
+gamma : number, ratio, 0.1 to 10, default 1.0
+    The midtone gamma: 1 = linear, above 1 brightens the midtones, below 1 darkens them;
+    black and white stay where they are (output = input ** (1 / gamma), as in
+    Photoshop).
+output_black : number (drivable), fraction, 0 to 1, default 0.0
+    The darkest value that can be output (0..1): raising it lifts the blacks to a matte
+    grey, the faded-film look (0.1 = gentle, 1 = everything white). Above `output_white`
+    the tones are reversed.
+output_white : number, fraction, 0 to 1, default 1.0
+    The brightest value that can be output (0..1): lowering it dims the whites.
 
-    Presets
-    -------
-    invert : The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement.
-    fade : A faded, matte look: black lifted to a 12% grey, white kept, so shadows turn flat and milky."""
+Presets
+-------
+invert : The photographic negative: every channel value v becomes 1 - v, so each colour turns to its complement.
+fade : A faded, matte look: black lifted to a 12% grey, white kept, so shadows turn flat and milky."""
     ...
 
 @_effect
-def light_leak(
-    *,
-    color: str | list[float] | tuple[float, float, float] = "#ff8a3d",
-    amount: float = 0.8,
-    size: float = 150.0,
-    angle: float = 0.0,
-    blobs: int = 3,
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def light_leak(*, color: str | list[float] | tuple[float, float, float] = '#ff8a3d', amount: float = 0.8, size: float = 150.0, angle: float = 0.0, blobs: int = 3, seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Add `blobs` seeded patches of warm light coming in from the side `angle` points to, tinted `color` and screened over the picture by `amount`.  Each patch is a Gaussian bump, centred a random depth (up to `size` px) in from that side and a random place along it, with a random width of half to all of `size` px, stretched along the edge by up to twice and weighted by half to all. The patches add up and are squashed smoothly into 0..1 (1 - exp(-sum)), so overlaps never clip into flat plateaus. The picture only ever gets brighter.
 
-    Parameters
-    ----------
-    color : colour, default '#ff8a3d'
-        The tint of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the
-        orange of a leaking film back; red or yellow give other leaks.
-    amount : number, ratio, 0 to 2, default 0.8
-        How strongly the light is screened over the picture: 0 = off, 1 = the brightest
-        patch at full brightness in `color`; above 1 it saturates to white sooner.
-    size : number, px, 6 to 600, default 150.0
-        How big the patches are and how deep they reach into the picture, in px tuned for a
-        picture about 480 px high: each patch is a soft bump whose width is between half of
-        this and all of it, centred between the edge and this far in. Raising it floods more
-        of the picture.
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        The side the light comes in from, as the direction from the picture's centre, in
-        degrees clockwise from pointing right, as seen on screen: 0 = the right edge, 90 =
-        the bottom, 180 = the left, 270 = the top; in between, the corner.
-    blobs : whole number, count, 1 to 16, default 3
-        How many patches of light there are, at random places along that side (each brighter
-        or fainter and stretched along the edge by chance). Overlapping patches merge into
-        one wash; raising it gives a more even, wider leak.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same leak (the same patches in the same
-        places), another seed a different one."""
+Parameters
+----------
+color : colour, default '#ff8a3d'
+    The tint of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is the
+    orange of a leaking film back; red or yellow give other leaks.
+amount : number, ratio, 0 to 2, default 0.8
+    How strongly the light is screened over the picture: 0 = off, 1 = the brightest
+    patch at full brightness in `color`; above 1 it saturates to white sooner.
+size : number, px, 6 to 600, default 150.0
+    How big the patches are and how deep they reach into the picture, in px tuned for a
+    picture about 480 px high: each patch is a soft bump whose width is between half of
+    this and all of it, centred between the edge and this far in. Raising it floods more
+    of the picture.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The side the light comes in from, as the direction from the picture's centre, in
+    degrees clockwise from pointing right, as seen on screen: 0 = the right edge, 90 =
+    the bottom, 180 = the left, 270 = the top; in between, the corner.
+blobs : whole number, count, 1 to 16, default 3
+    How many patches of light there are, at random places along that side (each brighter
+    or fainter and stretched along the edge by chance). Overlapping patches merge into
+    one wash; raising it gives a more even, wider leak.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same leak (the same patches in the same
+    places), another seed a different one."""
     ...
 
 @_effect
-def light_rays(
-    *,
-    x: float = 0.5,
-    y: float = 0.3,
-    length: float = 0.5,
-    threshold: float = 0.7,
-    amount: float = 2.5,
-    samples: int = 8,
-    decay: float = 0.9,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def light_rays(*, x: float = 0.5, y: float = 0.3, length: float = 0.5, threshold: float = 0.7, amount: float = 2.5, samples: int = 8, decay: float = 0.9, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by `amount`.  Every pixel gathers the highlights from `samples` points on the line between itself and the light, from itself to `length` of the way there, each reading `decay` times as strong as the one before and the weights adding up to 1. A highlight streaks outward from the light, up to 1 / (1 - length) times its distance from it. The picture only ever gets brighter, and black stays black.
 
-    Parameters
-    ----------
-    x : number, fraction, 0 to 1, default 0.5
-        The light's horizontal position as a fraction of the way across the picture: 0 = the
-        first pixel column, 0.5 = the middle, 1 = the last. The rays point away from it.
-    y : number, fraction, 0 to 1, default 0.3
-        The light's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last. The rays point away from it.
-    length : number, fraction, 0 to 1, default 0.5
-        How far the rays reach back toward the light, as a fraction of each pixel's distance
-        from it: a pixel gathers light from the line between itself and the light, as far as
-        this share of the way (0.5 = half way, 1 = all the way to the light). A highlight
-        streaks outward from itself up to 1 / (1 - length) times its distance from the
-        light; 0 gives no rays.
-    threshold : number, fraction, 0 to 0.99, default 0.7
-        The brightness (0..1, per channel) where light starts: only values above it make
-        rays, rising to full at 1. Raising it limits the rays to the brightest highlights.
-    amount : number, ratio, 0 to 10, default 2.5
-        How strongly the rays are screened over the picture: 0 = off, 1 = the rays at full
-        brightness; above 1 they saturate to white sooner. The rays are an average along the
-        pixel's line to the light, so a highlight far from the pixel gives them much less
-        than the highlight itself: a few times 1 is usual.
-    decay : number, ratio, 0 to 1, default 0.9
-        How much less each reading counts than the one nearer the pixel (the weights are
-        decay^0, decay^1... scaled to add up to 1): 1 = all alike, rays of even brightness
-        to their tips; lower values make them fade away from the highlight; 0 = no rays at
-        all.
+Parameters
+----------
+x : number, fraction, 0 to 1, default 0.5
+    The light's horizontal position as a fraction of the way across the picture: 0 = the
+    first pixel column, 0.5 = the middle, 1 = the last. The rays point away from it.
+y : number, fraction, 0 to 1, default 0.3
+    The light's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last. The rays point away from it.
+length : number, fraction, 0 to 1, default 0.5
+    How far the rays reach back toward the light, as a fraction of each pixel's distance
+    from it: a pixel gathers light from the line between itself and the light, as far as
+    this share of the way (0.5 = half way, 1 = all the way to the light). A highlight
+    streaks outward from itself up to 1 / (1 - length) times its distance from the
+    light; 0 gives no rays.
+threshold : number, fraction, 0 to 0.99, default 0.7
+    The brightness (0..1, per channel) where light starts: only values above it make
+    rays, rising to full at 1. Raising it limits the rays to the brightest highlights.
+amount : number, ratio, 0 to 10, default 2.5
+    How strongly the rays are screened over the picture: 0 = off, 1 = the rays at full
+    brightness; above 1 they saturate to white sooner. The rays are an average along the
+    pixel's line to the light, so a highlight far from the pixel gives them much less
+    than the highlight itself: a few times 1 is usual.
+decay : number, ratio, 0 to 1, default 0.9
+    How much less each reading counts than the one nearer the pixel (the weights are
+    decay^0, decay^1... scaled to add up to 1): 1 = all alike, rays of even brightness
+    to their tips; lower values make them fade away from the highlight; 0 = no rays at
+    all.
 
-    Advanced parameters
-    -------------------
-    samples : whole number, count, 1 to 256, default 8
-        How many readings of the picture along each ray are added up, spread evenly over its
-        length: more is smoother and slower (the time grows with it); few show as separate
-        ghost copies of a highlight. With 1 the highlights only brighten themselves.
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, but steps and ghosts show), 'bilinear' blends the four pixels around
-        it (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels
-        (sharpest, a little slower).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What a reading sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge). The readings lie between a pixel and the
-        light, inside the picture; this rule matters only to 'bicubic', whose cubic fit
-        looks one pixel past the point it reads, and then only beside a light that sits on
-        the border."""
+Advanced parameters
+-------------------
+samples : whole number, count, 1 to 256, default 8
+    How many readings of the picture along each ray are added up, spread evenly over its
+    length: more is smoother and slower (the time grows with it); few show as separate
+    ghost copies of a highlight. With 1 the highlights only brighten themselves.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, but steps and ghosts show), 'bilinear' blends the four pixels around
+    it (smooth, slightly soft), 'bicubic' fits a cubic through the neighbouring pixels
+    (sharpest, a little slower).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a reading sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge). The readings lie between a pixel and the
+    light, inside the picture; this rule matters only to 'bicubic', whose cubic fit
+    looks one pixel past the point it reads, and then only beside a light that sits on
+    the border."""
     ...
 
 @_effect
-def liquid_metal(
-    *,
-    smoothing: float = 3.0,
-    relief: float = 35.0,
-    horizon: float = 0.65,
-    tint: str | list[float] | tuple[float, float, float] = "#c9d6ff",
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def liquid_metal(*, smoothing: float = 3.0, relief: float = 35.0, horizon: float = 0.65, tint: str | list[float] | tuple[float, float, float] = '#c9d6ff', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground.  The height is the Rec. 709 luminance smoothed by `smoothing`; only brightness matters, the picture's hues are gone. A viewer straight above sees, in a surface with slopes (dy, dx) down and across the picture, the environment at t = 0.5 + dy / (1 + dx^2 + dy^2) from the ground (0) to the sky (1), 0.5 where the surface is flat. The environment runs linearly from 0 on the ground to 0.5 at `horizon` to 1 at the sky, and the metal colours it from black through `tint` to white.
 
-    Parameters
-    ----------
-    smoothing : number, px, 0 to 20, default 3.0
-        Gaussian sigma in px with which the brightness is smoothed before it is read as
-        height: 0 = every pixel is a bump and the metal is rough with the picture's texture
-        and noise, larger = broad, flowing swells.
-    relief : number, px, 0 to 200, default 35.0
-        How tall the relief is: a white pixel stands this many px above a black one, so the
-        slope between neighbours is their brightness difference times this. 0 = a flat
-        mirror (one tint-coloured picture when the horizon is at 0.5), larger = steeper
-        relief and a more contrasty, more broken-up reflection. Sizes are in px, so the
-        defaults suit a picture about 480 px high: scale `smoothing` and `relief` with the
-        picture's size.
-    horizon : number, fraction, 0.05 to 0.95, default 0.65
-        Where the environment's horizon is, as a fraction of the way from the ground (0,
-        looking straight down) to the sky (1, looking straight up), kept off the extremes so
-        there is always some of both; a flat surface looks at 0.5. The metal is exactly
-        `tint` at the horizon, darker towards the ground and lighter towards the sky:
-        raising it turns more of the reflections dark, lowering it more of them light.
-    tint : colour, default '#c9d6ff'
-        The metal's colour as it looks at the horizon ('#rrggbb', '#rgb' or [r, g, b] 0..1):
-        the metal runs from black on the ground through this to white in the sky. A light
-        bluish silver by default; gold is '#e6b84d'.
+Parameters
+----------
+smoothing : number, px, 0 to 20, default 3.0
+    Gaussian sigma in px with which the brightness is smoothed before it is read as
+    height: 0 = every pixel is a bump and the metal is rough with the picture's texture
+    and noise, larger = broad, flowing swells.
+relief : number, px, 0 to 200, default 35.0
+    How tall the relief is: a white pixel stands this many px above a black one, so the
+    slope between neighbours is their brightness difference times this. 0 = a flat
+    mirror (one tint-coloured picture when the horizon is at 0.5), larger = steeper
+    relief and a more contrasty, more broken-up reflection. Sizes are in px, so the
+    defaults suit a picture about 480 px high: scale `smoothing` and `relief` with the
+    picture's size.
+horizon : number, fraction, 0.05 to 0.95, default 0.65
+    Where the environment's horizon is, as a fraction of the way from the ground (0,
+    looking straight down) to the sky (1, looking straight up), kept off the extremes so
+    there is always some of both; a flat surface looks at 0.5. The metal is exactly
+    `tint` at the horizon, darker towards the ground and lighter towards the sky:
+    raising it turns more of the reflections dark, lowering it more of them light.
+tint : colour, default '#c9d6ff'
+    The metal's colour as it looks at the horizon ('#rrggbb', '#rgb' or [r, g, b] 0..1):
+    the metal runs from black on the ground through this to white in the sky. A light
+    bluish silver by default; gold is '#e6b84d'.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the smoothing Gaussian is cut off, in sigmas (only matters when `smoothing` >
-        0). Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
-        edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
-        pixel repeated), 'wrap' (the opposite edge, so a tileable picture polishes without a
-        seam)."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the smoothing Gaussian is cut off, in sigmas (only matters when `smoothing` >
+    0). Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
+    edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
+    pixel repeated), 'wrap' (the opposite edge, so a tileable picture polishes without a
+    seam)."""
     ...
 
 @_effect
-def lut(
-    *,
-    file: Lut | os.PathLike[str] | str | numpy.ndarray = Lut.identity(2),
-    amount: float | Drive = 1.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def lut(*, file: Lut | os.PathLike[str] | str | numpy.ndarray = Lut.identity(2), amount: float | Drive = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`.  Each pixel's colour is looked up in the table, interpolating trilinearly between the eight nearest entries; values outside the table's domain take its edge entry, and the result is kept in 0..1.
 
-    Parameters
-    ----------
-    file : lookup table, default Lut.identity(2)
-        The 3D colour lookup table: the path of a `.cube` file (Adobe/Resolve format; 1D
-        tables are refused) in a recipe file (relative to the file) or in `fx`, or, in
-        Python, a Lut or an (n, n, n, 3) array; in Rust, the name of a table the photo was
-        given or the path of a `.cube` file. The default table changes nothing. Colours
-        between the table's entries are interpolated trilinearly.
-    amount : number (drivable), fraction, 0 to 1, default 1.0
-        How much of the table's grade shows: 0 leaves the picture unchanged, 0.5 is the
-        midway between the picture and the graded one, 1 is the table as written."""
+Parameters
+----------
+file : lookup table, default Lut.identity(2)
+    The 3D colour lookup table: the path of a `.cube` file (Adobe/Resolve format; 1D
+    tables are refused) in a recipe file (relative to the file) or in `fx`, or, in
+    Python, a Lut or an (n, n, n, 3) array; in Rust, the name of a table the photo was
+    given or the path of a `.cube` file. The default table changes nothing. Colours
+    between the table's entries are interpolated trilinearly.
+amount : number (drivable), fraction, 0 to 1, default 1.0
+    How much of the table's grade shows: 0 leaves the picture unchanged, 0.5 is the
+    midway between the picture and the graded one, 1 is the table as written."""
     ...
 
 @_effect
-def melt(
-    *,
-    amount: float = 40.0,
-    scale: float = 12.0,
-    seed: int = 0,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def melt(*, amount: float = 40.0, scale: float = 12.0, seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column.  Each column has a drip length between 0 and 1: smooth noise along the row, `scale` px wide and standardised to mean 0 and standard deviation 1, passed through the normal cumulative distribution so that lengths spread evenly. A pixel is pulled down by `amount` x its column's length x its own brightness (Rec. 709 luminance): it shows the picture that many px higher up in the same column, read by `interpolation` with `edge` above the top. Nothing moves sideways, black pixels stay in place, and the same `seed` gives the same drips. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    amount : number, px, 0 to 500, default 40.0
-        The longest drip, in px: a white pixel in the columns that drip most is pulled down
-        by this much, less bright pixels by their brightness's share of it, black ones not
-        at all. 0 leaves the picture unchanged.
-    scale : number, px, 1 to 200, default 12.0
-        How wide a drip is in px: neighbouring columns drip alike over about this distance.
-        Small = a fringe of thin needles, large = a few broad runs.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same drips, another seed a different
-        pattern of long and short columns.
+Parameters
+----------
+amount : number, px, 0 to 500, default 40.0
+    The longest drip, in px: a white pixel in the columns that drip most is pulled down
+    by this much, less bright pixels by their brightness's share of it, black ones not
+    at all. 0 leaves the picture unchanged.
+scale : number, px, 1 to 200, default 12.0
+    How wide a drip is in px: neighbouring columns drip alike over about this distance.
+    Small = a fringe of thin needles, large = a few broad runs.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same drips, another seed a different
+    pattern of long and short columns.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the pixels above and below it (smooth, slightly soft), 'bicubic'
-        fits a cubic through the neighbours (sharpest, a little slower, and may ring beside
-        hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What the drips read above the picture's top edge (only the top `amount` rows are
-        pulled from there): 'nearest' (the top row repeated, so the top smears down),
-        'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-        'wrap' (the bottom of the picture)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the pixels above and below it (smooth, slightly soft), 'bicubic'
+    fits a cubic through the neighbours (sharpest, a little slower, and may ring beside
+    hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What the drips read above the picture's top edge (only the top `amount` rows are
+    pulled from there): 'nearest' (the top row repeated, so the top smears down),
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'wrap' (the bottom of the picture)."""
     ...
 
 @_effect
-def motion_blur(
-    *,
-    angle: float = 0.0,
-    length: float | Drive = 24.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def motion_blur(*, angle: float = 0.0, length: float | Drive = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.  Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay flat, the mean is kept and the result never leaves the picture's own range. The cost hardly grows with the length.
 
-    Parameters
-    ----------
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        The direction of the motion, in degrees clockwise from pointing right on the screen,
-        0 to 360: 0 = horizontal, 90 = vertical, 45 = falling to the lower right. Opposite
-        directions (0 and 180) give the same blur.
-    length : number (drivable), px, 0 to 500, default 24.0
-        How far the smear reaches along the line, end to end, in px, tuned for a picture
-        about 480 px high: larger is a faster motion; 0 leaves the picture unchanged.
+Parameters
+----------
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The direction of the motion, in degrees clockwise from pointing right on the screen,
+    0 to 360: 0 = horizontal, 90 = vertical, 45 = falling to the lower right. Opposite
+    directions (0 and 180) give the same blur.
+length : number (drivable), px, 0 to 500, default 24.0
+    How far the smear reaches along the line, end to end, in px, tuned for a picture
+    about 480 px high: larger is a faster motion; 0 leaves the picture unchanged.
 
-    Advanced parameters
-    -------------------
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def noise_field(
-    *,
-    kind: Literal["value", "perlin", "worley", "sine"] = "perlin",
-    scale: float = 120.0,
-    octaves: int = 4,
-    persistence: float = 0.5,
-    lacunarity: float = 2.0,
-    warp: float = 0.0,
-    colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = (
-        "#0b1d3a",
-        "#2a7f9e",
-        "#f4e9c8",
-    ),
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["plasma"] | None = None,
-) -> Step:
+def noise_field(*, kind: Literal['value', 'perlin', 'worley', 'sine'] = 'perlin', scale: float = 120.0, octaves: int = 4, persistence: float = 0.5, lacunarity: float = 2.0, warp: float = 0.0, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#0b1d3a', '#2a7f9e', '#f4e9c8'), seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['plasma'] | None = None) -> Step:
     """Replace the picture with a noise field of `kind` (value, perlin, worley, the Voronoi-like one, or sine, the classic plasma), coloured through `colors`.  A generated background: the input is used only for its height and width, its content is ignored. Followed by `shatter` with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise is standardised to zero mean and unit deviation over the picture and passed through the normal cumulative distribution, so a pixel's place on the colour ramp is about its rank among all pixels. 'value' is fractal noise; 'perlin' sums octaves of gradient noise (a Gaussian random slope at each lattice point, blended with Perlin's fade curve); 'worley' sums octaves of F1 (the distance to the nearest feature point, one point per cell of `scale` / `lacunarity`^i, measured in those cells), weight `persistence`^i; 'sine' sums octaves of two plane sine waves sin(2 pi (x cos a + y sin a) / w + p) of wavelength w = `scale` / `lacunarity`^i, random directions a and phases p, weight `persistence`^i, layer i evaluated at positions pushed along x and y by `warp` px times the two waves of layer i - 1.  For the other kinds `warp` reads the finished picture at points shifted by two further fields of the kind (the seed's streams 1 and 2, standardised, so their deviation is `warp` px), bicubically, mirrored beyond the edge.
 
-    Parameters
-    ----------
-    kind : one of 'value', 'perlin', 'worley', 'sine', default 'perlin'
-        The noise: 'value' (random values on a lattice, smoothly interpolated: soft
-        blotches), 'perlin' (gradient noise: random slopes on a lattice, finer and more
-        even, zero at the lattice points) or 'worley' (cellular noise: the distance to the
-        nearest of a scatter of random points, one per cell of `scale` px, dark at each
-        point and brightening away from it; each layer is a finer scatter) or 'sine'
-        (crossed sine waves: smooth, regular swirls; the classic plasma).
-    scale : number, px, 2 to 1024, default 120.0
-        Size of the coarsest features in pixels: the spacing of the first lattice (value,
-        perlin), the size of a cell (worley) or the wavelength from crest to crest of the
-        first waves (sine); tuned for a picture about 480 px high. Larger = broad, slow
-        variation; small = fine grain.
-    octaves : whole number, count, 1 to 8, default 4
-        How many layers of noise are summed (all kinds), each finer than the last (by
-        `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine detail.
-        Each sine layer is two waves crossing at random angles. Layers finer than one pixel
-        (sine: two pixels) are dropped.
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weaker each finer layer is than the one before (all kinds): each layer's
-        weight is this to the power of its number. 0 = only the coarsest layer, 1 = every
-        layer equally strong (very rough).
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer is than the one before (all kinds): the lattice spacing,
-        cell size or wavelength is divided by this per layer. 1 = every layer the same size,
-        2 = each half as coarse, larger = detail drops off faster.
-    warp : number, px, 0 to 500, default 0.0
-        How far in pixels the pattern is pushed about, the typical shift of a point: the
-        swirling, folded look of a domain warp. 0 = no warp, and a little is nearly the same
-        picture. In 'sine' the first layer is never pushed, so with one octave `warp`
-        changes nothing.
-    colors : list of colours, default ('#0b1d3a', '#2a7f9e', '#f4e9c8')
-        The colours the noise is shown in, from its lowest values to its highest, evenly
-        spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in
-        the noise, so every colour is used about equally.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same picture, another seed a different
-        one.
+Parameters
+----------
+kind : one of 'value', 'perlin', 'worley', 'sine', default 'perlin'
+    The noise: 'value' (random values on a lattice, smoothly interpolated: soft
+    blotches), 'perlin' (gradient noise: random slopes on a lattice, finer and more
+    even, zero at the lattice points) or 'worley' (cellular noise: the distance to the
+    nearest of a scatter of random points, one per cell of `scale` px, dark at each
+    point and brightening away from it; each layer is a finer scatter) or 'sine'
+    (crossed sine waves: smooth, regular swirls; the classic plasma).
+scale : number, px, 2 to 1024, default 120.0
+    Size of the coarsest features in pixels: the spacing of the first lattice (value,
+    perlin), the size of a cell (worley) or the wavelength from crest to crest of the
+    first waves (sine); tuned for a picture about 480 px high. Larger = broad, slow
+    variation; small = fine grain.
+octaves : whole number, count, 1 to 8, default 4
+    How many layers of noise are summed (all kinds), each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth, more = more fine detail.
+    Each sine layer is two waves crossing at random angles. Layers finer than one pixel
+    (sine: two pixels) are dropped.
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer is than the one before (all kinds): each layer's
+    weight is this to the power of its number. 0 = only the coarsest layer, 1 = every
+    layer equally strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer is than the one before (all kinds): the lattice spacing,
+    cell size or wavelength is divided by this per layer. 1 = every layer the same size,
+    2 = each half as coarse, larger = detail drops off faster.
+warp : number, px, 0 to 500, default 0.0
+    How far in pixels the pattern is pushed about, the typical shift of a point: the
+    swirling, folded look of a domain warp. 0 = no warp, and a little is nearly the same
+    picture. In 'sine' the first layer is never pushed, so with one octave `warp`
+    changes nothing.
+colors : list of colours, default ('#0b1d3a', '#2a7f9e', '#f4e9c8')
+    The colours the noise is shown in, from its lowest values to its highest, evenly
+    spaced along the ramp; at least two. Each pixel's place on the ramp is its rank in
+    the noise, so every colour is used about equally.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same picture, another seed a different
+    one.
 
-    Presets
-    -------
-    plasma : Classic plasma: crossed sine waves, each layer folded by the one before, in a vivid colour wheel."""
+Presets
+-------
+plasma : Classic plasma: crossed sine waves, each layer folded by the one before, in a vivid colour wheel."""
     ...
 
 @_effect
-def ntsc(
-    *,
-    sigma: float = 4.0,
-    crawl: float = 0.3,
-    phase: float = 0.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def ntsc(*, sigma: float = 4.0, crawl: float = 0.3, phase: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal.  In YIQ (FCC coefficients) the colour axes I and Q are blurred by a Gaussian along each row only, while brightness Y is kept. Then the colour, as a modulated subcarrier, leaks into brightness: `crawl` of I cos t + Q sin t is added to Y, where t = 2 pi (x / 4 + y / 2 + `phase`), because the NTSC subcarrier is sampled four times per cycle and flips phase on every line. Greys have no colour, so they are not touched. The result is clipped to 0..1.
 
-    Parameters
-    ----------
-    sigma : number, px, 0 to 100, default 4.0
-        How far the colour smears sideways, as the standard deviation in px of a Gaussian
-        along each row, 0 to 100, tuned for a picture about 480 px high: 0 keeps the colour
-        where it is, raising it bleeds colour further past the edges of what it belongs to.
-        Brightness is not smeared.
-    crawl : number, fraction, 0 to 1, default 0.3
-        How much of the colour signal leaks into brightness as dot crawl, 0 to 1: a fine
-        diagonal chequer on coloured areas, as strong as the colour is. 0 = none, 1 = the
-        full colour signal; grey areas show none.
-    phase : number, cycles, 0 to 1, default 0.0
-        Where the chequer of the dot crawl is in its cycle, 0 to 1 (1 is the same as 0):
-        moving it sideways through a full cycle makes the dots crawl; half a cycle swaps
-        light dots and dark dots.
+Parameters
+----------
+sigma : number, px, 0 to 100, default 4.0
+    How far the colour smears sideways, as the standard deviation in px of a Gaussian
+    along each row, 0 to 100, tuned for a picture about 480 px high: 0 keeps the colour
+    where it is, raising it bleeds colour further past the edges of what it belongs to.
+    Brightness is not smeared.
+crawl : number, fraction, 0 to 1, default 0.3
+    How much of the colour signal leaks into brightness as dot crawl, 0 to 1: a fine
+    diagonal chequer on coloured areas, as strong as the colour is. 0 = none, 1 = the
+    full colour signal; grey areas show none.
+phase : number, cycles, 0 to 1, default 0.0
+    Where the chequer of the dot crawl is in its cycle, 0 to 1 (1 is the same as 0):
+    moving it sideways through a full cycle makes the dots crawl; half a cycle swaps
+    light dots and dark dots.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the smear's Gaussian is cut off, in sigmas, 1 to 10: the colour spreads over
-        about this many sigmas on either side. Lower is faster and gives a slightly sharper
-        tail.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What colour is smeared in from beyond the left and right edges: 'reflect' the
-        picture mirrored (edge pixel repeated), 'nearest' its edge pixel repeated, 'mirror'
-        mirrored about the edge pixel, 'wrap' the opposite side."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the smear's Gaussian is cut off, in sigmas, 1 to 10: the colour spreads over
+    about this many sigmas on either side. Lower is faster and gives a slightly sharper
+    tail.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What colour is smeared in from beyond the left and right edges: 'reflect' the
+    picture mirrored (edge pixel repeated), 'nearest' its edge pixel repeated, 'mirror'
+    mirrored about the edge pixel, 'wrap' the opposite side."""
     ...
 
 @_effect
-def outline(
-    *,
-    field: str = "subject",
-    width: float = 6.0,
-    color: str | list[float] | tuple[float, float, float] = "#ffffff",
-    position: Literal["outside", "inside", "center"] = "outside",
-    glow: float = 0.0,
-    field_threshold: float = 0.5,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def outline(*, field: str = 'subject', width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A coloured stroke of `width` px around a shape (the subject by default), with an optional soft halo of `glow` px.
 
-    The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly
-    as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft
-    the stroke lies behind it. The edge is antialiased over one pixel.
+The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly
+as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft
+the stroke lies behind it. The edge is antialiased over one pixel.
 
-    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
-    Parameters
-    ----------
-    field : field name, default 'subject'
-        The shape outlined: `subject` (the subject's silhouette), `background`, `light`,
-        `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel is inside
-        it from `field_threshold` up.
-    width : number, px, 0 to 200, default 6.0
-        Thickness of the stroke in px at the recipe's size; raising it thickens the line. 0
-        = no stroke.
-    color : colour, default '#ffffff'
-        The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-    position : one of 'outside', 'inside', 'center', default 'outside'
-        Which side of the shape's edge the stroke lies on: 'outside' (around the shape,
-        whose own pixels stay untouched), 'inside' (painted over the shape's rim) or
-        'center' (half of `width` on each side).
-    glow : number, px, 0 to 200, default 0.0
-        How far a soft halo of the same colour reaches beyond the stroke, in px; it fades
-        smoothly from the stroke to nothing. Raising it spreads the halo (a large value
-        makes an aura). 0 = no halo.
+Parameters
+----------
+field : field name, default 'subject'
+    The shape outlined: `subject` (the subject's silhouette), `background`, `light`,
+    `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel is inside
+    it from `field_threshold` up.
+width : number, px, 0 to 200, default 6.0
+    Thickness of the stroke in px at the recipe's size; raising it thickens the line. 0
+    = no stroke.
+color : colour, default '#ffffff'
+    The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+position : one of 'outside', 'inside', 'center', default 'outside'
+    Which side of the shape's edge the stroke lies on: 'outside' (around the shape,
+    whose own pixels stay untouched), 'inside' (painted over the shape's rim) or
+    'center' (half of `width` on each side).
+glow : number, px, 0 to 200, default 0.0
+    How far a soft halo of the same colour reaches beyond the stroke, in px; it fades
+    smoothly from the stroke to nothing. Raising it spreads the halo (a large value
+    makes an aura). 0 = no halo.
 
-    Advanced parameters
-    -------------------
-    field_threshold : number, fraction, 0 to 1, default 0.5
-        The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is
-        outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge
-        (hair, fur), raising it less."""
+Advanced parameters
+-------------------
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is
+    outlined: 0.5 = more than half covered. Lowering it takes in more of a soft edge
+    (hair, fur), raising it less."""
     ...
 
 @_effect
-def paper_texture(
-    *,
-    kind: Literal["paper", "canvas", "linen"] = "paper",
-    amount: float = 0.1,
-    scale: float = 6.0,
-    octaves: int = 3,
-    persistence: float = 0.5,
-    lacunarity: float = 2.0,
-    spacing: float = 6.0,
-    fibre: float = 0.3,
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def paper_texture(*, kind: Literal['paper', 'canvas', 'linen'] = 'paper', amount: float = 0.1, scale: float = 6.0, octaves: int = 3, persistence: float = 0.5, lacunarity: float = 2.0, spacing: float = 6.0, fibre: float = 0.3, seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture.  The texture has zero mean and unit standard deviation over the picture, so `amount` is its relative strength and the average brightness is kept (before clipping to 0..1). The fibres are fractal noise (`scale`, `octaves`, `persistence`, `lacunarity`); a weave is a cosine wave of period `spacing` across the columns plus one down the rows, mixed with the fibres by `fibre`. The same texture multiplies every channel; the same `seed` gives the same texture.
 
-    Parameters
-    ----------
-    kind : one of 'paper', 'canvas', 'linen', default 'paper'
-        The surface: 'paper' (random fibres only), 'canvas' (an even plain weave of threads
-        `spacing` px apart, with the fibres mixed in) or 'linen' (the same weave, but every
-        thread has its own random strength, so it looks uneven).
-    amount : number, fraction, 0 to 1, default 0.1
-        How strong the texture is: the standard deviation of the brightness change as a
-        fraction of each pixel's own value (the texture multiplies the picture, so black
-        stays black and the average brightness is kept). 0 = unchanged, 0.1 is visible, 0.3
-        is heavy; values lighten and darken alike, and the result is clipped to 0..1.
-    scale : number, px, 1 to 256, default 6.0
-        Size of the coarsest fibres in px, the spacing of the first noise lattice. Larger =
-        broader, softer mottling; small values give a fine tooth.
-    octaves : whole number, count, 1 to 8, default 3
-        How many layers of noise are summed for the fibres, each finer than the last (by
-        `lacunarity`) and weaker (by `persistence`). 1 = smooth blotches, more = more fine
-        detail. Layers finer than one pixel are dropped.
-    spacing : number, px, 3 to 64, default 6.0
-        The thread pitch of 'canvas' and 'linen' in px: the distance from one thread to the
-        next. Ignored for 'paper'. Larger = coarser weave.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always gives the same texture (fibres and, for 'linen',
-        thread strengths), another seed a different one.
+Parameters
+----------
+kind : one of 'paper', 'canvas', 'linen', default 'paper'
+    The surface: 'paper' (random fibres only), 'canvas' (an even plain weave of threads
+    `spacing` px apart, with the fibres mixed in) or 'linen' (the same weave, but every
+    thread has its own random strength, so it looks uneven).
+amount : number, fraction, 0 to 1, default 0.1
+    How strong the texture is: the standard deviation of the brightness change as a
+    fraction of each pixel's own value (the texture multiplies the picture, so black
+    stays black and the average brightness is kept). 0 = unchanged, 0.1 is visible, 0.3
+    is heavy; values lighten and darken alike, and the result is clipped to 0..1.
+scale : number, px, 1 to 256, default 6.0
+    Size of the coarsest fibres in px, the spacing of the first noise lattice. Larger =
+    broader, softer mottling; small values give a fine tooth.
+octaves : whole number, count, 1 to 8, default 3
+    How many layers of noise are summed for the fibres, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth blotches, more = more fine
+    detail. Layers finer than one pixel are dropped.
+spacing : number, px, 3 to 64, default 6.0
+    The thread pitch of 'canvas' and 'linen' in px: the distance from one thread to the
+    next. Ignored for 'paper'. Larger = coarser weave.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always gives the same texture (fibres and, for 'linen',
+    thread strengths), another seed a different one.
 
-    Advanced parameters
-    -------------------
-    persistence : number, ratio, 0 to 1, default 0.5
-        How much weaker each finer layer of fibres is than the one before: each layer's
-        weight is this to the power of its number. 0 = only the coarsest layer, 1 = every
-        layer equally strong (very rough).
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer of fibres is than the one before: the lattice spacing is
-        divided by this per layer. 1 = every layer the same size, 2 = each half as coarse,
-        larger = detail drops off faster in size.
-    fibre : number, fraction, 0 to 1, default 0.3
-        For 'canvas' and 'linen', the share of the texture's variance that comes from the
-        random fibres rather than the weave: 0 = a pure, regular weave, 1 = no weave (the
-        same as 'paper'). Ignored for 'paper'."""
+Advanced parameters
+-------------------
+persistence : number, ratio, 0 to 1, default 0.5
+    How much weaker each finer layer of fibres is than the one before: each layer's
+    weight is this to the power of its number. 0 = only the coarsest layer, 1 = every
+    layer equally strong (very rough).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer of fibres is than the one before: the lattice spacing is
+    divided by this per layer. 1 = every layer the same size, 2 = each half as coarse,
+    larger = detail drops off faster in size.
+fibre : number, fraction, 0 to 1, default 0.3
+    For 'canvas' and 'linen', the share of the texture's variance that comes from the
+    random fibres rather than the weave: 0 = a pure, regular weave, 1 = no weave (the
+    same as 'paper'). Ignored for 'paper'."""
     ...
 
 @_effect
-def parallax(
-    *,
-    field: str = "depth",
-    angle: float = 0.0,
-    amount: float = 9.6,
-    focus: float = 0.5,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def parallax(*, field: str = 'depth', angle: float = 0.0, amount: float = 9.6, focus: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera move would: layers nearer than `focus` shift along `angle`, farther ones the opposite way, each by its distance in depth from the focus.  Each output pixel reads the picture that far back along `angle`, taking its depth as the nearest within reach of the largest shift, so a near object lands whole over what lies behind it. Background it uncovers is the background beside it stretched over the gap: a 2.5D look, not a new view.
 
-    Parameters
-    ----------
-    field : field name, default 'depth'
-        The field read as how near each layer is, 1 = nearest: `depth` (the scene's depth),
-        `subject` (the subject moves as one layer against its background), `light` (bright
-        parts move as nearer), or a region of the recipe.
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        The direction the nearest layers move, in degrees clockwise from pointing right, as
-        seen on screen: 0 = right, 90 = down, 180 = left. Layers farther than the focus move
-        the opposite way.
-    amount : number, px, 0 to 48, default 9.6
-        How far the nearest layer (depth 1) moves when the focus is the farthest depth, 0 to
-        48 px: a layer moves amount x (its depth - focus) px. Raising it exaggerates the
-        shift; 0 leaves the picture unchanged.
-    focus : number, fraction, 0 to 1, default 0.5
-        The depth that stays still, as a fraction of the picture's depth range: 1 = the
-        nearest, 0 = the farthest. Nearer layers move along `angle`, farther ones the
-        opposite way; raising it moves more of the picture against `angle`.
+Parameters
+----------
+field : field name, default 'depth'
+    The field read as how near each layer is, 1 = nearest: `depth` (the scene's depth),
+    `subject` (the subject moves as one layer against its background), `light` (bright
+    parts move as nearer), or a region of the recipe.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The direction the nearest layers move, in degrees clockwise from pointing right, as
+    seen on screen: 0 = right, 90 = down, 180 = left. Layers farther than the focus move
+    the opposite way.
+amount : number, px, 0 to 48, default 9.6
+    How far the nearest layer (depth 1) moves when the focus is the farthest depth, 0 to
+    48 px: a layer moves amount x (its depth - focus) px. Raising it exaggerates the
+    shift; 0 leaves the picture unchanged.
+focus : number, fraction, 0 to 1, default 0.5
+    The depth that stays still, as a fraction of the picture's depth range: 1 = the
+    nearest, 0 = the farthest. Nearer layers move along `angle`, farther ones the
+    opposite way; raising it moves more of the picture against `angle`.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What a pixel near the border sees when its shift reads from beyond the picture:
-        'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-        'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a pixel near the border sees when its shift reads from beyond the picture:
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def particles(
-    *,
-    density: float = 1.0,
-    size: float = 6.0,
-    length: float = 0.0,
-    angle: float = 90.0,
-    softness: float = 0.5,
-    color: str | list[float] | tuple[float, float, float] = "#ffffff",
-    layers: int = 0,
-    size_falloff: float = 0.5,
-    brightness_falloff: float = 0.5,
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 0.8,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["embers", "floating_dust", "rain", "snow", "starfield"] | None = None,
-) -> Step:
+def particles(*, density: float = 1.0, size: float = 6.0, length: float = 0.0, angle: float = 90.0, softness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', layers: int = 0, size_falloff: float = 0.5, brightness_falloff: float = 0.5, seed: int = 0, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['embers', 'floating_dust', 'rain', 'snow', 'starfield'] | None = None) -> Step:
     """Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`: snow,
-    rain, embers, floating dust, stars.
+rain, embers, floating dust, stars.
 
-    Every particle lies at a random nearness d from 0 (farthest) to 1 (nearest), or in one of `layers` planes k / n.
-    Its width and streak length are `size` and `length` times 1 - `size_falloff` x (1 - d), and it screens
-    1 - `brightness_falloff` x (1 - d) of `color` along its middle, with an edge `softness` of its radius soft, so the
-    picture has depth. Where particles overlap the brighter one shows; they are cut off by the picture's edge and
-    only lighten it. A higher `density` keeps every particle of a lower one and adds more; the same `seed` always
-    gives the same particles.
+Every particle lies at a random nearness d from 0 (farthest) to 1 (nearest), or in one of `layers` planes k / n.
+Its width and streak length are `size` and `length` times 1 - `size_falloff` x (1 - d), and it screens
+1 - `brightness_falloff` x (1 - d) of `color` along its middle, with an edge `softness` of its radius soft, so the
+picture has depth. Where particles overlap the brighter one shows; they are cut off by the picture's edge and
+only lighten it. A higher `density` keeps every particle of a lower one and adds more; the same `seed` always
+gives the same particles.
 
-    Parameters
-    ----------
-    density : number, density, 0 to 300, default 1.0
-        How many particles there are: particles per 1000 design px² (a 32 x 32 px area at
-        the recipe's size), so any picture size looks alike. 0 = none (the picture
-        unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars, 244 a dense
-        field of tiny ones.
-    size : number, px, 1 to 200, default 6.0
-        The width in px of the nearest, largest particles; farther ones are narrower by
-        `size_falloff`. Tuned for a picture about 480 px high. Larger = bigger dots and
-        thicker streaks.
-    length : number, px, 0 to 200, default 0.0
-        The length in px of the streak each nearest particle draws from its head along
-        `angle`; farther ones are shorter by `size_falloff`. Tuned for a picture about 480
-        px high. 0 = round dots, larger = longer streaks, as with a slower shutter.
-    angle : number (cyclic), degrees, 0 to 360, default 90.0
-        The direction a streak runs from its head, in degrees clockwise from pointing right,
-        as seen on screen: 0 = right, 90 = down, 180 = left, 270 = up. Only streaks show it:
-        with a `length` of 0 it changes nothing.
-    softness : number, fraction, 0 to 1, default 0.5
-        How soft a particle's edge is: it falls from full brightness to none across this
-        fraction of the particle's radius (at least one pixel), so large ones are blurrier
-        than small ones, like particles out of focus. 0 = crisp one-pixel edges, 1 = fading
-        out from the middle.
-    color : colour, default '#ffffff'
-        The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. Particles are screened
-        over the picture, so they only lighten it.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always puts the same particles in the same places,
-        another seed others.
+Parameters
+----------
+density : number, density, 0 to 300, default 1.0
+    How many particles there are: particles per 1000 design px² (a 32 x 32 px area at
+    the recipe's size), so any picture size looks alike. 0 = none (the picture
+    unchanged), 1 is a steady shower of rain, 7 a clear night sky of stars, 244 a dense
+    field of tiny ones.
+size : number, px, 1 to 200, default 6.0
+    The width in px of the nearest, largest particles; farther ones are narrower by
+    `size_falloff`. Tuned for a picture about 480 px high. Larger = bigger dots and
+    thicker streaks.
+length : number, px, 0 to 200, default 0.0
+    The length in px of the streak each nearest particle draws from its head along
+    `angle`; farther ones are shorter by `size_falloff`. Tuned for a picture about 480
+    px high. 0 = round dots, larger = longer streaks, as with a slower shutter.
+angle : number (cyclic), degrees, 0 to 360, default 90.0
+    The direction a streak runs from its head, in degrees clockwise from pointing right,
+    as seen on screen: 0 = right, 90 = down, 180 = left, 270 = up. Only streaks show it:
+    with a `length` of 0 it changes nothing.
+softness : number, fraction, 0 to 1, default 0.5
+    How soft a particle's edge is: it falls from full brightness to none across this
+    fraction of the particle's radius (at least one pixel), so large ones are blurrier
+    than small ones, like particles out of focus. 0 = crisp one-pixel edges, 1 = fading
+    out from the middle.
+color : colour, default '#ffffff'
+    The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. Particles are screened
+    over the picture, so they only lighten it.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always puts the same particles in the same places,
+    another seed others.
 
-    Advanced parameters
-    -------------------
-    layers : whole number, count, 0 to 10, default 0
-        How many depth planes the particles are in. In plane k of n the particle is k / n of
-        the way from the farthest to the nearest, so more planes = a smoother range of
-        depths, and 1 = every particle at the nearest depth. 0 = no planes, every depth
-        between the nearest and the farthest occurs.
-    size_falloff : number, fraction, 0 to 1, default 0.5
-        How much smaller the farthest particles are: their width and length are 1 - this of
-        the nearest ones'. 0 = every particle the same size, 1 = from the nearest down to
-        nothing at the farthest.
-    brightness_falloff : number, fraction, 0 to 1, default 0.5
-        How much fainter the farthest particles are: their brightness is 1 - this of the
-        nearest ones'. 0 = every particle equally bright, 1 = from the nearest down to
-        nothing at the farthest.
+Advanced parameters
+-------------------
+layers : whole number, count, 0 to 10, default 0
+    How many depth planes the particles are in. In plane k of n the particle is k / n of
+    the way from the farthest to the nearest, so more planes = a smoother range of
+    depths, and 1 = every particle at the nearest depth. 0 = no planes, every depth
+    between the nearest and the farthest occurs.
+size_falloff : number, fraction, 0 to 1, default 0.5
+    How much smaller the farthest particles are: their width and length are 1 - this of
+    the nearest ones'. 0 = every particle the same size, 1 = from the nearest down to
+    nothing at the farthest.
+brightness_falloff : number, fraction, 0 to 1, default 0.5
+    How much fainter the farthest particles are: their brightness is 1 - this of the
+    nearest ones'. 0 = every particle equally bright, 1 = from the nearest down to
+    nothing at the farthest.
 
-    Step opacity
-    ------------
-    0.8: a step of this effect is mixed in at 0.8 unless it sets its own `opacity`, which replaces this.
+Step opacity
+------------
+0.8: a step of this effect is mixed in at 0.8 unless it sets its own `opacity`, which replaces this.
 
-    Presets
-    -------
-    embers : Glowing orange sparks rising and drifting right, each trailing a short streak down and to the left.
-    floating_dust : Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam.
-    rain : Thin pale streaks falling a little to the right, near ones long and bright, far ones short and faint.
-    snow : Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter.
-    starfield : Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky."""
+Presets
+-------
+embers : Glowing orange sparks rising and drifting right, each trailing a short streak down and to the left.
+floating_dust : Faint warm specks of light of several sizes, near ones large and soft, as out-of-focus dust in a sunbeam.
+rain : Thin pale streaks falling a little to the right, near ones long and bright, far ones short and faint.
+snow : Soft white flakes in four depth layers, the near ones large, blurry and bright, the far ones small and fainter.
+starfield : Small crisp stars of several sizes and brightnesses. Put a dark one-colour `gradient` step before it for a night sky."""
     ...
 
 @_effect
-def pattern(
-    *,
-    kind: Literal["stripes", "checks", "dots", "grid"] = "grid",
-    cell: float = 32.0,
-    angle: float = 0.0,
-    foreground: str | list[float] | tuple[float, float, float] = "#ffffff",
-    background: str | list[float] | tuple[float, float, float] = "#101018",
-    thickness: float = 0.2,
-    radius: float = 0.3,
-    feather: float = 1.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def pattern(*, kind: Literal['stripes', 'checks', 'dots', 'grid'] = 'grid', cell: float = 32.0, angle: float = 0.0, foreground: str | list[float] | tuple[float, float, float] = '#ffffff', background: str | list[float] | tuple[float, float, float] = '#101018', thickness: float = 0.2, radius: float = 0.3, feather: float = 1.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Replace the picture with a repeating pattern of stripes, checks, dots or a grid in two colours.  A generated background: the input is used only for its height and width, its content is ignored. The pattern is anchored at the top-left corner, so it does not shift when the picture is resized. Every shape is drawn from its signed distance in px to its border, so edges have the same softness at every angle.
 
-    Parameters
-    ----------
-    kind : one of 'stripes', 'checks', 'dots', 'grid', default 'grid'
-        The pattern: 'stripes' (parallel bands, `thickness` wide), 'checks' (a chessboard of
-        `cell` px squares, the top-left one in the foreground colour), 'dots' (a disc of
-        `radius` in every cell) or 'grid' (lines `thickness` wide along the cell borders).
-    cell : number, px, 2 to 512, default 32.0
-        The size of one repeat in px: the distance from one stripe to the next, the side of
-        a check, a dot or a grid square. Tuned for a picture about 480 px high; larger = a
-        coarser pattern.
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        The direction the pattern varies along, in degrees clockwise from pointing right,
-        about the picture's top-left corner: at 0 it changes from left to right, so the
-        stripes are vertical and the checks, dots and grid lines are aligned with the
-        picture's edges; at 90 it changes downward and the stripes are horizontal.
-    foreground : colour, default '#ffffff'
-        The colour of the stripes, the dark checks, the dots and the grid lines.
-    background : colour, default '#101018'
-        The colour between them.
-    thickness : number, fraction, 0 to 1, default 0.2
-        Used by 'stripes' and 'grid': the width of a stripe or a grid line as a fraction of
-        `cell`; 1 fills everything with the foreground colour. Ignored by 'checks' and
-        'dots'.
-    radius : number, fraction, 0 to 0.75, default 0.3
-        Used by 'dots' only: the radius of a dot as a fraction of `cell`; 0.5 touches the
-        neighbours, above 0.71 the dots overlap into a filled picture. Ignored by 'stripes',
-        'checks' and 'grid'.
-    feather : number, px, 0 to 32, default 1.0
-        The width of the soft edge in px, centred on the shape's border and blended
-        linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes."""
+Parameters
+----------
+kind : one of 'stripes', 'checks', 'dots', 'grid', default 'grid'
+    The pattern: 'stripes' (parallel bands, `thickness` wide), 'checks' (a chessboard of
+    `cell` px squares, the top-left one in the foreground colour), 'dots' (a disc of
+    `radius` in every cell) or 'grid' (lines `thickness` wide along the cell borders).
+cell : number, px, 2 to 512, default 32.0
+    The size of one repeat in px: the distance from one stripe to the next, the side of
+    a check, a dot or a grid square. Tuned for a picture about 480 px high; larger = a
+    coarser pattern.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The direction the pattern varies along, in degrees clockwise from pointing right,
+    about the picture's top-left corner: at 0 it changes from left to right, so the
+    stripes are vertical and the checks, dots and grid lines are aligned with the
+    picture's edges; at 90 it changes downward and the stripes are horizontal.
+foreground : colour, default '#ffffff'
+    The colour of the stripes, the dark checks, the dots and the grid lines.
+background : colour, default '#101018'
+    The colour between them.
+thickness : number, fraction, 0 to 1, default 0.2
+    Used by 'stripes' and 'grid': the width of a stripe or a grid line as a fraction of
+    `cell`; 1 fills everything with the foreground colour. Ignored by 'checks' and
+    'dots'.
+radius : number, fraction, 0 to 0.75, default 0.3
+    Used by 'dots' only: the radius of a dot as a fraction of `cell`; 0.5 touches the
+    neighbours, above 0.71 the dots overlap into a filled picture. Ignored by 'stripes',
+    'checks' and 'grid'.
+feather : number, px, 0 to 32, default 1.0
+    The width of the soft edge in px, centred on the shape's border and blended
+    linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes."""
     ...
 
 @_effect
-def perspective(
-    *,
-    vertical: float = 0.25,
-    horizontal: float = 0.0,
-    shear_x: float = 0.0,
-    shear_y: float = 0.0,
-    rotate: float = 0.0,
-    scale: float = 0.0,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["shear"] | None = None,
-) -> Step:
+def perspective(*, vertical: float = 0.25, horizontal: float = 0.0, shear_x: float = 0.0, shear_y: float = 0.0, rotate: float = 0.0, scale: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['shear'] | None = None) -> Step:
     """Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, shear, turn and zoom it.  A perspective correction: a keystone and a skew along each axis, then a turn and a zoom about the centre. The picture is moved by one projective transform about its centre, which keeps straight lines straight: first the vertical keystone (the far edge shrinks to 1 - `vertical` of the near one, the near edge keeps its width), then the horizontal one, then the skew (rows slide sideways by `shear_x` px per row, then columns down by `shear_y` px per column, so the area never changes), then `rotate` degrees clockwise, then `scale`. With all six at 0 the picture is returned unchanged. The output beyond the vanishing line reads from outside the picture, so `edge` says what it shows. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    vertical : number, fraction, -0.9 to 0.9, default 0.25
-        The vertical keystone: the fraction by which the far edge shrinks while the near one
-        keeps its width, straight lines staying straight, as when a camera tilts back to
-        shoot a tall building. Positive makes the top the far side (the top edge narrows to
-        1 - vertical of the bottom edge), negative makes the bottom the far side; 0 = none.
-        Raising it makes a steeper converging; it stops short of 1, where the far edge would
-        shrink to a point.
-    horizontal : number, fraction, -0.9 to 0.9, default 0.0
-        The horizontal keystone: the fraction by which the far edge shrinks while the near
-        one keeps its height, as when a camera turns to the side. Positive makes the right
-        side the far side (the right edge shortens to 1 - horizontal of the left edge),
-        negative makes the left side the far side; 0 = none. Applied after the vertical
-        keystone.
-    shear_x : number, ratio, -2 to 2, default 0.0
-        The horizontal skew, after the keystones, as a slope in columns per row: each row
-        slides sideways by this many pixels for every pixel it lies below the centre (and
-        the other way above it), so a vertical line leans into a line of this slope. 0 =
-        none, 0.2 = a lean of about 11 degrees, 1 = 45 degrees, positive slides the lower
-        half right and the upper half left, negative the other way. Applied before
-        `shear_y`.
-    shear_y : number, ratio, -2 to 2, default 0.0
-        The vertical skew, after `shear_x`, as a slope in rows per column: each column
-        slides down by this many pixels for every pixel it lies right of the centre (and up
-        on the left of it), so a horizontal line tilts into a line of this slope. 0 = none,
-        positive tilts the right side down, negative the right side up.
-    rotate : number (cyclic), degrees, -180 to 180, default 0.0
-        How far the picture is turned about its centre, after the keystones and skews, in
-        degrees: positive turns clockwise, negative counter-clockwise; 0 = none. The corners
-        it uncovers are filled by `edge`.
-    scale : number, fraction, -0.9 to 4, default 0.0
-        How much the picture is enlarged about its centre, after the keystones, skews and
-        turn, as a fraction of its size: 0 = unchanged, 0.5 = half as big again, -0.5 = half
-        the size (the empty margin is filled by `edge`). Enlarging it hides the corners that
-        the keystone and turn uncover.
+Parameters
+----------
+vertical : number, fraction, -0.9 to 0.9, default 0.25
+    The vertical keystone: the fraction by which the far edge shrinks while the near one
+    keeps its width, straight lines staying straight, as when a camera tilts back to
+    shoot a tall building. Positive makes the top the far side (the top edge narrows to
+    1 - vertical of the bottom edge), negative makes the bottom the far side; 0 = none.
+    Raising it makes a steeper converging; it stops short of 1, where the far edge would
+    shrink to a point.
+horizontal : number, fraction, -0.9 to 0.9, default 0.0
+    The horizontal keystone: the fraction by which the far edge shrinks while the near
+    one keeps its height, as when a camera turns to the side. Positive makes the right
+    side the far side (the right edge shortens to 1 - horizontal of the left edge),
+    negative makes the left side the far side; 0 = none. Applied after the vertical
+    keystone.
+shear_x : number, ratio, -2 to 2, default 0.0
+    The horizontal skew, after the keystones, as a slope in columns per row: each row
+    slides sideways by this many pixels for every pixel it lies below the centre (and
+    the other way above it), so a vertical line leans into a line of this slope. 0 =
+    none, 0.2 = a lean of about 11 degrees, 1 = 45 degrees, positive slides the lower
+    half right and the upper half left, negative the other way. Applied before
+    `shear_y`.
+shear_y : number, ratio, -2 to 2, default 0.0
+    The vertical skew, after `shear_x`, as a slope in rows per column: each column
+    slides down by this many pixels for every pixel it lies right of the centre (and up
+    on the left of it), so a horizontal line tilts into a line of this slope. 0 = none,
+    positive tilts the right side down, negative the right side up.
+rotate : number (cyclic), degrees, -180 to 180, default 0.0
+    How far the picture is turned about its centre, after the keystones and skews, in
+    degrees: positive turns clockwise, negative counter-clockwise; 0 = none. The corners
+    it uncovers are filled by `edge`.
+scale : number, fraction, -0.9 to 4, default 0.0
+    How much the picture is enlarged about its centre, after the keystones, skews and
+    turn, as a fraction of its size: 0 = unchanged, 0.5 = half as big again, -0.5 = half
+    the size (the empty margin is filled by `edge`). Enlarging it hides the corners that
+    the keystone and turn uncover.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What fills the margins the keystone, skew, turn and zoom uncover around the picture:
-        'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
-        'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge).
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What fills the margins the keystone, skew, turn and zoom uncover around the picture:
+    'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
+    'nearest' (the edge pixel repeated: streaks), 'wrap' (the opposite edge).
 
-    Presets
-    -------
-    shear : A shear: rows slid sideways in proportion to their height, so the picture leans like italic type."""
+Presets
+-------
+shear : A shear: rows slid sideways in proportion to their height, so the picture leans like italic type."""
     ...
 
 @_effect
-def pinch_bulge(
-    *,
-    amount: float = 0.5,
-    radius: float = 0.5,
-    x: float = 0.5,
-    y: float = 0.5,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def pinch_bulge(*, amount: float = 0.5, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`.  The picture about the centre is magnified (bulge) or shrunk (pinch) most at the centre and not at all at `radius`. Each pixel at distance d from the centre, d inside the radius, shows the picture on the same ray from the centre at distance d x (1 - amount x (1 - d / radius)^2), read by `interpolation`: nearer the centre for a bulge, so the middle is magnified, and farther out for a pinch. Pixels at the radius or beyond, and the centre itself, keep their place, no pixel is folded over, and the result never leaves 0..1.
 
-    Parameters
-    ----------
-    amount : number, fraction, -1 to 1, default 0.5
-        How far the middle is pushed. Positive is a bulge: the picture at the centre is
-        magnified, as seen through a lens or a bubble, ever more toward the centre and
-        without limit at 1 (the pixels around the centre all show the centre pixel).
-        Negative is a pinch: the picture at the centre is shrunk, as if drawn into a point,
-        down to half size at -1. The push fades smoothly to nothing at the radius, so no
-        pixel is folded over; 0 leaves the picture unchanged.
-    radius : number, fraction, 0 to 2, default 0.5
-        How far from the centre the effect reaches, as a fraction of the shorter side of the
-        picture, measured from the first pixel to the last (0.5 = a disc as wide as half of
-        it, 2 = a disc that covers the whole picture and more). Pixels from this far out are
-        untouched; 0 leaves the picture unchanged.
-    x : number, fraction, 0 to 1, default 0.5
-        The centre's horizontal position as a fraction of the way across the picture: 0 =
-        the first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.5
-        The centre's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last.
+Parameters
+----------
+amount : number, fraction, -1 to 1, default 0.5
+    How far the middle is pushed. Positive is a bulge: the picture at the centre is
+    magnified, as seen through a lens or a bubble, ever more toward the centre and
+    without limit at 1 (the pixels around the centre all show the centre pixel).
+    Negative is a pinch: the picture at the centre is shrunk, as if drawn into a point,
+    down to half size at -1. The push fades smoothly to nothing at the radius, so no
+    pixel is folded over; 0 leaves the picture unchanged.
+radius : number, fraction, 0 to 2, default 0.5
+    How far from the centre the effect reaches, as a fraction of the shorter side of the
+    picture, measured from the first pixel to the last (0.5 = a disc as wide as half of
+    it, 2 = a disc that covers the whole picture and more). Pixels from this far out are
+    untouched; 0 leaves the picture unchanged.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but a bulge turns blocky),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What a pinch sees beyond the picture's edge (it reads from farther out than it
-        shows): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
-        pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but a bulge turns blocky),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What a pinch sees beyond the picture's edge (it reads from farther out than it
+    shows): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
+    pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def pixel_grid(
-    *,
-    cell: int = 4,
-    gap: float = 0.15,
-    amount: float = 0.4,
-    keep_brightness: bool = False,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def pixel_grid(*, cell: int = 4, gap: float = 0.15, amount: float = 0.4, keep_brightness: bool = False, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """The picture on an LCD: each `cell` px cell split into red, green and blue stripes with a dark `gap` between.  A stripe is a third of the cell wide and lights only its own channel, in a rectangle that leaves half the gap free on each side (the gap's width is `gap` x the stripe's, horizontally and vertically alike). A pixel on a stripe's edge is lit in proportion to the area it shares with it. The result is the picture mixed with that pattern by `amount`, so it never brightens the picture; with `keep_brightness` the gains are divided by their mean over a whole cell (the same at every picture size), which brightens a lit stripe above the picture (clipped at 1).
 
-    Parameters
-    ----------
-    cell : whole number, px, 3 to 32, default 4
-        Width and height in px of one grid cell, which holds one red, one green and one blue
-        stripe, each a third of the cell wide. Larger = a coarser grid; the smallest, 3,
-        gives stripes one pixel wide.
-    gap : number, fraction, 0 to 1, default 0.15
-        Width of the dark lines between sub-pixels, as a fraction of a stripe's width (cell
-        / 3): the same lines run between the stripes and between rows of cells, half of each
-        inside its own sub-pixel. 0 = stripes touch, 1 = nothing is lit and the grid is
-        black. Raising it darkens the picture and shows the grid.
-    amount : number, fraction, 0 to 1, default 0.4
-        How far the picture is shown through the grid: 0 = the picture unchanged, 1 = the
-        picture as the grid lights it (each channel only inside its own sub-pixels, a third
-        of the picture's brightness or less), in between a mix of the two.
-    keep_brightness : true or false, default False
-        Whether the grid is brightened by the share it darkens the picture on average, so
-        the average brightness is kept and raising `amount` or `gap` shows the grid without
-        dimming the picture (a lit stripe is lifted above the picture's own value and clips
-        at 1 where that is already bright; with `gap` 1 and `amount` 1 nothing is lit and
-        the picture is black). False = the grid only ever darkens, as an LCD does."""
+Parameters
+----------
+cell : whole number, px, 3 to 32, default 4
+    Width and height in px of one grid cell, which holds one red, one green and one blue
+    stripe, each a third of the cell wide. Larger = a coarser grid; the smallest, 3,
+    gives stripes one pixel wide.
+gap : number, fraction, 0 to 1, default 0.15
+    Width of the dark lines between sub-pixels, as a fraction of a stripe's width (cell
+    / 3): the same lines run between the stripes and between rows of cells, half of each
+    inside its own sub-pixel. 0 = stripes touch, 1 = nothing is lit and the grid is
+    black. Raising it darkens the picture and shows the grid.
+amount : number, fraction, 0 to 1, default 0.4
+    How far the picture is shown through the grid: 0 = the picture unchanged, 1 = the
+    picture as the grid lights it (each channel only inside its own sub-pixels, a third
+    of the picture's brightness or less), in between a mix of the two.
+keep_brightness : true or false, default False
+    Whether the grid is brightened by the share it darkens the picture on average, so
+    the average brightness is kept and raising `amount` or `gap` shows the grid without
+    dimming the picture (a lit stripe is lifted above the picture's own value and clips
+    at 1 where that is already bright; with `gap` 1 and `amount` 1 nothing is lit and
+    the picture is black). False = the grid only ever darkens, as an LCD does."""
     ...
 
 @_effect
-def pixel_sort(
-    *,
-    by: Literal["brightness", "hue"] = "brightness",
-    low: float = 0.25,
-    high: float = 0.75,
-    axis: Literal["horizontal", "vertical"] = "horizontal",
-    order: Literal["ascending", "descending"] = "ascending",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def pixel_sort(*, by: Literal['brightness', 'hue'] = 'brightness', low: float = 0.25, high: float = 0.75, axis: Literal['horizontal', 'vertical'] = 'horizontal', order: Literal['ascending', 'descending'] = 'ascending', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A pixel sort: along every row (or column) the pixels whose key lies between two thresholds are put in order.  A run is a stretch of consecutive pixels in one row (column) that all have a key (`by`) from `low` to `high`; a pixel outside that range ends the run and never moves. Each run keeps exactly the pixels it had, only put in `order` of their key, so every row (column) keeps its pixels and no colour is invented. Equal keys keep their order.
 
-    Parameters
-    ----------
-    by : one of 'brightness', 'hue', default 'brightness'
-        What the pixels are measured and put in order by: 'brightness' (perceived
-        brightness, Rec. 709 weights; 0 = black, 1 = white) or 'hue' (the position on the
-        colour circle, 0 = red, 1/3 = green, 2/3 = blue; a grey has hue 0). Brightness gives
-        smooth light-to-dark smears, hue rainbow streaks.
-    low : number, fraction, 0 to 1, default 0.25
-        The lowest key, 0 to 1, a pixel may have and still be sorted: pixels below it stay
-        where they are and break a run in two. Raising it leaves more of the dark (or low-
-        hue) pixels alone. If it is above `high`, nothing is sorted.
-    high : number, fraction, 0 to 1, default 0.75
-        The highest key, 0 to 1, a pixel may have and still be sorted: pixels above it stay
-        where they are and break a run in two. Lowering it leaves more of the bright (or
-        high-hue) pixels alone, which protects the highlights. If it is below `low`, nothing
-        is sorted.
-    axis : one of 'horizontal', 'vertical', default 'horizontal'
-        The direction the pixels are sorted along: 'horizontal' sorts along every row (the
-        streaks run across the picture), 'vertical' along every column (the streaks run down
-        it).
-    order : one of 'ascending', 'descending', default 'ascending'
-        Which way a run is ordered: 'ascending' puts the lowest key first (the left or top
-        end of the run), 'descending' the highest key first."""
+Parameters
+----------
+by : one of 'brightness', 'hue', default 'brightness'
+    What the pixels are measured and put in order by: 'brightness' (perceived
+    brightness, Rec. 709 weights; 0 = black, 1 = white) or 'hue' (the position on the
+    colour circle, 0 = red, 1/3 = green, 2/3 = blue; a grey has hue 0). Brightness gives
+    smooth light-to-dark smears, hue rainbow streaks.
+low : number, fraction, 0 to 1, default 0.25
+    The lowest key, 0 to 1, a pixel may have and still be sorted: pixels below it stay
+    where they are and break a run in two. Raising it leaves more of the dark (or low-
+    hue) pixels alone. If it is above `high`, nothing is sorted.
+high : number, fraction, 0 to 1, default 0.75
+    The highest key, 0 to 1, a pixel may have and still be sorted: pixels above it stay
+    where they are and break a run in two. Lowering it leaves more of the bright (or
+    high-hue) pixels alone, which protects the highlights. If it is below `low`, nothing
+    is sorted.
+axis : one of 'horizontal', 'vertical', default 'horizontal'
+    The direction the pixels are sorted along: 'horizontal' sorts along every row (the
+    streaks run across the picture), 'vertical' along every column (the streaks run down
+    it).
+order : one of 'ascending', 'descending', default 'ascending'
+    Which way a run is ordered: 'ascending' puts the lowest key first (the left or top
+    end of the run), 'descending' the highest key first."""
     ...
 
 @_effect
-def polar(
-    *,
-    mode: Literal["to", "from"] = "to",
-    x: float = 0.5,
-    y: float = 0.5,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def polar(*, mode: Literal['to', 'from'] = 'to', x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Wrap the picture round the centre `x`, `y` into a planet (`mode` 'to'), or unwrap such a planet ('from').  Rectangular coordinates to polar (the picture wrapped round a centre) or back. The planet has the radius of half the shorter side, from the first pixel to the last. 'to': a pixel d px from the centre shows the row (1 - d / radius) down the picture, from the top, and the column that is the fraction of a whole turn, clockwise from straight up, of the width; the columns wrap round, so the seam shows nothing. 'from': each pixel reads the planet at the distance and angle that its row and column name, the same relation the other way. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    mode : one of 'to', 'from', default 'to'
-        Which way to convert: 'to' wraps the picture round the centre into a tiny planet
-        (its bottom row at the centre, its top row on the rim of a circle as wide as the
-        shorter side, the left edge straight up and the columns running clockwise, so the
-        sky of a panorama ends up outside); 'from' is the opposite, it takes a picture that
-        is such a planet round the centre and unwraps it into a flat picture, so 'from'
-        undoes 'to'.
-    x : number, fraction, 0 to 1, default 0.5
-        The planet's centre horizontal position as a fraction of the way across the picture:
-        0 = the first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.5
-        The planet's centre vertical position as a fraction of the way down the picture: 0 =
-        the first pixel row, 0.5 = the middle, 1 = the last.
+Parameters
+----------
+mode : one of 'to', 'from', default 'to'
+    Which way to convert: 'to' wraps the picture round the centre into a tiny planet
+    (its bottom row at the centre, its top row on the rim of a circle as wide as the
+    shorter side, the left edge straight up and the columns running clockwise, so the
+    sky of a panorama ends up outside); 'from' is the opposite, it takes a picture that
+    is such a planet round the centre and unwraps it into a flat picture, so 'from'
+    undoes 'to'.
+x : number, fraction, 0 to 1, default 0.5
+    The planet's centre horizontal position as a fraction of the way across the picture:
+    0 = the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The planet's centre vertical position as a fraction of the way down the picture: 0 =
+    the first pixel row, 0.5 = the middle, 1 = the last.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but the middle of a planet turns
-        blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-        'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
-        and may ring beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre
-        planet leaves it in 'from' (the angle itself never has an edge; it wraps round):
-        'nearest' (the default, unlike other warps' 'reflect': the edge pixel repeated, so
-        the sky stays one flat tone of the top row and the rim stays clean), 'reflect'
-        (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap'
-        (the opposite edge)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but the middle of a planet turns
+    blocky), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic through the neighbouring pixels (sharpest, a little slower,
+    and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What lies beyond the planet's rim in 'to', or beyond the picture where an off-centre
+    planet leaves it in 'from' (the angle itself never has an edge; it wraps round):
+    'nearest' (the default, unlike other warps' 'reflect': the edge pixel repeated, so
+    the sky stays one flat tone of the top row and the rim stays clean), 'reflect'
+    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'wrap'
+    (the opposite edge)."""
     ...
 
 @_effect
-def quadtree(
-    *,
-    threshold: float = 0.06,
-    max_cell: float = 60.0,
-    min_cell: float = 5.0,
-    gap: float = 1.0,
-    gap_color: str | list[float] | tuple[float, float, float] = "#000000",
-    rounding: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def quadtree(*, threshold: float = 0.06, max_cell: float = 60.0, min_cell: float = 5.0, gap: float = 1.0, gap_color: str | list[float] | tuple[float, float, float] = '#000000', rounding: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges.  Each cell is filled with the average colour of the photo under it. A cell splits into four while its colours spread more than `threshold` and its halves would still be at least `min_cell` wide; the first grid's cells are at most `max_cell` wide. `gap` draws a line between cells and `rounding` rounds their corners.
 
-    Parameters
-    ----------
-    threshold : number, fraction, 0 to 0.5, default 0.06
-        How uneven a cell has to be before it splits into four: the spread of its colour,
-        the largest standard deviation of red, green or blue inside it, on a 0 to 0.5 scale
-        (0.5 is the most any cell can have, half black and half white). 0 splits every cell
-        that is not perfectly flat; 0.5 splits none. Raising it gives bigger cells and a
-        coarser picture.
-    max_cell : number, px, 2 to 480, default 60.0
-        The largest a cell can be, in px at the recipe's size: the picture starts as an even
-        grid of cells at most this wide. Raising it makes the flat parts coarser.
-    min_cell : number, px, 1 to 480, default 5.0
-        The smallest a cell can be, in px at the recipe's size, never above `max_cell`. A
-        cell does not split into halves smaller than this. Lowering it keeps finer detail at
-        edges.
-    gap : number, px, 0 to 24, default 1.0
-        Width of the line between neighbouring cells, in px at the recipe's size: 0 = cells
-        touch, 1 a thin grid, 5 or more visible tiles. The picture's own edge gets no line.
-        A cell no wider than the line is all line, so keep it below `min_cell`.
-    gap_color : colour, default '#000000'
-        The colour of the lines between cells, and of the corners a `rounding` cuts away:
-        '#rrggbb', '#rgb' or three numbers 0 to 1.
-    rounding : number, fraction, 0 to 1, default 0.0
-        How round each cell's corners are, as a share of half its shorter side: 0 = square
-        cells, 1 = a circle in each square cell."""
+Parameters
+----------
+threshold : number, fraction, 0 to 0.5, default 0.06
+    How uneven a cell has to be before it splits into four: the spread of its colour,
+    the largest standard deviation of red, green or blue inside it, on a 0 to 0.5 scale
+    (0.5 is the most any cell can have, half black and half white). 0 splits every cell
+    that is not perfectly flat; 0.5 splits none. Raising it gives bigger cells and a
+    coarser picture.
+max_cell : number, px, 2 to 480, default 60.0
+    The largest a cell can be, in px at the recipe's size: the picture starts as an even
+    grid of cells at most this wide. Raising it makes the flat parts coarser.
+min_cell : number, px, 1 to 480, default 5.0
+    The smallest a cell can be, in px at the recipe's size, never above `max_cell`. A
+    cell does not split into halves smaller than this. Lowering it keeps finer detail at
+    edges.
+gap : number, px, 0 to 24, default 1.0
+    Width of the line between neighbouring cells, in px at the recipe's size: 0 = cells
+    touch, 1 a thin grid, 5 or more visible tiles. The picture's own edge gets no line.
+    A cell no wider than the line is all line, so keep it below `min_cell`.
+gap_color : colour, default '#000000'
+    The colour of the lines between cells, and of the corners a `rounding` cuts away:
+    '#rrggbb', '#rgb' or three numbers 0 to 1.
+rounding : number, fraction, 0 to 1, default 0.0
+    How round each cell's corners are, as a share of half its shorter side: 0 = square
+    cells, 1 = a circle in each square cell."""
     ...
 
 @_effect
-def radial_blur(
-    *,
-    mode: Literal["spin", "zoom"] = "zoom",
-    amount: float = 0.1,
-    x: float = 0.5,
-    y: float = 0.5,
-    samples: int = 8,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def radial_blur(*, mode: Literal['spin', 'zoom'] = 'zoom', amount: float = 0.1, x: float = 0.5, y: float = 0.5, samples: int = 8, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.  Every pixel becomes the average of `samples` points spread evenly along the arc or ray through it (centred on the pixel), each read by `interpolation`, each colour channel on its own. The centre stays sharp, flat areas stay flat and the result never leaves the picture's own range.
 
-    Parameters
-    ----------
-    mode : one of 'spin', 'zoom', default 'zoom'
-        The direction of the smear: 'spin' averages along the circle around the centre, as a
-        rotating camera or wheel would blur; 'zoom' averages along the ray through the
-        centre, as zooming the lens during the exposure would. The centre itself stays sharp
-        in both.
-    amount : number, fraction, 0 to 1, default 0.1
-        How far each pixel is smeared. 'spin': the arc, as a fraction of a full turn (0.1 =
-        36 degrees, 1 = a whole circle), centred on the pixel. 'zoom': the range of scales,
-        as a fraction of the pixel's distance from the centre (0.1 = from 5% closer to 5%
-        farther, 1 = from half to one and a half times the distance). Larger is a longer
-        smear and stronger at the edges; 0 leaves the picture unchanged.
-    x : number, fraction, 0 to 1, default 0.5
-        The centre's horizontal position as a fraction of the way across the picture: 0 =
-        the first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.5
-        The centre's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last.
+Parameters
+----------
+mode : one of 'spin', 'zoom', default 'zoom'
+    The direction of the smear: 'spin' averages along the circle around the centre, as a
+    rotating camera or wheel would blur; 'zoom' averages along the ray through the
+    centre, as zooming the lens during the exposure would. The centre itself stays sharp
+    in both.
+amount : number, fraction, 0 to 1, default 0.1
+    How far each pixel is smeared. 'spin': the arc, as a fraction of a full turn (0.1 =
+    36 degrees, 1 = a whole circle), centred on the pixel. 'zoom': the range of scales,
+    as a fraction of the pixel's distance from the centre (0.1 = from 5% closer to 5%
+    farther, 1 = from half to one and a half times the distance). Larger is a longer
+    smear and stronger at the edges; 0 leaves the picture unchanged.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
 
-    Advanced parameters
-    -------------------
-    samples : whole number, count, 1 to 256, default 8
-        How many points along each arc or ray are averaged, spread evenly over its length
-        and read from the picture by the chosen interpolation: more is smoother and slower
-        (the time grows with it), and a smear of more than a few pixels per sample shows as
-        separate ghost copies. With 1 the picture is unchanged.
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but steps and ghosts show in
-        smooth areas), 'bilinear' blends the four pixels around it (smooth, slightly soft),
-        'bicubic' fits a cubic spline through the neighbouring pixels (sharpest and most
-        exact on smooth gradients, a little slower, and may ring beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the smear sees beyond the picture's edge (arcs and rays near the corners leave
-        it): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
-        pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+samples : whole number, count, 1 to 256, default 8
+    How many points along each arc or ray are averaged, spread evenly over its length
+    and read from the picture by the chosen interpolation: more is smoother and slower
+    (the time grows with it), and a smear of more than a few pixels per sample shows as
+    separate ghost copies. With 1 the picture is unchanged.
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but steps and ghosts show in
+    smooth areas), 'bilinear' blends the four pixels around it (smooth, slightly soft),
+    'bicubic' fits a cubic spline through the neighbouring pixels (sharpest and most
+    exact on smooth gradients, a little slower, and may ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smear sees beyond the picture's edge (arcs and rays near the corners leave
+    it): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge
+    pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def reaction_diffusion(
-    *,
-    feed: float = 0.037,
-    kill: float = 0.06,
-    steps: int = 300,
-    cell: float = 8.0,
-    threshold: float = 0.6,
-    colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = (
-        "#12002b",
-        "#6a1bff",
-        "#ff2bd6",
-        "#ffd84a",
-    ),
-    resampling: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def reaction_diffusion(*, feed: float = 0.037, kill: float = 0.06, steps: int = 300, cell: float = 8.0, threshold: float = 0.6, colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a'), resampling: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts.  The model has two chemicals, u (starting at 1 everywhere) and v (starting at 0). Where the picture's brightness is above `threshold` they start at u = 1/2, v = 1/4. Each step both diffuse (v half as fast as u, by the five-point Laplacian) and react: u += Du lap u - u v^2 + feed (1 - u), v += Dv lap v + u v^2 - (feed + kill) v, with Du = 0.2097 and Dv = 0.105 (Pearson 1993) and a time step of 1. The result is drawn through `colors` at 1 - u, so untouched areas take the first colour. The simulation runs on cells of `cell` px: the picture is read at each cell's centre, and the cells are read back over the picture, both by `resampling`.
 
-    Parameters
-    ----------
-    feed : number, ratio, 0.01 to 0.08, default 0.037
-        The feed rate F of the Gray-Scott model: how fast chemical u is replenished.
-        Together with `kill` it decides the kind of pattern: about 0.03 to 0.04 with a kill
-        of 0.06 gives spots and worms, higher feeds give mazes and fingerprints, the
-        extremes leave nothing but the seed.
-    kill : number, ratio, 0.04 to 0.07, default 0.06
-        The kill rate k of the Gray-Scott model: how fast chemical v is removed. Raising it
-        makes the pattern sparser (isolated spots); lowering it fills the picture.
-    steps : whole number, count, 0 to 5000, default 300
-        How many simulation steps run. 0 shows only the seed; more lets the pattern grow
-        outward from it and costs time in proportion (and more cells, so smaller `cell`,
-        cost more per step).
-    cell : number, px, 1 to 64, default 8.0
-        The size of one simulation cell in px: the model runs on a coarse grid and is read
-        back over the picture by `resampling`. 1 simulates every pixel (slow on large
-        pictures); larger = a coarser, larger-scale pattern that runs faster. Tuned for a
-        picture about 480 px high.
-    threshold : number, fraction, 0 to 1, default 0.6
-        Brightness (0..1) above which the picture seeds the pattern: only the brighter parts
-        start it. Lower seeds more of the picture; at 1 nothing seeds and the result is a
-        flat first colour.
-    colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')
-        The colour ramp, evenly spaced; at least two. Untouched areas take the first colour
-        and the strongest pattern the last.
+Parameters
+----------
+feed : number, ratio, 0.01 to 0.08, default 0.037
+    The feed rate F of the Gray-Scott model: how fast chemical u is replenished.
+    Together with `kill` it decides the kind of pattern: about 0.03 to 0.04 with a kill
+    of 0.06 gives spots and worms, higher feeds give mazes and fingerprints, the
+    extremes leave nothing but the seed.
+kill : number, ratio, 0.04 to 0.07, default 0.06
+    The kill rate k of the Gray-Scott model: how fast chemical v is removed. Raising it
+    makes the pattern sparser (isolated spots); lowering it fills the picture.
+steps : whole number, count, 0 to 5000, default 300
+    How many simulation steps run. 0 shows only the seed; more lets the pattern grow
+    outward from it and costs time in proportion (and more cells, so smaller `cell`,
+    cost more per step).
+cell : number, px, 1 to 64, default 8.0
+    The size of one simulation cell in px: the model runs on a coarse grid and is read
+    back over the picture by `resampling`. 1 simulates every pixel (slow on large
+    pictures); larger = a coarser, larger-scale pattern that runs faster. Tuned for a
+    picture about 480 px high.
+threshold : number, fraction, 0 to 1, default 0.6
+    Brightness (0..1) above which the picture seeds the pattern: only the brighter parts
+    start it. Lower seeds more of the picture; at 1 nothing seeds and the result is a
+    flat first colour.
+colors : list of colours, default ('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')
+    The colour ramp, evenly spaced; at least two. Untouched areas take the first colour
+    and the strongest pattern the last.
 
-    Advanced parameters
-    -------------------
-    resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How the picture is read at each cell and how the cells are read back over the
-        picture: 'nearest' takes the closest cell (blocky), 'bilinear' blends the four
-        around (smooth), 'bicubic' fits a cubic spline (the smoothest, may overshoot
-        slightly).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What lies beyond the picture's border for the diffusion and for reading: 'reflect'
-        (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
-        (the edge pixel repeated), 'wrap' (the opposite edge, so the pattern tiles)."""
+Advanced parameters
+-------------------
+resampling : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How the picture is read at each cell and how the cells are read back over the
+    picture: 'nearest' takes the closest cell (blocky), 'bilinear' blends the four
+    around (smooth), 'bicubic' fits a cubic spline (the smoothest, may overshoot
+    slightly).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What lies beyond the picture's border for the diffusion and for reading: 'reflect'
+    (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest'
+    (the edge pixel repeated), 'wrap' (the opposite edge, so the pattern tiles)."""
     ...
 
 @_effect
-def reflection(
-    *,
-    field: str = "subject",
-    height: float = 0.4,
-    fade: float = 0.7,
-    blur: float = 2.0,
-    field_threshold: float = 0.5,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 0.6,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def reflection(*, field: str = 'subject', height: float = 0.4, fade: float = 0.7, blur: float = 2.0, field_threshold: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A floor mirror: the picture above a shape's lowest row is mirrored about it, softened and fading with depth.
 
-    The floor line is the bottom of the shape; the reflection is `height` of the shape's height deep, blurred by
-    `blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade`
-    at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
+The floor line is the bottom of the shape; the reflection is `height` of the shape's height deep, blurred by
+`blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade`
+at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
 
-    When nothing in the field counts as the shape (see `field_threshold`), there is no floor line and so no
-    reflection: the picture comes back unchanged.
+When nothing in the field counts as the shape (see `field_threshold`), there is no floor line and so no
+reflection: the picture comes back unchanged.
 
-    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
-    Parameters
-    ----------
-    field : field name, default 'subject'
-        The shape whose lowest row is the floor line: `subject` (the subject's silhouette),
-        `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A row
-        belongs to it from `field_threshold` up.
-    height : number, fraction, 0 to 1, default 0.4
-        How tall the reflection is, as a fraction of the shape's height: 0.4 = 40% of it is
-        mirrored into the floor below the shape's lowest row, 1 = all of it; 0 = no
-        reflection. Where the picture ends first, the reflection is cut there.
-    fade : number, fraction, 0 to 1, default 0.7
-        How much of its strength the reflection loses between the floor line and its end, in
-        a straight line: 0 = as strong at the end as at the floor line, 1 = fades out
-        completely at its end.
-    blur : number, px, 0 to 100, default 2.0
-        Gaussian sigma of the reflection's softness in px at the recipe's size: raising it
-        makes a blurrier mirror, as on a rough floor; 0 = a sharp mirror image.
+Parameters
+----------
+field : field name, default 'subject'
+    The shape whose lowest row is the floor line: `subject` (the subject's silhouette),
+    `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A row
+    belongs to it from `field_threshold` up.
+height : number, fraction, 0 to 1, default 0.4
+    How tall the reflection is, as a fraction of the shape's height: 0.4 = 40% of it is
+    mirrored into the floor below the shape's lowest row, 1 = all of it; 0 = no
+    reflection. Where the picture ends first, the reflection is cut there.
+fade : number, fraction, 0 to 1, default 0.7
+    How much of its strength the reflection loses between the floor line and its end, in
+    a straight line: 0 = as strong at the end as at the floor line, 1 = fades out
+    completely at its end.
+blur : number, px, 0 to 100, default 2.0
+    Gaussian sigma of the reflection's softness in px at the recipe's size: raising it
+    makes a blurrier mirror, as on a rough floor; 0 = a sharp mirror image.
 
-    Advanced parameters
-    -------------------
-    field_threshold : number, fraction, 0 to 1, default 0.5
-        The field's value, 0 to 1, that some pixel of a row must reach for the row to count
-        as part of the shape when its lowest and highest rows are found: 0.5 = a pixel of at
-        least half. Lowering it counts faint fringes, so the floor line moves down and the
-        shape's height grows.
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
-        Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the blur sees beyond the picture's edge, and beyond the floor line, where the
-        reflection is mirrored: 'reflect' (mirrored, edge pixel repeated, which continues
-        the mirror image), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
-        pixel repeated) or 'wrap' (the opposite edge).
+Advanced parameters
+-------------------
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, that some pixel of a row must reach for the row to count
+    as part of the shape when its lowest and highest rows are found: 0.5 = a pixel of at
+    least half. Lowering it counts faint fringes, so the floor line moves down and the
+    shape's height grows.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas: it reaches truncate x blur px.
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge, and beyond the floor line, where the
+    reflection is mirrored: 'reflect' (mirrored, edge pixel repeated, which continues
+    the mirror image), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
+    pixel repeated) or 'wrap' (the opposite edge).
 
-    Step opacity
-    ------------
-    0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
+Step opacity
+------------
+0.6: a step of this effect is mixed in at 0.6 unless it sets its own `opacity`, which replaces this."""
     ...
 
 @_effect
-def relight(
-    *,
-    field: str = "depth",
-    angle: float = 225.0,
-    elevation: float = 45.0,
-    height: float = 200.0,
-    blur: float = 2.0,
-    saturation: float = 1.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["bump_light", "emboss"] | None = None,
-) -> Step:
+def relight(*, field: str = 'depth', angle: float = 225.0, elevation: float = 45.0, height: float = 200.0, blur: float = 2.0, saturation: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['bump_light', 'emboss'] | None = None) -> Step:
     """Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`: bump lighting, emboss, relighting by depth.  The lighting comes from the shape of `field`, not from the picture's brightness unless that is the field: the height is the field smoothed by `blur`; the surface normal is (-dx, -dy, 1) / its length with the slopes taken per pixel by central differences. The light's strength is the normal's dot product with the light's direction in proportion to what a flat surface gets, so flat areas are unchanged and a slope is brightened or darkened. The lit surface is the picture mixed into mid grey by `saturation`; all channels are multiplied by the one grey gain, so the colour ratios are kept, and the result is clipped to 0..1. A low `elevation` with `saturation` 0 is an emboss: the relief in grey. A sharp step in the field (a subject's outline in depth) lights as a steep cliff and can leave a dark or bright fringe beside it; raise `blur` or lower `height` to soften it.
 
-    Parameters
-    ----------
-    field : field name, default 'depth'
-        The field read as the relief, the higher the value the higher the ground: `depth`
-        (the nearest stands highest; the subject rises from its background), `light` (the
-        picture's own brightness: bright parts stand proud), `subject`, or a region the
-        recipe declares.
-    angle : number (cyclic), degrees, 0 to 360, default 225.0
-        Where the light comes from, in degrees clockwise from pointing right, on screen: 0 =
-        the right, 90 = below, 180 = the left, 225 = the upper left, 270 = above. Sides that
-        face it are brightened, those that face away darkened.
-    elevation : number, degrees, 1 to 90, default 45.0
-        How high the light stands above the picture's plane, in degrees: 90 = straight above
-        (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 =
-        grazing, so the shapes are dramatic and the lit side is clipped to white.
-    height : number, px, 0 to 1000, default 200.0
-        How tall the whole range of the field stands as a relief, in px at the recipe's
-        size: a field value of 1 stands this many px above 0, so the slope between
-        neighbours is their difference times this. 0 = flat (the relief is nothing: the
-        picture at `saturation` 1, mid grey at 0), larger = steeper shapes that catch more
-        of the light. A field of the picture's own brightness wants far less (about 8) than
-        a depth (about 200).
-    blur : number, px, 0 to 50, default 2.0
-        Gaussian sigma in px with which the field is smoothed before its slopes are taken: 0
-        = every ripple of the field is lit (its noise shows), larger = softer lighting that
-        follows only the broad shapes.
-    saturation : number, fraction, 0 to 1, default 1.0
-        How much of the picture's colour is lit: 1 = the picture itself, lit; 0 = the relief
-        alone, a grey surface lit (a flat field is mid grey); between, the picture mixed
-        into mid grey.
+Parameters
+----------
+field : field name, default 'depth'
+    The field read as the relief, the higher the value the higher the ground: `depth`
+    (the nearest stands highest; the subject rises from its background), `light` (the
+    picture's own brightness: bright parts stand proud), `subject`, or a region the
+    recipe declares.
+angle : number (cyclic), degrees, 0 to 360, default 225.0
+    Where the light comes from, in degrees clockwise from pointing right, on screen: 0 =
+    the right, 90 = below, 180 = the left, 225 = the upper left, 270 = above. Sides that
+    face it are brightened, those that face away darkened.
+elevation : number, degrees, 1 to 90, default 45.0
+    How high the light stands above the picture's plane, in degrees: 90 = straight above
+    (every slope only dims a little, whatever `angle`), 45 = the usual raking light, 1 =
+    grazing, so the shapes are dramatic and the lit side is clipped to white.
+height : number, px, 0 to 1000, default 200.0
+    How tall the whole range of the field stands as a relief, in px at the recipe's
+    size: a field value of 1 stands this many px above 0, so the slope between
+    neighbours is their difference times this. 0 = flat (the relief is nothing: the
+    picture at `saturation` 1, mid grey at 0), larger = steeper shapes that catch more
+    of the light. A field of the picture's own brightness wants far less (about 8) than
+    a depth (about 200).
+blur : number, px, 0 to 50, default 2.0
+    Gaussian sigma in px with which the field is smoothed before its slopes are taken: 0
+    = every ripple of the field is lit (its noise shows), larger = softer lighting that
+    follows only the broad shapes.
+saturation : number, fraction, 0 to 1, default 1.0
+    How much of the picture's colour is lit: 1 = the picture itself, lit; 0 = the relief
+    alone, a grey surface lit (a flat field is mid grey); between, the picture mixed
+    into mid grey.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0).
-        Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
-        edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
-        pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a
-        seam).
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0).
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
+    edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
+    pixel repeated), 'wrap' (the opposite edge, so a tileable picture lights without a
+    seam).
 
-    Presets
-    -------
-    bump_light : The picture's own brightness read as a fine relief (8 px tall) and lit from the upper left.
-    emboss : An embossed print: the picture's brightness as a 6 px relief in grey, lit from the upper left at 30 degrees."""
+Presets
+-------
+bump_light : The picture's own brightness read as a fine relief (8 px tall) and lit from the upper left.
+emboss : An embossed print: the picture's brightness as a 6 px relief in grey, lit from the upper left at 30 degrees."""
     ...
 
 @_effect
-def rgb_split(
-    *,
-    pair: Literal["red_blue", "red_cyan"] = "red_blue",
-    angle: float = 330.0,
-    amount: float = 8.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["anaglyph"] | None = None,
-) -> Step:
+def rgb_split(*, pair: Literal['red_blue', 'red_cyan'] = 'red_blue', angle: float = 330.0, amount: float = 8.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['anaglyph'] | None = None) -> Step:
     """Push red `amount` px along `angle` and the opposite channels `amount` px the other way: an RGB split, a glitch fringe or a red-cyan 3D anaglyph.  Red moves `amount` px in the direction `angle` (degrees clockwise from pointing right: 0 right, 90 down); blue moves `amount` px the opposite way. Green stays with 'red_blue' and moves with blue with 'red_cyan'. On a grey picture the channels end up exactly twice `amount` px from each other in a row, which shows as a red fringe on one side of an edge and a blue (or cyan) one on the other. Whole or fractional distances are allowed; what a channel shows where it has left the picture is set by `edge`.
 
-    Parameters
-    ----------
-    pair : one of 'red_blue', 'red_cyan', default 'red_blue'
-        Which channels part: 'red_blue' moves red one way and blue the other and leaves
-        green in place (colour fringes on a colour picture); 'red_cyan' moves red one way
-        and green and blue together the other, as in 3D glasses (grey the picture first,
-        e.g. with `grade` at saturation 0, for the classic anaglyph).
-    angle : number (cyclic), degrees, 0 to 360, default 330.0
-        The direction red moves, in degrees clockwise from pointing right on the screen (as
-        CSS `rotate`), 0 to 360: 0 = right, 90 = down, 180 = left, 270 = up. Blue (and green
-        with 'red_cyan') moves the opposite way.
-    amount : number, px, 0 to 500, default 8.0
-        How far red and its opposite channels each move from where they were, in pixels, 0
-        to 500; they end up twice this far apart. 0 leaves the picture unchanged. A fraction
-        of a pixel blends the two pixels it lies between. Raising it pulls the colour
-        fringes further apart.
+Parameters
+----------
+pair : one of 'red_blue', 'red_cyan', default 'red_blue'
+    Which channels part: 'red_blue' moves red one way and blue the other and leaves
+    green in place (colour fringes on a colour picture); 'red_cyan' moves red one way
+    and green and blue together the other, as in 3D glasses (grey the picture first,
+    e.g. with `grade` at saturation 0, for the classic anaglyph).
+angle : number (cyclic), degrees, 0 to 360, default 330.0
+    The direction red moves, in degrees clockwise from pointing right on the screen (as
+    CSS `rotate`), 0 to 360: 0 = right, 90 = down, 180 = left, 270 = up. Blue (and green
+    with 'red_cyan') moves the opposite way.
+amount : number, px, 0 to 500, default 8.0
+    How far red and its opposite channels each move from where they were, in pixels, 0
+    to 500; they end up twice this far apart. 0 leaves the picture unchanged. A fraction
+    of a pixel blends the two pixels it lies between. Raising it pulls the colour
+    fringes further apart.
 
-    Advanced parameters
-    -------------------
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What a moved channel shows where it has left the picture's edge: 'nearest' repeats
-        the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what
-        left on the other side, 'reflect' mirrors the channel (the edge line repeated once),
-        'mirror' mirrors it about the edge line.
+Advanced parameters
+-------------------
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What a moved channel shows where it has left the picture's edge: 'nearest' repeats
+    the channel's edge pixels (a coloured smear along the edge), 'wrap' brings back what
+    left on the other side, 'reflect' mirrors the channel (the edge line repeated once),
+    'mirror' mirrors it about the edge line.
 
-    Presets
-    -------
-    anaglyph : A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the picture first with `grade` saturation 0 for the classic look."""
+Presets
+-------
+anaglyph : A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the picture first with `grade` saturation 0 for the classic look."""
     ...
 
 @_effect
-def rim_light(
-    *,
-    field: str = "subject",
-    angle: float = 320.0,
-    color: str | list[float] | tuple[float, float, float] = "#ff9a4d",
-    width: float = 12.0,
-    amount: float = 1.0,
-    falloff: float = 1.5,
-    smoothing: float = 2.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    field_threshold: float = 0.5,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def rim_light(*, field: str = 'subject', angle: float = 320.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Light along a shape's edge (the subject by default) from one side: a band of `width` px inside the edge, tinted
-    `color`.
+`color`.
 
-    Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
-    direction of `angle` (head-on = full, side-on = none, away = none), and the light fades with depth by `falloff`.
-    It is screened over the picture, so it only ever brightens, and never reaches outside the shape or its
-    interior beyond `width`. The picture's own border is no edge. A shape without an edge (empty or full) lights
-    nothing.
+Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
+direction of `angle` (head-on = full, side-on = none, away = none), and the light fades with depth by `falloff`.
+It is screened over the picture, so it only ever brightens, and never reaches outside the shape or its
+interior beyond `width`. The picture's own border is no edge. A shape without an edge (empty or full) lights
+nothing.
 
-    `field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
 
-    Parameters
-    ----------
-    field : field name, default 'subject'
-        The shape whose edge is lit: `subject` (the subject's silhouette), `background`,
-        `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel
-        is inside it from `field_threshold` up.
-    angle : number (cyclic), degrees, 0 to 360, default 320.0
-        The direction the light comes from, in degrees clockwise from pointing right, as
-        seen on screen: 0 = from the right, 90 = from below, 180 = from the left, 270 = from
-        above. Only edges whose outward direction faces it are lit.
-    color : colour, default '#ff9a4d'
-        The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
-        orange.
-    width : number, px, 1 to 200, default 12.0
-        Depth of the lit band inside the shape's edge, in px at the recipe's size: raising
-        it lets the light reach further in.
-    amount : number, ratio, 0 to 5, default 1.0
-        How strong the light is where it is brightest (an edge that faces the light head-
-        on): 0 = off, 1 = the colour at full strength, above 1 saturates sooner.
-    falloff : number, ratio, 0.1 to 10, default 1.5
-        How the light fades from the edge into the band: it is (1 - depth / width)^falloff
-        of its strength. 1 = evenly, above 1 stays close to the edge, below 1 carries
-        further in.
+Parameters
+----------
+field : field name, default 'subject'
+    The shape whose edge is lit: `subject` (the subject's silhouette), `background`,
+    `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel
+    is inside it from `field_threshold` up.
+angle : number (cyclic), degrees, 0 to 360, default 320.0
+    The direction the light comes from, in degrees clockwise from pointing right, as
+    seen on screen: 0 = from the right, 90 = from below, 180 = from the left, 270 = from
+    above. Only edges whose outward direction faces it are lit.
+color : colour, default '#ff9a4d'
+    The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. The default is a warm
+    orange.
+width : number, px, 1 to 200, default 12.0
+    Depth of the lit band inside the shape's edge, in px at the recipe's size: raising
+    it lets the light reach further in.
+amount : number, ratio, 0 to 5, default 1.0
+    How strong the light is where it is brightest (an edge that faces the light head-
+    on): 0 = off, 1 = the colour at full strength, above 1 saturates sooner.
+falloff : number, ratio, 0.1 to 10, default 1.5
+    How the light fades from the edge into the band: it is (1 - depth / width)^falloff
+    of its strength. 1 = evenly, above 1 stays close to the edge, below 1 carries
+    further in.
 
-    Advanced parameters
-    -------------------
-    smoothing : number, px, 0 to 50, default 2.0
-        Gaussian sigma, in px, with which the silhouette is smoothed before the edge's
-        direction is read: raising it evens out the jaggedness of a pixel edge (fur), at the
-        cost of detail in small features. 0 uses the raw edge.
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the `smoothing` blur is cut off, in sigmas: it reaches truncate x smoothing
-        px. Larger is more exact and slower.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the `smoothing` blur sees beyond the picture's border: 'reflect' (mirrored,
-        border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
-        border pixel repeated) or 'wrap' (the opposite border).
-    field_threshold : number, fraction, 0 to 1, default 0.5
-        The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is
-        lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
-        fur), raising it less."""
+Advanced parameters
+-------------------
+smoothing : number, px, 0 to 50, default 2.0
+    Gaussian sigma, in px, with which the silhouette is smoothed before the edge's
+    direction is read: raising it evens out the jaggedness of a pixel edge (fur), at the
+    cost of detail in small features. 0 uses the raw edge.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the `smoothing` blur is cut off, in sigmas: it reaches truncate x smoothing
+    px. Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the `smoothing` blur sees beyond the picture's border: 'reflect' (mirrored,
+    border pixel repeated), 'mirror' (mirrored about the border pixel), 'nearest' (the
+    border pixel repeated) or 'wrap' (the opposite border).
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is
+    lit: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
+    fur), raising it less."""
     ...
 
 @_effect
-def ripple(
-    *,
-    wavelength: float = 40.0,
-    amplitude: float = 6.0,
-    phase: float = 0.0,
-    angle: float = 0.0,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def ripple(*, wavelength: float = 40.0, amplitude: float = 6.0, phase: float = 0.0, angle: float = 0.0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`.  A pixel at distance s px from the picture's centre measured along the wave's direction (`angle` degrees clockwise from pointing right) is moved by amplitude x sin(2 pi s / wavelength + phase) px, at a right angle to that direction (down for angle 0, left for angle 90), and the point between pixels is read by `interpolation`. The wave is at its phase along the line through the centre, so turning `angle` turns the whole pattern about the centre. The result never leaves 0..1.
 
-    Parameters
-    ----------
-    wavelength : number, px, 2 to 4000, default 40.0
-        The distance in pixels from one crest of the wave to the next, along the wave's
-        direction. Raising it gives long, lazy swells; lowering it gives tight, fine ripples
-        (below about 4 px the wave is too fine for the pixels to show it).
-    amplitude : number, px, 0 to 500, default 6.0
-        How far in pixels the wave moves a pixel at its crest, perpendicular to the wave's
-        direction. Raising it makes taller waves and a more broken-up picture; 0 leaves the
-        picture unchanged.
-    phase : number (cyclic), degrees, -180 to 180, default 0.0
-        Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the
-        line through the picture's centre and rising away from it in the wave's direction,
-        90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it
-        slides the wave along.
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        The direction the wave travels in, in degrees clockwise from pointing right: 0 sends
-        the wave along the picture's width, so each column is moved up or down and the
-        crests are horizontal ripples running across; 90 sends it down the picture, so each
-        row is moved left or right. Pixels are always moved at a right angle to this
-        direction.
+Parameters
+----------
+wavelength : number, px, 2 to 4000, default 40.0
+    The distance in pixels from one crest of the wave to the next, along the wave's
+    direction. Raising it gives long, lazy swells; lowering it gives tight, fine ripples
+    (below about 4 px the wave is too fine for the pixels to show it).
+amplitude : number, px, 0 to 500, default 6.0
+    How far in pixels the wave moves a pixel at its crest, perpendicular to the wave's
+    direction. Raising it makes taller waves and a more broken-up picture; 0 leaves the
+    picture unchanged.
+phase : number (cyclic), degrees, -180 to 180, default 0.0
+    Where the wave starts, in degrees of one cycle: 0 has the wave at zero along the
+    line through the picture's centre and rising away from it in the wave's direction,
+    90 has a crest there, and 360 is a whole cycle and so the same as 0. Changing it
+    slides the wave along.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The direction the wave travels in, in degrees clockwise from pointing right: 0 sends
+    the wave along the picture's width, so each column is moved up or down and the
+    crests are horizontal ripples running across; 90 sends it down the picture, so each
+    row is moved left or right. Pixels are always moved at a right angle to this
+    direction.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the wave sees beyond the picture's edge (it moves pixels in from outside along
-        the edges): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
-        edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the wave sees beyond the picture's edge (it moves pixels in from outside along
+    the edges): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the
+    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def scanlines(
-    *,
-    spacing: float = 3.0,
-    thickness: float = 0.5,
-    darkness: float = 0.35,
-    offset: float = 0.0,
-    softness: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def scanlines(*, spacing: float = 3.0, thickness: float = 0.5, darkness: float = 0.35, offset: float = 0.0, softness: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`.  The lines start at row `offset` and repeat every `spacing` px. A pixel row is multiplied by 1 - `darkness` x the share of the row a line covers, so whole rows under a line are exactly 1 - `darkness` times the picture and rows no line touches are unchanged; the same gain applies to every column and channel.
 
-    Parameters
-    ----------
-    spacing : number, px, 1 to 2000, default 3.0
-        Distance in px from the top of one line to the top of the next. A spacing that is
-        not a whole number drifts against the pixel rows and the lines are anti-aliased.
-        Larger = fewer, wider-set lines.
-    thickness : number, fraction, 0 to 1, default 0.5
-        How thick each line is, as a fraction of `spacing`: 0 = no line (the picture is
-        unchanged), 0.5 = lines and gaps equally wide, 1 = the lines touch and the whole
-        picture is darkened alike. A line that covers only part of a pixel row darkens that
-        row in proportion.
-    darkness : number, fraction, 0 to 1, default 0.35
-        How much a line darkens what is under it: 0 = nothing (the picture is unchanged),
-        0.35 is a visible screen, 1 = black lines. A line multiplies the picture by 1 -
-        darkness, so colours keep their ratios.
-    offset : number, px, 0 to 2000, default 0.0
-        How far down in px the first line starts from the top of the picture (the middle of
-        its soft edge, when `softness` is above 0). Offsets of more than `spacing` repeat
-        the pattern: the lines are at offset + k x spacing.
-    softness : number, fraction, 0 to 1, default 0.0
-        How softly a line fades in and out: 0 = hard edges, each row darkened by the share
-        of it a line covers; 1 = as soft as the lines and gaps allow, so with a `thickness`
-        of 0.5 the darkness swells and fades along sin^2, darkest in the middle of a line
-        and nothing in the middle of a gap, as on a CRT. In between, each edge fades over
-        `softness` x the narrower of a line and a gap, either side of the hard edge. It
-        keeps the average darkening of the picture: only its shape changes."""
+Parameters
+----------
+spacing : number, px, 1 to 2000, default 3.0
+    Distance in px from the top of one line to the top of the next. A spacing that is
+    not a whole number drifts against the pixel rows and the lines are anti-aliased.
+    Larger = fewer, wider-set lines.
+thickness : number, fraction, 0 to 1, default 0.5
+    How thick each line is, as a fraction of `spacing`: 0 = no line (the picture is
+    unchanged), 0.5 = lines and gaps equally wide, 1 = the lines touch and the whole
+    picture is darkened alike. A line that covers only part of a pixel row darkens that
+    row in proportion.
+darkness : number, fraction, 0 to 1, default 0.35
+    How much a line darkens what is under it: 0 = nothing (the picture is unchanged),
+    0.35 is a visible screen, 1 = black lines. A line multiplies the picture by 1 -
+    darkness, so colours keep their ratios.
+offset : number, px, 0 to 2000, default 0.0
+    How far down in px the first line starts from the top of the picture (the middle of
+    its soft edge, when `softness` is above 0). Offsets of more than `spacing` repeat
+    the pattern: the lines are at offset + k x spacing.
+softness : number, fraction, 0 to 1, default 0.0
+    How softly a line fades in and out: 0 = hard edges, each row darkened by the share
+    of it a line covers; 1 = as soft as the lines and gaps allow, so with a `thickness`
+    of 0.5 the darkness swells and fades along sin^2, darkest in the middle of a line
+    and nothing in the middle of a gap, as on a CRT. In between, each edge fades over
+    `softness` x the narrower of a line and a gap, either side of the hard edge. It
+    keeps the average darkening of the picture: only its shape changes."""
     ...
 
 @_effect
-def seams(
-    *,
-    width: float = 2.0,
-    color: str | list[float] | tuple[float, float, float] = "#ffffff",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    partition: str | None = None,
-    name: str | None = None,
-) -> Step:
+def seams(*, width: float = 2.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', partition: str | None = None, name: str | None = None) -> Step:
     """Draw a solid line or band along every border between the pieces of a partition.
 
-    The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is
-    not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a partition
-    (grid, shards, cuts, svg or bands) or a selection such as the subject (counted as two pieces, what it chooses
-    and what it does not), which outlines its hard edge. Without a partition (or with a single piece) there is no
-    border and the picture is unchanged.
+The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is
+not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a partition
+(grid, shards, cuts, svg or bands) or a selection such as the subject (counted as two pieces, what it chooses
+and what it does not), which outlines its hard edge. Without a partition (or with a single piece) there is no
+border and the picture is unchanged.
 
-    `partition` is filled in by the recipe (never set it in a recipe file): int32 labels, one piece number per pixel.
+`partition` is filled in by the recipe (never set it in a recipe file): int32 labels, one piece number per pixel.
 
-    Parameters
-    ----------
-    width : number, px, 0 to 48, default 2.0
-        Width of the line in px at the recipe's size, centred on each border: 0 draws
-        nothing, 1 is a hairline, 10 or more a band. Raising it widens the line.
-    color : colour, default '#ffffff'
-        Colour of the line, solid: '#rrggbb', '#rgb' or three numbers from 0 to 1."""
+Parameters
+----------
+width : number, px, 0 to 48, default 2.0
+    Width of the line in px at the recipe's size, centred on each border: 0 draws
+    nothing, 1 is a hairline, 10 or more a band. Raising it widens the line.
+color : colour, default '#ffffff'
+    Colour of the line, solid: '#rrggbb', '#rgb' or three numbers from 0 to 1."""
     ...
 
 @_effect
-def selective_color(
-    *,
-    hue: float = 0.0,
-    width: float = 60.0,
-    feather: float = 30.0,
-    hue_shift: float | Drive = 0.0,
-    saturation: float = 1.0,
-    lightness: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["hue_shift"] | None = None,
-) -> Step:
+def selective_color(*, hue: float = 0.0, width: float = 60.0, feather: float = 30.0, hue_shift: float | Drive = 0.0, saturation: float = 1.0, lightness: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['hue_shift'] | None = None) -> Step:
     """Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a range as wide as the wheel is a hue shift.  A range of hues (a centre, a width and a feather) and the changes made to the colours inside it. Works in HSV on the gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the `hue` centre, falling linearly to 0 over `feather` degrees; the wheel wraps round) times its HSV saturation, so a grey, which has no hue, is never selected and a pale colour is changed less than a vivid one. Pixels of weight 0 come back bit for bit. A selected pixel moves by weight times each change: `hue_shift` degrees, saturation times `saturation` and value toward black or full by `lightness`. Saturation and value stay inside 0..1 by construction, so the result needs no clipping.
 
-    Parameters
-    ----------
-    hue : number (cyclic), degrees, 0 to 360, default 0.0
-        Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120
-        green, 180 cyan, 240 blue, 300 magenta; 360 is red again.
-    width : number, degrees, 0 to 360, default 60.0
-        Full width of the range, 0..360 degrees, centred on `hue`; colours inside it are
-        changed at full strength. 360 takes in every colour; raising it widens the range.
-    feather : number, degrees, 0 to 180, default 30.0
-        How far beyond each edge of the range the change fades out, 0..180 degrees: the
-        weight falls in a straight line from full at the edge to none that far away. 0 gives
-        a hard edge; raising it blends the range into its neighbours.
-    hue_shift : number (drivable), degrees, -180 to 180, default 0.0
-        How far the selected hues are turned round the colour wheel, -180..180 degrees;
-        positive goes red toward yellow, green, blue. 0 keeps the hue. With `width` 360 and
-        `feather` 0 every colour turns (preset `hue_shift`).
-    saturation : number, ratio, 0 to 3, default 1.0
-        Gain on the saturation of the selected colours: 1 keeps it, 0 turns them grey, above
-        1 makes them more vivid (stopping at full saturation).
-    lightness : number, fraction, -1 to 1, default 0.0
-        Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to
-        black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the
-        gap in that direction.
+Parameters
+----------
+hue : number (cyclic), degrees, 0 to 360, default 0.0
+    Centre of the range on the colour wheel, 0..360 degrees: 0 red, 60 yellow, 120
+    green, 180 cyan, 240 blue, 300 magenta; 360 is red again.
+width : number, degrees, 0 to 360, default 60.0
+    Full width of the range, 0..360 degrees, centred on `hue`; colours inside it are
+    changed at full strength. 360 takes in every colour; raising it widens the range.
+feather : number, degrees, 0 to 180, default 30.0
+    How far beyond each edge of the range the change fades out, 0..180 degrees: the
+    weight falls in a straight line from full at the edge to none that far away. 0 gives
+    a hard edge; raising it blends the range into its neighbours.
+hue_shift : number (drivable), degrees, -180 to 180, default 0.0
+    How far the selected hues are turned round the colour wheel, -180..180 degrees;
+    positive goes red toward yellow, green, blue. 0 keeps the hue. With `width` 360 and
+    `feather` 0 every colour turns (preset `hue_shift`).
+saturation : number, ratio, 0 to 3, default 1.0
+    Gain on the saturation of the selected colours: 1 keeps it, 0 turns them grey, above
+    1 makes them more vivid (stopping at full saturation).
+lightness : number, fraction, -1 to 1, default 0.0
+    Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to
+    black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the
+    gap in that direction.
 
-    Presets
-    -------
-    hue_shift : Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay."""
+Presets
+-------
+hue_shift : Every colour turned 150 degrees round the wheel (vivid colours fully, pale ones less); greys stay."""
     ...
 
 @_effect
-def sharpen(
-    *,
-    radius: float = 2.0,
-    amount: float | Drive = 0.8,
-    threshold: float = 0.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "constant", "nearest", "mirror", "wrap"] = "reflect",
-    constant_value: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["clarity"] | None = None,
-) -> Step:
+def sharpen(*, radius: float = 2.0, amount: float | Drive = 0.8, threshold: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['clarity'] | None = None) -> Step:
     """An unsharp mask: the difference between the picture and a blurred copy is added back, scaled by `amount`.  Sharpen, or add clarity: add `amount` times the detail that a `radius` px Gaussian blur removes. Detail smaller than `threshold` is left as it is; each colour channel is sharpened on its own, and the result is kept within 0..1. A small `radius` brings out fine texture; a large one (preset `clarity`: 30 px) is local contrast, which exaggerates how each area differs from its surroundings so features stand out even when the whole face sits in a narrow band of brightness. Put that before effects that turn tone into marks (ascii, halftone), which are blind to small tonal differences.
 
-    Parameters
-    ----------
-    radius : number, px, 0 to 100, default 2.0
-        Gaussian sigma of the blurred copy in px at the recipe's size: small radii sharpen
-        fine texture, large ones add local contrast around coarse edges; 0 leaves the
-        picture unchanged.
-    amount : number (drivable), ratio, 0 to 5, default 0.8
-        How much of the detail is added back: 0 = off, 1 = the full difference from the
-        blurred copy; above 1 edges overshoot and halos show.
-    threshold : number, fraction, 0 to 1, default 0.0
-        The smallest difference (0..1, per channel) from the blurred copy that is sharpened:
-        smaller differences are left alone, which keeps grain and smooth skin from being
-        sharpened; 0 sharpens everything.
+Parameters
+----------
+radius : number, px, 0 to 100, default 2.0
+    Gaussian sigma of the blurred copy in px at the recipe's size: small radii sharpen
+    fine texture, large ones add local contrast around coarse edges; 0 leaves the
+    picture unchanged.
+amount : number (drivable), ratio, 0 to 5, default 0.8
+    How much of the detail is added back: 0 = off, 1 = the full difference from the
+    blurred copy; above 1 edges overshoot and halos show.
+threshold : number, fraction, 0 to 1, default 0.0
+    The smallest difference (0..1, per channel) from the blurred copy that is sharpened:
+    smaller differences are left alone, which keeps grain and smooth skin from being
+    sharpened; 0 sharpens everything.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
-        px. Larger is more exact and slower.
-    edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`, so the border
-        stands out from it).
-    constant_value : number, fraction, 0 to 1, default 0.0
-        The brightness (0..1) assumed beyond the edge when `edge` is 'constant'; ignored
-        otherwise.
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blur's Gaussian is cut off, in sigmas: the blur reaches truncate x radius
+    px. Larger is more exact and slower.
+edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`, so the border
+    stands out from it).
+constant_value : number, fraction, 0 to 1, default 0.0
+    The brightness (0..1) assumed beyond the edge when `edge` is 'constant'; ignored
+    otherwise.
 
-    Presets
-    -------
-    clarity : Local contrast: features stand out against a wide (30 px) blur of their surroundings."""
+Presets
+-------
+clarity : Local contrast: features stand out against a wide (30 px) blur of their surroundings."""
     ...
 
 @_effect
-def shatter(
-    *,
-    pieces: int = 24,
-    shape: Literal["voronoi", "triangles"] = "voronoi",
-    detail: float = 0.0,
-    fill: float = 0.0,
-    offset: float = 10.0,
-    angle: float = 5.0,
-    gap: float = 0.0,
-    color: str | list[float] | tuple[float, float, float] = "#000000",
-    seed: int = 0,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def shatter(*, pieces: int = 24, shape: Literal['voronoi', 'triangles'] = 'voronoi', detail: float = 0.0, fill: float = 0.0, offset: float = 10.0, angle: float = 5.0, gap: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Break the picture into pieces (Voronoi cells or triangles), move and turn each, optionally flatten each to its
-    mean colour (stained glass, low-poly), and draw `gap` px lines between them.
+mean colour (stained glass, low-poly), and draw `gap` px lines between them.
 
-    The pieces are the Voronoi cells round `pieces` points (random, or gathered along the picture's edges by `detail`),
-    or the triangles of those points and of points round the picture's edge (`shape`). Each draws its own move (up to
-    `offset` px each way) and its own turn (up to `angle` degrees, about its centre) from `seed`, and shows the picture
-    moved and turned that way: one rigid move of the input per piece, so the picture inside a piece is not bent, only
-    cut along the borders. `fill` then pulls each piece's colours to their average. The lines of `color` are drawn
-    along the borders of the pieces where they lie, over the pictures.
+The pieces are the Voronoi cells round `pieces` points (random, or gathered along the picture's edges by `detail`),
+or the triangles of those points and of points round the picture's edge (`shape`). Each draws its own move (up to
+`offset` px each way) and its own turn (up to `angle` degrees, about its centre) from `seed`, and shows the picture
+moved and turned that way: one rigid move of the input per piece, so the picture inside a piece is not bent, only
+cut along the borders. `fill` then pulls each piece's colours to their average. The lines of `color` are drawn
+along the borders of the pieces where they lie, over the pictures.
 
-    Parameters
-    ----------
-    pieces : whole number, count, 4 to 500, default 24
-        How many points the picture breaks round, 4 to 500: with `shape` 'voronoi' each is a
-        piece (the cell nearer to it than to any other, so the average piece is the
-        picture's area divided by this); with 'triangles' the points are corners of
-        triangles, and there are more pieces than points (see `shape`). More = smaller
-        pieces.
-    shape : one of 'voronoi', 'triangles', default 'voronoi'
-        The pieces' shape. 'voronoi' = the cells round the points, as broken glass;
-        'triangles' = the Delaunay triangles of the points and of points added round the
-        picture's edge, about as far apart as the others are (about 4 times the square root
-        of `pieces` of them), as in a low-poly picture. That makes 2 x `pieces` + b - 2
-        triangles for b edge points: about 2.75 per point at 24 points on a 4:3 picture,
-        fewer per point as `pieces` grows.
-    detail : number, fraction, 0 to 1, default 0.0
-        How far the points follow the picture's detail: 0 = they lie anywhere at random; 1 =
-        they gather along its edges, in proportion to how sharply the brightness changes, so
-        edges break into small pieces and plain areas into large ones. In between mixes the
-        two. A picture with no edges gets random points whatever this is.
-    fill : number, fraction, 0 to 1, default 0.0
-        How far each piece is flattened to one colour, the average of what it shows: 0 =
-        each piece shows the picture (moved and turned), as it is; 1 = each piece is one
-        flat colour, as stained glass or low-poly; in between mixes the two.
-    offset : number, px, 0 to 200, default 10.0
-        The farthest a piece's picture is moved, in pixels, up or down and left or right:
-        each piece draws its own random move up to this far in each direction. 0 = no piece
-        moves. Raising it tears the picture further apart. Tuned for a picture about 480 px
-        high.
-    angle : number, degrees, 0 to 45, default 5.0
-        The most a piece's picture is turned, in degrees, about the piece's own centre: each
-        piece draws its own random turn up to this far clockwise or anticlockwise. 0 = no
-        piece turns.
-    gap : number, px, 0 to 32, default 0.0
-        The width of the lines between the pieces, in pixels, with anti-aliased edges; 0 =
-        no lines, the pieces simply meet (below 1 px the lines get fainter). Raising it
-        draws the cracks in `color`. Tuned for a picture about 480 px high.
-    color : colour, default '#000000'
-        The colour of the lines between the pieces.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed for where the pieces lie and how each moves and turns: the same seed
-        always gives the same break, another seed a different one.
+Parameters
+----------
+pieces : whole number, count, 4 to 500, default 24
+    How many points the picture breaks round, 4 to 500: with `shape` 'voronoi' each is a
+    piece (the cell nearer to it than to any other, so the average piece is the
+    picture's area divided by this); with 'triangles' the points are corners of
+    triangles, and there are more pieces than points (see `shape`). More = smaller
+    pieces.
+shape : one of 'voronoi', 'triangles', default 'voronoi'
+    The pieces' shape. 'voronoi' = the cells round the points, as broken glass;
+    'triangles' = the Delaunay triangles of the points and of points added round the
+    picture's edge, about as far apart as the others are (about 4 times the square root
+    of `pieces` of them), as in a low-poly picture. That makes 2 x `pieces` + b - 2
+    triangles for b edge points: about 2.75 per point at 24 points on a 4:3 picture,
+    fewer per point as `pieces` grows.
+detail : number, fraction, 0 to 1, default 0.0
+    How far the points follow the picture's detail: 0 = they lie anywhere at random; 1 =
+    they gather along its edges, in proportion to how sharply the brightness changes, so
+    edges break into small pieces and plain areas into large ones. In between mixes the
+    two. A picture with no edges gets random points whatever this is.
+fill : number, fraction, 0 to 1, default 0.0
+    How far each piece is flattened to one colour, the average of what it shows: 0 =
+    each piece shows the picture (moved and turned), as it is; 1 = each piece is one
+    flat colour, as stained glass or low-poly; in between mixes the two.
+offset : number, px, 0 to 200, default 10.0
+    The farthest a piece's picture is moved, in pixels, up or down and left or right:
+    each piece draws its own random move up to this far in each direction. 0 = no piece
+    moves. Raising it tears the picture further apart. Tuned for a picture about 480 px
+    high.
+angle : number, degrees, 0 to 45, default 5.0
+    The most a piece's picture is turned, in degrees, about the piece's own centre: each
+    piece draws its own random turn up to this far clockwise or anticlockwise. 0 = no
+    piece turns.
+gap : number, px, 0 to 32, default 0.0
+    The width of the lines between the pieces, in pixels, with anti-aliased edges; 0 =
+    no lines, the pieces simply meet (below 1 px the lines get fainter). Raising it
+    draws the cracks in `color`. Tuned for a picture about 480 px high.
+color : colour, default '#000000'
+    The colour of the lines between the pieces.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for where the pieces lie and how each moves and turns: the same seed
+    always gives the same break, another seed a different one.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but turned pieces turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
-        ring beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What lies beyond the picture's edge, for a moved piece that reads from there and for
-        the edges `detail` looks for at the border (with 'wrap' a mismatch between opposite
-        sides counts as an edge): 'reflect' (the default, as for warps: mirrored, edge pixel
-        repeated, so a moved piece shows no gap at the border), 'mirror' (mirrored about the
-        edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but turned pieces turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic spline through the neighbouring pixels (sharpest, a little slower, and may
+    ring beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What lies beyond the picture's edge, for a moved piece that reads from there and for
+    the edges `detail` looks for at the border (with 'wrap' a mismatch between opposite
+    sides counts as an edge): 'reflect' (the default, as for warps: mirrored, edge pixel
+    repeated, so a moved piece shows no gap at the border), 'mirror' (mirrored about the
+    edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def slice_shift(
-    *,
-    slices: int = 30,
-    amount: float = 24.0,
-    seed: int = 0,
-    bands: int = 0,
-    band_min_height: float = 4.8,
-    band_max_height: float = 28.8,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["glitch"] | None = None,
-) -> Step:
+def slice_shift(*, slices: int = 30, amount: float = 24.0, seed: int = 0, bands: int = 0, band_min_height: float = 4.8, band_max_height: float = 28.8, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['glitch'] | None = None) -> Step:
     """Glitch tearing: the picture cut into strips and bands that slide sideways by random distances, wrapping around.  Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide `bands` more strips of random height placed at random rows. A strip that slides out of the picture on one side comes back in on the other (it wraps around), and the strip moves by whole pixels, so every row keeps exactly the pixels it had, only in a different order. The cuts, the bands and the slides depend only on `seed`, `slices`, `bands`, `amount` and the picture's size.
 
-    Parameters
-    ----------
-    slices : whole number, count, 0 to 500, default 30
-        How many horizontal strips the whole picture is cut into, 0 to 500 (never more than
-        it has rows). The cuts fall at random rows, so the strips differ in height; 1 slides
-        the whole picture as one; 0 = no tear, only the bands move. More strips make a
-        finer, busier tear.
-    amount : number, px, 0 to 2000, default 24.0
-        The furthest a strip or band slides, in px, 0 to 2000, tuned for a picture about 480
-        px high: each slides by a random whole number of pixels between that far left and
-        that far right, so one may also stay put. 0 leaves the picture unchanged; the
-        picture's width or more can slide one by a whole picture width.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed for where the cuts and the bands fall and how far each slides: the same
-        seed always gives the same tear, any other seed gives a different one.
-    bands : whole number, count, 0 to 500, default 0
-        How many extra strips slide, 0 to 500, on top of the tear: each is placed at a
-        random row, so they may overlap (a row in two slides by both) and the rest of the
-        picture stays; 0 = none. A few bands with `slices` 0 make a corrupted video frame.
-    band_min_height : number, px, 0 to 2000, default 4.8
-        The lowest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high
-        (never below 1 px). Each band's height is drawn at random between this and
-        `band_max_height`, which it may not exceed.
-    band_max_height : number, px, 0 to 2000, default 28.8
-        The tallest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high.
-        Raising it gives taller bands.
+Parameters
+----------
+slices : whole number, count, 0 to 500, default 30
+    How many horizontal strips the whole picture is cut into, 0 to 500 (never more than
+    it has rows). The cuts fall at random rows, so the strips differ in height; 1 slides
+    the whole picture as one; 0 = no tear, only the bands move. More strips make a
+    finer, busier tear.
+amount : number, px, 0 to 2000, default 24.0
+    The furthest a strip or band slides, in px, 0 to 2000, tuned for a picture about 480
+    px high: each slides by a random whole number of pixels between that far left and
+    that far right, so one may also stay put. 0 leaves the picture unchanged; the
+    picture's width or more can slide one by a whole picture width.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for where the cuts and the bands fall and how far each slides: the same
+    seed always gives the same tear, any other seed gives a different one.
+bands : whole number, count, 0 to 500, default 0
+    How many extra strips slide, 0 to 500, on top of the tear: each is placed at a
+    random row, so they may overlap (a row in two slides by both) and the rest of the
+    picture stays; 0 = none. A few bands with `slices` 0 make a corrupted video frame.
+band_min_height : number, px, 0 to 2000, default 4.8
+    The lowest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high
+    (never below 1 px). Each band's height is drawn at random between this and
+    `band_max_height`, which it may not exceed.
+band_max_height : number, px, 0 to 2000, default 28.8
+    The tallest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high.
+    Raising it gives taller bands.
 
-    Presets
-    -------
-    glitch : A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."""
+Presets
+-------
+glitch : A corrupted video frame: seven bands at random rows slide sideways, the rest of the picture stays. Follow it with rgb_split (wrap) for the colour fringes."""
     ...
 
 @_effect
-def starburst(
-    *,
-    rays: int = 4,
-    length: float = 60.0,
-    width: float = 1.0,
-    threshold: float = 0.95,
-    limit: float = 1.0,
-    amount: float = 0.8,
-    angle: float = 0.0,
-    spacing: float = 0.0,
-    variation: float = 0.0,
-    seed: int = 0,
-    color: str | list[float] | tuple[float, float, float] = "#ffffff",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["sparkle"] | None = None,
-) -> Step:
+def starburst(*, rays: int = 4, length: float = 60.0, width: float = 1.0, threshold: float = 0.95, limit: float = 1.0, amount: float = 0.8, angle: float = 0.0, spacing: float = 0.0, variation: float = 0.0, seed: int = 0, color: str | list[float] | tuple[float, float, float] = '#ffffff', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sparkle'] | None = None) -> Step:
     """Diffraction spikes, sparkle or star glints: what is brighter than `threshold` gets `rays` thin lines of light, tinted `color` and screened over the picture by `amount`. `limit` caps how many pixels count as bright, `spacing` thins them to a random few, `variation` dims each by a random amount (both from `seed`).  Each spike is `width` px wide, starts at the point at full brightness and fades linearly to nothing at `length` px; they leave the point at equal angles, the first at `angle`. Each point's light is scaled by 0 or 1 (`spacing`) and by a random number from 1 - `variation` to 1; the numbers depend on `seed` and the picture's size only, so a point keeps its draw while the picture around it changes. Light is only drawn from points inside the picture, so nothing enters from beyond its edge. The picture only ever gets brighter, and black stays black.  A recipe's size keeps the light of a bright area, and the number of glints, the same at any resolution.
 
-    Parameters
-    ----------
-    rays : whole number, count, 1 to 32, default 4
-        How many spikes leave each bright point, evenly spread round it: 4 = a cross, 6 = a
-        six-pointed star, 1 = a single comet tail. Raising it makes a denser star.
-    length : number, px, 0.5 to 600, default 60.0
-        How far each spike reaches, in px tuned for a picture about 480 px high: it fades
-        linearly from the point to nothing at this distance. Raising it makes longer,
-        fainter-tipped spikes.
-    threshold : number, fraction, 0 to 0.99, default 0.95
-        The brightness (0..1, per channel) where a spike starts: only values above it make
-        light, rising to full at 1. Raising it limits the spikes to the brightest points.
-        Every pixel above it sends out spikes, so at a low threshold a large bright area (a
-        window, a sky, white fur) floods the picture with light: raise the threshold, or cap
-        the number of points with `limit`.
-    amount : number, ratio, 0 to 10, default 0.8
-        How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as
-        bright as the point that makes it, at the point; above 1 it saturates to white
-        sooner.
-    angle : number (cyclic), degrees, 0 to 360, default 0.0
-        The direction of the first spike, in degrees clockwise from pointing right, as seen
-        on screen: 0 = to the right, 90 = down. The other spikes follow at equal angles, so
-        with 4 spikes 45 turns the cross into an X.
-    spacing : number, px, 0 to 200, default 0.0
-        The average distance in px, tuned for a picture about 480 px high, between the
-        points that send out spikes inside a bright area: each bright pixel sends them with
-        the chance 1 / spacing^2 (the same ones for the same `seed`; raising it only drops
-        points), so the glints keep their number per area of the picture at any size. 0, or
-        anything below 1, = every bright point, each with its share of a design pixel's
-        light, so a bright area gives the same total light at any size. Raise it to turn a
-        bright area into separate glints; 13 gives a scatter of glitter.
-    color : colour, default '#ffffff'
-        The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour
-        of the light that makes them.
+Parameters
+----------
+rays : whole number, count, 1 to 32, default 4
+    How many spikes leave each bright point, evenly spread round it: 4 = a cross, 6 = a
+    six-pointed star, 1 = a single comet tail. Raising it makes a denser star.
+length : number, px, 0.5 to 600, default 60.0
+    How far each spike reaches, in px tuned for a picture about 480 px high: it fades
+    linearly from the point to nothing at this distance. Raising it makes longer,
+    fainter-tipped spikes.
+threshold : number, fraction, 0 to 0.99, default 0.95
+    The brightness (0..1, per channel) where a spike starts: only values above it make
+    light, rising to full at 1. Raising it limits the spikes to the brightest points.
+    Every pixel above it sends out spikes, so at a low threshold a large bright area (a
+    window, a sky, white fur) floods the picture with light: raise the threshold, or cap
+    the number of points with `limit`.
+amount : number, ratio, 0 to 10, default 0.8
+    How strongly the spikes are screened over the picture: 0 = off, 1 = a spike as
+    bright as the point that makes it, at the point; above 1 it saturates to white
+    sooner.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The direction of the first spike, in degrees clockwise from pointing right, as seen
+    on screen: 0 = to the right, 90 = down. The other spikes follow at equal angles, so
+    with 4 spikes 45 turns the cross into an X.
+spacing : number, px, 0 to 200, default 0.0
+    The average distance in px, tuned for a picture about 480 px high, between the
+    points that send out spikes inside a bright area: each bright pixel sends them with
+    the chance 1 / spacing^2 (the same ones for the same `seed`; raising it only drops
+    points), so the glints keep their number per area of the picture at any size. 0, or
+    anything below 1, = every bright point, each with its share of a design pixel's
+    light, so a bright area gives the same total light at any size. Raise it to turn a
+    bright area into separate glints; 13 gives a scatter of glitter.
+color : colour, default '#ffffff'
+    The tint of the spikes: '#rrggbb', '#rgb' or [r, g, b] 0..1. White keeps the colour
+    of the light that makes them.
 
-    Advanced parameters
-    -------------------
-    width : number, px, 1 to 20, default 1.0
-        The thickness in px of each spike, tuned for a picture about 480 px high, with a
-        soft edge one px wide: 1 = a hairline. Raising it makes bolder spikes.
-    limit : number, fraction, 0 to 1, default 1.0
-        The most pixels that send out spikes, as a share of all the picture's pixels, the
-        brightest first: the threshold is raised just enough to keep to it (never above
-        0.99, so a picture with more than this share of near-white pixels still lights
-        those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to
-        keep a low `threshold` from flooding large bright areas.
-    variation : number, fraction, 0 to 1, default 0.0
-        How much the points differ in brightness, and so in how far their spikes show: each
-        one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1
-        = from full down to nothing.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed for `spacing` and `variation`: the same seed picks the same points of
-        the same picture, another seed others.
+Advanced parameters
+-------------------
+width : number, px, 1 to 20, default 1.0
+    The thickness in px of each spike, tuned for a picture about 480 px high, with a
+    soft edge one px wide: 1 = a hairline. Raising it makes bolder spikes.
+limit : number, fraction, 0 to 1, default 1.0
+    The most pixels that send out spikes, as a share of all the picture's pixels, the
+    brightest first: the threshold is raised just enough to keep to it (never above
+    0.99, so a picture with more than this share of near-white pixels still lights
+    those). 1 = no cap, 0.001 = at most one pixel in a thousand, 0 = none. Lower it to
+    keep a low `threshold` from flooding large bright areas.
+variation : number, fraction, 0 to 1, default 0.0
+    How much the points differ in brightness, and so in how far their spikes show: each
+    one's light is scaled by a random number from 1 - `variation` to 1. 0 = all alike, 1
+    = from full down to nothing.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for `spacing` and `variation`: the same seed picks the same points of
+    the same picture, another seed others.
 
-    Presets
-    -------
-    sparkle : Scattered glitter: small white four-pointed glints on a random few of the bright points, of varied brightness."""
+Presets
+-------
+sparkle : Scattered glitter: small white four-pointed glints on a random few of the bright points, of varied brightness."""
     ...
 
 @_effect
-def stretch(
-    *,
-    axis: Literal["vertical", "horizontal"] = "vertical",
-    at: float = 0.5,
-    span: float = 72.0,
-    side: Literal["both", "after", "before"] = "both",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def stretch(*, axis: Literal['vertical', 'horizontal'] = 'vertical', at: float = 0.5, span: float = 72.0, side: Literal['both', 'after', 'before'] = 'both', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A pixel stretch: one line of the picture repeated over the lines beside it, the way a glitched file smears.  Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. The line sits at `at` and keeps its place; the lines within `span` of it on the chosen `side` become copies of it, the rest of the picture is untouched. Every output pixel is an input pixel, so no colour is invented.
 
-    Parameters
-    ----------
-    axis : one of 'vertical', 'horizontal', default 'vertical'
-        Which way the line is smeared: 'vertical' repeats one pixel row up and down over the
-        rows beside it (streaks run down the picture), 'horizontal' repeats one pixel column
-        left and right (streaks run across).
-    at : number, fraction, 0 to 1, default 0.5
-        Where the line that is smeared lies, as a fraction 0 to 1 of the way across the
-        picture (down it for 'vertical', right for 'horizontal'): 0 = the first row or
-        column, 0.5 = the middle, 1 = the last. Moving it chooses which colours the smear
-        carries.
-    span : number, px, 0 to 2000, default 72.0
-        How far the line is smeared, in px, 0 to 2000, tuned for a picture about 480 px
-        high, on each side that `side` names, rounded to whole pixels. 0 = nothing is
-        smeared; the picture's height (width for 'horizontal') or more = the line covers the
-        whole picture. Raising it hides more of the picture behind the smear.
-    side : one of 'both', 'after', 'before', default 'both'
-        Which sides of the line are smeared: 'both' (outward each way), 'after' (down, or
-        right) or 'before' (up, or left). The other side keeps the picture as it is."""
+Parameters
+----------
+axis : one of 'vertical', 'horizontal', default 'vertical'
+    Which way the line is smeared: 'vertical' repeats one pixel row up and down over the
+    rows beside it (streaks run down the picture), 'horizontal' repeats one pixel column
+    left and right (streaks run across).
+at : number, fraction, 0 to 1, default 0.5
+    Where the line that is smeared lies, as a fraction 0 to 1 of the way across the
+    picture (down it for 'vertical', right for 'horizontal'): 0 = the first row or
+    column, 0.5 = the middle, 1 = the last. Moving it chooses which colours the smear
+    carries.
+span : number, px, 0 to 2000, default 72.0
+    How far the line is smeared, in px, 0 to 2000, tuned for a picture about 480 px
+    high, on each side that `side` names, rounded to whole pixels. 0 = nothing is
+    smeared; the picture's height (width for 'horizontal') or more = the line covers the
+    whole picture. Raising it hides more of the picture behind the smear.
+side : one of 'both', 'after', 'before', default 'both'
+    Which sides of the line are smeared: 'both' (outward each way), 'after' (down, or
+    right) or 'before' (up, or left). The other side keeps the picture as it is."""
     ...
 
 @_effect
-def swirl(
-    *,
-    angle: float = 90.0,
-    radius: float = 0.5,
-    x: float = 0.5,
-    y: float = 0.5,
-    interpolation: Literal["nearest", "bilinear", "bicubic"] = "bilinear",
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def swirl(*, angle: float = 90.0, radius: float = 0.5, x: float = 0.5, y: float = 0.5, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`.  The picture is turned about the centre by an angle that falls smoothly from `angle` at the centre to nothing at `radius`. Each pixel at distance d from the centre, d inside the radius, shows the picture at the point turned about the centre by angle x (1 - d / radius)^2, clockwise for a positive angle, read by `interpolation`. Pixels at the radius or beyond, and the centre itself, keep their place, and the result never leaves 0..1.
 
-    Parameters
-    ----------
-    angle : number, degrees, -720 to 720, default 90.0
-        How far the picture is turned at the centre, in degrees: positive turns clockwise,
-        negative counter-clockwise, 360 is a whole turn. The turn falls off with the square
-        of the distance left to the radius, so the picture is twisted into a spiral and
-        unturned at the radius. Larger is a tighter spiral; 0 leaves the picture unchanged.
-    radius : number, fraction, 0 to 2, default 0.5
-        How far from the centre the swirl reaches, as a fraction of the shorter side of the
-        picture, measured from the first pixel to the last (0.5 = a disc as wide as half of
-        it, 2 = a disc that covers the whole picture and more). Pixels from this far out are
-        untouched; 0 leaves the picture unchanged.
-    x : number, fraction, 0 to 1, default 0.5
-        The centre's horizontal position as a fraction of the way across the picture: 0 =
-        the first pixel column, 0.5 = the middle, 1 = the last.
-    y : number, fraction, 0 to 1, default 0.5
-        The centre's vertical position as a fraction of the way down the picture: 0 = the
-        first pixel row, 0.5 = the middle, 1 = the last.
+Parameters
+----------
+angle : number, degrees, -720 to 720, default 90.0
+    How far the picture is turned at the centre, in degrees: positive turns clockwise,
+    negative counter-clockwise, 360 is a whole turn. The turn falls off with the square
+    of the distance left to the radius, so the picture is twisted into a spiral and
+    unturned at the radius. Larger is a tighter spiral; 0 leaves the picture unchanged.
+radius : number, fraction, 0 to 2, default 0.5
+    How far from the centre the swirl reaches, as a fraction of the shorter side of the
+    picture, measured from the first pixel to the last (0.5 = a disc as wide as half of
+    it, 2 = a disc that covers the whole picture and more). Pixels from this far out are
+    untouched; 0 leaves the picture unchanged.
+x : number, fraction, 0 to 1, default 0.5
+    The centre's horizontal position as a fraction of the way across the picture: 0 =
+    the first pixel column, 0.5 = the middle, 1 = the last.
+y : number, fraction, 0 to 1, default 0.5
+    The centre's vertical position as a fraction of the way down the picture: 0 = the
+    first pixel row, 0.5 = the middle, 1 = the last.
 
-    Advanced parameters
-    -------------------
-    interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
-        How a point between pixels is read from the picture: 'nearest' takes the closest
-        pixel (fastest, keeps every value exactly as it is but edges turn jagged),
-        'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
-        a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
-        beside hard edges).
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the swirl sees beyond the picture's edge (a swirl near the border turns pixels
-        in from outside): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored
-        about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite
-        edge)."""
+Advanced parameters
+-------------------
+interpolation : one of 'nearest', 'bilinear', 'bicubic', default 'bilinear'
+    How a point between pixels is read from the picture: 'nearest' takes the closest
+    pixel (fastest, keeps every value exactly as it is but edges turn jagged),
+    'bilinear' blends the four pixels around it (smooth, slightly soft), 'bicubic' fits
+    a cubic through the neighbouring pixels (sharpest, a little slower, and may ring
+    beside hard edges).
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the swirl sees beyond the picture's edge (a swirl near the border turns pixels
+    in from outside): 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored
+    about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite
+    edge)."""
     ...
 
 @_effect
-def tile(
-    *,
-    columns: int = 3,
-    rows: int = 3,
-    offset_x: float = 0.0,
-    offset_y: float = 0.0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["scan_roll"] | None = None,
-) -> Step:
+def tile(*, columns: int = 3, rows: int = 3, offset_x: float = 0.0, offset_y: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['scan_roll'] | None = None) -> Step:
     """Repeat the picture scaled down in a grid, or slide it around: a rolling scan, a wrap-around shift.  The picture is averaged down by area (each new pixel is the mean of the source pixels it covers, fractions of a pixel counted in part) to a cell of whole pixels, width // `columns` by height // `rows` and at least 1 px each. The cell is slid by `offset_x` and `offset_y` of its size, wrapping around within the cell (a fraction of a pixel blends the two pixels it lies between), and repeated across the picture. When the grid does not divide the picture, the leftover pixels (width mod `columns` on the right, height mod `rows` at the bottom) show the start of the next copy, cut off. One column and one row give the picture itself, or with an offset the picture rolled around, as on a television whose sync slipped (the `scan_roll` preset).
 
-    Parameters
-    ----------
-    columns : whole number, count, 1 to 100, default 3
-        How many copies of the picture sit side by side, 1 to 100; 1 keeps the picture whole
-        across. Each copy is the width of the picture divided by this, rounded down (at
-        least 1 px).
-    rows : whole number, count, 1 to 100, default 3
-        How many copies sit one above another, 1 to 100; 1 keeps the picture whole down.
-        Each copy is the height of the picture divided by this, rounded down (at least 1
-        px).
-    offset_x : number, fraction, -1 to 1, default 0.0
-        How far the copies slide sideways, as a fraction of one copy's width, -1 to 1:
-        positive moves them to the right, negative to the left, and what leaves one side of
-        a copy comes back on the other; 0 leaves them where they are, and so does a whole
-        copy (1 or -1). A distance that ends between two pixels blends the two.
-    offset_y : number, fraction, -1 to 1, default 0.0
-        How far the copies slide vertically, as a fraction of one copy's height, -1 to 1:
-        positive moves them down, negative up, and what leaves the bottom of a copy comes
-        back at its top; 0 leaves them where they are, and so does a whole copy (1 or -1). A
-        distance that ends between two pixels blends the two.
+Parameters
+----------
+columns : whole number, count, 1 to 100, default 3
+    How many copies of the picture sit side by side, 1 to 100; 1 keeps the picture whole
+    across. Each copy is the width of the picture divided by this, rounded down (at
+    least 1 px).
+rows : whole number, count, 1 to 100, default 3
+    How many copies sit one above another, 1 to 100; 1 keeps the picture whole down.
+    Each copy is the height of the picture divided by this, rounded down (at least 1
+    px).
+offset_x : number, fraction, -1 to 1, default 0.0
+    How far the copies slide sideways, as a fraction of one copy's width, -1 to 1:
+    positive moves them to the right, negative to the left, and what leaves one side of
+    a copy comes back on the other; 0 leaves them where they are, and so does a whole
+    copy (1 or -1). A distance that ends between two pixels blends the two.
+offset_y : number, fraction, -1 to 1, default 0.0
+    How far the copies slide vertically, as a fraction of one copy's height, -1 to 1:
+    positive moves them down, negative up, and what leaves the bottom of a copy comes
+    back at its top; 0 leaves them where they are, and so does a whole copy (1 or -1). A
+    distance that ends between two pixels blends the two.
 
-    Presets
-    -------
-    scan_roll : A rolling scan: the picture slides down a quarter and wraps around, as a television whose vertical hold slipped. Set offset_x for a wrap-around shift sideways."""
+Presets
+-------
+scan_roll : A rolling scan: the picture slides down a quarter and wraps around, as a television whose vertical hold slipped. Set offset_x for a wrap-around shift sideways."""
     ...
 
 @_effect
-def tone_map(
-    *,
-    contrast: float = 0.5,
-    amount: float = 0.5,
-    pivot: float = 0.0,
-    radius: float = 30.0,
-    edge_threshold: float = 0.5,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["shadows_highlights"] | None = None,
-) -> Step:
+def tone_map(*, contrast: float = 0.5, amount: float = 0.5, pivot: float = 0.0, radius: float = 30.0, edge_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['shadows_highlights'] | None = None) -> Step:
     """HDR tone mapping, shadows and highlights recovery, lifted shadows.  Compresses the broad brightness differences of the picture and keeps (or boosts) its fine detail.  Brightness is the base 2 logarithm L of the Rec. 709 luma Y of the sRGB-encoded picture (Y floored at 1e-4), in stops below white. A guided filter (He, Sun and Tang 2010, guided by L itself) over a window of 2 x `radius` + 1 px, edge-preserving by `edge_threshold` stops, splits it into a base B and detail D = L - B (Durand and Dorsey 2002). The new log brightness is `contrast` x (B + `pivot`) - `pivot` + (1 + `amount`) x D, and every pixel's red, green and blue are multiplied by 2^(new - L) = 2^((`contrast` - 1) (B + `pivot`) + `amount` D), so hue and saturation stay and the result is held to 0..1. An even area of luma Y comes out as Y (Y 2^`pivot`)^(`contrast` - 1), which is Y^`contrast` for `pivot` 0. B is an average of values of L, so it never leaves their range: with `amount` 0 and `pivot` 0 lowering `contrast` only ever brightens; areas brighter than 2^-`pivot` are darkened.
 
-    Parameters
-    ----------
-    contrast : number, ratio, 0 to 1, default 0.5
-        How much of the broad brightness differences between areas is kept: 1 = all of them
-        (no compression), 0.5 = halved in stops (a picture with dark areas three stops below
-        its bright ones gets them one and a half apart), 0 = every area brought up to white
-        and only the detail left. Lowering it lightens dark areas the most; white stays
-        white.
-    amount : number, ratio, 0 to 5, default 0.5
-        How strongly the fine detail (what is left of the brightness once the broad areas
-        are taken out) is exaggerated: 0 = kept as it is, 1 = doubled in stops. Raising it
-        brings out texture; it can clip highlights.
-    pivot : number, stops, 0 to 8, default 0.0
-        The brightness, in stops below white, that compression leaves where it is: 0 = white
-        (everything is lightened, nothing darkened); 2 = a quarter of white's brightness
-        (about 0.25), where areas brighter than it are darkened and darker ones lightened,
-        recovering highlights as well as shadows. Raising it darkens bright areas more and
-        lightens dark ones less.
-    radius : number, px, 0 to 500, default 30.0
-        Size of what counts as a broad area, in px at the recipe's size (rounded to whole
-        px): the base layer is an average over a square of 2 x radius + 1 px. Larger treats
-        bigger structures as base and keeps only finer ones as detail; 0 makes every pixel
-        its own base, a plain global curve (a grey v becomes v^contrast).
+Parameters
+----------
+contrast : number, ratio, 0 to 1, default 0.5
+    How much of the broad brightness differences between areas is kept: 1 = all of them
+    (no compression), 0.5 = halved in stops (a picture with dark areas three stops below
+    its bright ones gets them one and a half apart), 0 = every area brought up to white
+    and only the detail left. Lowering it lightens dark areas the most; white stays
+    white.
+amount : number, ratio, 0 to 5, default 0.5
+    How strongly the fine detail (what is left of the brightness once the broad areas
+    are taken out) is exaggerated: 0 = kept as it is, 1 = doubled in stops. Raising it
+    brings out texture; it can clip highlights.
+pivot : number, stops, 0 to 8, default 0.0
+    The brightness, in stops below white, that compression leaves where it is: 0 = white
+    (everything is lightened, nothing darkened); 2 = a quarter of white's brightness
+    (about 0.25), where areas brighter than it are darkened and darker ones lightened,
+    recovering highlights as well as shadows. Raising it darkens bright areas more and
+    lightens dark ones less.
+radius : number, px, 0 to 500, default 30.0
+    Size of what counts as a broad area, in px at the recipe's size (rounded to whole
+    px): the base layer is an average over a square of 2 x radius + 1 px. Larger treats
+    bigger structures as base and keeps only finer ones as detail; 0 makes every pixel
+    its own base, a plain global curve (a grey v becomes v^contrast).
 
-    Advanced parameters
-    -------------------
-    edge_threshold : number, stops, 0.01 to 8, default 0.5
-        The brightness step, in stops, that counts as an edge the base layer must not blur
-        across: steps above it keep their own side of the base, which avoids halos around
-        them; steps below it are averaged away and count as detail. Raising it makes the
-        base smoother and more like a plain blur.
+Advanced parameters
+-------------------
+edge_threshold : number, stops, 0.01 to 8, default 0.5
+    The brightness step, in stops, that counts as an edge the base layer must not blur
+    across: steps above it keep their own side of the base, which avoids halos around
+    them; steps below it are averaged away and count as detail. Raising it makes the
+    base smoother and more like a plain blur.
 
-    Presets
-    -------
-    shadows_highlights : Shadows and highlights recovery: dark areas lifted and bright areas tamed by their local surroundings, texture kept."""
+Presets
+-------
+shadows_highlights : Shadows and highlights recovery: dark areas lifted and bright areas tamed by their local surroundings, texture kept."""
     ...
 
 @_effect
-def topographic(
-    *,
-    field: str = "light",
-    levels: int = 8,
-    thickness: float = 1.5,
-    line: str | list[float] | tuple[float, float, float] = "#ffffff",
-    fill: Literal["none", "bands"] = "none",
-    colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = (
-        "#16324f",
-        "#3f7d6a",
-        "#d9c97a",
-        "#9c6b43",
-        "#f4f1ea",
-    ),
-    smoothing: float = 5.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "reflect",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def topographic(*, field: str = 'light', levels: int = 8, thickness: float = 1.5, line: str | list[float] | tuple[float, float, float] = '#ffffff', fill: Literal['none', 'bands'] = 'none', colors: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea'), smoothing: float = 5.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Draw contour lines where the smoothed `field` crosses `levels` evenly spaced heights.  The field (`light` is the Rec. 709 luminance) is blurred by `smoothing` px and scaled to h = field x `levels`; the contours are h = 1, 2, ..., `levels` - 1. A pixel's distance to the nearest contour in px is |h - k| divided by the slope of h there (central differences, halved on the outermost rows and columns, which have one neighbour: lines come out thinner there), so a line is `thickness` px wide however steep or shallow the field runs; a pixel at distance d is covered by clip(`thickness` / 2 + 1/2 - d, 0, 1) of the `line` colour. Where the field does not vary there is no contour. With fill 'bands' the photo is first replaced by the colour of its band floor(h) (the last band for 1) taken from `colors`.
 
-    Parameters
-    ----------
-    field : field name, default 'light'
-        What the contours follow: 'light' (the picture's own brightness, a plain contour
-        map), 'depth' (how near things are, a `LiDAR` look), 'subject', 'background' or a
-        region of the recipe. Its range 0..1 is cut into `levels` bands.
-    levels : whole number, count, 2 to 64, default 8
-        How many bands the field's range 0..1 is cut into; there is a contour line at each
-        of the levels - 1 heights between them. 2 = a single line at the middle of the
-        range, 8 = a clear contour map, 14 = a busy one, 64 = a dense engraving.
-    thickness : number, px, 0.5 to 20, default 1.5
-        How wide the lines are, in pixels across the line however steep the field's slope
-        there; tuned for a picture about 480 px high. Edges are anti-aliased, so fractions
-        of a pixel show as partial strength.
-    line : colour, default '#ffffff'
-        The colour of the contour lines: '#rrggbb', '#rgb' or [r, g, b] 0..1.
-    fill : one of 'none', 'bands', default 'none'
-        What lies between the lines: 'none' (the photo itself, with the lines drawn over it)
-        or 'bands' (the photo is replaced by flat colour, each band coloured from `colors`
-        by its height, like a hypsometric map).
-    colors : list of colours, default ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')
-        The colours of the bands for fill 'bands', from the lowest band (the field near 0)
-        to the highest, evenly spaced along the ramp; at least two. Ignored by fill 'none'.
-    smoothing : number, px, 0 to 50, default 5.0
-        Sigma in pixels of the Gaussian blur the field gets before the contours are found,
-        so that grain and fine texture do not break the lines into specks; tuned for a
-        picture about 480 px high. 0 = the field as it is, raising it gives smoother,
-        simpler contours.
+Parameters
+----------
+field : field name, default 'light'
+    What the contours follow: 'light' (the picture's own brightness, a plain contour
+    map), 'depth' (how near things are, a `LiDAR` look), 'subject', 'background' or a
+    region of the recipe. Its range 0..1 is cut into `levels` bands.
+levels : whole number, count, 2 to 64, default 8
+    How many bands the field's range 0..1 is cut into; there is a contour line at each
+    of the levels - 1 heights between them. 2 = a single line at the middle of the
+    range, 8 = a clear contour map, 14 = a busy one, 64 = a dense engraving.
+thickness : number, px, 0.5 to 20, default 1.5
+    How wide the lines are, in pixels across the line however steep the field's slope
+    there; tuned for a picture about 480 px high. Edges are anti-aliased, so fractions
+    of a pixel show as partial strength.
+line : colour, default '#ffffff'
+    The colour of the contour lines: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+fill : one of 'none', 'bands', default 'none'
+    What lies between the lines: 'none' (the photo itself, with the lines drawn over it)
+    or 'bands' (the photo is replaced by flat colour, each band coloured from `colors`
+    by its height, like a hypsometric map).
+colors : list of colours, default ('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')
+    The colours of the bands for fill 'bands', from the lowest band (the field near 0)
+    to the highest, evenly spaced along the ramp; at least two. Ignored by fill 'none'.
+smoothing : number, px, 0 to 50, default 5.0
+    Sigma in pixels of the Gaussian blur the field gets before the contours are found,
+    so that grain and fine texture do not break the lines into specks; tuned for a
+    picture about 480 px high. 0 = the field as it is, raising it gives smoother,
+    simpler contours.
 
-    Advanced parameters
-    -------------------
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the smoothing blur is cut off, in sigmas: it reaches truncate x `smoothing`
-        px. Larger is more exact and slower; below 3 the blur turns visibly boxy.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
-        What the smoothing sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
-        repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
-        repeated), 'wrap' (the opposite edge)."""
+Advanced parameters
+-------------------
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the smoothing blur is cut off, in sigmas: it reaches truncate x `smoothing`
+    px. Larger is more exact and slower; below 3 the blur turns visibly boxy.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing sees beyond the picture's edge: 'reflect' (mirrored, edge pixel
+    repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel
+    repeated), 'wrap' (the opposite edge)."""
     ...
 
 @_effect
-def torn_edge(
-    *,
-    width: float = 24.0,
-    roughness: float = 0.5,
-    scale: float = 24.0,
-    octaves: int = 3,
-    persistence: float = 0.4,
-    lacunarity: float = 2.0,
-    fill: str | list[float] | tuple[float, float, float] = "#f5f0e6",
-    seed: int = 0,
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def torn_edge(*, width: float = 24.0, roughness: float = 0.5, scale: float = 24.0, octaves: int = 3, persistence: float = 0.4, lacunarity: float = 2.0, fill: str | list[float] | tuple[float, float, float] = '#f5f0e6', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`.  The distance along a side is `width` x (1 + `roughness` x noise), the noise fractal (`scale`, `octaves`, `persistence`, `lacunarity`) of zero mean and unit deviation along that side, so it averages `width` and has a standard deviation `roughness` x `width` (a negative distance tears nothing there). A pixel is torn away if it is closer to a side than that side's distance at its position. Every other pixel is kept exactly; the four sides tear independently, and the same `seed` always gives the same tear.
 
-    Parameters
-    ----------
-    width : number, px, 0 to 200, default 24.0
-        How far the tear is from each side on average, in px: 0 = no tear. Larger = more of
-        the border torn away.
-    roughness : number, fraction, 0 to 1, default 0.5
-        How ragged the tear is: the standard deviation of its distance from the side as a
-        fraction of `width`. 0 = a straight cut exactly `width` in, 0.3 is a gentle tear, 1
-        wanders between the very edge and twice the width.
-    scale : number, px, 1 to 200, default 24.0
-        Size of the tear's broadest bays and tongues along the side, in px (the spacing of
-        the first noise lattice). Larger = long slow waves, small = a jagged edge.
-    octaves : whole number, count, 1 to 8, default 3
-        How many layers of detail make up the tear, each finer than the last (by
-        `lacunarity`) and weaker (by `persistence`). 1 = smooth waves, more = a fibrous,
-        ragged edge. Layers finer than a pixel are dropped.
-    persistence : number, ratio, 0 to 1, default 0.4
-        How much weaker each finer layer of the tear is than the one before. 0 = only the
-        broadest layer, 1 = every layer equally strong (very jagged).
-    lacunarity : number, ratio, 1 to 4, default 2.0
-        How much finer each layer of the tear is than the one before: the lattice spacing is
-        divided by this per layer. 1 = every layer the same size, larger = detail much finer
-        than the waves.
-    fill : colour, default '#f5f0e6'
-        The paper colour that replaces the torn-away border: '#rrggbb', '#rgb' or [r, g, b]
-        0..1.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed: the same seed always tears the same line (each side its own), another
-        seed a different one."""
+Parameters
+----------
+width : number, px, 0 to 200, default 24.0
+    How far the tear is from each side on average, in px: 0 = no tear. Larger = more of
+    the border torn away.
+roughness : number, fraction, 0 to 1, default 0.5
+    How ragged the tear is: the standard deviation of its distance from the side as a
+    fraction of `width`. 0 = a straight cut exactly `width` in, 0.3 is a gentle tear, 1
+    wanders between the very edge and twice the width.
+scale : number, px, 1 to 200, default 24.0
+    Size of the tear's broadest bays and tongues along the side, in px (the spacing of
+    the first noise lattice). Larger = long slow waves, small = a jagged edge.
+octaves : whole number, count, 1 to 8, default 3
+    How many layers of detail make up the tear, each finer than the last (by
+    `lacunarity`) and weaker (by `persistence`). 1 = smooth waves, more = a fibrous,
+    ragged edge. Layers finer than a pixel are dropped.
+persistence : number, ratio, 0 to 1, default 0.4
+    How much weaker each finer layer of the tear is than the one before. 0 = only the
+    broadest layer, 1 = every layer equally strong (very jagged).
+lacunarity : number, ratio, 1 to 4, default 2.0
+    How much finer each layer of the tear is than the one before: the lattice spacing is
+    divided by this per layer. 1 = every layer the same size, larger = detail much finer
+    than the waves.
+fill : colour, default '#f5f0e6'
+    The paper colour that replaces the torn-away border: '#rrggbb', '#rgb' or [r, g, b]
+    0..1.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed: the same seed always tears the same line (each side its own), another
+    seed a different one."""
     ...
 
 @_effect
-def vhs(
-    *,
-    tracking: float = 28.8,
-    bands: int = 3,
-    band_static: float | Drive = 0.0,
-    dropouts: int = 0,
-    bleed: float = 5.0,
-    noise: float = 0.03,
-    wobble: float = 1.5,
-    seed: int = 0,
-    band_height: float = 19.2,
-    noise_size: float = 1.5,
-    wobble_size: float = 12.0,
-    truncate: float = 4.0,
-    edge: Literal["reflect", "nearest", "mirror", "wrap"] = "nearest",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-    preset: Literal["signal_noise"] | None = None,
-) -> Step:
+def vhs(*, tracking: float = 28.8, bands: int = 3, band_static: float | Drive = 0.0, dropouts: int = 0, bleed: float = 5.0, noise: float = 0.03, wobble: float = 1.5, seed: int = 0, band_height: float = 19.2, noise_size: float = 1.5, wobble_size: float = 12.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['signal_noise'] | None = None) -> Step:
     """Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled colour and tape noise (static, snow).  In this order: `bands` horizontal bands slide sideways by up to `tracking` px and take `band_static` of grey static (solid bands of snow across a clean picture at 1); every row then drifts sideways by a slow random wander of about `wobble` px; `dropouts` white streaks are stamped on; in YIQ (as `ntsc`) the colour is moved `bleed` px right and blurred sideways by that much, as colour on tape lags and smears; and `noise` of grain is added to the brightness. The bands, dropouts, noise and wobble each draw from their own stream of `seed`, so the same seed gives the same damage; changing the number of bands moves no dropout, noise or wobble. A row in several bands slides by the sum of their distances.
 
-    Parameters
-    ----------
-    tracking : number, px, 0 to 2000, default 28.8
-        How far a tracking band slides sideways, at most, in px, 0 to 2000, tuned for a
-        picture about 480 px high: each band slides by a random whole number of pixels up to
-        this, left or right. 0 = the bands do not move.
-    bands : whole number, count, 0 to 50, default 3
-        How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none.
-    band_static : number (drivable), fraction, 0 to 1, default 0.0
-        How much of each tracking band is replaced by grey static (analog snow), 0 to 1: the
-        share of every pixel in a band that becomes a random grey. 0 = none; 1 = bands of
-        pure static. Does nothing when `bands` is 0.
-    dropouts : whole number, count, 0 to 2000, default 0
-        How many dropout streaks, 0 to 2000: short white marks where the signal was lost,
-        each as tall as a speck of tape noise (`noise_size`) and between half of `tracking`
-        and `tracking` px long. 0 = none; raising it covers more of the picture.
-    bleed : number, px, 0 to 100, default 5.0
-        How far colour bleeds to the right of what it belongs to, 0 to 100 px, tuned for a
-        picture about 480 px high: colour lags the brightness by this many pixels and is
-        blurred sideways by a Gaussian of this standard deviation. 0 = no bleed; raising it
-        smears red and blue far past their edges.
-    noise : number, fraction, 0 to 1, default 0.03
-        The standard deviation of the tape noise added to brightness, 0 to 1 in picture
-        units: 0 = none, 0.03 is visible, 0.1 is heavy. Colour is not touched.
-    wobble : number, px, 0 to 50, default 1.5
-        How far the rows wander sideways, as the standard deviation in px of a slow random
-        drift from row to row, 0 to 50, tuned for a picture about 480 px high: 0 = straight
-        rows, a few px = the shaky edges of a worn tape.
-    seed : whole number, count, 0 to 4294967295, default 0
-        Random seed for the bands, the dropouts, the noise and the wobble: the same seed
-        always gives the same damage, any other a different one.
+Parameters
+----------
+tracking : number, px, 0 to 2000, default 28.8
+    How far a tracking band slides sideways, at most, in px, 0 to 2000, tuned for a
+    picture about 480 px high: each band slides by a random whole number of pixels up to
+    this, left or right. 0 = the bands do not move.
+bands : whole number, count, 0 to 50, default 3
+    How many horizontal tracking bands slide, 0 to 50, at random rows; 0 = none.
+band_static : number (drivable), fraction, 0 to 1, default 0.0
+    How much of each tracking band is replaced by grey static (analog snow), 0 to 1: the
+    share of every pixel in a band that becomes a random grey. 0 = none; 1 = bands of
+    pure static. Does nothing when `bands` is 0.
+dropouts : whole number, count, 0 to 2000, default 0
+    How many dropout streaks, 0 to 2000: short white marks where the signal was lost,
+    each as tall as a speck of tape noise (`noise_size`) and between half of `tracking`
+    and `tracking` px long. 0 = none; raising it covers more of the picture.
+bleed : number, px, 0 to 100, default 5.0
+    How far colour bleeds to the right of what it belongs to, 0 to 100 px, tuned for a
+    picture about 480 px high: colour lags the brightness by this many pixels and is
+    blurred sideways by a Gaussian of this standard deviation. 0 = no bleed; raising it
+    smears red and blue far past their edges.
+noise : number, fraction, 0 to 1, default 0.03
+    The standard deviation of the tape noise added to brightness, 0 to 1 in picture
+    units: 0 = none, 0.03 is visible, 0.1 is heavy. Colour is not touched.
+wobble : number, px, 0 to 50, default 1.5
+    How far the rows wander sideways, as the standard deviation in px of a slow random
+    drift from row to row, 0 to 50, tuned for a picture about 480 px high: 0 = straight
+    rows, a few px = the shaky edges of a worn tape.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for the bands, the dropouts, the noise and the wobble: the same seed
+    always gives the same damage, any other a different one.
 
-    Advanced parameters
-    -------------------
-    band_height : number, px, 0 to 2000, default 19.2
-        The tallest a tracking band can be, in px, 0 to 2000, tuned for a picture about 480
-        px high; each band is between half this and this tall (never under 1 px, never
-        taller than the picture).
-    noise_size : number, px, 0.5 to 50, default 1.5
-        How wide a speck of tape noise is, 0.5 to 50 px (up to 1 px every pixel is its own
-        speck), tuned for a picture about 480 px high. Raising it gives coarser grain.
-    wobble_size : number, px, 0.5 to 500, default 12.0
-        How many rows one wander of the wobble spans, 0.5 to 500 px, tuned for a picture
-        about 480 px high: small is a jitter from row to row, large a slow sway.
-    truncate : number, ratio, 1 to 10, default 4.0
-        Where the blurs of the bleed, the noise and the wobble are cut off, in sigmas, 1 to
-        10. Lower is faster and gives slightly sharper tails.
-    edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
-        What lies beyond the picture's left and right edges for everything that moves or
-        blurs sideways: 'nearest' the edge pixel repeated (a worn tape smears its edge
-        rather than bringing the far side round), 'wrap' the opposite side, 'reflect' the
-        picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel.
-        For the noise and wobble the rules act on the rows and columns of their own fields.
+Advanced parameters
+-------------------
+band_height : number, px, 0 to 2000, default 19.2
+    The tallest a tracking band can be, in px, 0 to 2000, tuned for a picture about 480
+    px high; each band is between half this and this tall (never under 1 px, never
+    taller than the picture).
+noise_size : number, px, 0.5 to 50, default 1.5
+    How wide a speck of tape noise is, 0.5 to 50 px (up to 1 px every pixel is its own
+    speck), tuned for a picture about 480 px high. Raising it gives coarser grain.
+wobble_size : number, px, 0.5 to 500, default 12.0
+    How many rows one wander of the wobble spans, 0.5 to 500 px, tuned for a picture
+    about 480 px high: small is a jitter from row to row, large a slow sway.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the blurs of the bleed, the noise and the wobble are cut off, in sigmas, 1 to
+    10. Lower is faster and gives slightly sharper tails.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
+    What lies beyond the picture's left and right edges for everything that moves or
+    blurs sideways: 'nearest' the edge pixel repeated (a worn tape smears its edge
+    rather than bringing the far side round), 'wrap' the opposite side, 'reflect' the
+    picture mirrored (edge pixel repeated once), 'mirror' mirrored about the edge pixel.
+    For the noise and wobble the rules act on the rows and columns of their own fields.
 
-    Presets
-    -------
-    signal_noise : A bad analog signal: a clean picture crossed by solid bands of static (snow) and short white tape dropouts."""
+Presets
+-------
+signal_noise : A bad analog signal: a clean picture crossed by solid bands of static (snow) and short white tape dropouts."""
     ...
 
 @_effect
-def vignette(
-    *,
-    amount: float | Drive = 0.5,
-    radius: float = 0.5,
-    feather: float = 0.5,
-    roundness: float = 1.0,
-    color: str | list[float] | tuple[float, float, float] = "#000000",
-    mask: str | None = None,
-    opacity: float = 1.0,
-    blend_mode: Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"] = "normal",
-    name: str | None = None,
-) -> Step:
+def vignette(*, amount: float | Drive = 0.5, radius: float = 0.5, feather: float = 0.5, roundness: float = 1.0, color: str | list[float] | tuple[float, float, float] = '#000000', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Fade the picture toward `color` from `radius` out to its corners, the centre untouched.  A pixel's distance from the centre is 0 in the middle and 1 at a corner; the contours of equal distance are superellipses through the corners (`roundness` 1: an ellipse, 0: a rectangle). From `radius` the pixel is mixed toward `color`, rising over `feather` along a smoothstep to `amount`.
 
-    Parameters
-    ----------
-    amount : number (drivable), fraction, 0 to 1, default 0.5
-        How far the edges are mixed toward the colour where the vignette is fullest: 0 =
-        off, 0.5 = halfway, 1 = the colour itself at the corners.
-    radius : number, fraction, 0 to 1, default 0.5
-        Where the vignette starts, as a fraction of the distance from the centre to a
-        corner: everything inside is untouched. Raising it clears more of the picture; 1
-        leaves even the corners alone.
-    feather : number, fraction, 0 to 1, default 0.5
-        How far beyond the radius the vignette takes to reach full strength, as a fraction
-        of the distance from the centre to a corner (a smooth S-curve). 0 = a hard edge;
-        raising it softens the transition.
-    roundness : number, fraction, 0 to 1, default 1.0
-        The shape of the vignette's contours: 1 = an ellipse that follows the picture's
-        proportions, 0 = a rectangle, which darkens the middle of each edge as much as a
-        corner; in between, a rounded rectangle.
-    color : colour, default '#000000'
-        The colour the edges fade to: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens,
-        white lightens."""
+Parameters
+----------
+amount : number (drivable), fraction, 0 to 1, default 0.5
+    How far the edges are mixed toward the colour where the vignette is fullest: 0 =
+    off, 0.5 = halfway, 1 = the colour itself at the corners.
+radius : number, fraction, 0 to 1, default 0.5
+    Where the vignette starts, as a fraction of the distance from the centre to a
+    corner: everything inside is untouched. Raising it clears more of the picture; 1
+    leaves even the corners alone.
+feather : number, fraction, 0 to 1, default 0.5
+    How far beyond the radius the vignette takes to reach full strength, as a fraction
+    of the distance from the centre to a corner (a smooth S-curve). 0 = a hard edge;
+    raising it softens the transition.
+roundness : number, fraction, 0 to 1, default 1.0
+    The shape of the vignette's contours: 1 = an ellipse that follows the picture's
+    proportions, 0 = a rectangle, which darkens the middle of each edge as much as a
+    corner; in between, a rounded rectangle.
+color : colour, default '#000000'
+    The colour the edges fade to: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens,
+    white lightens."""
     ...
