@@ -38,7 +38,12 @@ fn no_smear_and_no_crawl_leave_the_picture_as_it_is_whatever_the_edge_rule() -> 
             edge,
             ..Params::default()
         };
-        assert_close(&run_picture(&params, 9, 11, &picture)?, &picture, 1e-5, &format!("{edge:?}"));
+        assert_close(
+            &run_picture(&params, 9, 11, &picture)?,
+            &picture,
+            1e-5,
+            &format!("{edge:?}"),
+        );
     }
     Ok(())
 }
@@ -110,7 +115,11 @@ fn colour_is_blurred_along_each_row_alone_while_brightness_is_kept() -> Result<(
                     }
                 }
             }
-            assert_yiq(&out, &expected, &format!("{edge:?}, sigma {sigma}, truncate {truncate}"));
+            assert_yiq(
+                &out,
+                &expected,
+                &format!("{edge:?}, sigma {sigma}, truncate {truncate}"),
+            );
         }
     }
     Ok(())

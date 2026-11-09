@@ -131,7 +131,13 @@ pub(crate) fn clumped(
     if size <= 1.0 {
         return plane;
     }
-    standardised(gaussian_filter_plane(&plane, (height, width), size / 2.0, truncate, edge))
+    standardised(gaussian_filter_plane(
+        &plane,
+        (height, width),
+        size / 2.0,
+        truncate,
+        edge,
+    ))
 }
 
 /// `sum` shifted to mean 0 and scaled to standard deviation 1; all zeros if it has no variation.

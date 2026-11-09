@@ -28,17 +28,19 @@ fn untouched() -> Params {
 }
 
 fn channel_of(picture: &[f32], channel: usize) -> Vec<f64> {
-    picture.iter().skip(channel).step_by(3).map(|&level| f64::from(level)).collect()
+    picture
+        .iter()
+        .skip(channel)
+        .step_by(3)
+        .map(|&level| f64::from(level))
+        .collect()
 }
 
 #[test]
 fn every_damage_at_its_minimum_leaves_the_picture_exactly_as_it_is() -> Result<(), Error> {
     let picture = varied(9, 11);
     for edge in [Edge::Reflect, Edge::Nearest, Edge::Mirror, Edge::Wrap] {
-        let params = Params {
-            edge,
-            ..untouched()
-        };
+        let params = Params { edge, ..untouched() };
         let out = run_picture(&params, 9, 11, &picture)?;
         assert_eq!(first_bit_difference(&out, &picture), None, "{edge:?}");
     }
@@ -65,13 +67,23 @@ fn bands_only_rotate_the_rows_they_cover_by_no_more_than_their_tracking_together
         for column in 0..width {
             let (from_row, from_column) = read[row * width + column];
             assert_eq!(from_row.round() as usize, row, "row {row} read from another row");
-            assert_eq!(from_column.round() as usize, (first + column) % width, "row {row}, column {column}");
+            assert_eq!(
+                from_column.round() as usize,
+                (first + column) % width,
+                "row {row}, column {column}"
+            );
         }
         let slide = (width - first) % width;
         moved += usize::from(slide != 0);
-        assert!(slide <= 15 || width - slide <= 15, "row {row} slid {slide} px, past 3 bands of 5");
+        assert!(
+            slide <= 15 || width - slide <= 15,
+            "row {row} slid {slide} px, past 3 bands of 5"
+        );
     }
-    assert!((1..=30).contains(&moved), "{moved} rows moved; 3 bands cover at most 30");
+    assert!(
+        (1..=30).contains(&moved),
+        "{moved} rows moved; 3 bands cover at most 30"
+    );
     Ok(())
 }
 
@@ -95,7 +107,11 @@ fn the_wobble_moves_rows_with_the_deviation_asked_for_and_slowly_when_its_size_i
     for (wobble_size, slack) in [(0.5, 0.6), (4.0, 2e-3), (8.0, 2e-3)] {
         let drift = drifts(wobble_size)?;
         assert!(mean(&drift).abs() < slack, "size {wobble_size}: mean {}", mean(&drift));
-        assert!((deviation(&drift) - 2.0).abs() < slack, "size {wobble_size}: deviation {}", deviation(&drift));
+        assert!(
+            (deviation(&drift) - 2.0).abs() < slack,
+            "size {wobble_size}: deviation {}",
+            deviation(&drift)
+        );
     }
     let slow = drifts(8.0)?;
     assert!(correlation(&slow[1..], &slow[..side - 1]) > 0.6);
@@ -121,7 +137,10 @@ fn a_dropout_is_a_white_rectangle_as_tall_as_a_noise_speck_and_as_long_as_the_tr
             .collect();
         assert!(out.iter().all(|&level| level == 0.0 || level == 1.0), "seed {seed}");
         let (top, bottom) = (white[0].0, white[white.len() - 1].0);
-        let (left, right) = (white[0].1, white[1.min(white.len() - 1)..].iter().map(|p| p.1).max().unwrap_or(0));
+        let (left, right) = (
+            white[0].1,
+            white[1.min(white.len() - 1)..].iter().map(|p| p.1).max().unwrap_or(0),
+        );
         let (rows, columns) = (bottom - top + 1, right - left + 1);
         assert_eq!(white.len(), rows * columns, "seed {seed}: not a rectangle");
         assert_eq!(rows, 2.min(height - top), "seed {seed}");
@@ -137,7 +156,9 @@ fn static_fills_the_band_with_grey_noise_and_nothing_else_changes() -> Result<()
     let side = 40;
     // (the level of the picture, the share of static, the mean and deviation of what a band holds): a share s of a uniform
     // grey of mean 1/2 and deviation 1/sqrt(12) on the level (1 - s)
-    for (level, share, expected_mean, expected_deviation) in [(1.0_f32, 0.5_f32, 0.75, 0.144_3), (0.0, 1.0, 0.5, 0.288_7)] {
+    for (level, share, expected_mean, expected_deviation) in
+        [(1.0_f32, 0.5_f32, 0.75, 0.144_3), (0.0, 1.0, 0.5, 0.288_7)]
+    {
         let params = Params {
             bands: 3,
             tracking: 0.0,
@@ -148,7 +169,11 @@ fn static_fills_the_band_with_grey_noise_and_nothing_else_changes() -> Result<()
         let out = run_picture(&params, side, side, &vec![level; side * side * 3])?;
         let rows: Vec<&[f32]> = out.chunks_exact(side * 3).collect();
         let covered: Vec<&&[f32]> = rows.iter().filter(|row| row.iter().any(|&v| v != level)).collect();
-        assert!((5..=30).contains(&covered.len()), "level {level}: {} rows", covered.len());
+        assert!(
+            (5..=30).contains(&covered.len()),
+            "level {level}: {} rows",
+            covered.len()
+        );
         let grey: Vec<f64> = covered
             .iter()
             .flat_map(|row| {
@@ -158,8 +183,16 @@ fn static_fills_the_band_with_grey_noise_and_nothing_else_changes() -> Result<()
                 })
             })
             .collect();
-        assert!((mean(&grey) - expected_mean).abs() < 0.04, "level {level}: mean {}", mean(&grey));
-        assert!((deviation(&grey) - expected_deviation).abs() < 0.03, "level {level}: deviation {}", deviation(&grey));
+        assert!(
+            (mean(&grey) - expected_mean).abs() < 0.04,
+            "level {level}: mean {}",
+            mean(&grey)
+        );
+        assert!(
+            (deviation(&grey) - expected_deviation).abs() < 0.03,
+            "level {level}: deviation {}",
+            deviation(&grey)
+        );
     }
     let nothing = Params {
         bands: 0,
@@ -167,7 +200,10 @@ fn static_fills_the_band_with_grey_noise_and_nothing_else_changes() -> Result<()
         ..untouched()
     };
     let picture = varied(9, 11);
-    assert_eq!(first_bit_difference(&run_picture(&nothing, 9, 11, &picture)?, &picture), None);
+    assert_eq!(
+        first_bit_difference(&run_picture(&nothing, 9, 11, &picture)?, &picture),
+        None
+    );
     Ok(())
 }
 
@@ -176,14 +212,17 @@ fn bled_colour_is_the_colour_moved_right_and_blurred_while_brightness_stays() ->
     let (rows, width) = (3, 40);
     let colour = [0.7, 0.45, 0.35];
     let picture: Vec<f32> = (0..rows * width)
-        .flat_map(|at| if (12..20).contains(&(at % width)) { colour } else { [0.5; 3] })
+        .flat_map(|at| {
+            if (12..20).contains(&(at % width)) {
+                colour
+            } else {
+                [0.5; 3]
+            }
+        })
         .collect();
     let before = yiq_of(&picture);
     for bleed in [4.0_f32, 2.5] {
-        let params = Params {
-            bleed,
-            ..untouched()
-        };
+        let params = Params { bleed, ..untouched() };
         let out = yiq_of(&run_picture(&params, rows, width, &picture)?);
         for axis in 1..3 {
             let line: Vec<f64> = (0..width).map(|column| before[column][axis]).collect();
@@ -202,8 +241,14 @@ fn bled_colour_is_the_colour_moved_right_and_blurred_while_brightness_stays() ->
             for row in 0..rows {
                 for column in 0..width {
                     let got = out[row * width + column];
-                    assert!((got[axis] - expected[column]).abs() < 3e-5, "bleed {bleed}, axis {axis}, column {column}");
-                    assert!((got[0] - before[row * width + column][0]).abs() < 3e-5, "brightness at column {column}");
+                    assert!(
+                        (got[axis] - expected[column]).abs() < 3e-5,
+                        "bleed {bleed}, axis {axis}, column {column}"
+                    );
+                    assert!(
+                        (got[0] - before[row * width + column][0]).abs() < 3e-5,
+                        "brightness at column {column}"
+                    );
                 }
             }
         }
@@ -223,12 +268,24 @@ fn tape_noise_has_the_deviation_asked_clumps_with_its_size_and_leaves_colour_alo
             ..untouched()
         };
         let out = channel_of(&run_picture(&params, side, side, &grey)?, 0);
-        assert!((mean(&out) - 0.5).abs() < if clumped { 1e-3 } else { 6e-3 }, "size {noise_size}: mean {}", mean(&out));
+        assert!(
+            (mean(&out) - 0.5).abs() < if clumped { 1e-3 } else { 6e-3 },
+            "size {noise_size}: mean {}",
+            mean(&out)
+        );
         if clumped {
-            assert!((deviation(&out) - 0.05).abs() < 1e-3, "size {noise_size}: deviation {}", deviation(&out));
+            assert!(
+                (deviation(&out) - 0.05).abs() < 1e-3,
+                "size {noise_size}: deviation {}",
+                deviation(&out)
+            );
             assert!(neighbour_correlation(&out, side) > 0.8);
         } else {
-            assert!((deviation(&out) - 0.05).abs() < 5e-3, "size {noise_size}: deviation {}", deviation(&out));
+            assert!(
+                (deviation(&out) - 0.05).abs() < 5e-3,
+                "size {noise_size}: deviation {}",
+                deviation(&out)
+            );
             assert!(neighbour_correlation(&out, side).abs() < 0.15);
         }
     }
@@ -240,7 +297,10 @@ fn tape_noise_has_the_deviation_asked_clumps_with_its_size_and_leaves_colour_alo
     let out = yiq_of(&run_picture(&params, side, side, &coloured)?);
     let want = yiq_of(&coloured[..3]);
     for (at, pixel) in out.iter().enumerate() {
-        assert!((pixel[1] - want[0][1]).abs() < 3e-5 && (pixel[2] - want[0][2]).abs() < 3e-5, "colour at {at}");
+        assert!(
+            (pixel[1] - want[0][1]).abs() < 3e-5 && (pixel[2] - want[0][2]).abs() < 3e-5,
+            "colour at {at}"
+        );
     }
     let brightness: Vec<f64> = out.iter().map(|pixel| pixel[0]).collect();
     assert!((deviation(&brightness) - 0.02).abs() < 1e-3);

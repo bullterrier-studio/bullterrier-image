@@ -67,11 +67,13 @@ const fn inverse(m: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
 const YIQ_TO_RGB: [[f64; 3]; 3] = inverse(&RGB_TO_YIQ);
 
 /// `matrix` applied to `pixel`, in f32.
-#[expect(clippy::cast_possible_truncation, reason = "the coefficients are stored in the f32 picture's precision")]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the coefficients are stored in the f32 picture's precision"
+)]
 fn rotated(matrix: &[[f64; 3]; 3], pixel: [f32; 3]) -> [f32; 3] {
-    matrix.map(|row| {
-        (row[0] * f64::from(pixel[0]) + row[1] * f64::from(pixel[1]) + row[2] * f64::from(pixel[2])) as f32
-    })
+    matrix
+        .map(|row| (row[0] * f64::from(pixel[0]) + row[1] * f64::from(pixel[1]) + row[2] * f64::from(pixel[2])) as f32)
 }
 
 /// Convert sRGB to the NTSC YIQ of television (FCC 47 CFR 73.682 coefficients): (Y, I, Q), Y in 0..1, I about -0.6..0.6
@@ -135,7 +137,10 @@ mod tests {
             ([1.0, 1.0, 1.0], [1.0, 0.0, 0.0]),
         ] {
             let got = rgb_to_yiq(rgb);
-            assert!(got.iter().zip(yiq).all(|(a, b)| (a - b).abs() < 1e-6), "{rgb:?}: {got:?}");
+            assert!(
+                got.iter().zip(yiq).all(|(a, b)| (a - b).abs() < 1e-6),
+                "{rgb:?}: {got:?}"
+            );
         }
     }
 
@@ -148,14 +153,20 @@ mod tests {
             ([1.0, 0.0, 0.0], [1.0, 1.0, 1.0]),
         ] {
             let got = yiq_to_rgb(yiq);
-            assert!(got.iter().zip(rgb).all(|(a, b)| (a - b).abs() < 1e-4), "{yiq:?}: {got:?}");
+            assert!(
+                got.iter().zip(rgb).all(|(a, b)| (a - b).abs() < 1e-4),
+                "{yiq:?}: {got:?}"
+            );
         }
         for red in 0_u8..=4 {
             for green in 0_u8..=4 {
                 for blue in 0_u8..=4 {
                     let colour = [red, green, blue].map(|level| f32::from(level) / 4.0);
                     let back = yiq_to_rgb(rgb_to_yiq(colour));
-                    assert!(back.iter().zip(colour).all(|(a, b)| (a - b).abs() < 1e-5), "{colour:?}: {back:?}");
+                    assert!(
+                        back.iter().zip(colour).all(|(a, b)| (a - b).abs() < 1e-5),
+                        "{colour:?}: {back:?}"
+                    );
                 }
             }
         }
