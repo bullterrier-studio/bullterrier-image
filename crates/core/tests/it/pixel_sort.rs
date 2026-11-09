@@ -31,7 +31,11 @@ fn sorted_greys(levels: &[f32], order: Order, axis: Axis, low: f32, high: f32) -
         axis,
         ..Params::default()
     };
-    let (height, width) = if axis == Axis::Horizontal { (1, levels.len()) } else { (levels.len(), 1) };
+    let (height, width) = if axis == Axis::Horizontal {
+        (1, levels.len())
+    } else {
+        (levels.len(), 1)
+    };
     let out = run_picture(&params, height, width, &greys(levels))?;
     Ok(out.as_chunks::<3>().0.iter().map(|pixel| pixel[0]).collect())
 }
@@ -47,7 +51,11 @@ fn runs_between_the_thresholds_are_ordered_and_the_rest_stays() -> Result<(), Er
     ];
     for axis in [Axis::Horizontal, Axis::Vertical] {
         for (order, expected) in cases {
-            assert_eq!(sorted_greys(&ROW, order, axis, 0.2, 0.8)?, expected, "{axis:?} {order:?}");
+            assert_eq!(
+                sorted_greys(&ROW, order, axis, 0.2, 0.8)?,
+                expected,
+                "{axis:?} {order:?}"
+            );
         }
     }
     Ok(())
@@ -57,7 +65,10 @@ fn runs_between_the_thresholds_are_ordered_and_the_rest_stays() -> Result<(), Er
 fn the_thresholds_are_inclusive_and_crossed_ones_sort_nothing() -> Result<(), Error> {
     // 0.25 and 0.75 are exactly low and high, so they are inside and the whole row is one run
     let row = [0.75, 0.5, 0.25];
-    assert_eq!(sorted_greys(&row, Order::Ascending, Axis::Horizontal, 0.25, 0.75)?, [0.25, 0.5, 0.75]);
+    assert_eq!(
+        sorted_greys(&row, Order::Ascending, Axis::Horizontal, 0.25, 0.75)?,
+        [0.25, 0.5, 0.75]
+    );
     assert_eq!(sorted_greys(&row, Order::Ascending, Axis::Horizontal, 0.8, 0.2)?, row);
     Ok(())
 }
@@ -74,8 +85,41 @@ fn by_hue_equal_keys_keep_their_order() -> Result<(), Error> {
         ..Params::default()
     };
     let out = run_picture(&params, 1, 4, &picture)?;
-    let expected: Vec<f32> = [pixels[1], pixels[2], pixels[3], pixels[0]].iter().flatten().copied().collect();
+    let expected: Vec<f32> = [pixels[1], pixels[2], pixels[3], pixels[0]]
+        .iter()
+        .flatten()
+        .copied()
+        .collect();
     assert_eq!(first_bit_difference(&out, &expected), None);
+    Ok(())
+}
+
+#[test]
+fn by_hue_a_long_run_keeps_equal_keys_in_their_order() -> Result<(), Error> {
+    // pixel i has hue 0, 1/3 or 2/3 by i % 3 (reddish, greenish, blueish) and a different pale tone t; a stable sort lists the
+    // reds in their order, then the greens, then the blues
+    let tone = |index: usize| {
+        #[expect(clippy::cast_precision_loss, reason = "a small index")]
+        let t = index as f32 / 200.0;
+        match index % 3 {
+            0 => [1.0, t, t],
+            1 => [t, 1.0, t],
+            _ => [t, t, 1.0],
+        }
+    };
+    let pixels: Vec<[f32; 3]> = (0..90).map(tone).collect();
+    let expected: Vec<[f32; 3]> = (0..3)
+        .flat_map(|class| (0..90).filter(move |i| i % 3 == class).map(tone))
+        .collect();
+    let flat = |pixels: &[[f32; 3]]| pixels.iter().flatten().copied().collect::<Vec<f32>>();
+    let params = Params {
+        by: By::Hue,
+        low: 0.0,
+        high: 1.0,
+        ..Params::default()
+    };
+    let out = run_picture(&params, 1, 90, &flat(&pixels))?;
+    assert_eq!(first_bit_difference(&out, &flat(&expected)), None);
     Ok(())
 }
 
@@ -86,8 +130,12 @@ fn line_pixels(values: &[f32], height: usize, width: usize, axis: Axis) -> Vec<V
         [values[at].to_bits(), values[at + 1].to_bits(), values[at + 2].to_bits()]
     };
     let mut lines: Vec<Vec<[u32; 3]>> = match axis {
-        Axis::Horizontal => (0..height).map(|row| (0..width).map(|column| pixel(row, column)).collect()).collect(),
-        Axis::Vertical => (0..width).map(|column| (0..height).map(|row| pixel(row, column)).collect()).collect(),
+        Axis::Horizontal => (0..height)
+            .map(|row| (0..width).map(|column| pixel(row, column)).collect())
+            .collect(),
+        Axis::Vertical => (0..width)
+            .map(|column| (0..height).map(|row| pixel(row, column)).collect())
+            .collect(),
     };
     for line in &mut lines {
         line.sort_unstable();
@@ -115,7 +163,10 @@ fn every_line_keeps_exactly_its_pixels() -> Result<(), Error> {
                     line_pixels(&picture, height, width, axis),
                     "{params:?}"
                 );
-                assert!(first_bit_difference(&out, &picture).is_some(), "{params:?} sorted nothing");
+                assert!(
+                    first_bit_difference(&out, &picture).is_some(),
+                    "{params:?} sorted nothing"
+                );
             }
         }
     }
@@ -138,7 +189,10 @@ fn sorting_columns_is_sorting_rows_of_the_turned_picture() -> Result<(), Error> 
     };
     let across = run_picture(&Params::default(), width, height, &turn(&picture, height, width))?;
     assert_eq!(
-        first_bit_difference(&turn(&across, width, height), &run_picture(&vertical, height, width, &picture)?),
+        first_bit_difference(
+            &turn(&across, width, height),
+            &run_picture(&vertical, height, width, &picture)?
+        ),
         None
     );
     Ok(())
