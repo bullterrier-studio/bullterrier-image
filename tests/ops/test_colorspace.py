@@ -1,7 +1,4 @@
-"""Tests of `ops/colorspace.py`: the sRGB transfer function, and Oklab, checked against published
-values and the standard library's `colorsys`."""
-
-import colorsys
+"""Tests of `ops/colorspace.py`: the sRGB transfer function and Oklab, checked against published values."""
 
 import numpy as np
 import pytest
