@@ -1,5 +1,5 @@
-//! Colour-space conversions: the sRGB transfer function (IEC 61966-2-1), one channel value at a time, and HSV and the
-//! NTSC YIQ of television, one pixel at a time. Values outside 0..1 are carried through (the transfer function mirrored around zero), so callers decide
+//! Colour-space conversions: the sRGB transfer function (IEC 61966-2-1), one channel value at a time, and HSV, Oklab and
+//! the NTSC YIQ of television, one pixel at a time. Values outside 0..1 are carried through (the transfer function mirrored around zero), so callers decide
 //! how to handle out-of-gamut colours.
 
 const ENCODED_BREAK: f32 = 0.04045; // constant: encoded value where the sRGB linear segment ends (IEC 61966-2-1)
@@ -87,6 +87,29 @@ pub(crate) fn yiq_to_rgb(pixel: [f32; 3]) -> [f32; 3] {
     rotated(&YIQ_TO_RGB, pixel)
 }
 
+/// Ottosson's matrix from linear sRGB to cone responses (Oklab, 2020).
+const TO_CONES: [[f32; 3]; 3] = [
+    [0.412_221_47, 0.536_332_55, 0.051_445_995], // constant: Ottosson (2020), Oklab, linear sRGB to cones (row 1)
+    [0.211_903_5, 0.680_699_5, 0.107_396_96],    // constant: Ottosson (2020), Oklab, linear sRGB to cones (row 2)
+    [0.088_302_46, 0.281_718_85, 0.629_978_7],   // constant: Ottosson (2020), Oklab, linear sRGB to cones (row 3)
+];
+
+/// Ottosson's matrix from the cube roots of the cone responses to lightness and the two colour axes (Oklab, 2020).
+const TO_LAB: [[f32; 3]; 3] = [
+    [0.210_454_26, 0.793_617_8, -0.004_072_047], // constant: Ottosson (2020), Oklab, cones to Lab (row 1)
+    [1.977_998_5, -2.428_592_2, 0.450_593_7],    // constant: Ottosson (2020), Oklab, cones to Lab (row 2)
+    [0.025_904_037, 0.782_771_77, -0.808_675_77], // constant: Ottosson (2020), Oklab, cones to Lab (row 3)
+];
+
+/// Convert gamma-encoded sRGB to Oklab (Ottosson, 2020), where equal distances look about equally different: (L, a, b),
+/// L the lightness (0 black, 1 white), a the green-red and b the blue-yellow axis, both 0 for a grey and within about
+/// -0.4..0.4 for sRGB colours.
+pub(crate) fn rgb_to_oklab(pixel: [f32; 3]) -> [f32; 3] {
+    let linear = pixel.map(srgb_to_linear);
+    let cones = TO_CONES.map(|row| (row[0] * linear[0] + row[1] * linear[1] + row[2] * linear[2]).cbrt());
+    TO_LAB.map(|row| row[0] * cones[0] + row[1] * cones[1] + row[2] * cones[2])
+}
+
 const OFFSETS: [f32; 3] = [5.0, 3.0, 1.0]; // constant: the red, green and blue channels' offsets in sectors (HSV)
 const SECTORS: f32 = 6.0; // constant: the hue circle is six sectors, red to yellow to green to cyan to blue to magenta (HSV)
 
@@ -150,7 +173,25 @@ mod tests {
     //! YIQ against the FCC's published matrix and its known inverse. The conversions are `pub(crate)`, so no public route
     //! shows them apart from the effects built on them.
 
-    use super::{rgb_to_yiq, yiq_to_rgb};
+    use super::{rgb_to_oklab, rgb_to_yiq, yiq_to_rgb};
+
+    #[test]
+    fn the_primaries_and_white_have_the_published_oklab() {
+        // Ottosson's published values (bottosson.github.io/posts/oklab), to four places
+        for (rgb, lab) in [
+            ([1.0, 1.0, 1.0], [1.0, 0.0, 0.0]),
+            ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+            ([1.0, 0.0, 0.0], [0.6280, 0.2249, 0.1258]),
+            ([0.0, 1.0, 0.0], [0.8664, -0.2339, 0.1795]),
+            ([0.0, 0.0, 1.0], [0.4520, -0.0325, -0.3115]),
+        ] {
+            let got = rgb_to_oklab(rgb);
+            assert!(
+                got.iter().zip(lab).all(|(a, b)| (a - b).abs() < 1e-3),
+                "{rgb:?}: {got:?}"
+            );
+        }
+    }
 
     #[test]
     fn the_primaries_and_white_have_the_published_yiq() {

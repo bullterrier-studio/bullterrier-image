@@ -437,6 +437,19 @@ fn cases() -> Vec<Case> {
                     .param("seed", 4_294_967_295_u32)
                     .param("edge", "reflect"),
                 Step::new("vhs"),
+                Step::new("dither")
+                    .param("method", "blue_noise")
+                    .param("palette", "custom")
+                    .param("custom", json!(["#0b1026", "#ff5a36", "#f7e7c6"]))
+                    .param("cell", 3),
+                Step::new("dither")
+                    .param("method", "atkinson")
+                    .param("colors", 5)
+                    .param("sample", 500),
+                Step::new("dither")
+                    .param("method", "bayer")
+                    .param("palette", "ega")
+                    .param("space", "rgb"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

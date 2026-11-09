@@ -6,4 +6,5 @@ size = 480
 effect = "dither"
 method = "blue_noise"
 cell = 4
-palette = ["#0b1026", "#ff5a36", "#f7e7c6"]
+palette = "custom"
+custom = ["#0b1026", "#ff5a36", "#f7e7c6"]

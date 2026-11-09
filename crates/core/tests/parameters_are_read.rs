@@ -256,6 +256,31 @@ fn conditional() -> Vec<Conditional> {
             field: "wobble_size",
             with: vec![("bands", json!(0))],
         },
+        // the colours of the list are used only when the palette says so
+        Conditional {
+            effect: "dither",
+            field: "custom",
+            with: vec![("palette", json!("custom"))],
+        },
+        // the k-means rounds change the colours only when the starting colours are not yet the answer
+        Conditional {
+            effect: "dither",
+            field: "iterations",
+            with: vec![
+                ("colors", json!(3)),
+                ("init", json!("random")),
+                ("tolerance", json!(0.0)),
+            ],
+        },
+        Conditional {
+            effect: "dither",
+            field: "tolerance",
+            with: vec![
+                ("colors", json!(3)),
+                ("init", json!("random")),
+                ("iterations", json!(2)),
+            ],
+        },
         // the clumping blur is run only for specks of more than a pixel
         Conditional {
             effect: "grain",
