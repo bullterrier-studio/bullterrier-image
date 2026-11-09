@@ -465,3 +465,22 @@ fn feather_softens_the_dot_edges_without_changing_the_ink() -> Result<(), Error>
     assert!((mean(&soft) - mean(&crisp)).abs() < 0.03 * mean(&crisp));
     Ok(())
 }
+
+#[test]
+fn a_full_turn_of_the_angle_is_no_turn() -> Result<(), Error> {
+    let photo = varied(48, 48);
+    let screen = |angle| {
+        run_picture(
+            &Params {
+                cell: 12,
+                angle,
+                ..Params::default()
+            },
+            48,
+            48,
+            &photo,
+        )
+    };
+    assert_eq!(first_difference(&screen(0.0)?, &screen(360.0)?), None);
+    Ok(())
+}

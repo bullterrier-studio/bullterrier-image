@@ -363,59 +363,95 @@ fn dog_draws_one_line_on_the_dark_side_of_a_step_and_on_dark_strokes_only() -> R
     Ok(())
 }
 
-/// A vertical step at column 8 of a picture `height` rows high whose contrast follows `contrast` row by row.
-fn fading_step(contrast: &[f32]) -> Vec<f32> {
-    contrast
-        .iter()
-        .flat_map(|&level| (0..24).map(move |column| if column >= 8 { level } else { 0.0 }))
-        .collect()
+/// The brightness of a line that reads between the thresholds of `edges` at its defaults and radius 1.
+const WEAK: f32 = 0.2;
+
+/// How a line of steps runs across the picture.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Run {
+    Down,
+    Across,
+    FallingDiagonal,
+    RisingDiagonal,
 }
 
-/// The `n` values from `from` to `to`, evenly.
-fn linear(from: f32, to: f32, n: usize) -> impl Iterator<Item = f32> {
-    (0..n).map(move |index| from + (to - from) * index as f32 / (n - 1) as f32)
+/// A picture of a thin line, 60 cells long, running as `run` says, whose brightness at the cell `n` along it is
+/// `contrast[n]`, on black: (height, width, grey), and the cell along the line of each pixel. (A line, not a step, so
+/// that where the contrast changes along it nothing else in the picture changes.)
+fn lined(run: Run, contrast: &[f32]) -> (usize, usize, Vec<f32>, Vec<usize>) {
+    let n = contrast.len();
+    let (height, width) = match run {
+        Run::Down => (n, 24),
+        Run::Across => (24, n),
+        Run::FallingDiagonal | Run::RisingDiagonal => (n, n + 16),
+    };
+    let (mut grey, mut along) = (vec![0.0; height * width], vec![0; height * width]);
+    for at in 0..height * width {
+        let (row, column) = (at / width, at % width);
+        let (cell, on) = match run {
+            Run::Down => (row, column == 8),
+            Run::Across => (column, row == 8),
+            Run::FallingDiagonal => (row, column == row + 8),
+            Run::RisingDiagonal => (row, column + row == n + 8),
+        };
+        along[at] = if run == Run::Across { column } else { row };
+        grey[at] = if on { contrast[cell] } else { 0.0 };
+    }
+    (height, width, grey, along)
 }
 
 #[test]
-fn canny_keeps_a_weak_line_only_where_it_joins_a_strong_one() -> Result<(), Error> {
-    // contrast is steepness for radius 1: the thresholds are 0.05 and 0.15 and 0.12 is between them
+fn canny_keeps_a_weak_line_only_where_it_joins_a_strong_one_whichever_way_the_line_runs() -> Result<(), Error> {
+    // of the line's brightness, a thin line of WEAK reads between the thresholds 0.05 and 0.15 and one of 1 above them
     let params = |method| Params {
         method,
         radius: 1.0,
         ..Params::default()
     };
-    let lit = |out: &[f32], rows: std::ops::Range<usize>| {
-        rows.into_iter()
-            .any(|row| out[row * 24 + 7] > 0.0 || out[row * 24 + 8] > 0.0)
+    // how many drawn pixels lie on the cells `cells` of the line
+    let drawn_on = |method, run, contrast: &[f32], cells: std::ops::Range<usize>| -> Result<usize, Error> {
+        let (height, width, grey, along) = lined(run, contrast);
+        let out = drawn(&params(method), height, width, &grey)?;
+        Ok((0..out.len())
+            .filter(|&at| out[at] > 0.0 && cells.contains(&along[at]))
+            .count())
     };
-    // 0.12 all the way down: nothing strong to join, though sobel draws it
-    let weak = fading_step(&[0.12; 60]);
+    // strong, easing off to weak over a dozen cells (a sudden drop leaves a gap in the crests of the line), then weak
+    let taper = (0..12_u8).map(|step| 1.0 - (1.0 - WEAK) * f32::from(step) / 11.0);
+    let strong_first: Vec<f32> = [vec![1.0; 10], taper.collect(), vec![WEAK; 38]].concat();
+    let strong_last: Vec<f32> = strong_first.iter().rev().copied().collect();
+    for run in [Run::Down, Run::Across, Run::FallingDiagonal, Run::RisingDiagonal] {
+        // 0.12 all the way: nothing strong to join, though sobel draws it
+        assert_eq!(
+            drawn_on(Method::Canny, run, &[WEAK; 60], 5..55)?,
+            0,
+            "{run:?}: alone, a weak line goes"
+        );
+        assert!(
+            drawn_on(Method::Sobel, run, &[WEAK; 60], 5..55)? > 0,
+            "{run:?}: sobel draws it"
+        );
+        // joined to a strong end, the weak line stays all the way along, in whichever direction it is followed
+        assert!(
+            drawn_on(Method::Canny, run, &strong_first, 20..55)? >= 30,
+            "{run:?}: strong end first"
+        );
+        assert!(
+            drawn_on(Method::Canny, run, &strong_last, 5..40)? >= 30,
+            "{run:?}: strong end last"
+        );
+    }
+    // strong, then a stretch of nothing, then weak: the gap cuts the weak part off
+    let gapped: Vec<f32> = [vec![1.0; 12], vec![0.0; 20], vec![WEAK; 28]].concat();
     assert!(
-        !lit(&drawn(&params(Method::Canny), 60, 24, &weak)?, 5..55),
-        "alone, a weak line goes"
+        drawn_on(Method::Canny, Run::Down, &gapped, 2..10)? > 0,
+        "the strong top is drawn"
     );
-    assert!(
-        lit(&drawn(&params(Method::Sobel), 60, 24, &weak)?, 5..55),
-        "sobel draws it"
+    assert_eq!(
+        drawn_on(Method::Canny, Run::Down, &gapped, 34..58)?,
+        0,
+        "the weak end is cut off"
     );
-    // from 1 down to 0.12: joined to its strong top, the weak end stays
-    let fading: Vec<f32> = linear(1.0, 0.12, 60).collect();
-    assert!(
-        lit(&drawn(&params(Method::Canny), 60, 24, &fading_step(&fading))?, 50..55),
-        "joined, it stays"
-    );
-    // strong, then a stretch under the lower threshold, then weak: the gap cuts the weak part off
-    let gapped: Vec<f32> = [
-        vec![1.0; 12],
-        linear(1.0, 0.02, 12).collect(),
-        vec![0.02; 12],
-        linear(0.02, 0.12, 12).collect(),
-        vec![0.12; 24],
-    ]
-    .concat();
-    let out = drawn(&params(Method::Canny), gapped.len(), 24, &fading_step(&gapped))?;
-    assert!(lit(&out, 2..10), "the strong top is drawn");
-    assert!(!lit(&out, 60..70), "the weak end is cut off");
     Ok(())
 }
 
