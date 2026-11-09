@@ -71,14 +71,6 @@ def _extent(occupied: np.ndarray) -> tuple[int, int]:
     return (first, last) if occupied.any() else (first, first)
 
 
-def _shift_axis(image: np.ndarray, distance: float, axis: int, edge: Edge) -> np.ndarray:
-    """`image` moved by `distance` px along one axis: output line i is the input at i - distance."""
-    near, far, fraction = _source_lines(image.shape[axis], distance, edge)
-    if fraction == 0:
-        return np.take(image, near, axis=axis)
-    return _blend(np.take(image, near, axis=axis), np.take(image, far, axis=axis), fraction)
-
-
 def _source_lines(size: int, distance: float, edge: Edge) -> tuple[np.ndarray, np.ndarray, float]:
     """For a shift by `distance` along a side of `size` lines: the line each output line reads (`near`), the line before
     it (`far`, read only when the fraction is not 0), and the share of `far` in the output."""
