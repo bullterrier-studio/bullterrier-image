@@ -1,14 +1,17 @@
-# A newsprint dot screen in warm white ink on black.
+# A two-ink print: the photo split into pink and blue screens on warm paper, the blue slipped a little off register.
 name = "halftone"
 size = 480
 
 [[step]]
 effect = "halftone"
 cell = 7
-angle = 45
-ink = "#fff1de"
+separation = "spot"
+inks = ["#e8325a", "#1f4fd8"]
+paper = "#f4efe4"
+offset = 1.5
+offset_angle = 20
 
 [[step]]
 effect = "gradient"
-colors = ["#000000"]
-mask = "background"           # the subject on black
+colors = ["#f4efe4"]
+mask = "background"           # the subject on bare paper

@@ -115,6 +115,26 @@ fn conditional() -> Vec<Conditional> {
             field: "constant_value",
             with: vec![("edge", json!("constant"))],
         },
+        // inks, the offset and its direction matter only while several inks print, on a paper that is not black
+        Conditional {
+            effect: "halftone",
+            field: "inks",
+            with: vec![("separation", json!("spot")), ("paper", json!("#ffffff"))],
+        },
+        Conditional {
+            effect: "halftone",
+            field: "offset",
+            with: vec![("separation", json!("cmyk")), ("paper", json!("#ffffff"))],
+        },
+        Conditional {
+            effect: "halftone",
+            field: "offset_angle",
+            with: vec![
+                ("separation", json!("cmyk")),
+                ("paper", json!("#ffffff")),
+                ("offset", json!(5.0)),
+            ],
+        },
         // a table that is none is the identity, which the amount mixes in without change
         Conditional {
             effect: "lut",

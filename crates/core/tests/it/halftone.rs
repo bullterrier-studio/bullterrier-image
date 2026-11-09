@@ -12,7 +12,7 @@
 
 use std::f32::consts::PI;
 
-use bullterrier_image::effects::halftone::Params;
+use bullterrier_image::effects::halftone::{Params, Separation, Shape};
 use bullterrier_image::params::Color;
 use bullterrier_image::{EdgeOrConstant, Error};
 
@@ -482,5 +482,330 @@ fn a_full_turn_of_the_angle_is_no_turn() -> Result<(), Error> {
         )
     };
     assert_eq!(first_difference(&screen(0.0)?, &screen(360.0)?), None);
+    Ok(())
+}
+
+/// The picture of one colour, `height` x `width`.
+fn colour(height: usize, width: usize, rgb: [f32; 3]) -> Vec<f32> {
+    (0..height * width).flat_map(|_| rgb).collect()
+}
+
+/// The channel `channel` of every pixel of `out`.
+fn channel(out: &[f32], channel: usize) -> Vec<f32> {
+    out.as_chunks::<3>().0.iter().map(|pixel| pixel[channel]).collect()
+}
+
+// inks no lighter than the paper in any channel: a lighter one cannot be printed on it
+const PINK: [f32; 3] = [0.9, 0.3, 0.45];
+const BLUE: [f32; 3] = [0.17, 0.35, 0.85];
+const PAPER: [f32; 3] = [0.95, 0.93, 0.88];
+
+/// Pink and blue spot inks on a light paper, the screens of the first at 45 degrees.
+fn spot() -> Params {
+    Params {
+        cell: 8,
+        separation: Separation::Spot,
+        inks: vec![Color(PINK), Color(BLUE)],
+        paper: Color(PAPER),
+        ..Params::default()
+    }
+}
+
+#[test]
+fn a_line_screen_keeps_the_tone_as_the_area_of_its_lines() -> Result<(), Error> {
+    // a line as wide as the ink needs: a share `tone` of each row of cells, but for the soft edge
+    let params = Params {
+        cell: 10,
+        angle: 0.0,
+        shape: Shape::Line,
+        ..white_on_black()
+    };
+    for tone in [0.1, 0.3, 0.6, 0.9] {
+        let ink = mean_ink(&params, 40, tone)?;
+        assert!((ink - tone).abs() < 0.03, "tone {tone}: {ink}");
+    }
+    Ok(())
+}
+
+#[test]
+fn lines_run_along_the_screen_rows_at_the_angle() -> Result<(), Error> {
+    // upright, every row of pixels is one value; turned a quarter, every column is
+    let screen = |angle: f32| {
+        red(
+            &Params {
+                cell: 10,
+                angle,
+                shape: Shape::Line,
+                ..white_on_black()
+            },
+            40,
+            40,
+            &flat(40, 40, 0.4),
+        )
+    };
+    let (upright, quarter) = (screen(0.0)?, screen(90.0)?);
+    for row in 0..40 {
+        for column in 1..40 {
+            assert!((upright[row * 40 + column] - upright[row * 40]).abs() < 1e-5, "row");
+            assert!((quarter[column * 40 + row] - quarter[row]).abs() < 1e-5, "column");
+        }
+    }
+    assert!(upright.iter().any(|&value| value > 0.9) && upright.iter().any(|&value| value < 0.1));
+    Ok(())
+}
+
+#[test]
+fn cmyk_prints_no_ink_for_paper_black_alone_for_black_and_cyan_alone_for_a_paper_relative_cyan() -> Result<(), Error> {
+    let params = Params {
+        cell: 8,
+        angle: 0.0,
+        separation: Separation::Cmyk,
+        paper: Color(PAPER),
+        ..Params::default()
+    };
+    let print = |photo: [f32; 3]| run_picture(&params, 32, 32, &colour(32, 32, photo));
+    let bare = print(PAPER)?;
+    assert!(
+        bare.as_chunks::<3>().0.iter().all(|pixel| is_pixel(*pixel, PAPER)),
+        "paper needs no ink"
+    );
+    // black: the black ink alone, a dark grey (#231f20) at the middle of a dot, never a colour
+    let black = print([0.0; 3])?;
+    let (red_of, green_of) = (channel(&black, 0), channel(&black, 1));
+    assert!(red_of.iter().copied().fold(1.0, f32::min) < 0.14 + 1e-3);
+    assert!(red_of.iter().zip(&green_of).all(|(r, g)| (r - g).abs() < 0.04));
+    // cyan relative to the paper: the cyan ink (green #ae = 0.682; its blue #ef is lighter than the paper, so adds none)
+    // and no magenta (green 0), yellow (blue 0) or black (both low)
+    let cyan = print([0.0, PAPER[1], PAPER[2]])?;
+    assert!(
+        channel(&cyan, 1).iter().all(|&g| g > 0.682 - 1e-3),
+        "no magenta or black"
+    );
+    assert!(
+        channel(&cyan, 2).iter().all(|&b| b > PAPER[2] - 1e-3),
+        "no yellow or black"
+    );
+    assert!(
+        channel(&cyan, 0).iter().copied().fold(1.0, f32::min) < 0.2,
+        "the cyan dots are there"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_spot_ink_the_photo_does_not_need_prints_nothing() -> Result<(), Error> {
+    // a photo of the first ink's own colour is that ink alone, so a second ink changes nothing
+    let photo = colour(32, 32, PINK);
+    let with_blue = run_picture(&spot(), 32, 32, &photo)?;
+    let alone = run_picture(
+        &Params {
+            inks: vec![Color(PINK)],
+            ..spot()
+        },
+        32,
+        32,
+        &photo,
+    )?;
+    assert_close(&with_blue, &alone, 1e-5, "pink alone");
+    // and the dots are there: some pixel is the ink itself
+    assert!(
+        with_blue
+            .as_chunks::<3>()
+            .0
+            .iter()
+            .any(|pixel| { pixel.iter().zip(PINK).all(|(a, b)| (a - b).abs() < 0.02) })
+    );
+    Ok(())
+}
+
+#[test]
+fn offset_zero_is_no_offset_whatever_its_direction() -> Result<(), Error> {
+    let photo = varied(40, 40);
+    for separation in [Separation::Cmyk, Separation::Spot] {
+        let base = Params { separation, ..spot() };
+        let turned = Params {
+            offset_angle: 77.0,
+            ..base.clone()
+        };
+        assert_eq!(
+            first_difference(
+                &run_picture(&base, 40, 40, &photo)?,
+                &run_picture(&turned, 40, 40, &photo)?
+            ),
+            None
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn the_second_ink_moves_by_the_offset_and_the_first_stays() -> Result<(), Error> {
+    // a flat photo of the second ink's colour is that ink alone: its pattern is the unmoved one slid by the offset
+    let (size, slide) = (48, 3);
+    let register = run_picture(&spot(), size, size, &colour(size, size, BLUE))?;
+    let sliding = |angle: f32| {
+        run_picture(
+            &Params {
+                offset: slide as f32,
+                offset_angle: angle,
+                ..spot()
+            },
+            size,
+            size,
+            &colour(size, size, BLUE),
+        )
+    };
+    let right = sliding(0.0)?;
+    let down = sliding(90.0)?;
+    for row in 0..size - slide {
+        for column in 0..size - slide {
+            for channel in 0..3 {
+                let at = |x: usize, y: usize| (y * size + x) * 3 + channel;
+                assert!(
+                    (right[at(column + slide, row)] - register[at(column, row)]).abs() < 1e-4,
+                    "right"
+                );
+                assert!(
+                    (down[at(column, row + slide)] - register[at(column, row)]).abs() < 1e-4,
+                    "down"
+                );
+            }
+        }
+    }
+    // the first ink does not move
+    let first = |offset: f32| run_picture(&Params { offset, ..spot() }, size, size, &colour(size, size, PINK));
+    assert_eq!(first_difference(&first(0.0)?, &first(5.0)?), None);
+    Ok(())
+}
+
+#[test]
+fn the_third_ink_moves_twice_as_far_as_the_second() -> Result<(), Error> {
+    let (size, slide) = (48, 2);
+    let green = [0.2, 0.7, 0.3];
+    let params = |offset: f32| Params {
+        offset,
+        inks: vec![Color(PINK), Color(BLUE), Color(green)],
+        ..spot()
+    };
+    let photo = colour(size, size, green);
+    let register = run_picture(&params(0.0), size, size, &photo)?;
+    let moved = run_picture(&params(slide as f32), size, size, &photo)?;
+    for row in 0..size {
+        for column in 0..size - 2 * slide {
+            let at = |x: usize| (row * size + x) * 3;
+            assert!((moved[at(column + 2 * slide)] - register[at(column)]).abs() < 1e-3);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_second_spot_ink_is_screened_thirty_degrees_from_the_first() -> Result<(), Error> {
+    // the blue photo is the second ink alone: it prints as a lone blue ink would at the angle thirty degrees on
+    let photo = colour(40, 40, BLUE);
+    let second = run_picture(&spot(), 40, 40, &photo)?;
+    let lone = run_picture(
+        &Params {
+            angle: 75.0,
+            inks: vec![Color(BLUE)],
+            ..spot()
+        },
+        40,
+        40,
+        &photo,
+    )?;
+    assert_close(&second, &lone, 1e-4, "second ink");
+    Ok(())
+}
+
+#[test]
+fn the_four_cmyk_screens_each_have_their_own_angle() -> Result<(), Error> {
+    // half of each ink alone against the paper (cyan takes away half the red, magenta of the green, yellow of the blue,
+    // black of all) makes separate dots; where they print is the mask of that ink's screen
+    let params = Params {
+        cell: 8,
+        angle: 0.0,
+        separation: Separation::Cmyk,
+        paper: Color(PAPER),
+        ..Params::default()
+    };
+    let mask = |photo: [f32; 3], channel_of: usize| -> Result<Vec<bool>, Error> {
+        let out = run_picture(&params, 48, 48, &colour(48, 48, photo))?;
+        let values = channel(&out, channel_of);
+        let lowest = values.iter().copied().fold(1.0, f32::min);
+        Ok(values
+            .iter()
+            .map(|&value| value < f32::midpoint(lowest, PAPER[channel_of]))
+            .collect())
+    };
+    let half = |channel: usize| {
+        let mut photo = PAPER;
+        photo[channel] *= 0.5;
+        photo
+    };
+    let masks = [
+        mask(half(0), 0)?,
+        mask(half(1), 1)?,
+        mask(half(2), 2)?,
+        mask(PAPER.map(|level| level * 0.5), 0)?,
+    ];
+    for one in 0..4 {
+        assert!(
+            masks[one].iter().any(|&on| on) && masks[one].iter().any(|&on| !on),
+            "screen {one} has dots"
+        );
+        for other in one + 1..4 {
+            let apart = masks[one].iter().zip(&masks[other]).filter(|(a, b)| a != b).count();
+            assert!(
+                apart > 48 * 48 / 10,
+                "screens {one} and {other} differ in {apart} pixels"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_offset_ink_reads_the_tone_where_its_dots_are() -> Result<(), Error> {
+    // a render with the second ink moved by `slide` is the unmoved render of the picture seen from `slide` on, slid back
+    let (size, cell, slide) = (48, 8_i32, 3);
+    let blocks = |at: &dyn Fn(usize, usize) -> (usize, usize)| -> Vec<f32> {
+        (0..size * size)
+            .flat_map(|index| {
+                let (x, y) = at(index % size, index / size);
+                if (x / 12 + y / 12) % 2 == 0 { BLUE } else { PAPER }
+            })
+            .collect()
+    };
+    let params = Params {
+        sigma: 0.0,
+        cell,
+        ..spot()
+    };
+    for (angle, along) in [(0.0, (slide, 0)), (90.0, (0, slide))] {
+        let moved = run_picture(
+            &Params {
+                offset: slide as f32,
+                offset_angle: angle,
+                ..params.clone()
+            },
+            size,
+            size,
+            &blocks(&|x, y| (x, y)),
+        )?;
+        let seen_from = blocks(&|x, y| ((x + along.0).min(size - 1), (y + along.1).min(size - 1)));
+        let register = run_picture(&params, size, size, &seen_from)?;
+        for row in 0..size - slide {
+            for column in 0..size - slide {
+                for channel in 0..3 {
+                    let at = |x: usize, y: usize| (y * size + x) * 3 + channel;
+                    assert!(
+                        (moved[at(column + along.0, row + along.1)] - register[at(column, row)]).abs() < 1e-3,
+                        "angle {angle} at {column}, {row}"
+                    );
+                }
+            }
+        }
+    }
     Ok(())
 }

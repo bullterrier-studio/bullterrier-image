@@ -485,6 +485,18 @@ fn cases() -> Vec<Case> {
                     .param("constant_value", 0.7),
                 Step::new("halftone").param("ink", "#ff8000").param("paper", "#e0e0d0"),
                 Step::new("halftone"),
+                Step::new("halftone").param("shape", "line").param("cell", 6),
+                Step::new("halftone")
+                    .param("separation", "cmyk")
+                    .param("paper", "#f4efe4")
+                    .param("offset", 2.5)
+                    .param("offset_angle", 30.0),
+                Step::new("halftone")
+                    .param("separation", "spot")
+                    .param("inks", json!(["#ff4d6d", "#2b59ff", "#ffd400"]))
+                    .param("paper", "#f4efe4")
+                    .param("shape", "line")
+                    .param("offset", 1.5),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
