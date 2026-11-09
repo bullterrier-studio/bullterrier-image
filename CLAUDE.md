@@ -336,9 +336,9 @@ A fix removes the cause, not the symptom (reasoning in `docs/design-decisions.md
 
 ## Lint, types and gates
 
-Three tiers. `uv run poe fast`: format, lint, types, Rust tests (the inner loop). `uv run poe check`: every static gate, the build
-check, the Rust tests and the Python suite (`gate`, `tooling` and `rebuild` tests left out); run it once before a merge. `uv run poe full`:
-`check` plus `gate-tests` (marker `gate`: tests that copy the project, write one deliberate mistake and check a gate fails, each
+Three tiers. `uv run poe fast`: format, lint, types, Rust tests (the inner loop). `uv run poe check`: every static gate, the Rust
+tests and the Python suite (`gate`, `tooling` and `rebuild` tests and the build check left out); run it once before a merge. `uv run poe full`:
+`check` plus `build-check` (the sdist and the wheel), `gate-tests` (marker `gate`: tests that copy the project, write one deliberate mistake and check a gate fails, each
 removing its copy and build folder; marker `tooling`: the shared tools' own tests, the same files in every repo), `check-scaffold`, `audit` and `check-min-deps`; run before a release (`poe release` does, CI
 does). Each step runs once per tier. A gate needs a known-bad row for every kind of source it must see (an effect file pulled in
 by `include!` is one); the rows live in `tests/tools/test_rust_gates.py`, and `[tool.gate-proofs] triggers` lists the files whose

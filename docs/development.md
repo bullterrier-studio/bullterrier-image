@@ -39,14 +39,14 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
 - Generated shared files (`src/bullterrier_image/fx.pyi`, `docs/effects/`) are not updated on feature branches, so branches
   adding effects never conflict. After merging, `uv run poe regenerate` brings them up to date in one commit. Existing
   pictures kept (`uv run poe gallery --force` renders all again; effect named with `--only` always rendered).
-- Every gate (ruff, vulture, deptry, build check, mypy, tests; for Rust rustfmt, clippy, rustdoc, cargo-shear,
+- Every gate (ruff, vulture, deptry, mypy, tests; `full` adds the build check; for Rust rustfmt, clippy, rustdoc, cargo-shear,
   cargo-deny, stubtest, cargo test) is configured in `pyproject.toml` and `Cargo.toml`, listed in
   [CLAUDE.md](../CLAUDE.md#lint-types-and-gates). `uv run poe fast` is the inner loop (format, lint, types, Rust tests).
 - Three tiers. `fast`: the inner loop. `check`: every static gate, the Rust tests and the Python suite, then the gate
   proofs (`gate-tests`: pytest marker `gate`, tests that copy the project, write one fault and see a gate fail; they
   remove their copies and build folders) if the change touches a file matching `[tool.gate-proofs] triggers` in
   `pyproject.toml` (what a proof edits or stands on) or its base with `origin/main` cannot be read (`poe proofs`). `full`:
-  `check` with the proofs always, the scaffold test (`rebuild`), the audit and the lowest-dependency run. The pre-push
+  `check` with the build of the sdist and the wheel (`build-check`), the proofs always, the scaffold test (`rebuild`), the audit and the lowest-dependency run. The pre-push
   hook runs `check` for a push to `main` and `full` for a tag; none of it for a push that changes only documentation
   or a tree a gate at least as high already passed on (the record carries the tier: `full` covers `check`, never the
   reverse); other branches are checked by CI when the pull request opens. CI runs the proofs once, on one Linux
