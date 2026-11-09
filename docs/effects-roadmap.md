@@ -89,7 +89,7 @@ belong to a layout package, not here.
 | `seams` ✓ | Solid line or band along every border between a partition's pieces. | `fx.seams(partition="glass", width=1)` |
 | `ascii` ✓ | Text rendering. | `fx.ascii(cell=6)` |
 | `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=96, min_cell=5.75)` |
-| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own (`palette="custom"`), on a grid of any size; `pattern=0` is plain palette reduction; presets `posterize` (each channel snapped to a few levels: `cube2` to `cube6` palettes matched in `space="rgb"`) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette="custom", custom=["#0b1026", "#ff5a36", "#f7e7c6"], cell=4)` |
+| `dither` ✓ | Floyd-Steinberg, Atkinson, Bayer or blue-noise dots to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own (`palette="custom"`), on a grid of any size, or one to four spot `inks` printed as dither layers over a `paper` (`separation="inks"`, with `offset` misregistration); `pattern=0` is plain palette reduction; presets `posterize` (each channel snapped to a few levels: `cube2` to `cube6` palettes matched in `space="rgb"`) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette="custom", custom=["#0b1026", "#ff5a36", "#f7e7c6"], cell=4)` |
 | `edges` ✓ | Edge lines by Sobel, Canny or difference of Gaussians, in `color` on `background`; screened over the picture they light up the edges, in a dark `color` on light they are line art. | `fx.edges(method="dog", radius=2)` |
 | `crosshatch` | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
 | line and CMYK screens ✓ (on `halftone`) | `shape` = dot or line (lines whose width carries tone); `separation` = none, cmyk (four process inks at the classic screen angles) or spot (up to four `inks`, unmixed from the photo); `offset` and `offset_angle` misregister the inks. Replaces `line_halftone` and `cmyk_halftone`. | `fx.halftone(shape="line", cell=8, angle=30)`, `fx.halftone(separation="cmyk", paper="#ffffff", angle=0, cell=9, offset=1.5)`, `fx.halftone(separation="spot", inks=["#ff4d6d", "#2b59ff"], paper="#f4efe4")` |
@@ -97,7 +97,7 @@ belong to a layout package, not here.
 | `stipple` | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
 | `voronoi_mosaic` ✓ (the look `stained-glass`: `shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Look](../src/bullterrier_image/looks/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
 | `low_poly` ✓ (the look `low-poly`: `shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Look](../src/bullterrier_image/looks/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
-| `risograph` (a recipe, planned) | Spot-colour layers, misregistration, grain: `dither` or `halftone` with inks, each offset, then `grain`. Needs inks with a per-ink offset on those two. | `fx.halftone(inks=["#ff4d6d","#2b59ff"], ...)` |
+| `risograph` ✓ ([recipe](../examples/recipes/risograph.toml)) | Spot-colour layers, misregistration, grain: `halftone` with spot inks, each offset, then paper texture and `grain`. | `fx.halftone(separation="spot", inks=["#ff4d6d","#2b59ff"], paper="#f4efe4", offset=2.5)` |
 
 ## Computational and experimental
 
@@ -299,17 +299,17 @@ control packages.
 What combining effects can give, once the pieces exist:
 
 - **Cyberpunk** ✓ ([recipe](../examples/recipes/cyberpunk.toml)): colour balance, chromatic aberration, scanlines, bloom, `particles` rain, CRT glass
-- **Risograph poster**: levels, risograph inks (`halftone` or `dither` with inks), paper texture
+- **Risograph poster** ✓ ([recipe](../examples/recipes/risograph.toml)): levels, risograph inks (`halftone` with spot inks), paper texture, grain
 - **Terminal** ✓ ([recipe](../examples/recipes/terminal.toml)): green ASCII on a curved CRT screen with shadow mask, scanlines and glow
 - **Vaporwave** ✓ ([recipe](../examples/recipes/vaporwave.toml)): gradient background, grid pattern, gradient map, colour split
-- **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), black and white until `halftone` has CMYK separation; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
+- **Newspaper** ✓ ([recipe](../examples/recipes/newsprint.toml), CMYK halftone; the sepia is `gradient_map`'s preset): CMYK halftone, paper texture, faded sepia, torn edge
 - **Double exposure** ✓ ([recipe](../examples/recipes/double-exposure.toml)): black and white, a night sky multiplied into the silhouette, vignette
 - **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
 - **Portrait pop** ✓ ([recipe](../examples/recipes/portrait-pop.toml)): grey, blurred background, subject in colour
 - **Turn to dust**: ASCII, disperse, `particles` (preset `embers`) (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Risograph poster needs inks on `halftone` or `dither`; Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `particles` exist).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `particles` exist).
 
 ## Still planned
 
@@ -318,8 +318,8 @@ A look is added to `examples/recipes/` by the batch that builds its last missing
 injected `depth`; `disperse`, `drop_shadow`, `outline`, `reflection` and `rim_light` the injected `subject`. Moving them
 onto `field` leaves one mechanism; the owner schedules it.
 
-**Feature batch after E5 (E5b).** Halftone inks with a per-ink offset, line screens, ink separation and dither inks, then the
-risograph recipe. The Rust port of those effects (E5) stays a parity port; the new capability follows it.
+**Feature batch after E5 (E5b) ✓.** Halftone inks with a per-ink offset, line screens, ink separation and dither inks, then
+the risograph recipe. The Rust port of those effects (E5) stayed a parity port; the new capability followed it.
 
 **E6 additions.** `defringe` (halo removal) and `light_wrap`, next to `outline`, `rim_light` and `blend`.
 

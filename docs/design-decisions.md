@@ -916,6 +916,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   first: four spot inks are for flat art, use `cmyk` for four tones); the offset needs no random misregistration, which
   would be a hidden tunable and break determinism, and a direction with a distance is what a loose press plate does.
   *Consequence:* ink 0 is the reference and never moves; `cmyk` screens are the classic 15, 75, 0 and 45 added to `angle`.
+- **`dither` prints inks as binary layers, with its own `separation`, `inks`, `paper`, `offset`, `offset_angle`.** Each ink's
+  coverage plane (`Inks::coverages`) is dithered to 0 and 1 with the chosen `method`, `cell` and `pattern`, shifted by whole
+  pixels and printed over `paper`; `palette` and `custom` are not reused for inks. *Reason:* a palette is colours to choose
+  between, inks are layers that overlap, and one more `separation` mode keeps the two effects reading alike without a
+  shared parameter set. *Consequence:* the pixels are the 2^n combinations of the inks over the paper; the layers are
+  dithered one after another in ink order, so the result does not depend on the thread count.
 
 ## Fixing defects
 

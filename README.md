@@ -159,7 +159,7 @@ uv run bt-image steps examples/photos/bullterrier.jpeg examples/recipes/ember-gl
 
 ## Gallery
 
-More from same photo. All 16 recipes: [`examples/recipes/`](examples/recipes).
+More from same photo. All 17 recipes: [`examples/recipes/`](examples/recipes).
 
 <table>
   <tr>
@@ -172,7 +172,7 @@ More from same photo. All 16 recipes: [`examples/recipes/`](examples/recipes).
     <td valign="top"><a href="examples/recipes/cyberpunk.toml"><b>cyberpunk</b></a><br><sub>Neon night street: fringes, scanlines, rain.</sub></td>
     <td valign="top"><a href="examples/recipes/vaporwave.toml"><b>vaporwave</b></a><br><sub>Sunset gradient, glowing grid, duotoned dog.</sub></td>
     <td valign="top"><a href="examples/recipes/terminal.toml"><b>terminal</b></a><br><sub>Green phosphor CRT: scanlines, glow.</sub></td>
-    <td valign="top"><a href="examples/recipes/newsprint.toml"><b>newsprint</b></a><br><sub>Newspaper clipping: dots, torn edge.</sub></td>
+    <td valign="top"><a href="examples/recipes/newsprint.toml"><b>newsprint</b></a><br><sub>Newspaper clipping: CMYK dots, torn edge.</sub></td>
   </tr>
   <tr>
     <td align="center" width="25%"><img src="examples/output/bullterrier/northern-lights.jpg" alt="northern-lights"></td>
