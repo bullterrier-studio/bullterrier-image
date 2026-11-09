@@ -18,7 +18,7 @@ pub(crate) fn yiq(pixel: &[f32]) -> [f64; 3] {
 
 /// The (Y, I, Q) of every pixel of `picture` (three channels a pixel, row after row).
 pub(crate) fn yiq_of(picture: &[f32]) -> Vec<[f64; 3]> {
-    picture.chunks_exact(3).map(yiq).collect()
+    picture.as_chunks::<3>().0.iter().map(|pixel| yiq(pixel)).collect()
 }
 
 /// `line` convolved with the Gaussian of `sigma` cut off at `truncate` sigmas, `rule` beyond its ends: from the definition,

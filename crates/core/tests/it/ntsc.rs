@@ -50,7 +50,13 @@ fn no_smear_and_no_crawl_leave_the_picture_as_it_is_whatever_the_edge_rule() -> 
 
 #[test]
 fn a_grey_picture_has_no_colour_to_smear_or_leak_so_it_is_unchanged() -> Result<(), Error> {
-    let grey: Vec<f32> = varied(8, 12).chunks_exact(3).flat_map(|pixel| [pixel[0]; 3]).collect();
+    let colours = varied(8, 12);
+    let grey: Vec<f32> = colours
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .flat_map(|pixel| [pixel[0]; 3])
+        .collect();
     for (sigma, crawl, phase, edge) in [
         (4.0, 0.3, 0.0, Edge::Reflect),
         (20.0, 1.0, 0.3, Edge::Wrap),
@@ -97,11 +103,11 @@ fn colour_is_blurred_along_each_row_alone_while_brightness_is_kept() -> Result<(
     let picture = two_colours_per_row(rows);
     let before = yiq_of(&picture);
     for edge in EDGES {
-        for (sigma, truncate) in [(2.0, 4.0), (3.5, 2.0)] {
+        for (sigma, truncate) in [(2.0_f32, 4.0_f32), (3.5, 2.0)] {
             let params = Params {
-                sigma: sigma as f32,
+                sigma,
                 crawl: 0.0,
-                truncate: truncate as f32,
+                truncate,
                 edge,
                 ..Params::default()
             };
@@ -110,7 +116,10 @@ fn colour_is_blurred_along_each_row_alone_while_brightness_is_kept() -> Result<(
             for row in 0..rows {
                 for axis in 1..3 {
                     let line: Vec<f64> = (0..width).map(|column| before[row * width + column][axis]).collect();
-                    for (column, value) in smoothed(&line, sigma, truncate, edge).into_iter().enumerate() {
+                    for (column, value) in smoothed(&line, f64::from(sigma), f64::from(truncate), edge)
+                        .into_iter()
+                        .enumerate()
+                    {
                         expected[row * width + column][axis] = value;
                     }
                 }
@@ -145,7 +154,7 @@ fn the_crawl_adds_the_subcarrier_to_brightness_a_quarter_cycle_a_column_and_half
             .map(|at| {
                 let (row, column) = ((at / width) as f64, (at % width) as f64);
                 let angle = std::f64::consts::TAU * (column / 4.0 + row / 2.0 + f64::from(phase));
-                [luma + 0.5 * (i * angle.cos() + q * angle.sin()), i, q]
+                [0.5_f64.mul_add(i * angle.cos() + q * angle.sin(), luma), i, q]
             })
             .collect();
         assert_yiq(&out, &expected, &format!("phase {phase}"));

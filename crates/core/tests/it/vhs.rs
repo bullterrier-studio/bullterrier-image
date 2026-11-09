@@ -3,7 +3,17 @@
 //! of the known mean, bled colour is the input's colour moved and blurred (worked out from the definition) with
 //! brightness kept, tape noise has the asked deviation and leaves colour alone, and the damage depends only on the seed.
 
-#![expect(clippy::cast_precision_loss, reason = "small picture sizes")]
+#![expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    reason = "small picture sizes and non-negative places"
+)]
+#![expect(
+    clippy::float_cmp,
+    reason = "values set or copied, never computed: an untouched row is exactly its level, static is one grey in all three channels"
+)]
 
 use bullterrier_image::effects::vhs::Params;
 use bullterrier_image::{Edge, Error};
@@ -177,7 +187,7 @@ fn static_fills_the_band_with_grey_noise_and_nothing_else_changes() -> Result<()
         let grey: Vec<f64> = covered
             .iter()
             .flat_map(|row| {
-                row.chunks_exact(3).map(|pixel| {
+                row.as_chunks::<3>().0.iter().map(|pixel| {
                     assert!(pixel[0] == pixel[1] && pixel[1] == pixel[2], "static is grey");
                     f64::from(pixel[0])
                 })
