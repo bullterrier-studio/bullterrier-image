@@ -49,8 +49,8 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
   `check` with the proofs always, the scaffold test (`rebuild`), the audit and the lowest-dependency run. The pre-push
   hook runs `check` for a push to `main` and `full` for a tag; none of it for a push that changes only documentation
   or a tree a gate at least as high already passed on (the record carries the tier: `full` covers `check`, never the
-  reverse); other branches are checked by CI when the pull request opens. CI runs the proofs as one job
-  (`gate-tests.yml`).
+  reverse); other branches are checked by CI when the pull request opens. CI runs the proofs once, on one Linux
+  cell of `test.yml`.
 - Apple Vision test skipped off macOS. Portable subject backend and depth model tested with tiny stand-in models built in the
   tests: suite never downloads a real model; tests of real models run only when already in cache and assert coarse
   properties (a model update may change every pixel).

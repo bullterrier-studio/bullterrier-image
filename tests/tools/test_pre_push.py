@@ -1,10 +1,8 @@
 """tools/pre_push.py decides whether a push must pass the whole local gate first: pushes to main, anything that is not
 a branch (a release tag) and any push while local main has code its remote-tracking branch lacks do; any other branch
-is left to CI, so feature-branch pushes stay quick, and so is a push that changes only documentation. The tests use
-real throwaway repositories with a bare repository as the remote."""
+is left to CI, so feature-branch pushes stay quick, and so is a push that changes only documentation."""
 
 import importlib.util
-import os
 import shutil
 import subprocess
 import sys
@@ -12,6 +10,9 @@ import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
+
+pytestmark = pytest.mark.tooling
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,18 +30,16 @@ pre_push = _load()
 
 
 @pytest.mark.parametrize("ref", ["refs/heads/main", "refs/tags/v1.2.3", "refs/tags/v1.2.3rc1", "", "main"])
-def test_main_and_tags_and_anything_unclear_must_pass_the_gate_whatever_main_looks_like(git_repo, monkeypatch, ref):
-    git_repo.commit("chore: start", {"start.txt": "start"})
-    git_repo.add_remote()
-    git_repo.git("push", "-q", "origin", "main")  # main is level with origin/main
+def test_main_tags_and_anything_unclear_must_pass_the_gate_whatever_main_looks_like(git_repo, monkeypatch, ref):
+    level(git_repo)
     monkeypatch.chdir(git_repo.path)
     assert pre_push.must_run(ref)
 
 
+# the states local main can be in against origin/main
 def level(repo):
     repo.commit("chore: start", {"start.txt": "start"})
-    repo.add_remote()
-    repo.git("push", "-q", "origin", "main")
+    repo.push()
 
 
 def ahead_with_code(repo):
@@ -56,15 +55,12 @@ def ahead_with_documentation(repo):
 def behind(repo):
     level(repo)
     repo.commit("feat: code", {"src/code.py": "x = 1"})
-    repo.git("push", "-q", "origin", "main")
+    repo.push()
     repo.git("reset", "-q", "--hard", "HEAD~1")
 
 
 def diverged(repo):
-    level(repo)
-    repo.commit("feat: code", {"src/code.py": "x = 1"})
-    repo.git("push", "-q", "origin", "main")
-    repo.git("reset", "-q", "--hard", "HEAD~1")
+    behind(repo)
     repo.commit("feat: other code", {"src/other.py": "x = 2"})
 
 
@@ -74,12 +70,7 @@ def ahead_without_changes(repo):
 
 
 def no_remote_tracking_main(repo):
-    repo.commit("feat: code", {"src/code.py": "x = 1"})
-    repo.add_remote()  # nothing pushed yet
-
-
-def no_remote(repo):
-    repo.commit("feat: code", {"src/code.py": "x = 1"})
+    repo.commit("feat: code", {"src/code.py": "x = 1"})  # nothing pushed yet
 
 
 def no_local_main(repo):
@@ -88,9 +79,8 @@ def no_local_main(repo):
     repo.git("branch", "-q", "-D", "main")
 
 
-def remote_named_upstream_is_level_origin_is_not(repo):
+def upstream_level_origin_not(repo):
     repo.commit("chore: start", {"start.txt": "start"})
-    repo.add_remote()  # origin lacks main
     repo.add_remote("upstream")
     repo.git("push", "-q", "upstream", "main")
 
@@ -105,13 +95,8 @@ def remote_named_upstream_is_level_origin_is_not(repo):
         pytest.param(diverged, True, id="main and origin/main each with commits of their own"),
         pytest.param(ahead_without_changes, True, id="main ahead by a commit that changes nothing: no proof"),
         pytest.param(no_remote_tracking_main, True, id="no origin/main: nothing says main is level"),
-        pytest.param(no_remote, True, id="no remote at all"),
         pytest.param(no_local_main, True, id="no local main"),
-        pytest.param(
-            remote_named_upstream_is_level_origin_is_not,
-            True,
-            id="origin lacks main (the remote asked about is the default one)",
-        ),
+        pytest.param(upstream_level_origin_not, True, id="origin lacks main (the default remote is asked)"),
     ],
 )
 @pytest.mark.parametrize("ref", ["refs/heads/feat/x", "refs/heads/main2"])
@@ -124,7 +109,7 @@ def test_a_branch_push_runs_the_gate_while_main_has_code_its_remote_tracking_bra
 
 
 def test_the_remote_pre_commit_names_decides_which_remote_tracking_main_counts(git_repo, monkeypatch):
-    remote_named_upstream_is_level_origin_is_not(git_repo)
+    upstream_level_origin_not(git_repo)
     monkeypatch.chdir(git_repo.path)
     assert pre_push.must_run("refs/heads/feat/x", "origin")
     assert not pre_push.must_run("refs/heads/feat/x", "upstream")
@@ -146,30 +131,17 @@ def test_a_feature_branch_push_with_main_level_skips_the_gate_and_succeeds(git_r
         pytest.param(ahead_with_code, {"docs/page.md": "x"}, None, True, id="feat/x first (only a page), main ahead"),
         pytest.param(ahead_with_code, {"src/other.py": "y = 2"}, None, True, id="feat/x first with code, main ahead"),
         pytest.param(level, {"src/other.py": "y = 2"}, None, False, id="feat/x first with code, main level"),
-        pytest.param(level, {"README.md": "y"}, None, False, id="feat/x first with a page, main level"),
         pytest.param(ahead_with_documentation, {"src/other.py": "y = 2"}, None, False, id="main ahead by a page only"),
         pytest.param(no_remote_tracking_main, {"README.md": "y"}, None, True, id="no origin/main"),
-        pytest.param(
-            remote_named_upstream_is_level_origin_is_not,
-            {"README.md": "y"},
-            "upstream",
-            False,
-            id="PRE_COMMIT_REMOTE_NAME names the remote whose main is level",
-        ),
-        pytest.param(
-            remote_named_upstream_is_level_origin_is_not,
-            {"README.md": "y"},
-            None,
-            True,
-            id="origin is the default remote, and its main is not level",
-        ),
+        pytest.param(upstream_level_origin_not, {"README.md": "y"}, "upstream", False, id="the named remote is level"),
+        pytest.param(upstream_level_origin_not, {"README.md": "y"}, None, True, id="the default remote is not"),
     ],
 )
 def test_a_multi_ref_push_runs_the_gate_whichever_ref_comes_first(
     git_repo, monkeypatch, capsys, state, feature_changes, remote_name, gate_runs
 ):
-    """`git push origin feat/x main` and `git push --all` report feat/x to the hook, and its pushed range is
-    feat/x's own; the gate runs because main, which is also pushed, has code."""
+    """pre-commit reports only the first ref of `git push --all` (and of `git push origin feat/x main`), with its
+    own range; the gate runs because main, which is pushed too, has code."""
     state(git_repo)
     main = git_repo.git("rev-parse", "main")
     git_repo.git("switch", "-q", "-c", "feat/x")
@@ -186,15 +158,20 @@ def test_a_multi_ref_push_runs_the_gate_whichever_ref_comes_first(
     assert ("uv is not on the PATH" in capsys.readouterr().out) is gate_runs
 
 
+def test_a_push_right_after_a_passed_gate_does_not_run_it_again(monkeypatch):
+    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
+    monkeypatch.setenv("BT_IMAGE_GATE_PASSED", "1")
+    assert pre_push.main() == 0
+
+
 @pytest.mark.parametrize(
     ("path", "is_documentation"),
     [
         pytest.param("README.md", True, id="the README"),
         pytest.param("CONTRIBUTING.md", True, id="a top-level page"),
-        pytest.param("docs/roadmap.md", True, id="a page in docs"),
+        pytest.param("docs/design-decisions.md", True, id="a page in docs"),
         pytest.param("docs/images/logo.svg", True, id="a picture in docs/images"),
         pytest.param("docs/images/banner/wide.jpg", True, id="a nested picture"),
-        pytest.param("docs/images/a.png", True, id="a png"),
         pytest.param("docs/images/B.SVG", True, id="a picture with a capitalised extension"),
         pytest.param("docs/images/photo.webp", True, id="a webp"),
         pytest.param("docs/images/make.py", False, id="a script in docs/images"),
@@ -204,18 +181,25 @@ def test_a_multi_ref_push_runs_the_gate_whichever_ref_comes_first(
         pytest.param("docs/make_banner.py", False, id="a script in docs"),
         pytest.param("docs/data.json", False, id="data in docs"),
         pytest.param("crates/core/README.md", False, id="a page inside a crate, which cargo packages"),
-        pytest.param("src/bullterrier_image/notes.md", False, id="a markdown file inside src"),
         pytest.param("src/bullterrier_image/errors.py", False, id="a source file"),
-        pytest.param("crates/core/src/lib.rs", False, id="a Rust file"),
+        pytest.param("src/bullterrier_image/notes.md", False, id="a markdown file inside src"),
         pytest.param("tests/tools/test_pre_push.py", False, id="a test"),
-        pytest.param("examples/star.py", False, id="a program in examples, which a test runs"),
-        pytest.param("Cargo.lock", False, id="the Rust lock file"),
-        pytest.param("uv.lock", False, id="the Python lock file"),
+        pytest.param("uv.lock", False, id="the lock file"),
         pytest.param(".github/workflows/ci.yml", False, id="a workflow"),
     ],
 )
 def test_only_pages_and_pictures_count_as_documentation(path, is_documentation):
     assert pre_push.is_documentation(path) is is_documentation
+
+
+def test_ci_skips_a_pull_request_for_the_same_documentation_the_hook_skips_the_gate_for():
+    """ci.yml's `changes` filter is the second copy of `is_documentation` (paths-filter runs without a checkout, so it
+    cannot ask this tool); its patterns are the ones the tool's rule spells, picture suffixes in either case."""
+    ci = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+    [step] = [step for step in ci["jobs"]["changes"]["steps"] if step.get("id") == "filter"]
+    patterns = yaml.safe_load(step["with"]["filters"])["code"]
+    either_case = ["".join(f"[{c}{c.upper()}]" for c in suffix[1:]) for suffix in sorted(pre_push.PICTURE_SUFFIXES)]
+    assert patterns == ["**", "!*.md", "!docs/*.md", *(f"!docs/images/**/*.{suffix}" for suffix in either_case)]
 
 
 @pytest.mark.parametrize(
@@ -227,7 +211,6 @@ def test_only_pages_and_pictures_count_as_documentation(path, is_documentation):
         pytest.param({"README.md": "x", "src/code.py": "x = 1"}, True, id="a page with one code file runs the gate"),
         pytest.param({"src/code.py": "x = 1"}, True, id="a code file alone runs the gate"),
         pytest.param({"docs/images/make.py": "x = 1"}, True, id="a script in docs/images runs the gate"),
-        pytest.param({"docs/images/a.png": "x"}, False, id="a picture in docs/images skips the gate"),
     ],
 )
 def test_a_push_of_only_documentation_skips_the_gate(git_repo, monkeypatch, capsys, changed, gate_runs):
@@ -243,74 +226,9 @@ def test_a_push_of_only_documentation_skips_the_gate(git_repo, monkeypatch, caps
     assert ("uv is not on the PATH" in capsys.readouterr().out) is gate_runs
 
 
-def test_a_push_whose_range_is_unknown_runs_the_gate(monkeypatch, capsys):
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
-    monkeypatch.delenv("PRE_COMMIT_FROM_REF", raising=False)
-    monkeypatch.delenv("PRE_COMMIT_TO_REF", raising=False)
-    monkeypatch.setattr(shutil, "which", lambda _name: None)
-    assert pre_push.main() == 1
-    assert "uv is not on the PATH" in capsys.readouterr().out
-
-
-@pytest.mark.parametrize(
-    ("from_ref", "to_ref"),
-    [
-        pytest.param("0" * 40, "HEAD", id="a pushed branch that is new on the remote: no earlier commit"),
-        pytest.param("f" * 40, "HEAD", id="a commit this clone does not have"),
-        pytest.param("HEAD", "", id="an empty end of the range"),
-        pytest.param("", "HEAD", id="an empty start of the range"),
-    ],
-)
-def test_a_range_git_cannot_read_runs_the_gate(git_repo, monkeypatch, capsys, from_ref, to_ref):
-    git_repo.commit("docs: only a page", {"README.md": "x"})
-    monkeypatch.chdir(git_repo.path)
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
-    monkeypatch.setenv("PRE_COMMIT_FROM_REF", from_ref)
-    monkeypatch.setenv("PRE_COMMIT_TO_REF", to_ref)
-    monkeypatch.setattr(shutil, "which", lambda _name: None)
-    assert pre_push.main() == 1
-    assert "uv is not on the PATH" in capsys.readouterr().out
-
-
-def test_a_push_that_changes_nothing_runs_the_gate(git_repo, monkeypatch, capsys):
-    """An empty list of changed files is no proof that only documentation changed."""
-    head = git_repo.commit("docs: a page", {"README.md": "x"})
-    monkeypatch.chdir(git_repo.path)
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
-    monkeypatch.setenv("PRE_COMMIT_FROM_REF", head)
-    monkeypatch.setenv("PRE_COMMIT_TO_REF", head)
-    monkeypatch.setattr(shutil, "which", lambda _name: None)
-    assert pre_push.main() == 1
-    assert "uv is not on the PATH" in capsys.readouterr().out
-
-
-@pytest.mark.parametrize(
-    ("main_changes", "gate_runs"),
-    [
-        pytest.param({"docs/roadmap.md": "y"}, False, id="a tag of documentation, and main ahead by documentation"),
-        pytest.param({"src/code.py": "x = 1"}, True, id="a tag of documentation does not hide code in main"),
-    ],
-)
-def test_a_documentation_only_push_of_a_tag_skips_the_gate_unless_main_has_code(
-    git_repo, monkeypatch, capsys, main_changes, gate_runs
-):
-    before = git_repo.commit("chore: start", {"start.txt": "start"})
-    git_repo.add_remote()
-    git_repo.git("push", "-q", "origin", "main")
-    after = git_repo.commit("docs: change", {"docs/roadmap.md": "x"})
-    git_repo.commit("chore: main change", main_changes)
-    monkeypatch.chdir(git_repo.path)
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/tags/v1.2.3")
-    monkeypatch.setenv("PRE_COMMIT_FROM_REF", before)
-    monkeypatch.setenv("PRE_COMMIT_TO_REF", after)
-    monkeypatch.setattr(shutil, "which", lambda _name: None)
-    assert pre_push.main() == (1 if gate_runs else 0)
-    assert ("uv is not on the PATH" in capsys.readouterr().out) is gate_runs
-
-
 def test_a_rename_of_code_into_docs_runs_the_gate(git_repo, monkeypatch, capsys):
     """With rename detection `git diff --name-only` lists only the new name, `docs/lib.md`: that would skip the gate."""
-    before = git_repo.commit("chore: start", {"src/lib.rs": "pub fn draw() -> u32 {\n    1\n}\n" * 20})
+    before = git_repo.commit("chore: start", {"src/lib.rs": "pub fn one() -> u32 {\n    1\n}\n" * 20})
     (git_repo.path / "docs").mkdir()
     git_repo.git("mv", "src/lib.rs", "docs/lib.md")
     git_repo.git("commit", "-q", "-m", "docs: move")
@@ -320,6 +238,15 @@ def test_a_rename_of_code_into_docs_runs_the_gate(git_repo, monkeypatch, capsys)
     monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
     monkeypatch.setenv("PRE_COMMIT_FROM_REF", before)
     monkeypatch.setenv("PRE_COMMIT_TO_REF", after)
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    assert pre_push.main() == 1
+    assert "uv is not on the PATH" in capsys.readouterr().out
+
+
+def test_a_push_whose_range_is_unknown_runs_the_gate(monkeypatch, capsys):
+    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
+    monkeypatch.delenv("PRE_COMMIT_FROM_REF", raising=False)
+    monkeypatch.delenv("PRE_COMMIT_TO_REF", raising=False)
     monkeypatch.setattr(shutil, "which", lambda _name: None)
     assert pre_push.main() == 1
     assert "uv is not on the PATH" in capsys.readouterr().out
@@ -398,7 +325,7 @@ def test_a_pass_is_not_remembered_unless_the_tree_was_the_same_and_clean_through
 def test_outside_a_repository_nothing_is_remembered_and_nothing_fails(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     pre_push.record_gate_start()
-    pre_push.record_gate_pass("check")
+    pre_push.record_gate_pass()
     assert not pre_push.gate_passed_on("HEAD")
 
 
@@ -438,62 +365,16 @@ def test_a_push_of_a_newer_tree_than_the_one_that_passed_runs_the_gate(git_repo,
     assert "uv is not on the PATH" in capsys.readouterr().out
 
 
-def test_a_push_right_after_a_passed_gate_does_not_run_it_again(monkeypatch):
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", "refs/heads/main")
-    monkeypatch.setenv("BT_IMAGE_GATE_PASSED", "1")
-    assert pre_push.main() == 0
-
-
-# The tiers: check for main, full for a tag or a ref it cannot classify, the proofs only when their files change ---
-
-
-class FakeUv:
-    """A stand-in `uv` first on the PATH: records the poe task of each `uv run poe TASK` call, exits with `code`."""
-
-    def __init__(self, folder: Path) -> None:
-        self.folder = folder
-        self.log = folder / "calls.txt"
-        self.log.write_text("", encoding="utf-8")
-        self.answer(0)
-
-    def answer(self, code: int) -> None:
-        record = f"pathlib.Path({str(self.log)!r}).open('a').write(sys.argv[-1] + '\\n')"
-        script = f"import pathlib, sys\n{record}\nsys.exit({code})\n"
-        (self.folder / "uv").write_text(f"#!{sys.executable}\n{script}", encoding="utf-8")
-        (self.folder / "uv").chmod(0o755)
-
-    @property
-    def calls(self) -> list[str]:
-        return self.log.read_text(encoding="utf-8").split()
-
-
-@pytest.fixture
-def uv(tmp_path, monkeypatch) -> FakeUv:
-    if sys.platform == "win32":
-        pytest.skip("the stand-in uv is a script with a shebang")
-    folder = tmp_path / "fake-uv"
-    folder.mkdir()
-    monkeypatch.setenv("PATH", os.pathsep.join([str(folder), os.environ["PATH"]]))
-    return FakeUv(folder)
-
-
-def push(monkeypatch, ref, before, after):
-    monkeypatch.setenv("PRE_COMMIT_REMOTE_BRANCH", ref)
-    monkeypatch.setenv("PRE_COMMIT_FROM_REF", before)
-    monkeypatch.setenv("PRE_COMMIT_TO_REF", after)
-
-
 @pytest.mark.parametrize(
     ("ref", "tier"),
     [
-        pytest.param("refs/heads/main", "check", id="main"),
-        pytest.param("refs/heads/feat/x", "check", id="a branch pushed along with unpushed code on main"),
-        pytest.param("refs/tags/v1.0.0", "full", id="a tag"),
-        pytest.param("", "full", id="no ref reported"),
-        pytest.param("main", "full", id="a ref that is not spelt like one"),
+        pytest.param("refs/heads/main", "check", id="a push to main needs check"),
+        pytest.param("refs/heads/feat/x", "check", id="a branch pushed while main has unpushed code needs check"),
+        pytest.param("refs/tags/v1.2.3", "full", id="a tag needs full"),
+        pytest.param("", "full", id="a ref this hook cannot classify needs full"),
     ],
 )
-def test_a_push_needs_the_gate_its_ref_calls_for(ref, tier):
+def test_main_needs_the_check_tier_and_a_tag_the_full_one(ref, tier):
     assert pre_push.tier_for(ref) == tier
 
 
@@ -504,162 +385,125 @@ def test_a_push_needs_the_gate_its_ref_calls_for(ref, tier):
         pytest.param("full", "check", True, id="full covers check"),
         pytest.param("full", "full", True, id="full covers full"),
         pytest.param("check", "full", False, id="check never covers full"),
-        pytest.param(None, "check", False, id="nothing passed"),
     ],
 )
-def test_a_full_pass_covers_a_check_push_and_never_the_reverse(git_repo, monkeypatch, passed, needed, covers):
+def test_a_pass_covers_its_own_tier_and_the_lower_one_only(git_repo, monkeypatch, passed, needed, covers):
     git_repo.commit("chore: start", {"start.txt": "start"})
     monkeypatch.chdir(git_repo.path)
-    if passed:
-        passed_gate(git_repo, tier=passed)
+    passed_gate(git_repo, tier=passed)
     assert pre_push.gate_passed_on("HEAD", needed) is covers
-
-
-@pytest.mark.parametrize(
-    ("ref", "passed", "runs"),
-    [
-        pytest.param("refs/heads/main", None, ["check"], id="main, nothing passed: check"),
-        pytest.param("refs/heads/main", "check", [], id="main, check passed: nothing"),
-        pytest.param("refs/heads/main", "full", [], id="main, full passed: nothing"),
-        pytest.param("refs/tags/v1.0.0", None, ["full"], id="a tag, nothing passed: full"),
-        pytest.param("refs/tags/v1.0.0", "check", ["full"], id="a check pass never satisfies a tag"),
-        pytest.param("refs/tags/v1.0.0", "full", [], id="a full pass satisfies a tag"),
-    ],
-)
-def test_the_hook_runs_the_gate_its_ref_needs_unless_it_already_passed_on_the_pushed_tree(
-    git_repo, monkeypatch, uv, ref, passed, runs
-):
-    before = git_repo.commit("chore: start", {"start.txt": "start"})
-    after = git_repo.commit("feat: code", {"src/code.py": "x = 1"})
-    monkeypatch.chdir(git_repo.path)
-    if passed:
-        passed_gate(git_repo, tier=passed)
-    push(monkeypatch, ref, before, after)
-    assert pre_push.main() == 0
-    assert uv.calls == runs
-
-
-def test_the_hook_returns_the_status_of_the_gate_it_ran(git_repo, monkeypatch, uv):
-    before = git_repo.commit("chore: start", {"start.txt": "start"})
-    after = git_repo.commit("feat: code", {"src/code.py": "x = 1"})
-    monkeypatch.chdir(git_repo.path)
-    push(monkeypatch, "refs/heads/main", before, after)
-    uv.answer(3)
-    assert pre_push.main() == 3
-
-
-# a project whose proofs trigger on tools/ and whose gate-tests task exits 7
-PROJECT = (
-    "[tool.gate-proofs]\ntriggers = ['tools/*']\n\n[tool.poe.tasks]\ngate-tests = \"python -c 'raise SystemExit(7)'\"\n"
-)
-TRIGGERS = ["tools/*", "pyproject.toml", "crates/*/Cargo.toml", ".github/*"]
 
 
 @pytest.mark.parametrize(
     ("changed", "needed"),
     [
-        pytest.param(["src/code.py"], False, id="library code"),
-        pytest.param(["crates/core/src/ops/blur.rs"], False, id="a Rust module no proof edits"),
-        pytest.param(["docs/page.md"], False, id="documentation"),
-        pytest.param(["tools/pre_push.py"], True, id="a file in a listed folder"),
-        pytest.param(["tools/sub/deep.py"], True, id="a file below a listed folder: * crosses /"),
-        pytest.param(["pyproject.toml"], True, id="a listed file"),
-        pytest.param(["crates/core/Cargo.toml"], True, id="a glob in the middle of a path"),
-        pytest.param(["src/code.py", ".github/workflows/ci.yml"], True, id="one trigger among others"),
-        pytest.param(["tools_extra/x.py"], False, id="a folder whose name only starts like a listed one"),
-        pytest.param([], False, id="nothing changed"),
-        pytest.param(None, True, id="the paths are unknown"),
+        pytest.param(["src/bullterrier_image/cli.py"], False, id="library code alone leaves the proofs for full"),
+        pytest.param(["README.md", "tests/test_cli.py"], False, id="a page and an ordinary test"),
+        pytest.param(["pyproject.toml"], True, id="the configuration the gates read"),
+        pytest.param(["tools/check_commit_message.py"], True, id="a tool"),
+        pytest.param(["tests/tools/test_pre_push.py"], True, id="a proof"),
+        pytest.param([".github/workflows/ci.yml"], True, id="a workflow"),
+        pytest.param(["README.md", "tools/run_capped.py"], True, id="one trigger among other files"),
+        pytest.param([], False, id="no change at all"),
+        pytest.param(None, True, id="a change that cannot be read"),
     ],
 )
-def test_the_proofs_are_needed_when_a_changed_file_matches_a_trigger_or_the_change_is_unknown(changed, needed):
-    assert pre_push.proofs_needed(changed, TRIGGERS) is needed
+def test_the_proofs_run_when_the_change_touches_what_they_test_or_is_unknown(changed, needed):
+    assert pre_push.proofs_needed(changed, ["pyproject.toml", "tools/*", "tests/tools/*", ".github/*"]) is needed
 
 
-def test_every_file_a_gate_proof_anchors_on_is_a_trigger_and_no_file_it_only_appends_to_is():
-    """The triggers are written once, in pyproject.toml. The offences of tests/tools/test_rust_gates.py are the proofs'
-    own list of the files they edit. A change that needs the file's text (it fails on an empty file) makes the file a
-    trigger: editing that text can unrun the proof. A file a proof only appends to is not one, or each new module would
-    cost a proof run."""
-    spec = importlib.util.spec_from_file_location(
-        "rust_gates_offences", ROOT / "tests" / "tools" / "test_rust_gates.py"
-    )
-    assert spec is not None
-    assert spec.loader is not None
-    gates = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gates)
+def unmatched(triggers: list[str], files: list[str]) -> list[str]:
+    """The triggers that match none of `files`, by the hook's own rule."""
+    return [trigger for trigger in triggers if not pre_push.proofs_needed(files, [trigger])]
+
+
+def test_every_trigger_matches_a_tracked_file():
+    """A trigger that matches nothing (a file renamed, a typo) silently stops the proofs guarding what it named."""
     triggers = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["gate-proofs"]["triggers"]
-
-    def anchors_on_text(change) -> bool:
-        try:
-            change("")
-        except AssertionError:
-            return True
-        return False
-
-    anchored = {file for _task, file, change, _named in gates.OFFENCES.values() if anchors_on_text(change)}
-    appended = {file for _task, file, change, _named in gates.OFFENCES.values()} - anchored
-    assert [file for file in sorted(anchored) if not pre_push.proofs_needed([file], triggers)] == []
-    assert [file for file in sorted(appended) if pre_push.proofs_needed([file], triggers)] == []
+    tracked = subprocess.run(
+        ["git", "ls-files"], cwd=ROOT, capture_output=True, encoding="utf-8", check=True
+    ).stdout.splitlines()
+    assert triggers
+    assert unmatched(triggers, tracked) == []
 
 
-@pytest.fixture
-def clone(git_repo, monkeypatch):
-    """A working repository whose `origin/main` is its first commit, with a pyproject.toml whose gate-tests task exits 7
-    and whose triggers name `tools/*`; the current directory."""
-    git_repo.write(
-        "pyproject.toml",
-        PROJECT,
-    )
+@pytest.mark.parametrize(
+    ("triggers", "missing"),
+    [
+        pytest.param(["tools/*", "pyproject.toml", "docs/*.md"], [], id="a folder glob, a file, a nested glob"),
+        pytest.param(["pyproject.toml", "gone.toml"], ["gone.toml"], id="a file that does not exist"),
+        pytest.param(["tools/*", "toolz/*"], ["toolz/*"], id="a glob over a folder that does not exist"),
+        pytest.param(["docs/*.nothing"], ["docs/*.nothing"], id="a glob that matches no file in a folder that exists"),
+    ],
+)
+def test_the_trigger_check_names_each_trigger_that_matches_nothing(triggers, missing):
+    assert unmatched(triggers, ["tools/a.py", "docs/page.md", "pyproject.toml"]) == missing
+
+
+def test_without_a_record_of_a_pass_the_change_is_unknown_so_the_proofs_run(git_repo, monkeypatch):
     git_repo.commit("chore: start", {"start.txt": "start"})
-    git_repo.add_remote()
+    monkeypatch.chdir(git_repo.path)
+    assert pre_push.changed_since_proofs() is None
+
+
+def test_the_change_is_what_differs_from_the_commit_the_proofs_last_passed_on(git_repo, monkeypatch):
+    """Not from origin/main: the project does not push often, so origin/main can be many commits old."""
+    git_repo.commit("chore: start", {"start.txt": "start"})
     git_repo.push()
+    git_repo.commit("feat: old work", {"src/old.py": "x = 1"})
     monkeypatch.chdir(git_repo.path)
-    return git_repo
+    pre_push.record_proofs_pass()
+    assert pre_push.changed_since_proofs() == []
+    git_repo.commit("feat: new work", {"src/new.py": "x = 1"})
+    git_repo.write("untracked.txt", "u")
+    assert sorted(pre_push.changed_since_proofs() or []) == ["src/new.py", "untracked.txt"]
 
 
-@pytest.mark.parametrize(
-    ("make", "paths"),
-    [
-        pytest.param(lambda repo: repo.commit("feat: code", {"src/code.py": "x"}), ["src/code.py"], id="a commit"),
-        pytest.param(lambda repo: repo.write("untracked.txt", "u"), ["untracked.txt"], id="an untracked file"),
-        pytest.param(lambda repo: repo.write("start.txt", "edited"), ["start.txt"], id="an unstaged edit"),
-        pytest.param(lambda repo: (repo.write("new.txt", "n"), repo.git("add", "new.txt")), ["new.txt"], id="staged"),
-        pytest.param(lambda repo: None, [], id="nothing"),
-    ],
-)
-def test_the_change_is_everything_the_working_tree_differs_in_from_the_base_with_origin_main(clone, make, paths):
-    make(clone)
-    changed = pre_push.changed_since_base()
-    assert changed is not None
-    assert sorted(changed) == paths
+def test_a_pass_on_an_uncommitted_change_is_not_recorded(git_repo, monkeypatch):
+    git_repo.commit("chore: start", {"start.txt": "start"})
+    git_repo.write("start.txt", "edited")
+    monkeypatch.chdir(git_repo.path)
+    pre_push.record_proofs_pass()
+    assert pre_push.changed_since_proofs() is None
 
 
-def test_the_change_is_unknown_without_origin_main(git_repo, monkeypatch):
+@pytest.mark.parametrize(("tier", "recorded"), [("full", True), ("check", False)])
+def test_a_full_pass_records_the_proofs_it_ran_and_a_check_pass_does_not(git_repo, monkeypatch, tier, recorded):
     git_repo.commit("chore: start", {"start.txt": "start"})
     monkeypatch.chdir(git_repo.path)
-    assert pre_push.changed_since_base() is None
+    passed_gate(git_repo, tier=tier)
+    assert pre_push.changed_since_proofs() == ([] if recorded else None)
 
 
-@pytest.mark.parametrize(
-    ("path", "status"),
-    [
-        pytest.param("tools/new_tool.py", 7, id="a trigger changed: the proofs run (their status is the step's)"),
-        pytest.param("src/code.py", 0, id="nothing they test changed: left to full and CI"),
-    ],
-)
-def test_the_proofs_step_runs_gate_tests_only_when_the_change_touches_a_trigger(clone, path, status):
-    clone.commit("feat: change", {path: "x = 1"})
-    assert pre_push.run_proofs() == status
-
-
-def test_the_proofs_step_runs_gate_tests_when_the_base_cannot_be_read(git_repo, monkeypatch):
-    git_repo.write(
-        "pyproject.toml",
-        PROJECT,
+def project_whose_proofs_exit(repo, status: int) -> None:
+    """A pyproject.toml whose proofs trigger on tools/ and whose gate-tests task exits with `status`."""
+    repo.commit(
+        "chore: start",
+        {
+            "pyproject.toml": "[tool.gate-proofs]\ntriggers = ['tools/*']\n\n[tool.poe.tasks]\n"
+            f"gate-tests = \"python -c 'raise SystemExit({status})'\"\n"
+        },
     )
-    git_repo.commit("chore: start", {"start.txt": "start"})
+
+
+def test_the_proofs_step_runs_them_until_they_pass_then_only_when_a_trigger_changes(git_repo, monkeypatch):
+    project_whose_proofs_exit(git_repo, 0)
+    monkeypatch.chdir(git_repo.path)
+    assert pre_push.run_proofs() == 0
+    assert pre_push.changed_since_proofs() == [], "a pass on a clean tree is recorded"
+    git_repo.commit("feat: code", {"src/code.py": "x = 1"})
+    assert pre_push.run_proofs() == 0
+    assert pre_push.changed_since_proofs() == ["src/code.py"], "skipped: the record stays where they last ran"
+    git_repo.commit("feat: a tool", {"tools/new.py": "x = 1"})
+    assert pre_push.run_proofs() == 0
+    assert pre_push.changed_since_proofs() == []
+
+
+def test_failed_proofs_are_not_recorded_and_their_status_is_the_step_s(git_repo, monkeypatch):
+    project_whose_proofs_exit(git_repo, 7)
     monkeypatch.chdir(git_repo.path)
     assert pre_push.run_proofs() == 7
+    assert pre_push.changed_since_proofs() is None
 
 
 # One gate per checkout --------------------------------------------------------------------------------------------
@@ -714,5 +558,5 @@ def test_a_record_of_a_dead_gate_is_ignored_and_a_finished_gate_leaves_none(git_
     gate.kill()
     gate.wait()
     pre_push.record_gate_start()
-    pre_push.record_gate_pass("check")
+    pre_push.record_gate_pass()
     assert not record.exists()

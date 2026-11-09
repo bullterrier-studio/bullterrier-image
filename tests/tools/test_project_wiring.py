@@ -19,10 +19,9 @@ import pytest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-# the only commands that are not dev dependencies: tools every machine that can clone the repository already has, and
-# cargo, which rustup installs at the version rust-toolchain.toml pins, and python, the interpreter poe runs in (it runs
-# tools/run_capped.py, which a copy of the configuration can run without `uv run` building a project around it)
-SYSTEM_COMMANDS = {"git", "uv", "cargo", "python"}
+# the only commands that are not dev dependencies: tools every machine that can clone the repository already has, the
+# interpreter of the environment poe runs in, and cargo, which rustup installs at the version rust-toolchain.toml pins
+SYSTEM_COMMANDS = {"git", "uv", "python", "cargo"}
 # tool settings must live in pyproject.toml, never in the hook wiring
 TOOL_OPTIONS = ("--select", "--ignore", "--extend-select", "--line-length", "--config", "--strict", "--python-version")
 FIXING_OPTIONS = ("--fix", "--unsafe-fixes", "--write")
@@ -94,7 +93,7 @@ def test_a_tier_remembers_a_pass_for_the_push_by_starting_and_ending_with_the_ho
 
 # What `check` leaves to `full`: the gate proofs and the scaffold test (minutes, in copies), the audit (network) and the
 # lowest-dependency run (a second environment).
-FULL_ONLY = ("--dist=loadfile -m gate", "-m rebuild", "pip-audit", "--resolution lowest-direct")
+FULL_ONLY = ("-m 'gate or tooling'", "-m rebuild", "pip-audit", "--resolution lowest-direct")
 
 
 def test_check_leaves_the_proofs_the_scaffold_the_audit_and_the_minimum_dependencies_to_full(poe_runs):
@@ -111,17 +110,52 @@ def test_full_runs_everything_check_runs_but_the_conditional_proofs_and_the_reco
     assert missing == [conditional]
 
 
-def test_the_python_suite_leaves_the_gate_proofs_to_their_own_task(poe_runs):
-    for task in ("test", "check-min-deps"):
-        assert "not gate" in poe_runs[task][0], poe_runs[task]
-    assert " -m gate" in poe_runs["gate-tests"][0]
+def test_the_python_suite_leaves_the_slow_tests_of_the_tooling_to_their_own_task(poe_runs):
+    """The gate proofs and the shared tools' own tests (the same in every project, tested in the template) run in
+    `gate-tests`: in `check` only when the tooling changed, in `full` always. The suite is the project's own."""
+    for task in ["test", "check-min-deps"]:
+        assert "not gate and not tooling" in poe_runs[task][0], poe_runs[task]
+    assert "-m 'gate or tooling'" in poe_runs["gate-tests"][0]
 
 
 def test_every_poe_command_runs_a_dev_dependency_or_a_system_tool(pyproject, poe_runs):
-    allowed = dev_dependency_names(pyproject) | SYSTEM_COMMANDS
+    # a project whose own gates need another system tool (node, say) names it in `[tool.project-wiring] system-commands`
+    allowed = (
+        dev_dependency_names(pyproject)
+        | SYSTEM_COMMANDS
+        # the cargo tools Cargo.toml pins: `poe setup` installs them and `poe rust-tools` checks their versions
+        | set(tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))["workspace"]["metadata"]["tools"])
+        | set(pyproject["tool"].get("project-wiring", {}).get("system-commands", []))
+    )
     for task, commands in poe_runs.items():
         for command in commands:
             assert shlex.split(command)[0] in allowed, f"poe task {task!r} runs {command!r}"
+
+
+def runs_tests(words: list[str]) -> bool:
+    """Whether a command line starts a test runner (pytest, or `cargo test`)."""
+    return "pytest" in words or any(words[i : i + 2] == ["cargo", "test"] for i in range(len(words)))
+
+
+def test_every_task_that_runs_tests_runs_them_under_the_memory_cap(poe_runs):
+    # a runaway test froze the machine; a timeout limits seconds, not memory
+    runners = [
+        (task, words)
+        for task, commands in poe_runs.items()
+        for command in commands
+        if runs_tests(words := shlex.split(command))
+    ]
+    assert {"test", "gate-tests"} <= {task for task, _ in runners}, "the detector must see the suite's own tasks"
+    assert [(task, words) for task, words in runners if "tools/run_capped.py" not in words] == []
+
+
+def test_the_test_runner_detector_finds_pytest_and_cargo_test_and_nothing_else():
+    assert runs_tests(shlex.split("pytest -q -m 'not gate'"))
+    assert runs_tests(shlex.split("cargo test --workspace --locked"))
+    assert runs_tests(shlex.split("python tools/run_capped.py -- pytest -q"))
+    assert not runs_tests(shlex.split("cargo build --locked"))
+    assert not runs_tests(shlex.split("cargo deny --locked check"))
+    assert not runs_tests(shlex.split("ruff check tests/"))
 
 
 def test_the_rewrite_detector_catches_each_fixing_option_and_passes_checking_commands():
@@ -272,7 +306,7 @@ def test_the_core_crate_is_named_as_the_package_is_on_pypi_and_imported(pyprojec
 
 
 CORE = "crates/core/Cargo.toml"
-RENAMED = {  # a way the core crate can drift from the public names -> its edits: (file, old text, new text)
+RENAMED = {  # a way the core crate can drift from the public names -> its edits: (files, old text, new text)
     # the library keeps the import name here, so only the package's name differs
     "the package renamed (R0's name)": [
         (
@@ -293,8 +327,9 @@ def test_the_naming_rule_catches_a_core_crate_named_otherwise(pyproject, tmp_pat
     for name in ("Cargo.toml", "Cargo.lock"):
         shutil.copy(ROOT / name, tmp_path)
     shutil.copytree(ROOT / "crates", tmp_path / "crates", ignore=shutil.ignore_patterns("target"))
-    for relative, old, new in edits:
-        text = (tmp_path / relative).read_text(encoding="utf-8")
-        assert old in text
-        (tmp_path / relative).write_text(text.replace(old, new), encoding="utf-8")
+    for pattern, old, new in edits:
+        holders = [path for path in tmp_path.glob(pattern) if old in path.read_text(encoding="utf-8")]
+        assert holders, f"no {pattern} holds {old!r}"
+        for path in holders:
+            path.write_text(path.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
     assert core_crate_names(tmp_path) != public_names(pyproject)

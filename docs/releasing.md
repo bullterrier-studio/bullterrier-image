@@ -8,8 +8,8 @@ How a change is checked on GitHub and how a version reaches PyPI. The short rule
 `.github/workflows/ci.yml` runs on every push to main, pull request and merge-queue entry, and by hand (Actions tab,
 *CI*, *Run workflow*). Stage 1 runs every check in parallel: `lint.yml` (format, lint, dead code, dependencies, types,
 workflows, each Rust gate a step of its own), `test.yml` (the Rust tests and the suite on Linux, macOS and Windows,
-Python 3.12 to 3.14), `min-deps.yml` (the lowest allowed dependencies), `gate-tests.yml` (the proofs that each gate fails on a
-known-bad change, on Linux), `security.yml` (pip-audit and cargo-deny's
+Python 3.12 to 3.14, and on one Linux cell the proofs that each gate fails on a known-bad change), `min-deps.yml` (the
+lowest allowed dependencies), `security.yml` (pip-audit and cargo-deny's
 advisories, CodeQL for Python and Rust, and dependency review on pull requests) and `pre-commit.yml` (the commit hooks
 over every file). Stage 2, `build.yml`, only once every check passed: the sdist and one abi3 wheel per platform
 ([which](design-decisions.md#the-rust-core); built with maturin-action), checked by `tools/check_dists.py` and kept as

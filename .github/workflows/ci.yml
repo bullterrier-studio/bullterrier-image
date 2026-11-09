@@ -29,7 +29,8 @@ concurrency:
 jobs:
   # Whether a pull request changes anything but documentation. Every other event (main, merge queue, tags, releases, by
   # hand) always runs everything. The documentation is the same set tools/pre_push.py skips the local gate for: pages in
-  # the top level and docs/, and docs/images/.
+  # the top level and docs/, and the pictures in docs/images/ (its PICTURE_SUFFIXES; tests/tools/test_pre_push.py keeps
+  # the two equal).
   changes:
     name: What changed
     runs-on: ubuntu-latest
@@ -50,7 +51,12 @@ jobs:
               - '**'
               - '!*.md'
               - '!docs/*.md'
-              - '!docs/images/**'
+              - '!docs/images/**/*.[gG][iI][fF]'
+              - '!docs/images/**/*.[jJ][pP][eE][gG]'
+              - '!docs/images/**/*.[jJ][pP][gG]'
+              - '!docs/images/**/*.[pP][nN][gG]'
+              - '!docs/images/**/*.[sS][vV][gG]'
+              - '!docs/images/**/*.[wW][eE][bB][pP]'
       - name: Say what runs
         env:
           EVENT: ${{ github.event_name }}
@@ -61,7 +67,7 @@ jobs:
           elif [ "$CODE" = true ]; then
             msg="Pull request that changes code: every check runs."
           else
-            msg="Pull request that changes only documentation: lint, test, min-deps, gate-tests, security and build are skipped; pre-commit runs."
+            msg="Pull request that changes only documentation: lint, test, min-deps, security and build are skipped; pre-commit runs."
           fi
           echo "$msg"
           echo "$msg" >> "$GITHUB_STEP_SUMMARY"
@@ -79,10 +85,6 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     uses: ./.github/workflows/min-deps.yml # zizmor: ignore[self-repository] (see the note above)
-  gate-tests:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
-    uses: ./.github/workflows/gate-tests.yml # zizmor: ignore[self-repository] (see the note above)
   security:
     needs: changes
     if: needs.changes.outputs.code == 'true'
@@ -95,7 +97,7 @@ jobs:
 
   # stage 2: the distributions, from a commit that passed every check (release.yml publishes these files)
   build:
-    needs: [changes, lint, test, min-deps, gate-tests, security, pre-commit]
+    needs: [changes, lint, test, min-deps, security, pre-commit]
     # `!failure()`: a job that was skipped (documentation only) does not stop the build, one that failed does
     if: ${{ !cancelled() && !failure() && needs.changes.outputs.code == 'true' }}
     uses: ./.github/workflows/build.yml # zizmor: ignore[self-repository] (see the note above)
@@ -103,7 +105,7 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always() # report a result even when a job it needs failed or was skipped
-    needs: [changes, lint, test, min-deps, gate-tests, security, pre-commit, build]
+    needs: [changes, lint, test, min-deps, security, pre-commit, build]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

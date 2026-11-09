@@ -337,12 +337,12 @@ A fix removes the cause, not the symptom (reasoning in `docs/design-decisions.md
 ## Lint, types and gates
 
 Three tiers. `uv run poe fast`: format, lint, types, Rust tests (the inner loop). `uv run poe check`: every static gate, the build
-check, the Rust tests and the Python suite (`gate` and `rebuild` tests left out); run it once before a merge. `uv run poe full`:
-`check` plus `gate-tests` (marker `gate`: tests that copy the project, write one deliberate mistake and check a gate fails; each
-removes its copy and build folder), `check-scaffold`, `audit` and `check-min-deps`; run before a release (`poe release` does, CI
+check, the Rust tests and the Python suite (`gate`, `tooling` and `rebuild` tests left out); run it once before a merge. `uv run poe full`:
+`check` plus `gate-tests` (marker `gate`: tests that copy the project, write one deliberate mistake and check a gate fails, each
+removing its copy and build folder; marker `tooling`: the shared tools' own tests, the same files in every repo), `check-scaffold`, `audit` and `check-min-deps`; run before a release (`poe release` does, CI
 does). Each step runs once per tier. A gate needs a known-bad row for every kind of source it must see (an effect file pulled in
 by `include!` is one); the rows live in `tests/tools/test_rust_gates.py`, and `[tool.gate-proofs] triggers` lists the files whose
-change makes `check` run the proofs on a push. Test and build profile: `[profile.test] opt-level = 1`, `[profile.dev] debug =
+change since the proofs last passed makes `check` run them. Test and build profile: `[profile.test] opt-level = 1`, `[profile.dev] debug =
 "line-tables-only"`, `split-debuginfo = "off"` (macOS otherwise keeps every object file).
 
 `check` runs every gate, cheapest first, stopping at the first failure: `ruff format --check` and `rust-fmt`;
@@ -428,6 +428,8 @@ Writing a test file:
   checked; a table replaces loops and branches.
 - **No change-detectors:** test a rule with a known-bad input; never restate configuration. Cross-effect rules live only in
   `tests/effects/test_contract.py`.
+- **Gate proofs are marked `gate`** (`pytestmark = pytest.mark.gate`), a shared tool's tests `tooling`; `poe test` leaves both out,
+  `poe gate-tests` runs them. A test of the project's own code is never `tooling`.
 - **Slow tests in groups:** `--dist=loadfile` (`addopts`) runs a file on one worker, so a module-scoped fixture that spawns tools
   (ruff, mypy, poe, git) is built once. Never `xdist_group`: with pytest 9.2 and xdist 3.8 it does nothing.
 - **Running:** one file or folder: `uv run pytest tests/ops/test_blur.py -n 0` (`-p no:randomly` for fixed order); everything:
@@ -478,8 +480,8 @@ before you run `check`, then merge and push).
   which rule failed. Merge, revert and fixup commits git writes pass unchanged.
 - **Never `--no-verify`, skip, silence or loosen a hook:** fix the cause. If a rule is wrong, change it in `pyproject.toml` in its
   own commit and say why.
-- All Python tooling is configured in `pyproject.toml` (ruff, mypy, pytest, import-linter, poe, commit-message, maturin),
-  all Rust tooling in `Cargo.toml` (lints, pinned cargo tools). Do not add `ruff.toml`, `mypy.ini`, `setup.cfg`,
-  `pytest.ini`, `.coveragerc`, `clippy.toml`, `.cargo/config.toml` or similar (a test fails). Other config files:
+- All Python tooling is configured in `pyproject.toml` (ruff, mypy, pytest, import-linter, commit-message, run-capped, rust-tests,
+  maturin), all Rust tooling in `Cargo.toml` (lints, pinned cargo tools). Do not add `ruff.toml`, `mypy.ini`, `setup.cfg`,
+  `pytest.ini`, `.coveragerc`, `.cargo/config.toml` or similar (a test fails). Other config files:
   `.pre-commit-config.yaml` (hook wiring only), `.editorconfig`, `.gitmessage`, and, for Rust tools that cannot read
-  `Cargo.toml`, `rust-toolchain.toml`, `rustfmt.toml`, `deny.toml` (root only).
+  `Cargo.toml`, `rust-toolchain.toml`, `rustfmt.toml`, `deny.toml`, `clippy.toml` (root only; lint levels stay in `Cargo.toml`).

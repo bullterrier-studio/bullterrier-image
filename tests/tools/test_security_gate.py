@@ -15,8 +15,9 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.gate
+
+ROOT = Path(__file__).resolve().parents[2]
 LIBRARY = "src/bullterrier_image/ops"  # library code, under no per-file exemption
 DOC = '"""Probe."""\n\n'
 
