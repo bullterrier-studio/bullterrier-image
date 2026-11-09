@@ -450,6 +450,14 @@ fn cases() -> Vec<Case> {
                     .param("method", "bayer")
                     .param("palette", "ega")
                     .param("space", "rgb"),
+                Step::new("quadtree")
+                    .param("threshold", 0.04)
+                    .param("max_cell", 40)
+                    .param("min_cell", 3)
+                    .param("gap", 1.5)
+                    .param("rounding", 0.6)
+                    .param("gap_color", "#102030"),
+                Step::new("quadtree"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),

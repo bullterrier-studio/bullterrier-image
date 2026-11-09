@@ -281,6 +281,12 @@ fn conditional() -> Vec<Conditional> {
                 ("iterations", json!(2)),
             ],
         },
+        // the tiny picture is smaller than the default first cell, which splits only where it is uneven enough
+        Conditional {
+            effect: "quadtree",
+            field: "max_cell",
+            with: vec![("min_cell", json!(1.0)), ("threshold", json!(0.2))],
+        },
         // the clumping blur is run only for specks of more than a pixel
         Conditional {
             effect: "grain",

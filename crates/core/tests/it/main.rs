@@ -88,6 +88,7 @@ mod pixel_grid;
 mod pixel_sort;
 mod polar;
 mod presets;
+mod quadtree;
 mod radial_blur;
 mod random;
 mod recipe_check;
