@@ -1,5 +1,6 @@
 """The parameter-model pattern every effect follows: `EffectParams`, `param`, `Color`, and the wording of errors."""
 
+import copy
 import inspect
 import pickle
 import re
@@ -1041,6 +1042,14 @@ def test_a_lookup_table_defaults_to_the_identity_and_takes_a_lut_only():
     for given in ["film.cube", 1, np.zeros((2, 2, 2, 3))]:
         with pytest.raises(RecipeError, match=r"`file`.*lookup table"):
             model.parse({"file": given})
+
+
+@pytest.mark.parametrize("copy_it", [copy.copy, copy.deepcopy], ids=["copy", "deepcopy"])
+def test_a_lookup_table_can_be_copied_and_so_can_a_field_that_defaults_to_one(copy_it):
+    table = Lut.identity(5)
+    assert copy_it(table) == table  # older pydantic deep-copies a default to build a model's signature
+    model = model_of(LUT)
+    assert copy_it(model.model_fields["file"].get_default()) == Lut.identity()
 
 
 # No effect declares a field or an optional colour yet, so the entries are written as `_core.params` writes them

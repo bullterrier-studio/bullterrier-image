@@ -248,6 +248,14 @@ class Lut:
         """By digest, as `==`."""
         return hash(self.digest)
 
+    def __copy__(self) -> Self:
+        """The table itself: it is read-only, and its Rust table cannot be pickled, which `copy` would try."""
+        return self
+
+    def __deepcopy__(self, _memo: dict[int, object]) -> Self:
+        """The table itself, as `__copy__`."""
+        return self
+
     def __repr__(self) -> str:
         """`Lut('film.cube', 33)`: label, then entries per axis, never the values; `Lut.identity(2)` for an identity."""
         return f"Lut.identity({self.size})" if self.label == "identity" else f"Lut({self.label!r}, {self.size})"
