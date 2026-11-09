@@ -22,7 +22,10 @@ pub(crate) const META: Meta = Meta {
 /// What `liquid_metal` reads around a pixel: the smoothing's reach and a pixel on either side for the slope.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     // constant: the kernel reaches int(truncate x smoothing + 0.5) px and the slope one more
-    Footprint::reach(f64::from(params.smoothing * params.truncate) + 1.5, params.edge == Edge::Wrap)
+    Footprint::reach(
+        f64::from(params.smoothing * params.truncate) + 1.5,
+        params.edge == Edge::Wrap,
+    )
 }
 
 /// Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground.
@@ -80,17 +83,24 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     );
     let (horizon, tint) = (params.horizon, params.tint.0);
     let mut pixels = vec![[0.0; 3]; height * width];
-    shade_slopes(&surface, (height, width), params.relief, edge, &mut pixels, |_, rise_y, rise_x| {
-        // The reflected ray's upward part, 2 n_y n_z in -1..1, as a height in 0..1.
-        let looks_up = 0.5 + rise_y / (1.0 + rise_x * rise_x + rise_y * rise_y); // constant: n_y n_z of a unit normal, 0.5 = the flat surface
-        // The metal's place on its black (0), tint (0.5), white (1) gradient: linear ground to horizon to sky.
-        let shine = if looks_up < horizon {
-            0.5 * looks_up / horizon // constant: the horizon sits at the gradient's middle
-        } else {
-            0.5 + 0.5 * (looks_up - horizon) / (1.0 - horizon) // constant: the horizon sits at the gradient's middle
-        };
-        let (towards_tint, towards_white) = ((2.0 * shine).min(1.0), (2.0 * shine - 1.0).max(0.0)); // constant: two halves of the gradient
-        tint.map(|level| (level * towards_tint + (1.0 - level) * towards_white).clamp(0.0, 1.0))
-    });
+    shade_slopes(
+        &surface,
+        (height, width),
+        params.relief,
+        edge,
+        &mut pixels,
+        |_, rise_y, rise_x| {
+            // The reflected ray's upward part, 2 n_y n_z in -1..1, as a height in 0..1.
+            let looks_up = 0.5 + rise_y / (1.0 + rise_x * rise_x + rise_y * rise_y); // constant: n_y n_z of a unit normal, 0.5 = the flat surface
+            // The metal's place on its black (0), tint (0.5), white (1) gradient: linear ground to horizon to sky.
+            let shine = if looks_up < horizon {
+                0.5 * looks_up / horizon // constant: the horizon sits at the gradient's middle
+            } else {
+                0.5 + 0.5 * (looks_up - horizon) / (1.0 - horizon) // constant: the horizon sits at the gradient's middle
+            };
+            let (towards_tint, towards_white) = ((2.0 * shine).min(1.0), (2.0 * shine - 1.0).max(0.0)); // constant: two halves of the gradient
+            tint.map(|level| (level * towards_tint + (1.0 - level) * towards_white).clamp(0.0, 1.0))
+        },
+    );
     Image::from_pixels(height, width, pixels)
 }

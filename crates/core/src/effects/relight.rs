@@ -20,7 +20,10 @@ pub(crate) const META: Meta = Meta {
 /// What `relight` reads around a pixel: the blur's reach and a pixel on either side for the slope.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     // constant: the kernel reaches int(truncate x blur + 0.5) px and the slope one more
-    Footprint::reach(f64::from(params.blur * params.truncate) + 1.5, params.edge == Edge::Wrap)
+    Footprint::reach(
+        f64::from(params.blur * params.truncate) + 1.5,
+        params.edge == Edge::Wrap,
+    )
 }
 
 /// Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`: bump
@@ -92,18 +95,33 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         f64::from(params.truncate),
         edge,
     );
-    let (angle, elevation) = (f64::from(params.angle).to_radians(), f64::from(params.elevation).to_radians());
+    let (angle, elevation) = (
+        f64::from(params.angle).to_radians(),
+        f64::from(params.elevation).to_radians(),
+    );
     #[expect(clippy::cast_possible_truncation, reason = "a direction, 0..1 in each part")]
-    let (to_x, to_y, level, lean) = (angle.cos() as f32, angle.sin() as f32, elevation.sin() as f32, elevation.cos() as f32);
+    let (to_x, to_y, level, lean) = (
+        angle.cos() as f32,
+        angle.sin() as f32,
+        elevation.sin() as f32,
+        elevation.cos() as f32,
+    );
     let (saturation, pixels_in) = (params.saturation, picture.pixels());
     let mut pixels = vec![[0.0; 3]; height * width];
-    shade_slopes(&smooth, (height, width), params.height, edge, &mut pixels, |index, rise_y, rise_x| {
-        // Lambert's law: the unit normal (-rise_x, -rise_y, 1) dotted with the direction to the light, over what a flat
-        // surface (sin of the elevation) catches
-        let toward = rise_x * to_x + rise_y * to_y;
-        let gain = (level - lean * toward) / ((1.0 + rise_x * rise_x + rise_y * rise_y).sqrt() * level);
-        // constant: mid grey, the neutral surface the relief is lit on when the picture's colours are left out
-        pixels_in[index].map(|value| ((saturation * value + (1.0 - saturation) * 0.5) * gain).clamp(0.0, 1.0))
-    });
+    shade_slopes(
+        &smooth,
+        (height, width),
+        params.height,
+        edge,
+        &mut pixels,
+        |index, rise_y, rise_x| {
+            // Lambert's law: the unit normal (-rise_x, -rise_y, 1) dotted with the direction to the light, over what a flat
+            // surface (sin of the elevation) catches
+            let toward = rise_x * to_x + rise_y * to_y;
+            let gain = (level - lean * toward) / ((1.0 + rise_x * rise_x + rise_y * rise_y).sqrt() * level);
+            // constant: mid grey, the neutral surface the relief is lit on when the picture's colours are left out
+            pixels_in[index].map(|value| ((saturation * value + (1.0 - saturation) * 0.5) * gain).clamp(0.0, 1.0))
+        },
+    );
     Image::from_pixels(height, width, pixels)
 }
