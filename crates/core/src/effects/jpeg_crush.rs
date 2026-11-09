@@ -117,10 +117,7 @@ fn crush(pixels: &[[f32; 3]], height: usize, width: usize, params: &Params) -> V
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     let ratio = inputs.size_ratio();
-    let design = (
-        whole(float(height) / ratio).max(1),
-        whole(float(width) / ratio).max(1),
-    );
+    let design = (whole(float(height) / ratio).max(1), whole(float(width) / ratio).max(1));
     if design == (height, width) {
         return Image::from_pixels(height, width, crush(picture.pixels(), height, width, params));
     }
