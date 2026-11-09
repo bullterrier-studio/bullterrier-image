@@ -234,7 +234,10 @@ fn averaged(pixels: &[Point], (height, width): (usize, usize), cell: usize) -> C
     let mut dots = vec![[0.0_f32; 3]; height.div_ceil(cell) * columns];
     par::rows(&mut dots, columns, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(columns).enumerate() {
-            let (top, bottom) = ((first_row + offset) * cell, ((first_row + offset + 1) * cell).min(height));
+            let (top, bottom) = (
+                (first_row + offset) * cell,
+                ((first_row + offset + 1) * cell).min(height),
+            );
             for row in pixels[top * width..bottom * width].chunks_exact(width) {
                 for (dot, run) in line.iter_mut().zip(row.chunks(cell)) {
                     for pixel in run {

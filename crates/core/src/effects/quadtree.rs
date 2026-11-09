@@ -67,7 +67,13 @@ fn coordinate(length: usize) -> f32 {
 
 /// Draws `leaf` into `band` (rows `first_row` on, `width` wide): each pixel is the cell's mean, or the line colour near the
 /// cell's border, by a rounded box's signed distance in pixel-centre coordinates.
-fn draw(band: &mut [[f32; 3]], (first_row, width): (usize, usize), leaf: &Leaf, picture_size: (usize, usize), params: &Params) {
+fn draw(
+    band: &mut [[f32; 3]],
+    (first_row, width): (usize, usize),
+    leaf: &Leaf,
+    picture_size: (usize, usize),
+    params: &Params,
+) {
     let rows = band.len() / width;
     let (first, last) = (leaf.top.max(first_row), leaf.bottom.min(first_row + rows));
     if params.gap == 0.0 && params.rounding == 0.0 {
