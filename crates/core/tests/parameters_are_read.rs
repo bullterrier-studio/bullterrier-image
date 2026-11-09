@@ -223,6 +223,23 @@ fn conditional() -> Vec<Conditional> {
             field: "band_max_height",
             with: vec![("bands", json!(7))],
         },
+        // at the defaults, three bands that slide further than this tiny picture is wide leave every row one colour, which
+        // neither bleeds nor wobbles; without bands they do
+        Conditional {
+            effect: "vhs",
+            field: "bleed",
+            with: vec![("bands", json!(0))],
+        },
+        Conditional {
+            effect: "vhs",
+            field: "wobble",
+            with: vec![("bands", json!(0))],
+        },
+        Conditional {
+            effect: "vhs",
+            field: "wobble_size",
+            with: vec![("bands", json!(0))],
+        },
         // the clumping blur is run only for specks of more than a pixel
         Conditional {
             effect: "grain",

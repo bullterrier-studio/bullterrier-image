@@ -81,9 +81,9 @@ HOST, OTHER = (path.parent.name for path in sorted((PACKAGE / "effects").glob("[
 # One forbidden import per rule, each in a copy of the package: the linter must fail, naming the module and the rule.
 FORBIDDEN = {
     "effect to effect": (
-        "effects/vhs/effect.py",
-        "import bullterrier_image.effects.ascii",
-        "bullterrier_image.effects.vhs.effect",
+        f"effects/{HOST}/effect.py",
+        f"import bullterrier_image.effects.{OTHER}",
+        f"bullterrier_image.effects.{HOST}.effect",
         EFFECTS_APART,
     ),
     "ops to core": ("ops/cells.py", "import bullterrier_image.core.params", "bullterrier_image.ops.cells", LAYERS),
@@ -178,7 +178,7 @@ ALLOWED = {
     "core to errors": ("core/vocabulary.py", "import bullterrier_image.errors"),
     "ops to errors": ("ops/cells.py", "import bullterrier_image.errors"),
     "ops to the Rust extension": ("ops/cells.py", "from bullterrier_image._native import _core"),
-    "an effect to the Rust extension": ("effects/vhs/effect.py", "from bullterrier_image._native import _core"),
+    "an effect to the Rust extension": (f"effects/{HOST}/effect.py", "from bullterrier_image._native import _core"),
 }
 
 

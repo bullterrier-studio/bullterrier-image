@@ -420,6 +420,23 @@ fn cases() -> Vec<Case> {
                 Step::new("lenticular"),
                 Step::new("interlace"),
                 Step::new("rgb_split"),
+                Step::new("ntsc")
+                    .param("sigma", 7.5)
+                    .param("crawl", 0.6)
+                    .param("phase", 0.3)
+                    .param("edge", "wrap"),
+                Step::new("ntsc"),
+                Step::new("vhs")
+                    .param("tracking", 20)
+                    .param("bands", 6)
+                    .param("band_static", 0.4)
+                    .param("dropouts", 30)
+                    .param("bleed", 9.5)
+                    .param("noise", 0.08)
+                    .param("wobble", 4)
+                    .param("seed", 4_294_967_295_u32)
+                    .param("edge", "reflect"),
+                Step::new("vhs"),
             ]),
             &[(201, 199), (131, 257), (1, 3_001), (3_001, 1)],
         ),
