@@ -906,6 +906,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   dark side of an edge and on dark strokes, which is one ink line, the sketch look, and unlike Sobel and Canny.
   *Consequence:* the line sits about one radius beside the edge, on its dark side; 'dog' still uses `threshold` and
   `softness` like the other methods.
+- **Inks (`ops/inks.rs`) mix and unmix in log density.** A channel under ink at coverage `c` is `paper * (ink/paper)^c`, so
+  the density `-ln(channel/paper)` of overlapping inks adds up. *Reason:* the inverse (how much of each ink makes a colour)
+  is then least squares with each coverage in 0..1, exact for one and two inks, and printing then unmixing returns the
+  coverages; an additive RGB mix has no such inverse. *Consequence:* inks lighter than the paper in a channel add no density
+  there; the unmix of three or four inks is a fixed count of sweeps, never a convergence test, so it is deterministic.
+- **Spot screens are `angle` + 30 degrees apart; the offset is `k * offset` along `offset_angle`.** *Reason:* 30 is a third
+  of the 90 degrees after which a square screen repeats, the largest spread for three screens (the fourth repeats the
+  first: four spot inks are for flat art, use `cmyk` for four tones); the offset needs no random misregistration, which
+  would be a hidden tunable and break determinism, and a direction with a distance is what a loose press plate does.
+  *Consequence:* ink 0 is the reference and never moves; `cmyk` screens are the classic 15, 75, 0 and 45 added to `angle`.
 
 ## Fixing defects
 
