@@ -3,8 +3,7 @@ import dataclasses
 import numpy as np
 import pytest
 
-from bullterrier_image.ops.convolve import Edge
-from bullterrier_image.ops.distance import EdgeField, edge_distance
+from bullterrier_image.ops.distance import Edge, EdgeField, edge_distance
 
 HEIGHT, WIDTH = 40, 60
 TOP, BOTTOM, LEFT, RIGHT = 10, 29, 15, 44  # inclusive bounds of the rectangle in the middle of the array

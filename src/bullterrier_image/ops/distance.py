@@ -5,11 +5,12 @@ bool mask: a full-resolution matte or a coarse grid of pieces.
 """
 
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from scipy import ndimage
 
-from bullterrier_image.ops.convolve import Edge
+Edge = Literal["reflect", "constant", "nearest", "mirror", "wrap"]  # scipy's names for what lies beyond an array
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ def edge_distance(
     none), so that it varies gently across a ridge instead of flipping. More smoothing turns the direction more
     gradually, and lets it reach further beyond the shape (up to `truncate` sigma). `truncate` is where the blur's
     kernel is cut off, in sigmas: smaller is faster and shorter-reaching, larger is more exact. `edge` is what the blur
-    sees beyond the array, as in `bullterrier_image.ops.convolve`: 'reflect' mirrors the field, so a border edge stays
+    sees beyond the array, as in scipy: 'reflect' mirrors the field, so a border edge stays
     an edge. The caller chooses all three blur settings; none has a hidden default.
     """
     row_height, col_width = sampling
