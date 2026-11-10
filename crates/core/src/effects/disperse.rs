@@ -201,17 +201,20 @@ pub struct Params {
     pub background_threshold: f32,
 }
 
-// constant: the numbers of the six random draws that make a piece's fate, fixed so that a seed keeps its look
-const DRAW_ORDER: u64 = 0;
-const DRAW_FLIGHT: u64 = 1;
-const DRAW_SPEED: u64 = 2;
-const DRAW_ANGLE: u64 = 3;
-const DRAW_SWAY: u64 = 4;
-const DRAW_PHASE: u64 = 5;
+/// The six random draws that make a piece's fate. Their order numbers them, so a seed keeps its look: do not reorder.
+#[derive(Clone, Copy)]
+enum Draw {
+    Order,
+    Flight,
+    Speed,
+    Angle,
+    Sway,
+    Phase,
+}
 
-/// A piece's `part`-th random number, 0..1: a hash of the seed and its place, so that it is the same at every `progress`.
-fn noise(seed: u32, cell: usize, part: u64) -> f64 {
-    unit(mix(seed, &[cell as u64, part])) // constant: a cell number fits 64 bits
+/// A piece's random number of the kind `draw`, 0..1: a hash of the seed and its place, the same at every `progress`.
+fn noise(seed: u32, cell: usize, draw: Draw) -> f64 {
+    unit(mix(seed, &[cell as u64, draw as u64])) // constant: a cell number fits 64 bits
 }
 
 /// The position `at` (0..1) in `low..high`.
@@ -261,7 +264,7 @@ fn leaving_order(params: &Params, grid: &Grid, present: &[bool], depth: &[f32], 
         if low <= high {
             *value = (*value - low) / (high - low).max(1e-6); // constant: guards a flat order
         }
-        *value = (*value * (1.0 - jitter) + noise(params.seed, cell, DRAW_ORDER) * jitter).clamp(0.0, 1.0);
+        *value = (*value * (1.0 - jitter) + noise(params.seed, cell, Draw::Order) * jitter).clamp(0.0, 1.0);
     }
     order
 }
@@ -313,10 +316,10 @@ fn fly(params: &Params, fate: &Fate) -> Mover {
     let speed = lerp(
         f64::from(params.distance_minimum),
         1.0,
-        noise(params.seed, cell, DRAW_SPEED),
+        noise(params.seed, cell, Draw::Speed),
     );
     let direction =
-        (heading + (0.5 - noise(params.seed, cell, DRAW_ANGLE)) * f64::from(params.angle_spread)).to_radians();
+        (heading + (0.5 - noise(params.seed, cell, Draw::Angle)) * f64::from(params.angle_spread)).to_radians();
     let journey = wind.abs() * speed; // this piece's whole journey
     let thrown = f64::from(params.outward) * f64::from(params.outward_distance);
     let [normal_x, normal_y] = fate.direction.map(f64::from);
@@ -336,7 +339,7 @@ fn fly(params: &Params, fate: &Fate) -> Mover {
     } else {
         hover * smooth(floating) - pullback * (1.0 - (1.0 - windup) * (1.0 - windup))
     };
-    let phase = noise(params.seed, cell, DRAW_PHASE);
+    let phase = noise(params.seed, cell, Draw::Phase);
     let tau = 2.0 * std::f64::consts::PI; // constant: a full turn in radians
     // the bob only exists while pieces hover
     let bob = if params.hover > 0.0 && age <= 0.0 {
@@ -347,7 +350,7 @@ fn fly(params: &Params, fate: &Fate) -> Mover {
         0.0
     };
     let sway = f64::from(params.sway)
-        * noise(params.seed, cell, DRAW_SWAY)
+        * noise(params.seed, cell, Draw::Sway)
         * t
         * (tau * (f64::from(params.sway_cycles) * t + phase)).sin();
     // Secondary layer: a brief glow just after leaving, then the fade.
@@ -416,7 +419,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     for cell in (0..grid.len()).filter(|&cell| present[cell]) {
         let column = cell % grid.columns;
         let depth = (f64::from(edges.distance[cell]) / f64::from(params.outline_depth)).clamp(0.0, 1.0);
-        let lifetime = flight * ((1.0 - variation) + 2.0 * variation * noise(params.seed, cell, DRAW_FLIGHT));
+        let lifetime = flight * ((1.0 - variation) + 2.0 * variation * noise(params.seed, cell, Draw::Flight));
         let detach_at = anticipation + order[cell] / reach.max(1e-6) * span; // constant: guards reach == 0
         let age = (progress - detach_at) / lifetime; // <= 0: not yet, 0..1: in flight, >= 1: gone
         let goes = order[cell] <= reach;
