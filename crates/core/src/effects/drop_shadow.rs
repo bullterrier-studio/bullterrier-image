@@ -132,7 +132,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;
         let behind: [f32; 3] = std::array::from_fn(|channel| {
-            pixel[channel] * clear[at] + near[channel] * (1.0 - clear[at]) + (far[channel] - near[channel]) * along_share[at]
+            pixel[channel] * clear[at]
+                + near[channel] * (1.0 - clear[at])
+                + (far[channel] - near[channel]) * along_share[at]
         });
         // the copies lie behind the shape: a pixel moves toward them by the share of it the shape does not cover
         std::array::from_fn(|channel| pixel[channel] + (1.0 - shape[at]) * (behind[channel] - pixel[channel]))

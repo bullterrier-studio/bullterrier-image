@@ -53,9 +53,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let mut beside = vec![false; height * width];
     for at in 0..height * width {
         let (row, column) = (at / width, at % width);
-        for next in [(column + 1 < width).then_some(at + 1), (row + 1 < height).then_some(at + width)]
-            .into_iter()
-            .flatten()
+        for next in [
+            (column + 1 < width).then_some(at + 1),
+            (row + 1 < height).then_some(at + width),
+        ]
+        .into_iter()
+        .flatten()
         {
             if labels[next] != labels[at] {
                 beside[at] = true;

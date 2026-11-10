@@ -109,17 +109,24 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let pixels_in = picture.pixels();
     let mut pixels = vec![[0.0; 3]; height * width];
     // constant: the distance is already in px, so a slope of the smoothed distance needs no scale
-    shade_slopes(&smooth, (height, width), 1.0, edge, &mut pixels, |index, rise_y, rise_x| {
-        if !inside[index] {
-            return pixels_in[index];
-        }
-        // constant: guards a flat distance (no direction, no light)
-        let length = rise_x.hypot(rise_y).max(1e-6);
-        let facing = ((rise_x * to_x + rise_y * to_y) / length).max(0.0);
-        let depth = -signed[index]; // px from the edge into the shape; 1 on its outermost pixels
-        let band = (1.0 - (depth - 1.0) / band_width).clamp(0.0, 1.0).powf(falloff);
-        let light = amount * facing * band * shape[index];
-        screen(pixels_in[index], tint.map(|channel| light * channel))
-    });
+    shade_slopes(
+        &smooth,
+        (height, width),
+        1.0,
+        edge,
+        &mut pixels,
+        |index, rise_y, rise_x| {
+            if !inside[index] {
+                return pixels_in[index];
+            }
+            // constant: guards a flat distance (no direction, no light)
+            let length = rise_x.hypot(rise_y).max(1e-6);
+            let facing = ((rise_x * to_x + rise_y * to_y) / length).max(0.0);
+            let depth = -signed[index]; // px from the edge into the shape; 1 on its outermost pixels
+            let band = (1.0 - (depth - 1.0) / band_width).clamp(0.0, 1.0).powf(falloff);
+            let light = amount * facing * band * shape[index];
+            screen(pixels_in[index], tint.map(|channel| light * channel))
+        },
+    );
     Image::from_pixels(height, width, pixels)
 }
