@@ -105,6 +105,7 @@ mod perspective;
 mod picture;
 mod pieces;
 mod pinch_bulge;
+mod pipeline_parts;
 mod pixel_grid;
 mod pixel_sort;
 mod placed;

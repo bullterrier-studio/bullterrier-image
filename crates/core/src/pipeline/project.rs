@@ -36,7 +36,6 @@ pub enum RecipeSource {
 
 /// How a project exports its results and what it checks.
 #[derive(Clone, Debug, PartialEq)]
-#[non_exhaustive]
 pub struct Settings {
     /// How stills are saved: one or more of the formats.
     pub formats: Vec<Format>,
