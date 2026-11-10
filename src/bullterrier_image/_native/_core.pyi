@@ -12,6 +12,7 @@ __all__ = [
     "Lut",
     "apply",
     "check",
+    "check_project",
     "check_recipe",
     "contact_sheet",
     "depth_finder_identity",
@@ -25,6 +26,7 @@ __all__ = [
     "params",
     "read",
     "read_map",
+    "read_project",
     "read_recipe",
     "refine_edge",
     "region_presets",
@@ -115,6 +117,8 @@ def subject_finder_identity(
     *, segmenter: str | None = None, model_file: str | os.PathLike[str] | None = None
 ) -> str: ...
 def depth_finder_identity(*, model_file: str | os.PathLike[str] | None = None) -> str: ...
+def read_project(path: str | os.PathLike[str]) -> dict[str, Any]: ...
+def check_project(given: Mapping[str, Any]) -> dict[str, Any]: ...
 def contact_sheet(tiles: Sequence[tuple[str, np.ndarray]], columns: int, tile: int) -> np.ndarray: ...
 def refine_edge(matte: np.ndarray, shrink: float, feather: float) -> np.ndarray: ...
 def region_presets(kind: str) -> dict[str, dict[str, Any]]: ...

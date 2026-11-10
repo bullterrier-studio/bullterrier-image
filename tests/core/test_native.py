@@ -18,6 +18,7 @@ from bullterrier_image.errors import (
     LutError,
     MapNotFoundError,
     NonFiniteImageError,
+    ProjectError,
     RecipeError,
     SubjectNotFoundError,
     UnknownEffectError,
@@ -36,6 +37,7 @@ RAISED_AS = {
     "image_write": ImageWriteError,
     "backend_unavailable": BackendUnavailableError,
     "lut": LutError,
+    "project": ProjectError,
 }
 
 

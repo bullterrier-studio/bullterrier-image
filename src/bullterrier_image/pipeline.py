@@ -30,32 +30,29 @@ A pipeline is described by a small project file, `bt-image.toml` (`init_project`
 """
 
 import fnmatch
-import functools
-import glob
 import hashlib
 import html
 import io
 import json
 import tempfile
 import time
-import tomllib
 import zipfile
 from collections.abc import Callable, Mapping
-from dataclasses import asdict, dataclass, field, fields, replace
+from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
 from importlib import metadata
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 import numpy as np
-from pydantic import AfterValidator, ConfigDict, Field, ValidationError, model_validator
+from pydantic import ConfigDict, Field
 from pydantic.dataclasses import dataclass as validated_dataclass
 
 from . import finding, imageio
 from .checks import matte_warnings, still_warnings
+from .core import native
 from .core.bridge import known_maps, maps_needed, needs_finder
 from .core.finder import Finder, find_map
-from .core.params import describe_error
 from .core.regions import FOUND_MAPS, Svg
 from .core.steps import file_name, runs
 from .core.values import Lut, Picture
@@ -73,32 +70,12 @@ _DEFAULT_PHOTOS = ["photos/*.jpg", "photos/*.jpeg", "photos/*.png", "photos/*.we
 _Share = Annotated[float, Field(strict=True, ge=0, le=1)]
 
 
-def _checked_as_project[T](cls: type[T]) -> type[T]:
-    """Make `cls` (a pydantic dataclass) report a failed validation as a `ProjectError` in the project's wording.
-
-    Pydantic writes the dataclass's `__init__` itself (one written in the class body is ignored), so it is wrapped
-    here; `dataclasses.replace` goes through it too, so a changed copy is checked like a new one."""
-    generated = cls.__init__
-    names = [f.name for f in fields(cls)]  # type: ignore[arg-type]  # a pydantic dataclass is a dataclass
-
-    @functools.wraps(generated)
-    def checked_init(self: object, *args: Any, **kwargs: Any) -> None:
-        try:
-            generated(self, *args, **kwargs)
-        except ValidationError as error:
-            raise ProjectError(describe_error(error, "", names)) from None
-
-    cls.__init__ = checked_init  # type: ignore[method-assign]  # replacing pydantic's generated constructor on purpose
-    return cls
-
-
-@_checked_as_project
-@validated_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
+@dataclass(frozen=True)
 class Project:
     """A pipeline as `bt-image.toml` describes it (see the module documentation; `load_project` reads one).
 
-    Every value is checked when the project is made, however it is made (a file, code, `dataclasses.replace`); a bad
-    one raises `ProjectError` naming the setting and the value.
+    Every value is checked when the project is made, however it is made (a file, code, `dataclasses.replace`), by the
+    core; a bad one raises `ProjectError` naming the setting and the value.
     photos: the photo files, at least one, no two with the same file name without its extension (each gets the output
         folder of that name). recipes: recipe files, or `Recipe` objects built in code, at least one. output: the folder
         everything is written to.
@@ -108,31 +85,40 @@ class Project:
     steps: also save the picture after every step.
     """
 
-    photos: Annotated[tuple[Path, ...], Field(min_length=1)]
-    recipes: Annotated[tuple[Path | Recipe, ...], Field(min_length=1)]  # files, or Recipe objects built in code
+    photos: tuple[Path, ...]
+    recipes: tuple[Path | Recipe, ...]  # files, or Recipe objects built in code
     output: Path
     formats: tuple[Literal["jpg", "png", "webp"], ...] = ("jpg",)
-    # largest first, so equal settings written in another order are the same settings
-    sizes: Annotated[
-        tuple[Annotated[int, Field(strict=True, ge=16)], ...], AfterValidator(lambda s: tuple(sorted(s, reverse=True)))
-    ] = ()
-    quality: int = Field(default=92, strict=True, ge=1, le=100)
-    subject_share: tuple[_Share, _Share] = (0.02, 0.97)
-    steps: bool = Field(default=False, strict=True)  # also save the picture after every step of every recipe
+    sizes: tuple[int, ...] = ()  # largest first, so equal settings written in another order are the same settings
+    quality: int = 92
+    subject_share: tuple[float, float] = (0.02, 0.97)
+    steps: bool = False  # also save the picture after every step of every recipe
 
-    @model_validator(mode="after")
-    def _consistent(self) -> "Project":
-        """The rules across values: at least one format (checked here: a bad item would also report the length),
-        a share range that is a range, and one output folder per photo."""
-        if not self.formats:
-            raise ValueError("formats must name at least one of jpg, png, webp")
-        low, high = self.subject_share
-        if not low < high:
-            raise ValueError(f"subject_share must be (low, high) with low < high, got {self.subject_share}")
-        stems = [p.stem for p in self.photos]
-        if len(set(stems)) != len(stems):
-            raise ValueError(f"two photos share a file name ({sorted({s for s in stems if stems.count(s) > 1})})")
-        return self
+    def __post_init__(self) -> None:
+        recipes = tuple(r if isinstance(r, Recipe) else Path(r) for r in self.recipes)
+        given = {
+            "photos": [str(p) for p in self.photos],
+            # the core holds a recipe built in code to nothing here: a placeholder object stands for it
+            "recipes": [{} if isinstance(r, Recipe) else str(r) for r in recipes],
+            "output": str(self.output),
+            "formats": list(self.formats),
+            "sizes": list(self.sizes),
+            "quality": self.quality,
+            "subject_share": list(self.subject_share),
+            "steps": self.steps,
+        }
+        checked = native.check_project(given)
+        for name, value in {
+            "photos": tuple(Path(p) for p in self.photos),
+            "recipes": recipes,
+            "output": Path(self.output),
+            "formats": tuple(checked["formats"]),
+            "sizes": tuple(checked["sizes"]),
+            "quality": checked["quality"],
+            "subject_share": tuple(checked["subject_share"]),
+            "steps": checked["steps"],
+        }.items():
+            object.__setattr__(self, name, value)
 
     @property
     def cache(self) -> Path:
@@ -168,46 +154,17 @@ def load_project(path: str | Path) -> Project:
     Raises ProjectError, starting with the file's name, for a file that is not TOML (with its line and column), an
     unknown key, globs that match no photo, no recipe file, or a value `Project` refuses; OSError if it cannot be read.
     """
-    path = Path(path)
-    root = path.parent
-    try:
-        with path.open("rb") as f:
-            raw = tomllib.load(f)
-    except tomllib.TOMLDecodeError as error:  # its message keeps the line and column
-        raise ProjectError(f"{path.name}: {error}") from None
-    except UnicodeDecodeError as error:
-        raise ProjectError(f"{path.name}: not UTF-8 text ({error.reason} at byte {error.start})") from None
-    unknown = set(raw) - {"photos", "recipes", "output", *_TABLES}
-    if unknown:
-        raise ProjectError(f"{path.name}: unknown keys {sorted(unknown)}")
-    settings: dict[str, Any] = {}
-    for name, keys in _TABLES.items():
-        table = raw.get(name, {})
-        if not isinstance(table, dict):
-            raise ProjectError(f"{path.name}: write `{name}` as a [{name}] table")
-        if set(table) - set(keys):
-            raise ProjectError(f"{path.name}: unknown keys {sorted(set(table) - set(keys))}; allowed: {sorted(keys)}")
-        settings |= table
-
-    photo_globs = raw.get("photos", _DEFAULT_PHOTOS)
-    found = {
-        Path(p)
-        for pattern in photo_globs
-        for p in glob.glob(str(root / pattern), recursive=True)  # noqa: PTH207  (skips hidden ._x.jpg copies; Path.glob does not)
-    }
-    photos = tuple(sorted(p for p in found if p.is_file()))
-    if not photos:
-        raise ProjectError(f"{path.name}: no photos match {photo_globs} (looked relative to {root.resolve()})")
-    recipes: list[Path] = []
-    for entry in raw.get("recipes", ["recipes"]):
-        target = root / entry
-        recipes += sorted(target.glob("*.toml")) if target.is_dir() else [target]
-    if not recipes or not all(r.is_file() for r in recipes):
-        raise ProjectError(f"{path.name}: no recipe files found in {raw.get('recipes', ['recipes'])}")
-    try:
-        return Project(photos=photos, recipes=tuple(recipes), output=root / raw.get("output", "out"), **settings)
-    except ProjectError as error:
-        raise ProjectError(f"{path.name}: {error}") from None
+    read = native.read_project(Path(path))
+    return Project(
+        photos=tuple(Path(p) for p in read["photos"]),
+        recipes=tuple(Path(r) for r in read["recipes"]),
+        output=Path(read["output"]),
+        formats=tuple(read["formats"]),
+        sizes=tuple(read["sizes"]),
+        quality=read["quality"],
+        subject_share=tuple(read["subject_share"]),
+        steps=read["steps"],
+    )
 
 
 def init_project(directory: str | Path = ".") -> Path:

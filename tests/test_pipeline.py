@@ -716,8 +716,8 @@ def test_text_files_are_utf8_whatever_the_locale(folder, photo):
     ("text", "expect"),
     [
         ('[export]\nformats = ["tiff"]\n', "formats"),
-        ("[export]\nspeed = 3\n", "unknown keys"),
-        ('colour = "red"\n', "unknown keys"),
+        ("[export]\nspeed = 3\n", "unknown field `speed`.*sizes"),
+        ('colour = "red"\n', "unknown field `colour`.*photos"),
         ('photos = ["nothing/*.jpg"]\n', "no photos match"),
         ('recipes = ["missing"]\n', "no recipe files"),
     ],
@@ -749,13 +749,18 @@ def test_two_photos_with_the_same_name_are_refused(folder):
         ({"sizes": (4,)}, "sizes.*4"),
         ({"subject_share": (0.9, 0.1)}, "subject_share"),
         ({"steps": "yes"}, "steps.*yes"),
-        ({"colour": "red"}, "colour"),
     ],
 )
 def test_a_project_built_in_code_is_checked_like_a_project_file(folder, option, expect):
     with pytest.raises(ProjectError, match=expect):
         Project(photos=(folder / "photos" / "a.png",), recipes=(folder / "recipes" / "warm.toml",), output=folder / "o",
                 **option)  # fmt: skip
+
+
+def test_a_project_given_a_setting_it_has_not_is_a_call_with_a_wrong_argument(folder):
+    with pytest.raises(TypeError, match="colour"):
+        Project(photos=(folder / "photos" / "a.png",), recipes=(folder / "recipes" / "warm.toml",), output=folder / "o",
+                colour="red")  # type: ignore[call-arg]  # fmt: skip
 
 
 @pytest.mark.skipif(Path("...png").stem != "..", reason='this pathlib gives "...png" no ".." stem (Python 3.14+)')

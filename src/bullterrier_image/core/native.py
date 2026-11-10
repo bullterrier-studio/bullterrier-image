@@ -21,6 +21,7 @@ from bullterrier_image.errors import (
     LutError,
     MapNotFoundError,
     NonFiniteImageError,
+    ProjectError,
     RecipeError,
     SubjectNotFoundError,
     UnknownEffectError,
@@ -39,6 +40,7 @@ _RAISED_AS: dict[str, type[BullterrierImageError]] = {
     "image_write": ImageWriteError,
     "backend_unavailable": BackendUnavailableError,
     "lut": LutError,
+    "project": ProjectError,
 }
 
 
@@ -84,6 +86,8 @@ check_recipe = entry(_core.check_recipe)
 read_recipe = entry(_core.read_recipe)
 refine_edge = entry(_core.refine_edge)
 contact_sheet = entry(_core.contact_sheet)
+read_project = entry(_core.read_project)
+check_project = entry(_core.check_project)
 find_subject = entry(_core.find_subject)
 find_depth = entry(_core.find_depth)
 find_inverse_depth = entry(_core.find_inverse_depth)

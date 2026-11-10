@@ -4,6 +4,7 @@
 mod files;
 mod finding;
 mod lut;
+mod pipeline;
 mod run;
 mod sheet;
 
@@ -47,6 +48,9 @@ mod _core {
 
     #[pymodule_export]
     use super::lut::PyLut;
+
+    #[pymodule_export]
+    use super::pipeline::{check_project, read_project};
 
     #[pymodule_export]
     use super::sheet::contact_sheet;
