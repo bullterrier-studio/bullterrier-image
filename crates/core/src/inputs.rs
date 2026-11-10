@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crate::effect::{Effect, Input};
-use crate::{Error, Lut, Picture};
+use crate::{Error, Image, Lut, Picture};
 
 /// A map over the picture: one value from 0 to 1 for every pixel (a subject's alpha, a depth, a light), row after row.
 #[derive(Clone, PartialEq)]
@@ -172,13 +172,15 @@ impl Labels {
 ///
 /// Build the offer with the `with_` methods; the core hands the effect the part of it that the effect declares. A lookup
 /// table (a parameter of the kind `lut`) is offered under its parameter's name, like a field's map; the parameter itself
-/// only names it (see [`LutName`](crate::params::LutName)).
+/// only names it (see [`LutName`](crate::params::LutName)). So is a picture (a parameter of the kind `picture`), an
+/// [`Image`] with straight alpha (see [`PictureName`](crate::params::PictureName)).
 #[derive(Clone, Debug)]
 pub struct Inputs<'a> {
     size_ratio: f64,
     partition: Option<&'a Labels>,
     fields: BTreeMap<String, &'a Layer>,
     luts: BTreeMap<String, &'a Lut>,
+    pictures: BTreeMap<String, &'a Image>,
 }
 
 impl Default for Inputs<'_> {
@@ -189,6 +191,7 @@ impl Default for Inputs<'_> {
             partition: None,
             fields: BTreeMap::new(),
             luts: BTreeMap::new(),
+            pictures: BTreeMap::new(),
         }
     }
 }
@@ -223,6 +226,13 @@ impl<'a> Inputs<'a> {
         self
     }
 
+    /// The offer with `image` for the picture parameter called `parameter`.
+    #[must_use]
+    pub fn with_picture(mut self, parameter: impl Into<String>, image: &'a Image) -> Self {
+        self.pictures.insert(parameter.into(), image);
+        self
+    }
+
     /// Working pixels per design pixel: 1 unless the effect declared [`Input::SizeRatio`].
     #[must_use]
     pub fn size_ratio(&self) -> f64 {
@@ -245,6 +255,13 @@ impl<'a> Inputs<'a> {
     #[must_use]
     pub fn lut(&self, parameter: &str) -> Option<&'a Lut> {
         self.luts.get(parameter).copied()
+    }
+
+    /// The picture for the picture parameter called `parameter`, if one was offered: none means no picture. Its alpha, if
+    /// it has any, is the cover of whatever the effect lays over the photo.
+    #[must_use]
+    pub fn picture(&self, parameter: &str) -> Option<&'a Image> {
+        self.pictures.get(parameter).copied()
     }
 
     /// The part of this offer `effect` declares, for a picture of `picture`'s size.
@@ -285,6 +302,7 @@ impl<'a> Inputs<'a> {
         }
         // a step offers a table for each lookup table parameter of its effect and no other
         declared.luts.clone_from(&self.luts);
+        declared.pictures.clone_from(&self.pictures);
         Ok(declared)
     }
 }

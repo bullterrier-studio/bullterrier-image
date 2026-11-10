@@ -15,7 +15,7 @@ mod cut;
 mod each;
 mod frame;
 mod laid;
-mod luts;
+mod assets;
 mod maps;
 mod regions;
 mod size;
@@ -23,7 +23,7 @@ mod step;
 mod trace;
 
 use cut::Cut;
-use luts::Luts;
+use assets::Assets;
 pub use maps::Finder;
 use maps::{Found, Maps};
 use regions::Evaluator;
@@ -46,6 +46,7 @@ pub struct Photo<'a> {
     maps: BTreeMap<String, Arc<Layer>>,
     finders: BTreeMap<String, Found>,
     luts: BTreeMap<String, Arc<Lut>>,
+    pictures: BTreeMap<String, Arc<Image>>,
 }
 
 impl fmt::Debug for Photo<'_> {
@@ -57,6 +58,7 @@ impl fmt::Debug for Photo<'_> {
             .field("maps", &self.maps.keys().collect::<Vec<_>>())
             .field("finders", &self.finders.keys().collect::<Vec<_>>())
             .field("luts", &self.luts.keys().collect::<Vec<_>>())
+            .field("pictures", &self.pictures.keys().collect::<Vec<_>>())
             .finish()
     }
 }
@@ -70,6 +72,7 @@ impl<'a> Photo<'a> {
             maps: BTreeMap::new(),
             finders: BTreeMap::new(),
             luts: BTreeMap::new(),
+            pictures: BTreeMap::new(),
         }
     }
 
@@ -106,6 +109,18 @@ impl<'a> Photo<'a> {
     #[must_use]
     pub fn with_lut(mut self, name: impl Into<String>, lut: Arc<Lut>) -> Self {
         self.luts.insert(name.into(), lut);
+        self
+    }
+
+    /// This photo with `image` for the name `name`: a step's parameter of the kind `picture` (such as `blend`'s `image`)
+    /// that holds `name` uses this picture, an RGB or RGBA [`Image`] (its alpha, straight, is how much of it covers the
+    /// photo). The picture is shared, not copied. One of the same name given before is replaced; one no step names is not
+    /// used. A name that is no given picture is read as the path of an image file (once per render, however many steps
+    /// name it, within the core's pixel limit), and a path that cannot be read is a render error naming it, before the
+    /// first step runs. (The photo itself is a [`Picture`]; this is a second picture a step lays over it.)
+    #[must_use]
+    pub fn with_picture(mut self, name: impl Into<String>, image: Arc<Image>) -> Self {
+        self.pictures.insert(name.into(), image);
         self
     }
 
@@ -199,7 +214,7 @@ impl<'a> Photo<'a> {
         // as the working picture has it, which a trace shows like a map a step uses
         let framed_subject = needs_subject.then(|| maps.get("subject", "`frame`")).transpose()?;
         let cut = Cut::plan(&recipe.frame, &working, framed_subject.clone())?;
-        let mut luts = Luts::new(&self.luts);
+        let mut assets = Assets::new(&self.luts, &self.pictures);
         let steps = recipe
             .steps
             .iter()
@@ -209,7 +224,7 @@ impl<'a> Photo<'a> {
                     registry,
                     presets,
                     ratio,
-                    &mut luts,
+                    &mut assets,
                     entry,
                     &format!("step {}", index + 1),
                 )

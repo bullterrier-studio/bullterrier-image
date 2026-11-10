@@ -22,6 +22,9 @@
 //! }
 //! ```
 //!
+//! A picture laid over the photo is a `PictureName` with no default (none: the step leaves the photo as it is); like a
+//! table it reaches the effect in its [`Inputs`](crate::Inputs).
+//!
 //! A lookup table is a `LutName` with no default (it is none: the identity table); it reaches the effect in its
 //! [`Inputs`](crate::Inputs), not in the values. A field is a `FieldName` with `#[param(default = "depth")]`: the name of
 //! the selection the effect works from, which it also finds as a [`Layer`](crate::Layer) in its `Inputs` under the
@@ -54,7 +57,7 @@ pub use bullterrier_image_derive::{Choice, Params};
 
 /// The names a choice picks from, in declaration order: what `#[derive(Choice)]` implements for a fieldless enum. The
 /// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `u32`, `bool`, `Color`, `Option<Color>`,
-/// `Vec<Color>`, `FieldName` and `LutName` by their written names.
+/// `Vec<Color>`, `FieldName`, `LutName` and `PictureName` by their written names.
 pub trait Choice {
     /// The names, in `snake_case`.
     const CHOICES: &'static [&'static str];
@@ -163,6 +166,9 @@ pub enum Kind {
     /// A 3D colour lookup table (`LutName`): the name of a table the photo was given, or the path of a `.cube` file;
     /// none is the identity table. The default is always none.
     Lut,
+    /// A picture laid over the photo (`PictureName`): the name of a picture the photo was given, or the path of an image
+    /// file; none leaves the photo as it is. The default is always none.
+    Picture,
 }
 
 /// The unit a number is in. Python's `UNITS` (`core/params.py`) lists the same names; a model checks its unit against them.
@@ -202,7 +208,7 @@ pub enum Scalar {
     Text(&'static str),
     /// The `'#rrggbb'` texts of a list of colours.
     List(&'static [&'static str]),
-    /// No value: the default of a lookup table (the identity table) or of an optional colour.
+    /// No value: the default of a lookup table (the identity table), of a picture or of an optional colour.
     Null,
 }
 
@@ -231,6 +237,28 @@ pub struct LutName(pub Option<String>);
 
 impl LutName {
     /// The table called `name`: a name given to the photo, or a path.
+    #[must_use]
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(Some(name.into()))
+    }
+
+    /// As a recipe writes it: the name, or `null` for none.
+    #[must_use]
+    pub fn json(&self) -> Value {
+        self.0.clone().map_or(Value::Null, Value::from)
+    }
+}
+
+/// The value of a picture parameter: the name of a picture the photo was given (see `Photo::with_picture`), else the path
+/// of an image file read once per render; none means no picture. A recipe writes it as a string or `null`. The picture
+/// itself never travels in the parameters: a render hands it to the effect in its [`Inputs`](crate::Inputs), as an
+/// [`Image`](crate::Image) with straight alpha. (It is not the [`Picture`](crate::Picture) a step reads: that is the photo.)
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PictureName(pub Option<String>);
+
+impl PictureName {
+    /// The picture called `name`: a name given to the photo, or a path.
     #[must_use]
     pub fn new(name: impl Into<String>) -> Self {
         Self(Some(name.into()))

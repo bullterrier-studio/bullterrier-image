@@ -56,6 +56,7 @@ fn a_complete_declaration_is_accepted_for_every_kind_of_field() {
         documented! { #[param(default = ["#000000"], min_length = 1, max_length = 1, advanced)] stops: Vec<Color>, },
         documented! { #[param()] file: LutName, },
         documented! { #[param(advanced)] file: LutName, },
+        documented! { #[param()] image: PictureName, },
         documented! { #[param(default = "depth")] field: FieldName, },
         documented! { #[param(default = "depth", advanced)] field: FieldName, },
         documented! { #[param()] color: Option<Color>, },
@@ -408,6 +409,16 @@ fn a_list_of_colours_that_breaks_its_rules_is_refused_naming_the_field() {
             "drivable on a lookup table",
             documented! { #[param(drivable)] file: LutName, },
             &["file", "drivable"],
+        ),
+        (
+            "a default on a picture",
+            documented! { #[param(default = "logo.png")] image: PictureName, },
+            &["image", "default", "none"],
+        ),
+        (
+            "a unit on a picture",
+            documented! { #[param(unit = px)] image: PictureName, },
+            &["image", "unit"],
         ),
         (
             "min_length on a lookup table",

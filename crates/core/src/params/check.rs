@@ -10,7 +10,7 @@ impl Table {
     ///
     /// The result has every parameter, in normal form: a parameter not given has its declared default; a decimal is a
     /// float even when given as a whole number; a colour is three numbers 0..1 (given as `'#rrggbb'`, `'#rgb'` in
-    /// either case, spaces around allowed, or three numbers); a lookup table is a non-empty string (a name or a path) or `null`; a field is a non-empty string; a `nullable` parameter also takes `null`; a list of colours is a list of those, between its
+    /// either case, spaces around allowed, or three numbers); a lookup table is a non-empty string (a name or a path) or `null`; a picture is a non-empty string (a name or a path) and, as it is `nullable`, `null`; a field is a non-empty string; a `nullable` parameter also takes `null`; a list of colours is a list of those, between its
     /// `min_length` and `max_length` long (the spellings may be mixed; the first element that is no colour is named by
     /// its place, counting from 0). Rules: a name the effect does not declare is refused,
     /// listing the declared ones; a decimal takes any number but not a switch or text; a whole number takes only a
@@ -132,6 +132,10 @@ impl Field {
                 Value::Null => Ok(Value::Null),
                 Value::String(name) if !name.is_empty() => Ok(value.clone()),
                 _ => Err(Constraint::LutName),
+            },
+            Kind::Picture => match value {
+                Value::String(name) if !name.is_empty() => Ok(value.clone()),
+                _ => Err(Constraint::PictureName),
             },
         }
     }

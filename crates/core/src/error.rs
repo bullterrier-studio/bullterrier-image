@@ -224,6 +224,8 @@ pub enum Constraint {
     FieldName,
     /// A lookup table is the name of a table or the path of a `.cube` file, in a non-empty string, or `null` for none.
     LutName,
+    /// A picture is the name of a picture or the path of an image file, in a non-empty string, or `null` for none.
+    PictureName,
 }
 
 impl Error {
@@ -322,6 +324,9 @@ impl fmt::Display for Constraint {
             Self::FieldName => formatter.write_str("must be the name of a field, a non-empty string"),
             Self::LutName => {
                 formatter.write_str("must be the name of a lookup table or the path of a .cube file, or null")
+            }
+            Self::PictureName => {
+                formatter.write_str("must be the name of a picture or the path of an image file, or null")
             }
         }
     }

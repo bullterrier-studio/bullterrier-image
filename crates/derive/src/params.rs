@@ -184,7 +184,7 @@ enum Written {
 }
 
 /// How the derive reads a field's type: it recognises `f32`, `i32`, `u32`, `bool`, `Color`, `Option<Color>`, `Vec<Color>`,
-/// `FieldName` and `LutName` by their written names (a type alias is not recognised) and takes any other type for a
+/// `FieldName`, `LutName` and `PictureName` by their written names (a type alias is not recognised) and takes any other type for a
 /// choice enum, whose names come from its `Choice` impl.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
@@ -197,6 +197,7 @@ enum Shape {
     Colours,
     Field,
     Lut,
+    Picture,
     Choice,
 }
 
@@ -212,6 +213,7 @@ fn shape(ty: &Type) -> Shape {
         "bool" => Shape::Switch,
         "Color" => Shape::Colour,
         "LutName" => Shape::Lut,
+        "PictureName" => Shape::Picture,
         "FieldName" => Shape::Field,
         "Option" if colour_argument(&last.arguments) => Shape::OptionalColour,
         "Vec" if colour_argument(&last.arguments) => Shape::Colours,
@@ -272,6 +274,9 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             (quote!(Lut), value),
             &broken,
         )?
+    } else if shape(ty) == Shape::Picture {
+        let value = quote!(crate::params::PictureName::default());
+        unset_parts(&settings, "a picture", "none", (quote!(Picture), value), &broken)?
     } else if shape(ty) == Shape::OptionalColour {
         let value = quote!(::core::option::Option::None);
         unset_parts(&settings, "an optional colour", "none", (quote!(Color), value), &broken)?
@@ -299,7 +304,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         max_length,
     } = parts;
     let (label, cyclic, drivable, advanced) = (name.to_string(), settings.cyclic, settings.drivable, settings.advanced);
-    let nullable = shape(ty) == Shape::OptionalColour;
+    let nullable = matches!(shape(ty), Shape::OptionalColour | Shape::Picture);
     let number = number_of(&settings, ty, &broken)?;
     let at_most = number.as_ref().and_then(|number| number.at_most.as_ref()).map_or_else(
         || quote!(::core::option::Option::None),
@@ -373,7 +378,7 @@ fn value_as_json(shape: Shape, name: &Ident) -> TokenStream {
             ::serde_json::Value::Array(colour.0.iter().copied().map(crate::params::decimal).collect())
         })),
         Shape::Field => quote!(::serde_json::Value::from(self.#name.0.clone())),
-        Shape::Lut => quote!(self.#name.json()),
+        Shape::Lut | Shape::Picture => quote!(self.#name.json()),
         Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
         Shape::Int | Shape::Unsigned | Shape::Switch => quote!(::serde_json::Value::from(self.#name)),
     }
@@ -394,7 +399,7 @@ fn other_parts(
         if shape == Shape::Choice {
             let ty = ty.to_token_stream().to_string().replace(' ', "");
             broken(&format!(
-                "`{ty}` is not f32, i32, u32, bool, Color, Option<Color>, Vec<Color>, FieldName or LutName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
+                "`{ty}` is not f32, i32, u32, bool, Color, Option<Color>, Vec<Color>, FieldName, LutName or PictureName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
                  (a number is f32, i32 or u32)"
             ))
         } else {
@@ -455,7 +460,7 @@ fn other_parts(
     })
 }
 
-/// A lookup table (`LutName`) or an optional colour (`Option<Color>`): it has no value until a step gives one, so its
+/// A lookup table (`LutName`), a picture (`PictureName`) or an optional colour (`Option<Color>`): it has no value until a step gives one, so its
 /// default is not written; no unit, bounds, lengths, cyclic or drivable either. `noun` names it for an error, `absent` what
 /// its default is; `kind` and `value` are the table's kind and the expression of the field's value when none is given.
 fn unset_parts(

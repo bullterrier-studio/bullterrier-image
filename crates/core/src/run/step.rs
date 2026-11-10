@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde_json::{Map, Value};
 
 use super::each::EachRun;
-use super::luts::Luts;
+use super::assets::Assets;
 use super::regions::Evaluator;
 use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
@@ -21,13 +21,13 @@ pub(super) fn prepare(
     registry: &Registry,
     presets: &Presets,
     ratio: f64,
-    luts: &mut Luts<'_>,
+    assets: &mut Assets<'_>,
     entry: &Entry,
     place: &str,
 ) -> Result<Prepared, Error> {
     Ok(match entry {
-        Entry::Step(step) => Prepared::Step(StepRun::new(registry, presets, ratio, luts, step, place)?),
-        Entry::Each(each) => Prepared::Each(EachRun::new(registry, presets, ratio, luts, each, place)?),
+        Entry::Step(step) => Prepared::Step(StepRun::new(registry, presets, ratio, assets, step, place)?),
+        Entry::Each(each) => Prepared::Each(EachRun::new(registry, presets, ratio, assets, each, place)?),
     })
 }
 
@@ -125,6 +125,8 @@ pub(super) struct StepRun {
     partition: Option<String>,
     /// The lookup table parameters of the effect that name a table, each with its table.
     luts: Vec<(String, Arc<Lut>)>,
+    /// The picture parameters of the effect that name a picture, each with its picture.
+    pictures: Vec<(String, Arc<Image>)>,
     laid: Laid,
 }
 
@@ -144,14 +146,14 @@ fn complete(
 }
 
 /// The table each lookup table parameter of `effect` names in `runs` (the parameters are the same at every level of a
-/// drive: a table is not drivable), found by `luts`; a parameter with no name is the identity table and has none.
+/// drive: a table is not drivable), found by `assets`; a parameter with no name is the identity table and has none.
 ///
 /// # Errors
 /// [`Error::Lut`] if a name is no table, placed at the step and the parameter.
 fn tables(
     effect: &dyn Effect,
     runs: &Runs,
-    luts: &mut Luts<'_>,
+    assets: &mut Assets<'_>,
     place: &str,
 ) -> Result<Vec<(String, Arc<Lut>)>, Error> {
     let Some(table) = effect.params() else {
@@ -164,11 +166,44 @@ fn tables(
     let mut found = Vec::new();
     for field in table.fields.iter().filter(|field| field.kind == Kind::Lut) {
         if let Some(name) = params[field.name].as_str() {
-            let lut = luts.get(name).map_err(|error| match error {
+            let lut = assets.lut(name).map_err(|error| match error {
                 Error::Lut(why) => Error::Lut(format!("{place}: effect '{}': `{}`: {why}", effect.name(), field.name)),
                 other => other,
             })?;
             found.push((field.name.to_owned(), lut));
+        }
+    }
+    Ok(found)
+}
+
+/// The picture each picture parameter of `effect` names in `runs` (a picture is not drivable), found by `assets`; a
+/// parameter with no name is no picture and has none.
+///
+/// # Errors
+/// [`Error::ImageRead`] if a name is no picture and no readable image file, placed at the step and the parameter.
+fn pictures(
+    effect: &dyn Effect,
+    runs: &Runs,
+    assets: &mut Assets<'_>,
+    place: &str,
+) -> Result<Vec<(String, Arc<Image>)>, Error> {
+    let Some(table) = effect.params() else {
+        return Ok(Vec::new());
+    };
+    let params = match runs {
+        Runs::One(params) => params,
+        Runs::Driven { levels, .. } => &levels[0],
+    };
+    let mut found = Vec::new();
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
+        if let Some(name) = params[field.name].as_str() {
+            let image = assets.picture(name).map_err(|error| match error {
+                Error::ImageRead(why) => {
+                    Error::ImageRead(format!("{place}: effect '{}': `{}`: {why}", effect.name(), field.name))
+                }
+                other => other,
+            })?;
+            found.push((field.name.to_owned(), image));
         }
     }
     Ok(found)
@@ -180,7 +215,7 @@ impl StepRun {
         registry: &Registry,
         presets: &Presets,
         ratio: f64,
-        luts: &mut Luts<'_>,
+        assets: &mut Assets<'_>,
         step: &Step,
         place: &str,
     ) -> Result<Self, Error> {
@@ -213,9 +248,11 @@ impl StepRun {
         } else {
             Runs::One(complete(&*effect, &step.effect, given, ratio, place)?)
         };
-        let luts = tables(&*effect, &runs, luts, place)?;
+        let luts = tables(&*effect, &runs, assets, place)?;
+        let pictures = pictures(&*effect, &runs, assets, place)?;
         Ok(Self {
             luts,
+            pictures,
             laid: Laid::new(
                 step.opacity.unwrap_or_else(|| effect.opacity()),
                 step.blend_mode,
@@ -247,6 +284,9 @@ impl StepRun {
         }
         for (parameter, lut) in &self.luts {
             offered = offered.with_lut(parameter.as_str(), lut);
+        }
+        for (parameter, image) in &self.pictures {
+            offered = offered.with_picture(parameter.as_str(), image);
         }
         let partition = self
             .partition
