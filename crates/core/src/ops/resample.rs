@@ -14,7 +14,11 @@ use crate::Error;
 
 /// A kernel: the weight an input pixel at distance `x` (in output pixels' worth) from the output pixel's centre has.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Filter {
+pub(crate) enum Filter {
+    /// The input pixel the output pixel's centre lies in: hard pixels, Pillow's `NEAREST`.
+    Nearest,
+    /// The triangle of width 2 (linear interpolation, widened by a shrink): soft, Pillow's `BILINEAR`.
+    Bilinear,
     /// `sinc(x) sinc(x / 3)` within 3 of the centre: sharp, for a shrink.
     Lanczos,
     /// The cubic convolution kernel of Keys with `a = -0.5` within 2 of the centre: smooth, for a growth.
@@ -27,8 +31,9 @@ impl Filter {
     /// How far from the output pixel's centre, in output pixels, the kernel reaches.
     const fn support(self) -> f64 {
         match self {
-            Self::Lanczos => 3.0, // constant: Lanczos a = 3, Pillow's `LANCZOS` support
-            Self::Box => 0.5,     // constant: Pillow's `BOX` support
+            Self::Lanczos => 3.0,             // constant: Lanczos a = 3, Pillow's `LANCZOS` support
+            Self::Box | Self::Nearest => 0.5, // constant: Pillow's `BOX` support; a nearest tap is the pixel the centre is in
+            Self::Bilinear => 1.0, // constant: the triangle filter is zero from 1 on, Pillow's `BILINEAR` support
             Self::Bicubic => 2.0, // constant: the cubic convolution kernel is zero from 2 on, Pillow's `BICUBIC` support
         }
     }
@@ -43,8 +48,9 @@ impl Filter {
             // constant: the coefficients of Keys' cubic convolution kernel, as Pillow writes them
             Self::Bicubic if x < self.support() => (((x - 5.0) * x + 8.0) * x - 4.0) * KEYS,
             // the taps of a box reach exactly the pixels whose centres lie in it (the right edge's included, as Pillow's do)
-            Self::Box => 1.0,
-            Self::Lanczos | Self::Bicubic => 0.0,
+            Self::Box | Self::Nearest => 1.0,
+            Self::Bilinear if x < 1.0 => 1.0 - x,
+            Self::Lanczos | Self::Bicubic | Self::Bilinear => 0.0,
         }
     }
 }
@@ -63,21 +69,28 @@ struct Tap {
     weights: Vec<f64>,
 }
 
-/// `from` input pixels along one axis resampled to `to` by `filter`: the taps of every output pixel, whose weights sum
-/// to 1.
+/// `from` input pixels along one axis resampled to `to` by `filter`: the taps of the output pixels `outputs` (each below
+/// `to`), whose weights sum to 1.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     reason = "the edges of the taps are rounded positions inside the axis"
 )]
-fn taps(filter: Filter, from: usize, to: usize) -> Vec<Tap> {
+fn taps(filter: Filter, from: usize, to: usize, outputs: impl Iterator<Item = usize>) -> Vec<Tap> {
     let scale = float(from) / float(to);
     // a shrink widens the kernel by the factor, so it reaches every pixel an output pixel covers
     let widened = scale.max(1.0);
     let support = filter.support() * widened;
-    (0..to)
+    outputs
         .map(|index| {
             let centre = (float(index) + 0.5) * scale;
+            if filter == Filter::Nearest {
+                // the pixel the centre lies in, whatever the shrink
+                return Tap {
+                    first: (centre as usize).min(from - 1),
+                    weights: vec![1.0],
+                };
+            }
             let first = (centre - support + 0.5).max(0.0) as usize;
             let end = ((centre + support + 0.5) as usize).min(from);
             let mut weights: Vec<f64> = (first..end)
@@ -151,6 +164,15 @@ impl Resize {
         }
     }
 
+    /// The change of a `height` x `width` thing to `to` (rows, columns) by `filter`. Both sizes are at least 1.
+    pub(crate) const fn to_size(height: usize, width: usize, to: (usize, usize), filter: Filter) -> Self {
+        Self {
+            from: (height, width),
+            to,
+            filter,
+        }
+    }
+
     /// The number of rows after the change.
     pub(crate) const fn height(&self) -> usize {
         self.to.0
@@ -161,19 +183,56 @@ impl Resize {
         self.to.1
     }
 
+    /// Only the pixels of the resized thing in `rows` and `columns` (each below the new height or width, any order, repeats
+    /// allowed): `rows.len()` rows of `columns.len()` pixels, each what [`apply`](Self::apply) would make there, within 0..1.
+    /// Work and memory follow the number asked for, not the new size, so a picture sized to far more pixels than any
+    /// photo has can still be looked at through a window.
+    pub(crate) fn sample<const C: usize>(
+        &self,
+        pixels: &[[f32; C]],
+        rows: &[usize],
+        columns: &[usize],
+    ) -> Vec<[f32; C]> {
+        let ((from_rows, from_columns), (to_rows, to_columns)) = (self.from, self.to);
+        if self.from == self.to {
+            // the same size: each pixel is its own (a kernel would only add rounding)
+            return rows
+                .iter()
+                .flat_map(|&row| columns.iter().map(move |&column| pixels[row * from_columns + column]))
+                .collect();
+        }
+        let wide = across(
+            pixels,
+            from_rows,
+            &taps(self.filter, from_columns, to_columns, columns.iter().copied()),
+        );
+        let mut out = down(
+            &wide,
+            columns.len(),
+            &taps(self.filter, from_rows, to_rows, rows.iter().copied()),
+        );
+        par::rows(&mut out, columns.len(), |_, band| {
+            for sample in band.iter_mut().flatten() {
+                *sample = sample.clamp(0.0, 1.0);
+            }
+        });
+        out
+    }
+
     /// `pixels`, the pixels of the thing the change was planned for (`C` samples each, row after row), resampled: the
     /// same layout at the new size, every sample within 0..1 (a sharp kernel overshoots near an edge, which a picture
     /// cannot show). A change of the size is planned, so at least one side differs.
     pub(crate) fn apply<const C: usize>(&self, pixels: &[[f32; C]]) -> Vec<[f32; C]> {
         let ((rows, columns), (new_rows, new_columns)) = (self.from, self.to);
-        let wide = (columns != new_columns).then(|| across(pixels, rows, &taps(self.filter, columns, new_columns)));
+        let wide = (columns != new_columns)
+            .then(|| across(pixels, rows, &taps(self.filter, columns, new_columns, 0..new_columns)));
         let mut out = if rows == new_rows {
             wide.unwrap_or_else(|| pixels.to_vec())
         } else {
             down(
                 wide.as_deref().unwrap_or(pixels),
                 new_columns,
-                &taps(self.filter, rows, new_rows),
+                &taps(self.filter, rows, new_rows, 0..new_rows),
             )
         };
         par::rows(&mut out, new_columns, |_, band| {

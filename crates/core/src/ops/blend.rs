@@ -18,11 +18,7 @@ pub(crate) fn lay(
 ) -> Image {
     #[expect(clippy::cast_possible_truncation, reason = "an opacity is from 0 to 1")]
     let opacity = opacity as f32;
-    let blend = |base: [f32; 3], source: [f32; 3], alpha: f32| {
-        let blended = blended(mode, base, source);
-        // Cb (1 - alpha) + B alpha is Cb + alpha (B - Cb), exact at alpha 0 and 1
-        std::array::from_fn(|channel| (base[channel] * (1.0 - alpha) + blended[channel] * alpha).clamp(0.0, 1.0))
-    };
+    let blend = |base: [f32; 3], source: [f32; 3], alpha: f32| mix(mode, base, source, alpha);
     let width = base.width();
     let mut pixels = vec![[0.0; 3]; base.pixels().len()];
     par::rows(&mut pixels, width, |first_row, band| {
@@ -45,6 +41,29 @@ pub(crate) fn lay(
         }
     });
     Image::from_pixels(base.height(), width, pixels)
+}
+
+/// `source` (straight RGBA, one pixel for each of `base`'s, row after row) laid over `base` by `mode`, each pixel mixed in
+/// by its own alpha: a new image in 0..1. Alpha 0 leaves the base exactly; alpha 1 and mode normal leaves the source.
+pub(crate) fn lay_rgba(base: &Picture<'_>, source: &[[f32; 4]], mode: BlendMode) -> Image {
+    let width = base.width();
+    let mut pixels = vec![[0.0; 3]; base.pixels().len()];
+    par::rows(&mut pixels, width, |first_row, band| {
+        let first = first_row * width;
+        for ((out, &base), &[red, green, blue, alpha]) in
+            band.iter_mut().zip(&base.pixels()[first..]).zip(&source[first..])
+        {
+            *out = mix(mode, base, [red, green, blue], alpha);
+        }
+    });
+    Image::from_pixels(base.height(), width, pixels)
+}
+
+/// `Cb + alpha (B(Cb, Cs) - Cb)` for one pixel, clipped to 0..1.
+fn mix(mode: BlendMode, base: [f32; 3], source: [f32; 3], alpha: f32) -> [f32; 3] {
+    let blended = blended(mode, base, source);
+    // Cb (1 - alpha) + B alpha is Cb + alpha (B - Cb), exact at alpha 0 and 1
+    std::array::from_fn(|channel| (base[channel] * (1.0 - alpha) + blended[channel] * alpha).clamp(0.0, 1.0))
 }
 
 /// `B(Cb, Cs)` of `mode` for one pixel.

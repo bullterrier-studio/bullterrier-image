@@ -77,3 +77,19 @@ pub(crate) fn places(picture: &[f32], height: usize, width: usize) -> Vec<(f64, 
         .map(|pixel| (f64::from(pixel[0]) * last_row, f64::from(pixel[1]) * last_column))
         .collect()
 }
+
+/// A 5 x 7 RGBA picture with a varied colour and an alpha of 0.4 to 1 at every pixel: the second picture an effect that
+/// lays one over the photo is offered, of another size and aspect than the photo's.
+pub(crate) fn asset() -> bullterrier_image::Image {
+    let values: Vec<f32> = (0..5_u8 * 7)
+        .flat_map(|at| {
+            [
+                f32::from(at * 3 % 11) / 10.0,
+                f32::from(at * 5 % 13) / 12.0,
+                f32::from(at * 7 % 9) / 8.0,
+                0.4 + f32::from(at % 4) * 0.2,
+            ]
+        })
+        .collect();
+    bullterrier_image::Image::rgba(5, 7, &values).unwrap_or_else(|_| unreachable!("35 pixels of four channels"))
+}

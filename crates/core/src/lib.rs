@@ -61,6 +61,7 @@ pub use footprint::Footprint;
 pub use inputs::{Inputs, Labels, Layer};
 pub use lut::Lut;
 pub use ops::edge::{Edge, EdgeOrConstant};
+pub use ops::place::{Anchor, Fit, Resample};
 pub use ops::radial::Motion;
 pub use ops::sample::Interpolation;
 pub use picture::{Image, Picture};

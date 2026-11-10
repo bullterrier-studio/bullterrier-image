@@ -142,6 +142,37 @@ fn conditional() -> Vec<Conditional> {
             field: "amount",
             with: vec![("file", json!("table"))],
         },
+        // without a picture the step leaves the photo as it is, whatever else is set
+        Conditional {
+            effect: "blend",
+            field: "mode",
+            with: vec![("image", json!("asset"))],
+        },
+        Conditional {
+            effect: "blend",
+            field: "fit",
+            with: vec![("image", json!("asset"))],
+        },
+        Conditional {
+            effect: "blend",
+            field: "at",
+            with: vec![("image", json!("asset"))],
+        },
+        Conditional {
+            effect: "blend",
+            field: "scale",
+            with: vec![("image", json!("asset"))],
+        },
+        Conditional {
+            effect: "blend",
+            field: "margin",
+            with: vec![("image", json!("asset"))],
+        },
+        Conditional {
+            effect: "blend",
+            field: "resample",
+            with: vec![("image", json!("asset"))],
+        },
         // on a 12 px picture the default ghosts (size 30 px) screen it to white, hiding the light's own features; the
         // default ring (72 px out, 12 px wide) lies wholly beyond the picture
         Conditional {
@@ -753,6 +784,8 @@ fn candidates(field: &Field) -> Vec<Value> {
         Kind::Field => vec![json!("ramp"), json!("top")],
         // a name: the test offers its own table to any effect that is given one (see `render`)
         Kind::Lut => vec![json!("table")],
+        // a name: the test offers its own picture to any effect that is given one (see `render`)
+        Kind::Picture => vec![json!("asset")],
         // the shortest list and one element more (where allowed), of colours that are not the default of any effect
         Kind::Colors => {
             let shortest = field.min_length.unwrap_or(1);
@@ -836,6 +869,27 @@ fn render(
     for field in table.fields.iter().filter(|field| field.kind == Kind::Lut) {
         if params[field.name].is_string() {
             inputs = inputs.with_lut(field.name, &negative);
+        }
+    }
+    // a picture is a small one with a varied colour and alpha at every pixel, of another size and aspect than the
+    // picture's, so that where it sits, how it is sized and how it is laid all show
+    let asset = Image::rgba(
+        5,
+        7,
+        &(0..5_u8 * 7)
+            .flat_map(|at| {
+                [
+                    f32::from(at * 3 % 11) / 10.0,
+                    f32::from(at * 5 % 13) / 12.0,
+                    f32::from(at * 7 % 9) / 8.0,
+                    0.4 + f32::from(at % 4) * 0.2,
+                ]
+            })
+            .collect::<Vec<_>>(),
+    )?;
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
+        if params[field.name].is_string() {
+            inputs = inputs.with_picture(field.name, &asset);
         }
     }
     Ok(effect.apply(picture, Value::Object(params), &inputs)?.into_values())

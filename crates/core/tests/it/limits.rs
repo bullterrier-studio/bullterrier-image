@@ -11,12 +11,13 @@
 
 use std::fmt::Write as _;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use bullterrier_image::region::{
     Bands, Curve, Cuts, Edge, EdgeStyle, Grid, Line, Path, Pick, Region, Shards, Shares, Svg,
 };
-use bullterrier_image::{Each, Entry, Error, ErrorKind, Layer, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::{Each, Entry, Error, ErrorKind, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
 
@@ -403,6 +404,39 @@ fn particles_at_their_largest_density_size_and_length_finish_and_one_past_is_ref
     ] {
         let past = photo
             .render(&particles(density, size, length), &Presets::new(), Options::default())
+            .map(drop);
+        assert!(refused(&past, &[field, value]), "{field}: {past:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn blend_at_its_largest_scale_and_margin_sizes_only_what_shows_and_one_past_is_refused() -> Outcome {
+    // a picture of 1 x 4000 pixels covering a 300 x 300 photo at twice its size would be 2.4 million x 600 pixels (some
+    // 23 GB of four floats) if it were made whole; only the 300 x 300 that show are
+    let (height, width) = (300, 300);
+    let pixels = vec![0.5; height * width * 3];
+    let strip = Arc::new(Image::rgba(1, 4000, &[0.2, 0.4, 0.6, 1.0].repeat(4000))?);
+    let photo = Photo::new(Picture::new(height, width, &pixels)?).with_picture("strip", strip);
+    let blend = |scale: f64, margin: f64| {
+        Recipe::new([Step::new("blend")
+            .param("image", "strip")
+            .param("mode", "normal")
+            .param("scale", scale)
+            .param("margin", margin)])
+    };
+    for fit in ["cover", "tile", "width", "stretch", "contain"] {
+        let step = Step::new("blend")
+            .param("image", "strip")
+            .param("fit", fit)
+            .param("scale", 2)
+            .param("margin", 216);
+        let most = photo.render(&Recipe::new([step]), &Presets::new(), Options::default());
+        assert!(most.is_ok(), "{fit}: {most:?}");
+    }
+    for (scale, margin, field, value) in [(2.01, 0.0, "scale", "2.01"), (1.0, 217.0, "margin", "217")] {
+        let past = photo
+            .render(&blend(scale, margin), &Presets::new(), Options::default())
             .map(drop);
         assert!(refused(&past, &[field, value]), "{field}: {past:?}");
     }

@@ -29,6 +29,7 @@ use bullterrier_image::{
     effect, effects,
 };
 use common::compare::first_bit_difference;
+use common::pictures::asset;
 use serde_json::{Map, Value, json};
 
 type Outcome = Result<(), Box<dyn Error>>;
@@ -136,10 +137,19 @@ fn run(
     width: usize,
     values: &[f32],
 ) -> Result<Vec<f32>, Box<dyn Error>> {
-    let params = table.check(one.name(), given)?;
+    // a picture parameter not given is the one picture on offer: an effect that lays one is run with it
+    let mut given = given.clone();
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
+        given.entry(field.name).or_insert_with(|| json!("asset"));
+    }
+    let params = table.check(one.name(), &given)?;
     let layer = cone(height, width)?;
     let pieces = halves(&layer)?;
+    let asset = asset();
     let mut inputs = Inputs::default();
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
+        inputs = inputs.with_picture(field.name, &asset);
+    }
     for field in table.fields.iter().filter(|field| field.kind == Kind::Field) {
         inputs = inputs.with_field(field.name, &layer);
     }
@@ -548,6 +558,7 @@ fn a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real() -> 
 
 fn photo(picture: Picture<'_>, height: usize, width: usize) -> Result<Photo<'_>, Box<dyn Error>> {
     Ok(Photo::new(picture)
+        .with_picture("asset", Arc::new(asset()))
         .with_map("depth", cone(height, width)?)?
         .with_map("subject", cone(height, width)?)?)
 }
@@ -555,6 +566,14 @@ fn photo(picture: Picture<'_>, height: usize, width: usize) -> Result<Photo<'_>,
 /// A step of `one` at its defaults; one that takes a partition draws along the subject's (two pieces).
 fn step(one: &dyn Effect) -> Step {
     let mut step = Step::new(one.name());
+    for field in one
+        .params()
+        .iter()
+        .flat_map(|table| &table.fields)
+        .filter(|field| field.kind == Kind::Picture)
+    {
+        step = step.param(field.name, "asset");
+    }
     if one.inputs().contains(&Input::Partition) {
         step.partition = Some("subject".to_owned());
     }

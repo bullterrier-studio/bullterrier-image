@@ -31,11 +31,28 @@ fn film() -> Result<Lut, Error> {
     Lut::new(5, [0.0; 3], [1.0; 3], entries)
 }
 
-/// `recipe` rendered on the `height` x `width` picture of `seed` with `threads`, the photo given the table `film`.
+/// A 9 x 14 picture of varied colours and alphas: the picture `logo`.
+fn logo() -> Result<Image, Error> {
+    let values: Vec<f32> = (0..9_u8 * 14)
+        .flat_map(|at| {
+            [
+                f32::from(at % 7) / 6.0,
+                f32::from(at % 11) / 10.0,
+                f32::from(at % 5) / 4.0,
+                0.25 + f32::from(at % 4) * 0.25,
+            ]
+        })
+        .collect();
+    Image::rgba(9, 14, &values)
+}
+
+/// `recipe` rendered on the `height` x `width` picture of `seed` with `threads`, the photo given the table `film` and the
+/// picture `logo`.
 fn render(height: usize, width: usize, seed: usize, recipe: &Recipe, threads: usize) -> Result<Image, Error> {
     let values = varied_seeded(height, width, seed);
     Photo::new(Picture::new(height, width, &values)?)
         .with_lut("film", Arc::new(film()?))
+        .with_picture("logo", Arc::new(logo()?))
         .render(recipe, &Presets::new(), Options::default().with_threads(threads))
 }
 
@@ -149,6 +166,23 @@ fn cases() -> Vec<Case> {
                 Step::new("color_balance"),
                 Step::new("selective_color").param("width", 360).param("hue_shift", 40),
                 Step::new("lut").param("file", "film").param("amount", 0.8),
+                Step::new("blend")
+                    .param("image", "logo")
+                    .param("mode", "overlay")
+                    .param("fit", "cover"),
+                Step::new("blend")
+                    .param("image", "logo")
+                    .param("mode", "soft_light")
+                    .param("fit", "tile")
+                    .param("scale", 0.3)
+                    .param("resample", "bicubic"),
+                Step::new("blend")
+                    .param("image", "logo")
+                    .param("mode", "normal")
+                    .param("fit", "width")
+                    .param("at", "bottom_right")
+                    .param("scale", 0.4)
+                    .param("margin", 12),
                 Step::new("vignette").param("roundness", 0.6).param("feather", 0.2),
                 Step::new("scanlines").param("spacing", 2.5).param("softness", 0.5),
                 Step::new("particles")

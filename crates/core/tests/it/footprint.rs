@@ -19,6 +19,7 @@ use std::error::Error;
 
 use crate::common::Outcome;
 use crate::common::compare::first_difference_within;
+use crate::common::pictures::asset;
 use bullterrier_image::params::{Field, Kind, Scalar, Table, Unit};
 use bullterrier_image::{Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, effect, effects};
 use serde_json::{Map, Value, json};
@@ -101,6 +102,7 @@ fn variants(table: &Table) -> Vec<Setting> {
             .collect(),
             Kind::Choice => field.choices.iter().map(|choice| json!(choice)).collect(),
             Kind::Bool => vec![json!(true), json!(false)],
+            Kind::Picture => vec![json!("asset")],
             _ => Vec::new(),
         };
         cases.extend(
@@ -180,6 +182,16 @@ fn run(
     }
     if one.inputs().contains(&Input::Partition) {
         inputs = inputs.with_partition(&pieces);
+    }
+    let asset = asset();
+    for field in table
+        .iter()
+        .flat_map(|table| &table.fields)
+        .filter(|field| field.kind == Kind::Picture)
+    {
+        if params[field.name].is_string() {
+            inputs = inputs.with_picture(field.name, &asset);
+        }
     }
     let picture = Picture::new(to - from, WIDTH, rows(picture, 3, from, to))?;
     Ok(one.apply(&picture, Value::Object(params.clone()), &inputs)?)

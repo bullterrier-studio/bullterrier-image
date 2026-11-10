@@ -11,19 +11,19 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
+mod assets;
 mod cut;
 mod each;
 mod frame;
 mod laid;
-mod assets;
 mod maps;
 mod regions;
 mod size;
 mod step;
 mod trace;
 
-use cut::Cut;
 use assets::Assets;
+use cut::Cut;
 pub use maps::Finder;
 use maps::{Found, Maps};
 use regions::Evaluator;

@@ -155,7 +155,8 @@ fn the_looks_of_an_each_step_find_their_pictures_too() -> Result<(), Error> {
 }
 
 #[test]
-fn an_image_file_named_by_a_step_is_read_and_a_given_picture_of_that_name_wins() -> Result<(), Box<dyn std::error::Error>> {
+fn an_image_file_named_by_a_step_is_read_and_a_given_picture_of_that_name_wins()
+-> Result<(), Box<dyn std::error::Error>> {
     let shower = Registered::new(Shower::new())?;
     let folder = Scratch::new()?;
     // a 4 x 6 RGB file, every sample 255: white
@@ -168,7 +169,12 @@ fn an_image_file_named_by_a_step_is_read_and_a_given_picture_of_that_name_wins()
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     assert_close(&render(&photo, &recipe)?, &vec![1.0; 72], 1e-6, "read from the file");
     let given = photo.with_picture(named, Arc::new(flat(0.25)?));
-    assert_close(&render(&given, &recipe)?, &vec![0.25; 72], 1e-6, "the given picture wins");
+    assert_close(
+        &render(&given, &recipe)?,
+        &vec![0.25; 72],
+        1e-6,
+        "the given picture wins",
+    );
     Ok(())
 }
 

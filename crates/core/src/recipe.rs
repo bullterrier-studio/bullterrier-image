@@ -97,6 +97,23 @@ impl BlendMode {
     }
 }
 
+impl crate::params::Choice for BlendMode {
+    // constant: the names of `BlendMode::ALL`, in its order (a test holds the two together)
+    const CHOICES: &'static [&'static str] = &[
+        "normal",
+        "multiply",
+        "screen",
+        "overlay",
+        "soft_light",
+        "difference",
+        "color",
+    ];
+
+    fn name(&self) -> &'static str {
+        BlendMode::name(*self)
+    }
+}
+
 /// How the pieces of an [`Each`] get their looks.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

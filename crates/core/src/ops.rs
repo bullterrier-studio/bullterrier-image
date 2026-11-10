@@ -32,6 +32,7 @@ pub(crate) mod noise;
 pub(crate) mod outlines;
 pub(crate) mod par;
 pub(crate) mod pieces;
+pub(crate) mod place;
 pub(crate) mod quadtree;
 pub(crate) mod radial;
 pub(crate) mod ramp;
