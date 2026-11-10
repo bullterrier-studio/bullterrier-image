@@ -606,6 +606,20 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   width, ratio }`; `Radius` stays in design px, and an effect with a reach in rounded working px or a share of a side converts
   (`ceil(working) / ratio`, `share x side / ratio`). *Reason:* a footprint that could not see the canvas forced four effects
   (`halftone` blurred, `swirl`, `pinch_bulge`, `ascii`) to `Whole`; only `halftone` is freed by it.
+- **Settled: the band height trades memory for time (banded render).** Measured on 24 MP (4000 x 6000), `grade`,
+  `vignette`, `gaussian_blur` radius 2, `grain`; memory is the peak beyond the photo as a multiple of the 288 MB image
+  made, time against the whole render at 1 / 4 threads (median of 3):
+
+  | rows | memory | time |
+  |---|---|---|
+  | 64 | 1.20x | +62% / +87% |
+  | 256 | 1.35x | +11% / +27% |
+  | 1024 | 1.92x | 0% / +13% |
+  | whole | 3.00x | baseline |
+
+  The extra ~58 MB over the output at 64 rows is per-band windows and blur planes; the split is unmeasured. A `Whole` step
+  gets no memory benefit; Fourier blurs cost more as bands shrink. *Reason:* whole stays the default because banded at 64
+  rows is +62% / +87% slower and only matches at 1024 rows.
 - **Settled: noise is scaled by its known deviation, not the picture's (banded render, B2).** A fractal field
   (`noise::field_rows`) is divided at each pixel by its own deviation, derived from the lattice (a value is uniform on -1..1,
   variance 1/3; the Catmull-Rom weights of the pixel's place give the rest, octaves independent), and clumped noise

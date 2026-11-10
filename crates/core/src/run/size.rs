@@ -85,6 +85,21 @@ impl Options {
     ///
     /// A recipe's `px` values scale by the working picture as a whole, never by a band: the look is the same.
     ///
+    /// Choosing `rows`: a smaller band holds less and takes longer. Measured on 24 MP (4000 x 6000) with `grade`,
+    /// `vignette`, `gaussian_blur` radius 2 and `grain`, one run each; memory is the peak beyond the photo, as a multiple
+    /// of the image the render makes; time is against the whole-picture render, at 1 / 4 threads:
+    ///
+    /// ```text
+    /// rows    memory   time
+    /// 64      1.20x    +62% / +87%
+    /// 256     1.35x    +11% / +27%
+    /// 1024    1.92x    0% / +13%
+    /// whole   3.00x    baseline
+    /// ```
+    ///
+    /// A `Whole` step in the recipe gets no memory benefit. Blurs done by Fourier transform (16 px a side or more) cost
+    /// more as bands shrink.
+    ///
     /// ```text
     /// let image = photo.render(&look, &presets, Options::default().with_band(64))?;
     /// ```
