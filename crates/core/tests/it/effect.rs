@@ -107,7 +107,7 @@ fn a_place_that_does_not_hold_the_picture_refuses_the_run_naming_the_effect() ->
             "{place:?}: {result:?}"
         );
     }
-    assert!(takes.received().is_empty());
+    assert_eq!(takes.received().len(), 0);
     for place in [Place::new(5, 3, 3), Place::new(2, 3, 0)] {
         apply(takes.name(), &picture, json!({}), &Inputs::default().with_place(place))?;
     }
