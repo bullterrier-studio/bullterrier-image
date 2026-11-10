@@ -272,10 +272,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                     inks.print(&coverages)
                 } else if coverages[0] > 0.0 {
                     let sampled = cells[0].sampled;
-                    let dot = params.ink.map_or_else(
-                        || vivid(sampled, params.ink_floor),
-                        |ink| ink.0,
-                    );
+                    let dot = params.ink.map_or_else(|| vivid(sampled, params.ink_floor), |ink| ink.0);
                     [0, 1, 2].map(|channel| paper[channel] * (1.0 - coverages[0]) + dot[channel] * coverages[0])
                 } else {
                     paper
