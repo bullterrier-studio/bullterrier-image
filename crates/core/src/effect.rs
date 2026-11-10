@@ -85,11 +85,14 @@ pub enum Input {
     Partition,
     /// Working pixels per design pixel: for an effect whose light or density is per working pixel.
     SizeRatio,
+    /// Where the picture lies on the canvas a render works on (see [`Place`](crate::Place)): for an effect whose answer
+    /// at a pixel depends on the pixel's place on the canvas, which the picture it is handed may be only a band of.
+    Place,
 }
 
 impl Input {
     /// Every input, in the order recipes list them.
-    pub const ALL: &'static [Self] = &[Self::Partition, Self::SizeRatio];
+    pub const ALL: &'static [Self] = &[Self::Partition, Self::SizeRatio, Self::Place];
 
     /// The input's name in `snake_case`: `"size_ratio"`.
     #[must_use]
@@ -97,6 +100,7 @@ impl Input {
         match self {
             Self::Partition => "partition",
             Self::SizeRatio => "size_ratio",
+            Self::Place => "place",
         }
     }
 }

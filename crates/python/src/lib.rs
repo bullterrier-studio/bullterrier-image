@@ -318,6 +318,7 @@ fn register(
                 .iter()
                 .copied()
                 .find(|known| known.name() == given)
+                .filter(|known| *known != Input::Place) // a canvas place has no Python form yet
                 .ok_or_else(|| PyValueError::new_err(format!("{given:?} is not an input of effects")))
         })
         .collect::<PyResult<Vec<_>>>()?;

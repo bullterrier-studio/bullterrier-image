@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table, Unit};
 use bullterrier_image::{
-    Category, Effect, Error, FieldParam, Finder, Image, Input, Inputs, Layer, Picture, Regions, register, unregister,
+    Category, Effect, Error, FieldParam, Finder, Image, Input, Inputs, Layer, Picture, Place, Regions, register, unregister,
 };
 use serde_json::Value;
 
@@ -116,6 +116,7 @@ pub(crate) struct Received {
     pub(crate) picture: Vec<f32>,
     pub(crate) params: Value,
     pub(crate) size_ratio: f64,
+    pub(crate) place: Place,
     pub(crate) partition: Option<Vec<i32>>,
     pub(crate) fields: BTreeMap<String, Vec<f32>>,
 }
@@ -209,6 +210,7 @@ impl Effect for Recorder {
             picture: picture.values().to_vec(),
             params,
             size_ratio: inputs.size_ratio(),
+            place: inputs.place(picture),
             partition: inputs.partition().map(|labels| labels.values().to_vec()),
             fields,
         });

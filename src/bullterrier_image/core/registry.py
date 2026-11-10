@@ -78,8 +78,9 @@ CATEGORIES = tuple(CATEGORY_DESCRIPTIONS)
 # pieces of the region the step names with its `partition` key, int32 (h, w) numbered 0..n-1 in piece order (reading
 # order, `bands` highest first); and `size_ratio`, a float: working px per design px (1.0 for a call outside a recipe),
 # for an effect whose light or density is per working pixel. An effect declares the ones it needs as keyword-only
-# parameters after `params`, each with a default.
-INPUTS = ("partition", "size_ratio")
+# parameters after `params`, each with a default. `place` (where a band lies on its canvas) is the core's alone: it is
+# listed so that no parameter takes its name, and a Python effect cannot declare it.
+INPUTS = ("partition", "size_ratio", "place")
 
 # The keys of a recipe step besides its effect's parameters, written the same in a recipe file and in `fx`: which
 # effect, where it applies, how much of it shows, how it combines with the picture below it, one of its presets, the

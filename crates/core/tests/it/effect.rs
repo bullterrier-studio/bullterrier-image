@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use crate::common::Outcome;
 use crate::common::run::{Counting, Recorder, Registered};
-use bullterrier_image::{Category, Error, Input, Inputs, Labels, Layer, Picture, apply};
+use bullterrier_image::{Category, Error, Input, Inputs, Labels, Layer, Picture, Place, apply};
 use serde_json::json;
 
 /// A 2 x 3 picture and the partition and map to offer with it.
@@ -23,6 +23,7 @@ fn layer(level: f32) -> Result<Layer, Error> {
 
 const PARTITION: &[Input] = &[Input::Partition];
 const RATIO: &[Input] = &[Input::SizeRatio];
+const PLACE: &[Input] = &[Input::Place];
 
 #[test]
 fn a_declared_partition_arrives_and_an_undeclared_one_is_absent() -> Outcome {
@@ -69,6 +70,45 @@ fn the_size_ratio_arrives_only_if_declared_else_the_effect_sees_one() -> Outcome
     apply(ignores.name(), &picture, json!({}), &offered)?;
     assert!((takes.received()[0].size_ratio - 2.5).abs() < f64::EPSILON);
     assert!((ignores.received()[0].size_ratio - 1.0).abs() < f64::EPSILON);
+    Ok(())
+}
+
+#[test]
+fn the_place_arrives_only_if_declared_else_the_canvas_is_the_picture_itself() -> Outcome {
+    let values = picture_values();
+    let picture = Picture::new(2, 3, &values)?;
+    let offered = Inputs::default().with_place(Place::new(10, 3, 4));
+    let takes = Registered::new(Recorder::new(PLACE, &[]))?;
+    let ignores = Registered::new(Recorder::new(&[], &[]))?;
+    let unoffered = Registered::new(Recorder::new(PLACE, &[]))?;
+    apply(takes.name(), &picture, json!({}), &offered)?;
+    apply(ignores.name(), &picture, json!({}), &offered)?;
+    apply(unoffered.name(), &picture, json!({}), &Inputs::default())?;
+    assert_eq!(takes.received()[0].place, Place::new(10, 3, 4));
+    assert_eq!(ignores.received()[0].place, Place::new(2, 3, 0));
+    assert_eq!(unoffered.received()[0].place, Place::new(2, 3, 0));
+    Ok(())
+}
+
+#[test]
+fn a_place_that_does_not_hold_the_picture_refuses_the_run_naming_the_effect() -> Outcome {
+    let values = picture_values();
+    let picture = Picture::new(2, 3, &values)?;
+    let takes = Registered::new(Recorder::new(PLACE, &[]))?;
+    // (the place offered, what the message must say): rows 4..6 of a canvas of 5 rows, a canvas of another width;
+    // rows 3..5 of 5 and the first row of a canvas of exactly the picture's size are fine
+    for (place, said) in [(Place::new(5, 3, 4), "rows 4..6"), (Place::new(10, 4, 0), "canvas is 4 wide")] {
+        let result = apply(takes.name(), &picture, json!({}), &Inputs::default().with_place(place));
+        assert!(
+            matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains(takes.name()) && error.to_string().contains(said)),
+            "{place:?}: {result:?}"
+        );
+    }
+    assert!(takes.received().is_empty());
+    for place in [Place::new(5, 3, 3), Place::new(2, 3, 0)] {
+        apply(takes.name(), &picture, json!({}), &Inputs::default().with_place(place))?;
+    }
+    assert_eq!(takes.received().len(), 2);
     Ok(())
 }
 
@@ -150,5 +190,5 @@ fn all_categories_lists_every_variant_once_in_catalogue_order() {
 #[test]
 fn all_inputs_lists_every_variant_once_in_recipe_order() {
     let names: Vec<&str> = Input::ALL.iter().map(|input| input.name()).collect();
-    assert_eq!(names, ["partition", "size_ratio"]);
+    assert_eq!(names, ["partition", "size_ratio", "place"]);
 }

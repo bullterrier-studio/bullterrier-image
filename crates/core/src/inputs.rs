@@ -167,6 +167,36 @@ impl Labels {
     }
 }
 
+/// Where the picture an effect is handed lies on the canvas: the picture a render works on, which an effect may be
+/// handed only a band of.
+///
+/// An effect whose answer at a pixel depends on where the pixel is (a vignette's distance from the middle, a noise hashed
+/// by position) reads the canvas coordinates from here, never from the picture's own: row `r` of the picture is canvas row
+/// `first_row + r`, and the canvas is `canvas_height` x `canvas_width`. An effect that declares [`Input::Place`] and is
+/// offered none sees the picture itself as the canvas.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Place {
+    /// The number of rows of the canvas.
+    pub canvas_height: usize,
+    /// The number of columns of the canvas, which is also the picture's.
+    pub canvas_width: usize,
+    /// The canvas row of the picture's row 0.
+    pub first_row: usize,
+}
+
+impl Place {
+    /// The place of a picture whose row 0 is row `first_row` of a canvas of `canvas_height` x `canvas_width`.
+    #[must_use]
+    pub fn new(canvas_height: usize, canvas_width: usize, first_row: usize) -> Self {
+        Self {
+            canvas_height,
+            canvas_width,
+            first_row,
+        }
+    }
+}
+
 /// What a step offers an effect besides the picture and its parameters, and what an effect receives of it: only the
 /// inputs it declares (see [`Effect::inputs`] and [`Effect::fields`]); the rest is absent.
 ///
@@ -177,6 +207,7 @@ impl Labels {
 #[derive(Clone, Debug)]
 pub struct Inputs<'a> {
     size_ratio: f64,
+    place: Option<Place>,
     partition: Option<&'a Labels>,
     fields: BTreeMap<String, &'a Layer>,
     luts: BTreeMap<String, &'a Lut>,
@@ -188,6 +219,7 @@ impl Default for Inputs<'_> {
     fn default() -> Self {
         Self {
             size_ratio: 1.0,
+            place: None,
             partition: None,
             fields: BTreeMap::new(),
             luts: BTreeMap::new(),
@@ -202,6 +234,14 @@ impl<'a> Inputs<'a> {
     #[must_use]
     pub fn with_size_ratio(mut self, ratio: f64) -> Self {
         self.size_ratio = ratio;
+        self
+    }
+
+    /// The offer with `place`, where the picture lies on its canvas. Without it the picture is its own canvas. A run is
+    /// refused if the picture does not lie within the canvas (see [`Place`]).
+    #[must_use]
+    pub fn with_place(mut self, place: Place) -> Self {
+        self.place = Some(place);
         self
     }
 
@@ -239,6 +279,14 @@ impl<'a> Inputs<'a> {
         self.size_ratio
     }
 
+    /// Where `picture`, the one the effect is run on, lies on its canvas: as offered if the effect declared
+    /// [`Input::Place`], else the picture itself is the canvas.
+    #[must_use]
+    pub fn place(&self, picture: &Picture<'_>) -> Place {
+        self.place
+            .unwrap_or_else(|| Place::new(picture.height(), picture.width(), 0))
+    }
+
     /// The pieces of the step's region, if the effect declared [`Input::Partition`].
     #[must_use]
     pub fn partition(&self) -> Option<&'a Labels> {
@@ -272,9 +320,31 @@ impl<'a> Inputs<'a> {
     pub(crate) fn declared_by(&self, effect: &dyn Effect, picture: &Picture<'_>) -> Result<Self, Error> {
         let size = (picture.height(), picture.width());
         let mut declared = Self::default();
+        if let Some(place) = self.place {
+            // checked whether or not the effect declares it: a band caller cannot offer a place that does not hold the band
+            let last = place.first_row.saturating_add(picture.height());
+            if place.canvas_width != picture.width() {
+                return Err(Error::Inputs(format!(
+                    "the effect {:?} was given a place whose canvas is {} wide, the picture {}",
+                    effect.name(),
+                    place.canvas_width,
+                    picture.width()
+                )));
+            }
+            if last > place.canvas_height {
+                return Err(Error::Inputs(format!(
+                    "the effect {:?} was given a place of rows {}..{} for a canvas of {} rows",
+                    effect.name(),
+                    place.first_row,
+                    last,
+                    place.canvas_height
+                )));
+            }
+        }
         for input in effect.inputs() {
             match input {
                 Input::SizeRatio => declared.size_ratio = self.size_ratio,
+                Input::Place => declared.place = self.place,
                 Input::Partition => {
                     let partition = self
                         .partition
