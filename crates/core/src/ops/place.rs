@@ -3,6 +3,8 @@
 //! [`place`] turns any picture (an asset: a texture, a logo, a cut-out) into RGBA at the photo's size, transparent where
 //! the picture is not, so an effect only has to combine two pictures of one size.
 
+use std::ops::Range;
+
 use super::length::{float, whole};
 use super::resample::{Filter, Resize};
 use crate::Image;
@@ -103,8 +105,8 @@ pub(crate) struct Placement {
     pub(crate) resample: Resample,
 }
 
-/// `asset` fitted to a photo of `height` x `width` pixels: its straight-alpha RGBA, row after row, transparent (all 0)
-/// wherever the picture is not.
+/// `asset` fitted to a photo of `height` x `width` pixels: the rows `rows` of its straight-alpha RGBA, row after row,
+/// transparent (all 0) wherever the picture is not.
 ///
 /// The picture is first sized, then multiplied by `scale`, then put in the free space of the photo inside the margin:
 /// - `Cover` fills the area inside the margin, keeping the aspect, and what hangs over is cropped; `Contain` fits inside
@@ -121,7 +123,12 @@ pub(crate) struct Placement {
     clippy::cast_possible_wrap,
     reason = "positions are rounded lengths of pictures far below 2^53; a size is at least 1"
 )]
-pub(crate) fn place(asset: &Image, (height, width): (usize, usize), placement: &Placement) -> Vec<Rgba> {
+pub(crate) fn place(
+    asset: &Image,
+    (height, width): (usize, usize),
+    rows: Range<usize>,
+    placement: &Placement,
+) -> Vec<Rgba> {
     let Placement {
         fit,
         at,
@@ -151,8 +158,8 @@ pub(crate) fn place(asset: &Image, (height, width): (usize, usize), placement: &
     let (top, left) = (start(inset, area_h, size_h, down), start(inset, area_w, size_w, across));
 
     // the row and column of the sized picture shown at each row and column of the photo, none where it is not
-    let shown = |length: usize, first: i64, size: usize| -> Vec<Option<usize>> {
-        (0..length)
+    let shown = |places: Range<usize>, first: i64, size: usize| -> Vec<Option<usize>> {
+        places
             .map(|place| {
                 let from = place as i64 - first;
                 if fit == Fit::Tile {
@@ -163,11 +170,11 @@ pub(crate) fn place(asset: &Image, (height, width): (usize, usize), placement: &
             })
             .collect()
     };
-    let (shown_rows, shown_columns) = (shown(height, top, size_h), shown(width, left, size_w));
-    let rows: Vec<usize> = shown_rows.iter().flatten().copied().collect();
+    let (shown_rows, shown_columns) = (shown(rows.clone(), top, size_h), shown(0..width, left, size_w));
+    let sized_rows: Vec<usize> = shown_rows.iter().flatten().copied().collect();
     let columns: Vec<usize> = shown_columns.iter().flatten().copied().collect();
-    let mut placed = vec![Rgba::default(); height * width];
-    if rows.is_empty() || columns.is_empty() {
+    let mut placed = vec![Rgba::default(); rows.len() * width];
+    if sized_rows.is_empty() || columns.is_empty() {
         return placed;
     }
 
@@ -183,8 +190,11 @@ pub(crate) fn place(asset: &Image, (height, width): (usize, usize), placement: &
             [red * alpha, green * alpha, blue * alpha, alpha]
         })
         .collect();
-    let sampled =
-        Resize::to_size(source_h, source_w, (size_h, size_w), resample.filter()).sample(&weighted, &rows, &columns);
+    let sampled = Resize::to_size(source_h, source_w, (size_h, size_w), resample.filter()).sample(
+        &weighted,
+        &sized_rows,
+        &columns,
+    );
     let on_photo =
         |shown: &[Option<usize>]| -> Vec<usize> { (0..shown.len()).filter(|&place| shown[place].is_some()).collect() };
     let (photo_rows, photo_columns) = (on_photo(&shown_rows), on_photo(&shown_columns));

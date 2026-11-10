@@ -7,7 +7,7 @@
 
 use serde::Deserialize;
 
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::blend;
 use crate::ops::place::{self, Anchor, Fit, Placement, Resample};
 use crate::params::{Params, PictureName};
@@ -17,12 +17,12 @@ use crate::{BlendMode, Footprint, Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Compositing,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `blend` reads around a pixel: the picture is placed by the photo's size, so any pixel can depend on the whole.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Lay a second picture over the photo with a blend mode (overlay a logo, double exposure), fitted by cover, contain,
@@ -75,10 +75,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let Some(asset) = inputs.image("image") else {
         return picture.map(|pixel| pixel);
     };
-    let (height, width) = (picture.height(), picture.width());
+    // the asset is laid on the canvas, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
     let placed = place::place(
         asset,
-        (height, width),
+        (place.canvas_height, place.canvas_width),
+        place.first_row..place.first_row + picture.height(),
         &Placement {
             fit: params.fit,
             at: params.at,

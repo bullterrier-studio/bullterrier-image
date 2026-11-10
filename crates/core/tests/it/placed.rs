@@ -54,6 +54,14 @@ fn cases() -> Vec<(&'static str, Value)> {
             json!({"seed": 3, "base": 0.6, "height": 40.0, "waviness": 8.0}),
         ),
         ("torn_edge", json!({"width": 6.0, "roughness": 0.9, "seed": 4})),
+        (
+            "blend",
+            json!({"image": "asset", "mode": "multiply", "fit": "cover", "at": "center"}),
+        ),
+        (
+            "blend",
+            json!({"image": "asset", "mode": "screen", "fit": "contain", "at": "bottom_right", "margin": 3.0}),
+        ),
     ]
 }
 
