@@ -64,6 +64,11 @@ fn cases() -> Vec<(&'static str, Value)> {
         ),
         ("ripple", json!({"amplitude": 5.0, "wavelength": 13.0, "angle": 30.0})),
         ("chromatic_aberration", json!({"amount": 6.0, "x": 0.3, "y": 0.6})),
+        ("halftone", json!({"sigma": 0.0, "cell": 6, "angle": 30.0})),
+        (
+            "halftone",
+            json!({"sigma": 0.0, "cell": 5, "angle": 15.0, "separation": "cmyk", "paper": "#ffffff"}),
+        ),
     ]
 }
 

@@ -80,7 +80,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     );
     // the wave is measured from the middle of the picture, between the middle two pixels of a side with an even number
     Centre::new(place.canvas_height, place.canvas_width, 0.5, 0.5)
-        .from_row(place.first_row)
+        .with_first_row(place.first_row)
         .warp(&sampler, |spot| {
             let along = spot.across * cos + spot.down * sin;
             // a pixel shows what is `moved` px behind it

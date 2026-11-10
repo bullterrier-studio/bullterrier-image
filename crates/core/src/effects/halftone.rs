@@ -3,7 +3,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::blur::gaussian_filter;
 use crate::ops::cast;
 use crate::ops::color::{luminance, vivid};
@@ -18,13 +18,20 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Stylised,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `halftone` reads around a pixel: the grid of dots is anchored at the picture's corner, so a row is not the same
 /// in another frame of reference.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    // A pixel shows the tone at the centre of its screen cell, at most half a cell diagonal away (and the pixel below it).
+    // The blur adds its own reach, a multiple of the cell that the runner rounds to whole pixels, which the radius in
+    // design px cannot bound at every size ratio: only the unblurred screen is claimed.
+    if params.sigma == 0.0 {
+        Footprint::Radius(f64::from(params.cell))
+    } else {
+        Footprint::Whole
+    }
 }
 
 /// A print-style dot screen: tone becomes dot size.
@@ -192,8 +199,11 @@ fn amounts(params: &Params, inks: &Inks, ink_is_bright: bool, sampled: [f32; 3])
 }
 
 /// The dot screen.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    // the screen is laid on the canvas, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
+    let canvas_last = place.canvas_height - 1;
     let cell = cast::single(f64::from(params.cell));
     let blurred;
     let smooth = if params.sigma > 0.0 {
@@ -232,7 +242,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             })
             .collect();
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
-            let y = cast::single(float(first + offset));
+            let y = cast::single(float(place.first_row + first + offset));
             for (column, out) in line.iter_mut().enumerate() {
                 let x = cast::single(float(column));
                 let mut coverages = [0.0; MOST_INKS];
@@ -245,7 +255,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                     if remembered.key != [cu.to_bits(), cv.to_bits()] {
                         // the tone at the centre, mapped back to the picture
                         let column = pixel((cu * cos - cv * sin) * cell + screen.shift[0], width - 1);
-                        let row = pixel((cu * sin + cv * cos) * cell + screen.shift[1], height - 1);
+                        let row = pixel((cu * sin + cv * cos) * cell + screen.shift[1], canvas_last);
+                        // (a picture given fewer rows than the footprint says reads the nearest it has)
+                        let row = row.clamp(place.first_row, place.first_row + height - 1) - place.first_row;
                         let sampled = smooth[row * width + column];
                         remembered.key = [cu.to_bits(), cv.to_bits()];
                         remembered.sampled = sampled;

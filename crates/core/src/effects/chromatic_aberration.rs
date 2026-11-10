@@ -132,7 +132,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         params.interpolation,
         params.edge.extension(),
     );
-    let centre = Centre::new(canvas_height, canvas_width, x, y).from_row(place.first_row);
+    let centre = Centre::new(canvas_height, canvas_width, x, y).with_first_row(place.first_row);
     let mut sum = vec![[0.0_f32; 3]; height * width];
     for (copy, weight) in weights(copies).into_iter().enumerate() {
         let scale = 1.0 - shift * (1.0 - 2.0 * copy as f64 / (copies - 1) as f64);

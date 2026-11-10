@@ -80,7 +80,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         let at = row * 2 * width + column;
         let (i, q) = (planes[at], planes[at + width]);
         let [cos, sin] = subcarrier[column % subcarrier.len()];
-        let line = if (first_row + row) % 2 == 0 { 1.0 } else { -1.0 }; // constant: the subcarrier flips phase on every line
+        let line = if (first_row + row).is_multiple_of(2) { 1.0 } else { -1.0 }; // constant: the subcarrier flips phase on every line
         let crawl = params.crawl * line * (i * cos + q * sin);
         yiq_to_rgb([luma + crawl, i, q]).map(|level| level.clamp(0.0, 1.0))
     })

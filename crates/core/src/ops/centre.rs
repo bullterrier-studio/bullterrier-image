@@ -48,7 +48,7 @@ impl Centre {
 
     /// This centre for a picture that is the rows of the canvas from `first_row` (the centre is then made from the
     /// canvas's size): a [`Spot`] counts rows on the canvas and the warp reads the picture where its place falls.
-    pub(crate) fn from_row(self, first_row: usize) -> Self {
+    pub(crate) fn with_first_row(self, first_row: usize) -> Self {
         Self { first_row, ..self }
     }
 
