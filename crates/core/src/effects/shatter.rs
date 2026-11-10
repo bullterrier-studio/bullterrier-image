@@ -150,7 +150,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                 .map(|corners| {
                     // the average of a triangle's corners
                     let sum = corners.iter().fold([0.0, 0.0], |sum, p| [sum[0] + p[0], sum[1] + p[1]]);
-                    [sum[0] / 3.0 - 0.5, sum[1] / 3.0 - 0.5] // constant: three corners
+                    [sum[0] / 3.0 - 0.5, sum[1] / 3.0 - 0.5] // constant: the mean of a triangle's three corners
                 })
                 .collect();
             (labels(height, width, &mesh), centres)

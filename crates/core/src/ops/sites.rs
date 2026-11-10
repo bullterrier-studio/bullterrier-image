@@ -151,7 +151,7 @@ pub(crate) fn scatter(
             .map(|_| [rng.uniform() * columns, rng.uniform() * rows])
             .collect();
     };
-    let mut running = 0.0;
+    let mut running = 0.0; // constant: the running total starts at nothing
     let cumulative: Vec<f64> = weights
         .iter()
         .map(|weight| {
