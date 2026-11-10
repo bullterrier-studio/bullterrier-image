@@ -159,6 +159,26 @@ impl<R: Infer> ModelFinder<R> {
         }
     }
 
+    /// The model's own answer for a depth finder: the relative inverse depth of `picture` (larger is nearer) stretched to the
+    /// photo's size, row after row, not scaled to the photo: the same value in two photos is the same nearness, so photos can
+    /// be scaled alike. Only the order and the ratios of differences mean anything: it is neither a distance nor bounded.
+    ///
+    /// # Errors
+    /// [`Error::BackendUnavailable`] if this is not a depth finder, or the model cannot run or answers with the wrong size.
+    pub fn inverse_depth(&self, picture: &Picture<'_>) -> Result<Tensor, Error> {
+        if self.kind != ModelKind::Depth {
+            return Err(Error::BackendUnavailable(
+                "only a depth model answers an inverse depth".to_owned(),
+            ));
+        }
+        let (input, side) = depth_input(picture);
+        let answer = self.answer(&input, side)?;
+        Tensor::new(
+            vec![picture.height(), picture.width()],
+            inverse_depth(&answer.values, side, (picture.height(), picture.width())),
+        )
+    }
+
     /// This finder with the edge clean-up of a subject set to `shrink` and `feather` px ([`refine_edge`](crate::refine_edge)):
     /// the defaults are 1.5 and 1, for a photo of 1000 to 1600 px. A depth is not cleaned.
     #[must_use]
@@ -169,14 +189,10 @@ impl<R: Infer> ModelFinder<R> {
     }
 }
 
-impl<R: Infer> Finder for ModelFinder<R> {
-    fn find(&self, picture: &Picture<'_>) -> Result<Layer, Error> {
-        let (height, width) = (picture.height(), picture.width());
-        let (input, side) = match self.kind {
-            ModelKind::Subject => (subject_input(picture), (SUBJECT_SIDE, SUBJECT_SIDE)),
-            ModelKind::Depth => depth_input(picture),
-        };
-        let answer = self.runner.infer(&input)?;
+impl<R: Infer> ModelFinder<R> {
+    /// The model's answer for `input`, checked to be the `side` (rows, columns) it was asked about.
+    fn answer(&self, input: &Tensor, side: (usize, usize)) -> Result<Tensor, Error> {
+        let answer = self.runner.infer(input)?;
         let (rows, columns) = side;
         if answer.values.len() != rows * columns {
             return Err(Error::BackendUnavailable(format!(
@@ -185,6 +201,18 @@ impl<R: Infer> Finder for ModelFinder<R> {
                 rows * columns
             )));
         }
+        Ok(answer)
+    }
+}
+
+impl<R: Infer> Finder for ModelFinder<R> {
+    fn find(&self, picture: &Picture<'_>) -> Result<Layer, Error> {
+        let (height, width) = (picture.height(), picture.width());
+        let (input, side) = match self.kind {
+            ModelKind::Subject => (subject_input(picture), (SUBJECT_SIDE, SUBJECT_SIDE)),
+            ModelKind::Depth => depth_input(picture),
+        };
+        let answer = self.answer(&input, side)?;
         match self.kind {
             ModelKind::Subject => subject_map(&answer.values, side, (height, width), (self.shrink, self.feather)),
             ModelKind::Depth => depth_map(&answer.values, side, (height, width)),
@@ -289,24 +317,33 @@ fn subject_map(
     Ok(crate::refine_edge(&matte, shrink, feather))
 }
 
+/// The depth map of a photo of `to` from a depth model's `answer` at its own size `from`: the inverse depth stretched to the
+/// photo ([`inverse_depth`]) scaled to 0..1, nearest 1 and farthest 0 (all 0 when the model tells nothing apart).
 fn depth_map(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Result<Layer, Error> {
-    let (low, span) = spread(answer);
-    if span == 0.0 {
-        return Layer::new(to.0, to.1, vec![0.0; to.0 * to.1]);
-    }
-    // an affine rescale commutes with the bilinear stretch (each output is a convex mix of its inputs), so the answer is
-    // scaled to 0..1 first, which the stretch keeps within 0..1, and then to the stretched range, as the Python did
-    let scaled: Vec<f32> = answer.iter().map(|&value| (value - low) / span).collect();
-    let stretched = stretched(&scaled, from, to);
-    let (low, span) = spread(&stretched);
+    let raw = inverse_depth(answer, from, to);
+    let (low, span) = spread(&raw);
     let values = if span == 0.0 {
-        vec![0.0; stretched.len()]
+        vec![0.0; raw.len()]
     } else {
-        stretched.iter().map(|&value| (value - low) / span).collect()
+        raw.iter().map(|&value| (value - low) / span).collect()
     };
     // a value that is not a number made the spread, and so every value, not a number: the map refuses it here, where
     // every map is checked
     Layer::new(to.0, to.1, values)
+}
+
+/// `answer` (`from` rows x columns) stretched bilinear to `to`, on the model's own scale: the stretch keeps 0..1, so the
+/// answer is scaled to 0..1 first (an affine rescale commutes with a convex mix) and back after.
+fn inverse_depth(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Vec<f32> {
+    let (low, span) = spread(answer);
+    if span == 0.0 {
+        return vec![low; to.0 * to.1];
+    }
+    let scaled: Vec<f32> = answer.iter().map(|&value| (value - low) / span).collect();
+    stretched(&scaled, from, to)
+        .into_iter()
+        .map(|value| value * span + low)
+        .collect()
 }
 
 /// The smallest of `values` and the distance to the largest. The order is the total one, in which a NaN is the largest

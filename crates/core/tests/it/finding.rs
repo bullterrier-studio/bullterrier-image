@@ -193,6 +193,50 @@ fn depth_is_scaled_so_the_nearest_pixel_is_1_and_the_farthest_0() -> Outcome {
 }
 
 #[test]
+fn the_inverse_depth_is_the_models_answer_at_the_photos_size_on_its_own_scale() -> Outcome {
+    // the answer grows to the right from 2 to 12, so a photo scaled by its own range would be 0..1
+    let stand = leaked(Stand::new(|input| {
+        let (height, width) = (input.shape()[2], input.shape()[3]);
+        let values = (0..height * width)
+            .map(|index| {
+                2.0 + 10.0 * f32::from(u16::try_from(index % width).unwrap_or(0))
+                    / f32::from(u16::try_from(width - 1).unwrap_or(1))
+            })
+            .collect();
+        Tensor::new(vec![1, height, width], values)
+    }));
+    let values = grey(100, 150, 0.5);
+    let raw = ModelFinder::new(ModelKind::Depth, stand).inverse_depth(&Picture::new(100, 150, &values)?)?;
+    assert_eq!(raw.shape(), [100, 150]);
+    let (low, high) = raw
+        .values()
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(l, h), &v| (l.min(v), h.max(v)));
+    // the stretch mixes neighbours, so the ends move in a little, never out: within the answer's 2..12 and on its scale
+    assert!(low >= 2.0 && low < 2.1 && high <= 12.0 && high > 11.9, "{low} {high}");
+    assert!(raw.values()[75 * 150 + 10] < raw.values()[75 * 150 + 140]);
+    Ok(())
+}
+
+#[test]
+fn a_flat_inverse_depth_keeps_its_value_and_only_a_depth_model_has_one() -> Outcome {
+    let flat = leaked(Stand::new(|input| {
+        let (height, width) = (input.shape()[2], input.shape()[3]);
+        Tensor::new(vec![1, height, width], vec![3.5; height * width])
+    }));
+    let values = grey(100, 150, 0.5);
+    let picture = Picture::new(100, 150, &values)?;
+    let raw = ModelFinder::new(ModelKind::Depth, flat).inverse_depth(&picture)?;
+    assert!(raw.values().iter().all(|&value| (value - 3.5).abs() < 1e-5));
+    let refused = ModelFinder::new(ModelKind::Subject, flat).inverse_depth(&picture);
+    assert!(
+        matches!(&refused, Err(Error::BackendUnavailable(message)) if message.contains("depth")),
+        "{refused:?}"
+    );
+    Ok(())
+}
+
+#[test]
 fn a_flat_depth_answer_is_an_all_zero_map() -> Outcome {
     let stand = leaked(Stand::new(|input| {
         let (height, width) = (input.shape()[2], input.shape()[3]);
