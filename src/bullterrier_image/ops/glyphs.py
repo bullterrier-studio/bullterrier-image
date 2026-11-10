@@ -1,8 +1,9 @@
 """Text characters as pixels: the shared machinery behind every effect that draws with glyphs.
 
-The module promises three things. `cell_size` says how big one character cell is, so effects can lay a grid over a
+The module promises two things. `cell_size` says how big one character cell is, so effects can lay a grid over a
 picture. `glyph_atlas` gives the ink coverage of each distinct character of a palette, ordered from least to most ink,
-so a brightness maps straight to an atlas index. `paint` turns a grid of such indices back into a coverage picture.
+so a brightness maps straight to an atlas index. (The `ascii` effect draws its glyphs in Rust, from the core's copy of
+the font; this module remains for the Python users of the font: `disperse`, the numbered pieces and the sheet.)
 
 Every glyph is drawn with the one font in `FONT`, never a system font, so a look is the same on every platform
 (within float tolerance). It is JetBrains Mono Regular (SIL OFL 1.1, `LICENSE-FONT`), monospaced, with Latin letters
@@ -29,7 +30,7 @@ def cell_size(cell: int) -> tuple[int, int]:
 
     `cell` = character width in px (a positive int). The width is always exactly `cell`; the height comes from the font
     and grows with `cell`.
-    This is the grid every glyph drawn by `glyph_atlas` and `paint` lives on, so callers can lay out whole characters.
+    This is the grid every glyph drawn by `glyph_atlas` lives on, so callers can lay out whole characters.
     """
     ascent, descent = _load_font(cell).getmetrics()
     return cell, ascent + descent
@@ -67,18 +68,6 @@ def _atlas(chars: str, cell: int) -> np.ndarray:
     atlas = np.stack(bitmaps)
     atlas.flags.writeable = False  # shared through the cache: one caller's edit must not reach the others
     return atlas
-
-
-def paint(indices: np.ndarray, atlas: np.ndarray) -> np.ndarray:
-    """Draw a grid of glyphs: cell (r, c) of the result holds the atlas glyph `indices[r, c]`.
-
-    `indices` = (rows, cols) integers, each in 0..n_glyphs-1.
-    `atlas` = (n_glyphs, cell_h, cell_w) coverage as returned by `glyph_atlas`.
-    Returns a float32 (rows * cell_h, cols * cell_w) coverage array in 0..1.
-    """
-    rows, cols = indices.shape
-    _, cell_h, cell_w = atlas.shape
-    return atlas[indices].transpose(0, 2, 1, 3).reshape(rows * cell_h, cols * cell_w)
 
 
 @lru_cache(maxsize=16)  # constant: a cache size, which never changes a result

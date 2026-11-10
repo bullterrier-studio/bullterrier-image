@@ -6,7 +6,7 @@ use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter;
 use crate::ops::cast;
-use crate::ops::color::luminance;
+use crate::ops::color::{luminance, vivid};
 use crate::ops::edge::EdgeOrConstant;
 use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, SPOT_SCREEN_STEP, shift};
 use crate::ops::length::{float, whole};
@@ -273,10 +273,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                 } else if coverages[0] > 0.0 {
                     let sampled = cells[0].sampled;
                     let dot = params.ink.map_or_else(
-                        || {
-                            let strongest = sampled[0].max(sampled[1]).max(sampled[2]).max(params.ink_floor);
-                            sampled.map(|level| (level / strongest).clamp(0.0, 1.0))
-                        },
+                        || vivid(sampled, params.ink_floor),
                         |ink| ink.0,
                     );
                     [0, 1, 2].map(|channel| paper[channel] * (1.0 - coverages[0]) + dot[channel] * coverages[0])

@@ -277,7 +277,7 @@ def _findings(path: Path) -> list[str]:
 
 def test_the_scan_covers_the_effect_packages_and_the_ops_modules():
     names = {_module_name(path) for path in SCANNED}
-    assert {"ops/color.py", "ops/cells.py"} <= names
+    assert {"ops/glyphs.py", "ops/cells.py"} <= names
     assert any(name.startswith("effects/") and name.endswith("/effect.py") for name in names)
 
 

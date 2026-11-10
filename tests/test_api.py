@@ -230,7 +230,7 @@ def test_a_step_describes_itself_briefly_for_labels():
     assert str(fx.grade(exposure=0.5, opacity=0.3)) == "grade(exposure=0.5) x0.3"
     assert str(fx.bloom(radius=26, blend_mode="screen")) == "bloom(radius=26) screen"
     assert str(fx.disperse(progress=0.9)) == "disperse(progress=0.9)"
-    assert len(fx.ascii(chars="xy" * 100).describe(width=30)) == 30
+    assert len(fx.ascii(chars="xy" * 60).describe(width=30)) == 30
 
 
 # --- fx: the effects as step builders ------------------------------------------------------------------------------

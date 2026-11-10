@@ -6,6 +6,7 @@ mod common;
 mod ambient_occlusion;
 mod anamorphic_streaks;
 mod apply;
+mod ascii;
 mod aurora;
 mod bands_narrowing;
 mod blend;

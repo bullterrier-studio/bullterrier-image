@@ -3,7 +3,7 @@ import pytest
 from PIL import Image, ImageDraw, ImageFont
 
 from bullterrier_image import RecipeError, fx
-from bullterrier_image.ops.glyphs import FONT, cell_size, glyph_atlas, paint
+from bullterrier_image.ops.glyphs import FONT, cell_size, glyph_atlas
 
 CELLS = [5, 8, 13, 20]
 
@@ -63,33 +63,6 @@ def test_atlas_is_cached_and_cannot_be_modified_in_place():
     assert not first.flags.writeable
     with pytest.raises(ValueError, match="read-only"):
         first[0, 0, 0] = 1.0
-
-
-def test_paint_places_glyph_i_in_cell_r_c():
-    atlas = glyph_atlas(" .:#█", 6)
-    height, width = atlas.shape[1:]
-    indices = np.array([[0, 3, 4], [2, 1, 3]])
-    out = paint(indices, atlas)
-    assert out.shape == (2 * height, 3 * width)
-    assert out.dtype == np.float32
-    for r in range(2):
-        for c in range(3):
-            np.testing.assert_array_equal(
-                out[r * height : (r + 1) * height, c * width : (c + 1) * width], atlas[indices[r, c]]
-            )
-
-
-@pytest.mark.parametrize(("rows", "cols"), [(1, 5), (4, 1), (3, 2)])
-def test_paint_output_shape_follows_rows_and_columns(rows, cols):
-    atlas = glyph_atlas(" .#", 7)
-    height, width = atlas.shape[1:]
-    assert height != width
-    assert paint(np.ones((rows, cols), dtype=int), atlas).shape == (rows * height, cols * width)
-
-
-def test_paint_of_an_empty_grid_is_empty():
-    atlas = glyph_atlas(" .#", 7)
-    assert paint(np.zeros((0, 3), dtype=int), atlas).shape == (0, 3 * atlas.shape[2])
 
 
 # --- the bundled font and glyph geometry ---------------------------------------------------------------------------

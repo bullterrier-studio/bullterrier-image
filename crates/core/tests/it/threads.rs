@@ -600,6 +600,14 @@ fn cases() -> Vec<Case> {
                     .param("paper", "#f4efe4")
                     .param("offset", 2.5)
                     .param("offset_angle", 30.0),
+                Step::new("ascii")
+                    .param("cell", 7)
+                    .param("chars", "░▒▓█ .")
+                    .param("photo", 0.3)
+                    .param("paper", "#f4efe4")
+                    .param("gamma", 1.6),
+                Step::new("ascii").param("ink", "#ff8000").param("cell", 13),
+                Step::new("ascii"),
                 Step::new("halftone")
                     .param("separation", "spot")
                     .param("inks", json!(["#ff4d6d", "#2b59ff", "#ffd400"]))

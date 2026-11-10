@@ -295,6 +295,31 @@ mod tests {
         Ok(())
     }
 
+    /// A glyph is centred on the cell with half pixels rounded up. In a cell 12 px wide (font 20 px, ascent 21, descent 6,
+    /// 27 rows) the baseline sits at 27 / 2 + (21 - 6 + 1) / 2 = 21.5, so a block 26.4 px high starts at row 1.1 and is cut
+    /// off by the bottom: row 0 is empty, row 1 is nine tenths covered (to 1/16 of a row) and rows 2 to 26 are full.
+    #[test]
+    fn the_line_is_centred_with_a_half_pixel_rounded_up() -> Result<(), String> {
+        let atlas = Atlas::new(" \u{2588}", 12)?;
+        let rows: Vec<f32> = atlas.glyph(1).chunks_exact(12).map(|row| row.iter().sum()).collect();
+        assert_eq!(rows.len(), 27);
+        assert!(rows[0] == 0.0, "{rows:?}");
+        assert!((rows[1] - 12.0 * 0.9).abs() < 12.0 / 16.0, "{rows:?}");
+        assert!(rows[2..].iter().all(|row| (row - 12.0).abs() < 1e-4), "{rows:?}");
+        Ok(())
+    }
+
+    /// In a cell 7 px wide the font is 12 px and an advance 7.2 px, 7 hinted: the glyph starts at 7 / 2 - 4 = -0.5, so a block
+    /// 7.2 px wide covers the first column and 6.7 px of the cell, 0.7 of the last column.
+    #[test]
+    fn the_advance_is_centred_with_a_half_pixel_rounded_up() -> Result<(), String> {
+        let atlas = Atlas::new(" \u{2588}", 7)?;
+        let middle = atlas.height() / 2;
+        let row = &atlas.glyph(1)[middle * 7..][..7];
+        assert!((row[0] - 1.0).abs() < 1e-4 && (row[6] - 0.7).abs() < 1e-4, "{row:?}");
+        Ok(())
+    }
+
     /// 'I' is symmetric in the font, so the middle of its ink is the middle of the cell.
     #[test]
     fn a_symmetric_glyph_sits_in_the_middle_of_its_cell() -> Result<(), String> {

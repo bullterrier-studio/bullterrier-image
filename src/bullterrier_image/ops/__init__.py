@@ -1,4 +1,4 @@
-"""Shared building blocks for effects and core: colour, resampling, glyphs, text art, pieces, distance.
+"""Shared building blocks for effects and core: resampling, glyphs, pieces, distance.
 
 Not effects themselves: an effect is a function on a picture that recipes can name; these are the tools several
 effects share, each a small module with one job. Effects depend on `ops`, never the reverse. Import a module by its

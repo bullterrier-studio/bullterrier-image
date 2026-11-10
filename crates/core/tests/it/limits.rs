@@ -411,6 +411,29 @@ fn particles_at_their_largest_density_size_and_length_finish_and_one_past_is_ref
 }
 
 #[test]
+fn ascii_at_its_widest_cell_and_longest_palette_finishes_and_one_past_is_refused() -> Outcome {
+    // the glyph atlas holds one cell of coverage for each character of the palette: the most is 128 characters in cells 200
+    // px wide (and some 530 high), 54 MB of coverage
+    let pixels = vec![0.5; 40 * 40 * 3];
+    let photo = Photo::new(Picture::new(40, 40, &pixels)?);
+    let palette: String = (0x21..).filter_map(char::from_u32).take(128).collect();
+    let ascii = |cell: u32, chars: &str| Recipe::new([Step::new("ascii").param("cell", cell).param("chars", chars)]);
+    let most = photo.render(&ascii(200, &palette), &Presets::new(), Options::default());
+    assert!(most.is_ok(), "{most:?}");
+    let longer: String = (0x21..).filter_map(char::from_u32).take(129).collect();
+    for (cell, chars, field, value) in [
+        (201, palette.as_str(), "cell", "201"),
+        (200, longer.as_str(), "chars", "128"),
+    ] {
+        let past = photo
+            .render(&ascii(cell, chars), &Presets::new(), Options::default())
+            .map(drop);
+        assert!(refused(&past, &[field, value]), "{field}: {past:?}");
+    }
+    Ok(())
+}
+
+#[test]
 fn blend_at_its_largest_scale_and_margin_sizes_only_what_shows_and_one_past_is_refused() -> Outcome {
     // a picture of 1 x 4000 pixels covering a 300 x 300 photo at twice its size would be 2.4 million x 600 pixels (some
     // 23 GB of four floats) if it were made whole; only the 300 x 300 that show are

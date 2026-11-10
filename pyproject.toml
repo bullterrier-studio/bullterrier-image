@@ -423,6 +423,7 @@ ignore_names = [
     "octaves",
     "persistence",
     "samples",
+    "amount",  # `Edge.amount`; the last ascii text-art code that read a name `amount` is gone
     "model_config",  # pydantic reads each model's settings from this class attribute
     "model_construct",  # `ValidatedModel.model_construct` overrides pydantic's to raise: a guard, called by no one
     "ignored_warning_kinds",  # pydantic reads it from a JSON schema generator class
