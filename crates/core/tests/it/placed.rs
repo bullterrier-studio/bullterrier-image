@@ -62,6 +62,8 @@ fn cases() -> Vec<(&'static str, Value)> {
             "blend",
             json!({"image": "asset", "mode": "screen", "fit": "contain", "at": "bottom_right", "margin": 3.0}),
         ),
+        ("ripple", json!({"amplitude": 5.0, "wavelength": 13.0, "angle": 30.0})),
+        ("chromatic_aberration", json!({"amount": 6.0, "x": 0.3, "y": 0.6})),
     ]
 }
 

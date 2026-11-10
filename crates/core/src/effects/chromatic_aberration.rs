@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
 use crate::ops::sample::{Interpolation, Sampler};
@@ -15,12 +15,13 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Light,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `chromatic_aberration` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    // a copy is magnified by at most 1 +- shift, which moves a pixel by at most `amount` px (the farthest corner moves by it)
+    Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
 }
 
 /// The spectrum as a simple rule, not a colour-matching table: the pure colours of the HSV colour wheel from red to blue
@@ -110,11 +111,14 @@ fn weights(copies: usize) -> Vec<[f64; 3]> {
     clippy::cast_sign_loss,
     reason = "a picture side is far below 2**52; the sums are made in f64 and stored in the f32 image; samples is from 3 to 32"
 )]
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the centre and the farthest corner are the canvas's, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
     let (height, width) = (picture.height(), picture.width());
+    let (canvas_height, canvas_width) = (place.canvas_height, place.canvas_width);
     let (x, y) = (f64::from(params.x), f64::from(params.y));
     // the farthest corner, in pixels: where the shift is the whole amount
-    let farthest = (y.max(1.0 - y) * (height - 1) as f64).hypot(x.max(1.0 - x) * (width - 1) as f64);
+    let farthest = (y.max(1.0 - y) * (canvas_height - 1) as f64).hypot(x.max(1.0 - x) * (canvas_width - 1) as f64);
     if params.amount == 0.0 || farthest == 0.0 {
         return picture.map(|pixel| pixel);
     }
@@ -128,7 +132,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         params.interpolation,
         params.edge.extension(),
     );
-    let centre = Centre::new(height, width, x, y);
+    let centre = Centre::new(canvas_height, canvas_width, x, y).from_row(place.first_row);
     let mut sum = vec![[0.0_f32; 3]; height * width];
     for (copy, weight) in weights(copies).into_iter().enumerate() {
         let scale = 1.0 - shift * (1.0 - 2.0 * copy as f64 / (copies - 1) as f64);

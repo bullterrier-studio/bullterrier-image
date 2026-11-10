@@ -13,6 +13,8 @@ use crate::Image;
 pub(crate) struct Centre {
     row: f64,
     column: f64,
+    /// The canvas row of the picture's first row: 0 unless the picture is a band of a larger canvas.
+    first_row: usize,
 }
 
 /// A pixel of the picture and its place measured from the [`Centre`].
@@ -21,7 +23,7 @@ pub(crate) struct Spot {
     centre: Centre,
     /// The pixel's place among the picture's pixels, row after row: `row * width + column`.
     pub(crate) index: usize,
-    /// The pixel's row, from the top: 0 for the first.
+    /// The pixel's row, from the top of the canvas: 0 for the first.
     pub(crate) row: f64,
     /// The pixel's column, from the left: 0 for the first.
     pub(crate) column: f64,
@@ -40,7 +42,14 @@ impl Centre {
         Self {
             row: y * (height - 1) as f64,
             column: x * (width - 1) as f64,
+            first_row: 0,
         }
+    }
+
+    /// This centre for a picture that is the rows of the canvas from `first_row` (the centre is then made from the
+    /// canvas's size): a [`Spot`] counts rows on the canvas and the warp reads the picture where its place falls.
+    pub(crate) fn from_row(self, first_row: usize) -> Self {
+        Self { first_row, ..self }
     }
 
     /// The picture of `sampler` with every pixel replaced by the picture read at the place `source` gives for it as
@@ -79,7 +88,7 @@ impl Centre {
         let mut out = vec![[0.0; 3]; height * width];
         par::rows(&mut out, width, |first_row, band| {
             for (at, pixel) in band.iter_mut().enumerate() {
-                let (row, column) = ((first_row + at / width) as f64, (at % width) as f64);
+                let (row, column) = ((self.first_row + first_row + at / width) as f64, (at % width) as f64);
                 let (read_row, read_column) = source(Spot {
                     centre: self,
                     index: first_row * width + at,
@@ -88,6 +97,8 @@ impl Centre {
                     down: row - self.row,
                     across: column - self.column,
                 });
+                // the place is on the canvas; the sampler holds the rows from `first_row`
+                let read_row = read_row - self.first_row as f64;
                 let read = sampler.at(read_row, read_column).map(|level| level.clamp(0.0, 1.0));
                 *pixel = match border {
                     None => read.map(|level| level as f32),

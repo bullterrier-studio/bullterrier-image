@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
 use crate::ops::sample::{Interpolation, Sampler};
@@ -15,12 +15,13 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Distortion,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `ripple` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    // a pixel shows what is at most `amplitude` px away; a wrapped edge reads the far side
+    Footprint::reach(f64::from(params.amplitude), params.edge == Edge::Wrap)
 }
 
 /// Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`.
@@ -64,8 +65,9 @@ pub struct Params {
 }
 
 /// The picture with the wave passed through it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    let place = inputs.place(picture);
     let (sin, cos) = f64::from(params.angle).to_radians().sin_cos();
     let phase = f64::from(params.phase).to_radians();
     let (amplitude, wavelength) = (f64::from(params.amplitude), f64::from(params.wavelength));
@@ -77,10 +79,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         params.edge.extension(),
     );
     // the wave is measured from the middle of the picture, between the middle two pixels of a side with an even number
-    Centre::new(height, width, 0.5, 0.5).warp(&sampler, |spot| {
-        let along = spot.across * cos + spot.down * sin;
-        // a pixel shows what is `moved` px behind it
-        let moved = amplitude * (std::f64::consts::TAU * along / wavelength + phase).sin();
-        (spot.row - cos * moved, spot.column + sin * moved)
-    })
+    Centre::new(place.canvas_height, place.canvas_width, 0.5, 0.5)
+        .from_row(place.first_row)
+        .warp(&sampler, |spot| {
+            let along = spot.across * cos + spot.down * sin;
+            // a pixel shows what is `moved` px behind it
+            let moved = amplitude * (std::f64::consts::TAU * along / wavelength + phase).sin();
+            (spot.row - cos * moved, spot.column + sin * moved)
+        })
 }
