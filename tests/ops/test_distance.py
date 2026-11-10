@@ -3,7 +3,7 @@ import dataclasses
 import numpy as np
 import pytest
 
-from bullterrier_image.ops.blur import Edge
+from bullterrier_image.ops.convolve import Edge
 from bullterrier_image.ops.distance import EdgeField, edge_distance
 
 HEIGHT, WIDTH = 40, 60

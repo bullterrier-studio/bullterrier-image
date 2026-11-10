@@ -35,21 +35,29 @@ pub(crate) fn triangles(height: usize, width: usize, sites: &[[f64; 2]], spacing
     let input: Vec<delaunator::Point> = points.iter().map(|&[x, y]| delaunator::Point { x, y }).collect();
     delaunator::triangulate(&input)
         .triangles
-        .chunks_exact(3)
-        .map(|corners| [points[corners[0]], points[corners[1]], points[corners[2]]])
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|corners| corners.map(|corner| points[corner]))
         .collect()
 }
 
 /// The index in `triangles` (which tile a `height` x `width` picture) of the triangle that holds each pixel's centre, row
 /// after row. A centre on a side shared by triangles goes to the first of them.
-#[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap, reason = "a few thousand triangles at most")]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "a few thousand triangles at most"
+)]
 pub(crate) fn labels(height: usize, width: usize, triangles: &[Triangle]) -> Vec<i32> {
     let mut found = vec![0_i32; height * width];
     let mut placed = vec![false; height * width];
     for (index, triangle) in triangles.iter().enumerate() {
         let (top, bottom) = triangle
             .iter()
-            .fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), p| (low.min(p[1]), high.max(p[1])));
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), p| {
+                (low.min(p[1]), high.max(p[1]))
+            });
         // the rows whose centres lie between the triangle's highest and lowest corner
         let first = length::whole((top - 0.5 - SLACK).ceil());
         let last = length::whole((bottom - 0.5 + SLACK).floor() + 1.0).min(height);
@@ -151,16 +159,19 @@ mod tests {
 
     #[test]
     fn no_corner_of_any_triangle_lies_inside_the_circle_through_another() {
-        for (seed, (count, size)) in [(3, SIZES[0]), (8, SIZES[1]), (25, SIZES[2])].into_iter().enumerate() {
-            let mesh = triangles(size.0, size.1, &scattered(count, size, seed as u32), 9.0);
+        for (seed, (count, size)) in (0_u32..).zip([(3, SIZES[0]), (8, SIZES[1]), (25, SIZES[2])]) {
+            let mesh = triangles(size.0, size.1, &scattered(count, size, seed), 9.0);
             let corners = vertices(&mesh);
-            assert!(!mesh.is_empty());
+            assert_ne!(mesh.len(), 0);
             for triangle in &mesh {
                 let centre = circumcentre(triangle);
                 let radius = (triangle[0][0] - centre[0]).hypot(triangle[0][1] - centre[1]);
                 for corner in &corners {
                     let away = (corner[0] - centre[0]).hypot(corner[1] - centre[1]);
-                    assert!(away >= radius * (1.0 - 1e-9), "{corner:?} is inside the circle of {triangle:?}");
+                    assert!(
+                        away >= radius * (1.0 - 1e-9),
+                        "{corner:?} is inside the circle of {triangle:?}"
+                    );
                 }
             }
         }
@@ -168,11 +179,11 @@ mod tests {
 
     #[test]
     fn n_corners_with_h_on_the_picture_edge_make_2n_minus_2_minus_h_triangles() {
-        for (seed, size) in SIZES.into_iter().enumerate() {
+        for (seed, size) in (0_u32..).zip(SIZES) {
             let (height, width) = (length::float(size.0), length::float(size.1));
-            let mesh = triangles(size.0, size.1, &scattered(14, size, seed as u32 + 40), 7.0);
+            let mesh = triangles(size.0, size.1, &scattered(14, size, seed + 40), 7.0);
             let corners = vertices(&mesh);
-            let on_edge = |p: &[f64; 2]| p[0] == 0.0 || p[0] == width || p[1] == 0.0 || p[1] == height;
+            let on_edge = |p: &[f64; 2]| p[0] < 1e-9 || width - p[0] < 1e-9 || p[1] < 1e-9 || height - p[1] < 1e-9;
             let hull = corners.iter().filter(|p| on_edge(p)).count();
             assert_eq!(mesh.len(), 2 * corners.len() - 2 - hull, "{size:?}");
         }
@@ -190,31 +201,41 @@ mod tests {
 
     #[test]
     fn the_four_corners_are_corners_and_the_triangles_tile_the_picture() {
-        for (seed, size) in SIZES.into_iter().enumerate() {
+        for (seed, size) in (0_u32..).zip(SIZES) {
             let (height, width) = (length::float(size.0), length::float(size.1));
-            let mesh = triangles(size.0, size.1, &scattered(11, size, seed as u32 + 70), 8.0);
+            let mesh = triangles(size.0, size.1, &scattered(11, size, seed + 70), 8.0);
             let corners = vertices(&mesh);
             for corner in [[0.0, 0.0], [width, 0.0], [width, height], [0.0, height]] {
                 assert!(corners.contains(&corner), "{corner:?}");
             }
             let total: f64 = mesh.iter().map(area).sum();
-            assert!((total - height * width).abs() < 1e-6, "{total} against {}", height * width);
+            assert!(
+                (total - height * width).abs() < 1e-6,
+                "{total} against {}",
+                height * width
+            );
         }
     }
 
     #[test]
     fn every_pixel_goes_to_the_one_triangle_that_holds_its_centre() {
-        for (seed, size) in SIZES.into_iter().enumerate() {
-            let mesh = triangles(size.0, size.1, &scattered(9, size, seed as u32 + 90), 8.0);
+        for (seed, size) in (0_u32..).zip(SIZES) {
+            let mesh = triangles(size.0, size.1, &scattered(9, size, seed + 90), 8.0);
             let found = labels(size.0, size.1, &mesh);
             for (at, label) in found.iter().enumerate() {
                 let centre = [length::float(at % size.1) + 0.5, length::float(at / size.1) + 0.5];
                 let inside: Vec<usize> = (0..mesh.len()).filter(|&t| holds(&mesh[t], centre, 1e-7)).collect();
-                assert!(inside.contains(&(*label as usize)), "pixel {at}: label {label}, held by {inside:?}");
+                assert!(
+                    inside.contains(&usize::try_from(*label).unwrap_or(usize::MAX)),
+                    "pixel {at}: label {label}, held by {inside:?}"
+                );
                 // a centre clear of every side is held by exactly one triangle, the label's
                 let clear: Vec<usize> = (0..mesh.len()).filter(|&t| holds(&mesh[t], centre, -1e-7)).collect();
                 assert!(clear.len() <= 1, "pixel {at}: {clear:?}");
-                assert!(clear.is_empty() || clear == [*label as usize], "pixel {at}: {label}, {clear:?}");
+                assert!(
+                    clear.is_empty() || clear == [usize::try_from(*label).unwrap_or(usize::MAX)],
+                    "pixel {at}: {label}, {clear:?}"
+                );
             }
         }
     }

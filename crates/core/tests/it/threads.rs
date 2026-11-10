@@ -191,6 +191,16 @@ fn cases() -> Vec<Case> {
                     .param("angle", 30)
                     .param("layers", 3)
                     .param("seed", 5),
+                Step::new("shatter")
+                    .param("pieces", 30)
+                    .param("fill", 0.5)
+                    .param("gap", 1.5)
+                    .param("detail", 0.5)
+                    .param("seed", 2),
+                Step::new("shatter")
+                    .param("pieces", 20)
+                    .param("shape", "triangles")
+                    .param("gap", 1),
             ]),
             &thin_and_odd,
         ),

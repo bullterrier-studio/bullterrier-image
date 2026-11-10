@@ -409,6 +409,7 @@ ignore_names = [
     "aspect",
     "anchor",
     "margin",
+    "radius",
     "pad_top",
     "pad_right",
     "pad_bottom",

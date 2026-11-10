@@ -443,6 +443,29 @@ fn blend_at_its_largest_scale_and_margin_sizes_only_what_shows_and_one_past_is_r
     Ok(())
 }
 
+#[test]
+fn shatter_at_its_most_pieces_finishes_in_both_shapes_and_one_more_is_refused() -> Outcome {
+    // the points are drawn, the triangles found and the pieces' means kept for each: the work follows `pieces`
+    let pixels = vec![0.5; 120 * 120 * 3];
+    let photo = Photo::new(Picture::new(120, 120, &pixels)?);
+    let shatter = |pieces: u32, shape: &str| {
+        Recipe::new([Step::new("shatter")
+            .param("pieces", pieces)
+            .param("shape", shape)
+            .param("fill", 1)
+            .param("gap", 2)])
+    };
+    for shape in ["voronoi", "triangles"] {
+        let most = photo.render(&shatter(500, shape), &Presets::new(), Options::default());
+        assert!(most.is_ok(), "{shape}: {most:?}");
+    }
+    let past = photo
+        .render(&shatter(501, "voronoi"), &Presets::new(), Options::default())
+        .map(drop);
+    assert!(refused(&past, &["pieces", "501"]), "{past:?}");
+    Ok(())
+}
+
 // ---- the files an svg region reads --------------------------------------------------------------------------------
 
 const NS: &str = r#"xmlns="http://www.w3.org/2000/svg""#;

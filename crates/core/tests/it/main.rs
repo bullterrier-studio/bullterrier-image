@@ -135,6 +135,7 @@ mod seams;
 mod shards;
 mod shards_sites;
 mod sharpen;
+mod shatter;
 mod shift;
 mod slice_shift;
 mod spatial;

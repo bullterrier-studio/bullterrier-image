@@ -479,6 +479,12 @@ fn conditional() -> Vec<Conditional> {
             field: "seed",
             with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
         },
+        // the lines of a colour are drawn only where there is a gap
+        Conditional {
+            effect: "shatter",
+            field: "color",
+            with: vec![("gap", json!(3.0))],
+        },
         // the 12 px picture is too small for the default density to make a single particle; at the largest density it has
         // dozens
         Conditional {
