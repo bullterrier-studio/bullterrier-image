@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::noise::{Fractal, field};
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -13,12 +13,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Texture,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `torn_edge` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Tear the border away: each side's pixels closer than a wandering distance of about `width` px become `fill`.
@@ -86,13 +86,16 @@ fn distances(length: usize, side: u64, params: &Params) -> Vec<f32> {
 }
 
 /// The picture with the border torn away.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let (height, width) = (picture.height(), picture.width());
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the tears follow the canvas's four sides, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
+    let (height, width) = (place.canvas_height, place.canvas_width);
     let (top, bottom) = (distances(width, 0, params), distances(width, 1, params));
     // constant: each of the four edges draws from a stream of its own
     let (left, right) = (distances(height, 2, params), distances(height, 3, params));
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**24")]
     picture.map_at(|row, column, pixel| {
+        let row = place.first_row + row;
         let torn = (row as f32) < top[column]
             || ((height - 1 - row) as f32) < bottom[column]
             || (column as f32) < left[row]

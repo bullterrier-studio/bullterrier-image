@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::gauss::ndtr;
 use crate::ops::noise::{Fractal, field};
 use crate::ops::{cast, length, ramp};
@@ -15,12 +15,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Backgrounds,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `aurora` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Replace the picture with an aurora: a curtain of light with a wavy base and vertical rays over a dark sky.
@@ -88,8 +88,10 @@ pub struct Params {
 }
 
 /// The aurora, in the picture's size: the picture is used only for its height and width.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let (rows, width) = (picture.height(), picture.width());
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the curtain's base is a share of the canvas's height, and a row is counted from the canvas's top
+    let place = inputs.place(picture);
+    let (rows, width) = (place.canvas_height, place.canvas_width);
     // constant: a one-row field, so the noise runs along the picture only
     let along = |spacing: f32, stream| {
         field(
@@ -120,7 +122,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         f64::from(params.falloff),
     );
     picture.map_at(|row, column, _| {
-        let above = base + f64::from(params.waviness) * f64::from(ripple[column]) - length::float(row);
+        let above =
+            base + f64::from(params.waviness) * f64::from(ripple[column]) - length::float(place.first_row + row);
         let up = above / tall; // 0 at the base, 1 at the curtain's top
         let brightness =
             cast::single((above + 0.5).clamp(0.0, 1.0) * (1.0 - up).clamp(0.0, 1.0).powf(falloff) * ray[column]);

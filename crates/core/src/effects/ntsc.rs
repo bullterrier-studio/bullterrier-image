@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::cast;
 use crate::ops::chroma::smeared;
 use crate::ops::colorspace::{rgb_to_yiq, yiq_to_rgb};
@@ -16,13 +16,13 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Glitch,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `ntsc` reads around a pixel: the dot crawl follows the parity of the row, so a row is not the same in another frame
 /// of reference.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal.
@@ -58,7 +58,7 @@ pub struct Params {
 }
 
 /// The picture with its colour smeared and crawling.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     let planes = smeared(
         picture.pixels(),
@@ -70,6 +70,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     // The subcarrier is sampled four times per cycle (SMPTE 244M), so t advances a quarter cycle with each column, and half
     // a cycle with each row: the (cos t, sin t) of the four columns are those of column 0 turned by a quarter each time, and
     // an odd row has them negated.
+    // the lines alternate from the top of the canvas, whichever row of it the picture starts at
+    let first_row = inputs.place(picture).first_row;
     let turn = std::f64::consts::TAU * f64::from(params.phase);
     let (cos, sin) = (cast::single(turn.cos()), cast::single(turn.sin()));
     let subcarrier = [[cos, sin], [-sin, cos], [-cos, -sin], [sin, -cos]];
@@ -78,7 +80,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         let at = row * 2 * width + column;
         let (i, q) = (planes[at], planes[at + width]);
         let [cos, sin] = subcarrier[column % subcarrier.len()];
-        let line = if row % 2 == 0 { 1.0 } else { -1.0 }; // constant: the subcarrier flips phase on every line
+        let line = if (first_row + row) % 2 == 0 { 1.0 } else { -1.0 }; // constant: the subcarrier flips phase on every line
         let crawl = params.crawl * line * (i * cos + q * sin);
         yiq_to_rgb([luma + crawl, i, q]).map(|level| level.clamp(0.0, 1.0))
     })

@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::shift::shifted;
 use crate::params::{Choice, Params};
@@ -14,12 +14,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Glitch,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `interlace` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Which of the two fields of rows slides.
@@ -56,7 +56,7 @@ pub struct Params {
 }
 
 /// The picture with the rows of one field slid sideways.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     // constant: no vertical distance, the rows only slide sideways
     let moved = shifted(
@@ -69,8 +69,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     );
     // the rows of the slid field have this remainder of the row index: the odd ones (second, fourth...) 1, the even ones 0
     let slid = usize::from(params.field == Field::Odd);
+    // the fields are the canvas's rows, whichever of them the picture starts at
+    let first_row = inputs.place(picture).first_row;
     picture.map_at(|row, column, pixel| {
-        if row % 2 == slid {
+        if (first_row + row) % 2 == slid {
             moved[row * width + column]
         } else {
             pixel

@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::light::screen;
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -13,12 +13,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Light,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `lens_flare` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Add a halo and a ring round the light at (`x`, `y`) and `ghosts` soft discs along the line from it through the
@@ -100,9 +100,11 @@ impl Bump {
 }
 
 /// The picture with the flare screened over it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the light lies on the canvas, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
-    let (last_row, last_column) = ((picture.height() - 1) as f64, (picture.width() - 1) as f64);
+    let (last_row, last_column) = ((place.canvas_height - 1) as f64, (place.canvas_width - 1) as f64);
     let light = (f64::from(params.y) * last_row, f64::from(params.x) * last_column);
     let middle = (last_row / 2.0, last_column / 2.0);
     let (halo, ring, size) = (f64::from(params.halo), f64::from(params.ring), f64::from(params.size));
@@ -136,7 +138,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         reason = "the flare is summed in f64 and stored in the f32 picture"
     )]
     picture.map_at(|row, column, pixel| {
-        let flare = bumps.iter().map(|bump| bump.at(row, column)).sum::<f64>() as f32;
+        let flare = bumps
+            .iter()
+            .map(|bump| bump.at(place.first_row + row, column))
+            .sum::<f64>() as f32;
         screen(pixel, tint.map(|channel| channel * flare))
     })
 }

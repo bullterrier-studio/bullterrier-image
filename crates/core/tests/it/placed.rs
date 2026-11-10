@@ -37,6 +37,23 @@ fn cases() -> Vec<(&'static str, Value)> {
         ),
         ("gradient", json!({"kind": "radial", "x": 0.3, "y": 0.2, "radius": 0.6})),
         ("gradient", json!({"kind": "conic", "x": 0.7, "y": 0.4, "angle": 20.0})),
+        ("fractal", json!({"kind": "julia", "zoom": 2.0, "x": 0.1})),
+        (
+            "fractal",
+            json!({"kind": "mandelbrot", "zoom": 1.5, "x": -0.5, "iterations": 40}),
+        ),
+        (
+            "lens_flare",
+            json!({"x": 0.3, "y": 0.6, "ghosts": 4, "halo": 30.0, "ring": 18.0}),
+        ),
+        ("interlace", json!({"offset": 3.5, "field": "even"})),
+        ("interlace", json!({"offset": -2.0, "field": "odd"})),
+        ("ntsc", json!({"sigma": 2.0, "crawl": 0.5, "phase": 0.2})),
+        (
+            "aurora",
+            json!({"seed": 3, "base": 0.6, "height": 40.0, "waviness": 8.0}),
+        ),
+        ("torn_edge", json!({"width": 6.0, "roughness": 0.9, "seed": 4})),
     ]
 }
 

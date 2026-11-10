@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::cast::single;
 use crate::ops::length;
 use crate::ops::ramp;
@@ -15,12 +15,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Backgrounds,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `fractal` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// The escape radius. Any radius above 2 decides escape correctly; a large one makes the smooth count
@@ -104,8 +104,10 @@ fn escape_count(mut z: (f32, f32), c: (f32, f32), iterations: i32) -> Option<f64
 }
 
 /// The fractal, in the picture's size: the picture is used only for its height and width.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let (height, width) = (picture.height(), picture.width());
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the view is centred on the canvas, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
+    let (height, width, first_row) = (place.canvas_height, place.canvas_width, place.first_row);
     // plane units per pixel; the picture's centre is the point (x, y), rows run downwards and the imaginary axis up
     let step = VIEW_SPAN / f64::from(params.zoom) / length::float(height.min(width));
     let (centre_x, centre_y) = (f64::from(params.x), f64::from(params.y));
@@ -116,7 +118,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     picture.map_at(|row, column, _| {
         let point = (
             single(centre_x + (length::float(column) - half_width) * step),
-            single(centre_y - (length::float(row) - half_height) * step),
+            single(centre_y - (length::float(first_row + row) - half_height) * step),
         );
         let count = match params.kind {
             Kind::Julia => escape_count(point, constant, params.iterations),
