@@ -150,9 +150,10 @@ def render(
     core works, so renders from several Python threads run side by side.
 
     band: how many rows of the working picture are made at a time, a whole number of 1 or more (RecipeError for anything
-    else); None, the default, makes the whole picture at once. The result is the same bytes for any band, and a run of
-    steps that each read only a bounded neighbourhood of a pixel (a blur, a grade, a vignette) needs memory for a band,
-    not for several pictures. A step that may read any pixel runs on the whole picture. `trace` keeps every step's
+    else); None, the default, makes the whole picture at once. The result equals the whole render within float rounding
+    (1e-4; most effects byte for byte), and a run of steps that each read only a bounded neighbourhood of a pixel (a
+    blur, a grade, a vignette) needs memory for a band, not for several pictures. A step that may read any pixel runs on
+    the whole picture. `trace` keeps every step's
     picture and takes no band.
     """
     recipe = _one_recipe(recipe)

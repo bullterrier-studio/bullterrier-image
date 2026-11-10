@@ -71,7 +71,7 @@ impl Options {
     }
 
     /// These options with `rows`, how many rows of the working picture a render makes at a time: the same picture as the
-    /// whole-picture render (byte for byte, at any number of threads), made in bands so that the memory a run of steps
+    /// whole-picture render (equal within float rounding, 1e-4; most effects byte for byte; at any number of threads), made in bands so that the memory a run of steps
     /// needs beyond the picture it makes is about a band's, not several pictures'. Without it the render works on the
     /// whole picture.
     ///

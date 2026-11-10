@@ -594,6 +594,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     `swirl` (reach is a share of the canvas, not a design px value), `tile` (cells average the whole picture), `quadtree`,
     `dither` (palette and error diffusion), `disperse` (grid ordered over the figure), `shatter` (also B),
     `reaction_diffusion` (iteration), `reflection`, `rim_light` (distance from the figure).
+  - Fourier blurs: `relight` is `Whole` while its blur reaches 16 working px or more (`ops/blur::is_fourier`, the blur's
+    own switch), because `height` multiplies the window-dependent sum into a visible difference; `liquid_metal` and the
+    other blur users stay banded (probed, no difference above 1e-3).
   - F (no Place needed, a claim to make): `pixel_sort` (`axis` horizontal: row-local, `Radius(0)`; vertical sorts whole
     columns: E), `stretch` (horizontal: row-local; vertical reads `from[row]` over the canvas: E), `topographic`
     (`Radius(smoothing reach + 1)` on its field), `edges` (`canny` hysteresis: `Whole`), `ascii` (cells anchored at the canvas
@@ -618,7 +621,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   | whole | 3.00x | baseline |
 
   The extra ~58 MB over the output at 64 rows is per-band windows and blur planes; the split is unmeasured. A `Whole` step
-  gets no memory benefit; Fourier blurs cost more as bands shrink. *Reason:* whole stays the default because banded at 64
+  gets no memory benefit; Fourier blurs cost more as bands shrink. A banded render equals the whole one within float
+  rounding (1e-4; most effects byte for byte): the Fourier sum depends on the window's length. *Reason:* whole stays the default because banded at 64
   rows is +62% / +87% slower and only matches at 1024 rows.
 - **Settled: noise is scaled by its known deviation, not the picture's (banded render, B2).** A fractal field
   (`noise::field_rows`) is divided at each pixel by its own deviation, derived from the lattice (a value is uniform on -1..1,

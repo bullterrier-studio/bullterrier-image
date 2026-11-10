@@ -20,7 +20,7 @@ its `Unreleased` becomes the release date.
 
 ### Added
 
-- `Options::with_band(rows)` and Python `band=`: render in bands of rows, the same pixels as the whole render, and
+- `Options::with_band(rows)` and Python `band=`: render in bands of rows, the whole render's pixels (within float rounding, 1e-4), and
   memory no longer grows with the picture.
 
 ## [0.1.0] - 2026-10-23
