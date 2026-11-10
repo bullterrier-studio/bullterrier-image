@@ -79,10 +79,7 @@ color : colour, default '#8fb8ff'
 
 @_effect
 def ascii(*, cell: int = 10, chars: str = ' .:-=+*#%@', ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, gamma: float = 1.0, photo: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.
-
-Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's
-tones survive as denser and lighter characters.
+    """Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.  Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's tones survive as denser and lighter characters. The glyphs are drawn from one bundled monospaced font (`JetBrains Mono` Regular), never a system font, so a look is the same on every platform.
 
 Parameters
 ----------
@@ -103,8 +100,8 @@ ink : colour or none, default None
 ink_floor : number, fraction, 0.01 to 1, default 0.35
     With no `ink`: the most a character's colour is brightened, as a floor 0.01 to 1 on
     its strongest channel: a colour whose strongest channel is below it is scaled by 1 /
-    ink_floor instead of up to full, so dark areas stay dark. Lowering it brightens dark
-    colours more (and their noise); 1 = colours as they are.
+    `ink_floor` instead of up to full, so dark areas stay dark. Lowering it brightens
+    dark colours more (and their noise); 1 = colours as they are.
 paper : colour, default '#000000'
     The paper colour behind the characters. Dark paper (Rec. 709 luminance below
     `paper_threshold`) puts dense characters on bright areas; lighter paper puts them on
