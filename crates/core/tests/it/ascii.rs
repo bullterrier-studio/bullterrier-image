@@ -134,6 +134,17 @@ fn the_paper_threshold_decides_whether_mid_grey_paper_is_dark_or_light() -> Resu
         &flat(27, 16, 1.0),
     )?;
     assert!(red(&dark).iter().any(|value| *value > 0.9));
+    // "below" the threshold is strict: black paper (luminance 0) at a threshold of 0 is light, as the field's doc says of 0
+    let black = Params {
+        ink: Some(Color([1.0, 0.0, 0.0])),
+        paper_threshold: 0.0,
+        ..white_on_black(8)
+    };
+    let out = run_picture(&black, 27, 16, &flat(27, 16, 1.0))?;
+    assert!(
+        out.iter().all(|value| *value == 0.0),
+        "white needs no ink on light paper"
+    );
     Ok(())
 }
 
