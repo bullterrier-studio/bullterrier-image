@@ -205,6 +205,23 @@ fn a_flat_depth_answer_is_an_all_zero_map() -> Outcome {
 }
 
 #[test]
+fn an_answer_that_is_not_a_number_is_refused_not_taken_for_a_flat_one() -> Outcome {
+    for answer in [f32::NAN, f32::INFINITY] {
+        let stand = leaked(Stand::new(move |input| {
+            let (rows, columns) = (input.shape()[2], input.shape()[3]);
+            Tensor::new(vec![1, rows, columns], vec![answer; rows * columns])
+        }));
+        let values = grey(100, 150, 0.5);
+        let refused = ModelFinder::new(ModelKind::Depth, stand).find(&Picture::new(100, 150, &values)?);
+        assert!(
+            matches!(&refused, Err(Error::Inputs(message)) if message.contains("map")),
+            "{answer}: {refused:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn an_answer_of_the_wrong_size_is_refused_naming_the_sizes() -> Outcome {
     let stand = leaked(Stand::new(|_| Tensor::new(vec![1, 1, 8, 8], vec![1.0; 64])));
     let values = grey(40, 60, 0.5);

@@ -290,29 +290,29 @@ fn subject_map(
 }
 
 fn depth_map(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Result<Layer, Error> {
-    let (low, high) = answer
-        .iter()
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(low, high), &value| {
-            (low.min(value), high.max(value))
-        });
-    let span = high - low;
-    if !span.is_finite() || span <= 0.0 {
+    let (low, span) = spread(answer);
+    if span == 0.0 {
         return Layer::new(to.0, to.1, vec![0.0; to.0 * to.1]);
     }
     // an affine rescale commutes with the bilinear stretch (each output is a convex mix of its inputs), so the answer is
     // scaled to 0..1 first, which the stretch keeps within 0..1, and then to the stretched range, as the Python did
     let scaled: Vec<f32> = answer.iter().map(|&value| (value - low) / span).collect();
     let stretched = stretched(&scaled, from, to);
-    let (low, high) = stretched
-        .iter()
-        .fold((f32::INFINITY, f32::NEG_INFINITY), |(low, high), &value| {
-            (low.min(value), high.max(value))
-        });
-    let span = high - low;
-    let values = if span > 0.0 {
-        stretched.iter().map(|&value| (value - low) / span).collect()
-    } else {
+    let (low, span) = spread(&stretched);
+    let values = if span == 0.0 {
         vec![0.0; stretched.len()]
+    } else {
+        stretched.iter().map(|&value| (value - low) / span).collect()
     };
+    // a value that is not a number made the spread, and so every value, not a number: the map refuses it here, where
+    // every map is checked
     Layer::new(to.0, to.1, values)
+}
+
+/// The smallest of `values` and the distance to the largest. The order is the total one, in which a NaN is the largest
+/// (or the smallest) of all, so a NaN makes the spread a NaN instead of being skipped: scaling by it gives a NaN map.
+fn spread(values: &[f32]) -> (f32, f32) {
+    let low = values.iter().copied().min_by(f32::total_cmp).unwrap_or(0.0);
+    let high = values.iter().copied().max_by(f32::total_cmp).unwrap_or(0.0);
+    (low, high - low)
 }
