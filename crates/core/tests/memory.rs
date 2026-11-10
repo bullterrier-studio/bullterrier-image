@@ -205,6 +205,55 @@ fn a_trace_holds_a_picture_for_every_step_which_is_what_the_measurement_must_see
     Ok(())
 }
 
+/// A 24-megapixel photo: 4000 rows of 6000.
+const BIG_HEIGHT: usize = 4000;
+const BIG_WIDTH: usize = 6000;
+/// The bytes of the colour of the big photo, which is also the bytes of the image a render of it makes.
+const BIG_IMAGE: usize = BIG_HEIGHT * BIG_WIDTH * 3 * size_of::<f32>();
+
+/// The most bytes, beyond the photo's own, that a render of steps that each read a pixel or a few rows around it holds at
+/// once on the big photo with `options`. The recipe needs no maps.
+fn pixel_steps_peak(options: Options) -> Result<usize, Error> {
+    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
+    let values = vec![0.5_f32; BIG_HEIGHT * BIG_WIDTH * 3];
+    let recipe = Recipe::new([
+        Step::new("grade").param("exposure", 0.1),
+        Step::new("vignette"),
+        Step::new("gaussian_blur").param("radius", 2.0),
+        Step::new("grain"),
+    ]);
+    let photo = Photo::new(Picture::new(BIG_HEIGHT, BIG_WIDTH, &values)?);
+    let before = HEAP.current_usage();
+    HEAP.reset_peak_usage();
+    let result = photo.render(&recipe, &Presets::new(), options)?;
+    let peak = HEAP.peak_usage() - before;
+    drop(result);
+    Ok(peak)
+}
+
+#[test]
+fn a_banded_render_holds_the_image_it_makes_and_a_little_more() -> Result<(), Error> {
+    let peak = pixel_steps_peak(Options::default().with_band(64))?;
+    assert!(
+        peak <= BIG_IMAGE + BIG_IMAGE / 4,
+        "a banded render held {peak} bytes, {} % of the image it makes",
+        peak * 100 / BIG_IMAGE
+    );
+    Ok(())
+}
+
+#[test]
+fn a_whole_picture_render_of_the_same_steps_holds_more_which_is_what_the_measurement_must_see() -> Result<(), Error> {
+    // the known-bad of the test above: the same steps with no band
+    let peak = pixel_steps_peak(Options::default())?;
+    assert!(
+        peak > BIG_IMAGE + BIG_IMAGE / 4,
+        "a whole render held {peak} bytes, {} % of the image it makes",
+        peak * 100 / BIG_IMAGE
+    );
+    Ok(())
+}
+
 #[test]
 fn a_size_no_picture_can_have_is_refused_before_the_framed_photo_is_made() -> Result<(), Error> {
     // a flip makes a second picture of the photo's size, and a longest side of 100,000 asks for 100,000 x 66,667 pixels,
