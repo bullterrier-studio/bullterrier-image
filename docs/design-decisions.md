@@ -572,8 +572,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     mod 4, row-local smear); `aurora` (`base` x canvas height, row; noise is one row over the width); `torn_edge` (tears
     are 1-D noise over the canvas width and height); `blend` (the asset placed on the canvas size); `ripple`
     (`Radius(amplitude)`, sine about the canvas centre; `Whole` for wrap); `chromatic_aberration` (`Radius(amount)`, scale
-    about the canvas centre; `Whole` for wrap); `halftone` (`Radius` of its blur, screen lattice from the origin; unclear:
-    the screen code was not read in full).
+    about the canvas centre; `Whole` for wrap); `halftone` (screen lattice and cell centre from the canvas
+    top; `Radius(cell)` only while `sigma` is 0: the blur's reach is a multiple of the cell, which the runner rounds to
+    whole px, and no radius in design px bounds that at every size ratio, so a blurred screen stays `Whole` (F) until the
+    footprint can see the ratio). Done in B1b: every A row but `grain`/`vignette` (B1a) reads `Place`; `ripple` and
+    `chromatic_aberration` are `Radius(amplitude)` and `Radius(amount)`, the rest `Pixel`.
   - B (B2, counter-based draws): `dead_pixels` (a shuffle picks exactly `count` cells: a per-cell chance would change
     "exactly" to "on average"; unclear, leader's call); `slice_shift` (`Rng` strips and bands over the height; `Pixel`);
     `vhs` (`Rng` bands and dropouts, a row drift from 1-D noise; `Whole` while `noise` > 0 with `noise_size` > 1, D);
@@ -591,7 +594,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - F (no Place needed, a claim to make): `pixel_sort` (`axis` horizontal: row-local, `Radius(0)`; vertical sorts whole
     columns: E), `stretch` (horizontal: row-local; vertical reads `from[row]` over the canvas: E), `topographic`
     (`Radius(smoothing reach + 1)` on its field), `edges` (`canny` hysteresis: `Whole`), `ascii` (cells anchored at the canvas
-    top, `Radius(cell height)`; unclear: the cell height is the atlas's, not a design px value).
+    top; stays `Whole`: a pixel reads its whole cell, whose height is the atlas's function of the rounded working cell,
+    not a bound in design px). `swirl` and `pinch_bulge` stay `Whole` (E): they read up to twice a share of the canvas's
+    shorter side, which a radius in design px cannot say.
   - Open for the leader: the `standardised` noise fields (D) hold 9 effects `Whole`; an analytic normalisation (the
     lattice noise has a known deviation) would turn them to A or `Radius` at the price of a visible change; `grain`'s
     claim depends on the size in *working* px (design size x ratio), which `footprint(&Params)` cannot see, so it is `Pixel`
