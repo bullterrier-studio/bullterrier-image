@@ -106,7 +106,10 @@ fn a_width_of_one_recolours_the_outermost_ring_fully_and_nothing_deeper() -> Res
     for (at, (got, was)) in after.iter().zip(&before).enumerate() {
         let (row, column) = (at / SIZE, at % SIZE);
         if ring(row, column) {
-            assert!(!near(*got, PINK) && got[1] > 0.4, "ring pixel ({row}, {column}) unchanged: {got:?}");
+            assert!(
+                !near(*got, PINK) && got[1] > 0.4,
+                "ring pixel ({row}, {column}) unchanged: {got:?}"
+            );
         } else {
             assert_eq!(got, was, "pixel ({row}, {column})");
         }
@@ -125,7 +128,10 @@ fn the_band_is_width_rings_and_a_pixel_just_beyond_it_is_exactly_as_it_was() -> 
         if ring(row, column) {
             assert!(near(*got, GREEN), "depth 1, pixel ({row}, {column}): {got:?}");
         } else if *was == GREY {
-            assert!(near(*got, mix(GREY, GREEN, 0.5)), "depth 2, pixel ({row}, {column}): {got:?}");
+            assert!(
+                near(*got, mix(GREY, GREEN, 0.5)),
+                "depth 2, pixel ({row}, {column}): {got:?}"
+            );
         } else {
             assert_eq!(got, was, "pixel ({row}, {column})");
         }

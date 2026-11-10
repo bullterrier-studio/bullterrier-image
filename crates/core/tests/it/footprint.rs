@@ -395,3 +395,153 @@ fn an_effect_that_knows_the_place_of_a_pixel_cannot_say_pixel() -> Outcome {
     );
     Ok(())
 }
+
+/// Parameters read together by an effect's footprint, set to values that make each term matter at once: the sweep above
+/// moves one parameter at a time, so a claim that adds or multiplies two of them is never tried at both extremes. The
+/// reaches are between a few rows and about half the picture (a larger margin is clamped to the whole and proves
+/// little). `edge` stays at its default: a wrapping edge says `Whole`.
+fn combinations() -> Vec<(&'static str, Value)> {
+    let mut rows = vec![
+        ("light_wrap", json!({})),
+        ("light_wrap", json!({"width": 96, "blur": 1})), // a wide band, a short reach
+        ("light_wrap", json!({"width": 1, "blur": 100})), // a thin band, a long reach
+        ("light_wrap", json!({"width": 96, "blur": 8})),
+        ("outline", json!({"width": 30, "glow": 12})),
+        ("outline", json!({"width": 0, "glow": 30})),
+        ("outline", json!({"width": 30, "glow": 0})),
+        ("outline", json!({"width": 200, "glow": 200})), // clamped to the whole picture
+        ("defringe", json!({"width": 4, "amount": 1, "field_threshold": 0.1})),
+        ("defringe", json!({"width": 1, "amount": 1})),
+        ("echo", json!({"copies": 32, "dy": 1})),
+        ("echo", json!({"copies": 32, "dy": -1.5})),
+        ("echo", json!({"copies": 1, "dy": 40})),
+        ("parallax", json!({"amount": 48, "focus": 0})),
+        ("parallax", json!({"amount": 48, "focus": 1})),
+        ("parallax", json!({"amount": 20, "focus": 0.3})),
+        ("drop_shadow", json!({"copies": 5, "offset": 4, "blur": 2})),
+        (
+            "drop_shadow",
+            json!({"copies": 1, "offset": 0, "blur": 10, "truncate": 1}),
+        ),
+        ("drop_shadow", json!({"copies": 4, "offset": 12, "blur": 0})),
+        (
+            "drop_shadow",
+            json!({"copies": 3, "offset": 6, "blur": 4, "truncate": 10}),
+        ),
+        ("edges", json!({"method": "sobel", "radius": 2, "truncate": 10})),
+        ("edges", json!({"method": "dog", "radius": 2, "truncate": 10})),
+        ("edges", json!({"method": "dog", "radius": 12, "truncate": 1})),
+        ("focus_blur", json!({"radius": 2, "truncate": 10})),
+        ("focus_blur", json!({"radius": 12, "truncate": 1})),
+        ("relight", json!({"blur": 2, "truncate": 10})),
+        ("relight", json!({"blur": 12, "truncate": 1})),
+        ("liquid_metal", json!({"smoothing": 2, "truncate": 10})),
+        ("liquid_metal", json!({"smoothing": 12, "truncate": 1})),
+    ];
+    // the blurs that reach `radius x truncate`
+    for name in ["gaussian_blur", "bloom", "sharpen", "highpass", "ambient_occlusion"] {
+        rows.push((name, json!({"radius": 2, "truncate": 10})));
+        rows.push((name, json!({"radius": 12, "truncate": 1})));
+        rows.push((name, json!({"radius": 5, "truncate": 5})));
+    }
+    rows
+}
+
+/// `inner` with its footprint replaced by `says`: its pixels are the real effect's.
+struct Claim {
+    inner: std::sync::Arc<dyn Effect>,
+    says: Footprint,
+}
+
+impl Effect for Claim {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn category(&self) -> Category {
+        self.inner.category()
+    }
+
+    fn inputs(&self) -> &[Input] {
+        self.inner.inputs()
+    }
+
+    fn fields(&self) -> &[bullterrier_image::FieldParam] {
+        self.inner.fields()
+    }
+
+    fn params(&self) -> Option<Table> {
+        self.inner.params()
+    }
+
+    fn footprint(&self, _params: &Value) -> Result<Footprint, bullterrier_image::Error> {
+        Ok(self.says)
+    }
+
+    fn apply(
+        &self,
+        picture: &Picture<'_>,
+        params: Value,
+        inputs: &Inputs<'_>,
+    ) -> Result<Image, bullterrier_image::Error> {
+        self.inner.apply(picture, params, inputs)
+    }
+}
+
+/// `problems_of` for one setting over the same maps `problems` uses.
+fn problems_with(one: &dyn Effect, setting: &Setting) -> Result<Vec<String>, Box<dyn Error>> {
+    let picture = hashed(HEIGHT * WIDTH * 3, 3);
+    let rectangle = |rows: std::ops::Range<usize>| {
+        Layer::new(
+            HEIGHT,
+            WIDTH,
+            (0..HEIGHT * WIDTH)
+                .map(|at| {
+                    f32::from(u8::from(
+                        rows.contains(&(at / WIDTH)) && (4..20).contains(&(at % WIDTH)),
+                    ))
+                })
+                .collect(),
+        )
+    };
+    let maps = [
+        Layer::new(HEIGHT, WIDTH, hashed(HEIGHT * WIDTH, 5))?,
+        rectangle(36..60)?,
+        rectangle(4..HEIGHT - 4)?,
+    ];
+    let mut found = Vec::new();
+    for map in &maps {
+        found.extend(problems_of(one, setting, 1.0, &picture, map)?);
+    }
+    Ok(found)
+}
+
+#[test]
+fn an_effect_whose_footprint_reads_two_parameters_tells_the_truth_with_both_at_once() -> Outcome {
+    for (name, setting) in combinations() {
+        let Value::Object(setting) = setting else {
+            return Err("a row is an object".into());
+        };
+        let found = problems_with(&*effect(name)?, &setting)?;
+        assert!(found.is_empty(), "{name} {setting:?}: {found:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn every_combination_can_fail_a_claim_that_reads_nothing_around_a_pixel() -> Outcome {
+    for (name, setting) in combinations() {
+        let Value::Object(setting) = setting else {
+            return Err("a row is an object".into());
+        };
+        let liar = Claim {
+            inner: effect(name)?,
+            says: Footprint::Pixel,
+        };
+        assert!(
+            !problems_with(&liar, &setting)?.is_empty(),
+            "{name} {setting:?} passed a claim of Pixel: the row proves nothing"
+        );
+    }
+    Ok(())
+}
