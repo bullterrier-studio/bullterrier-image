@@ -69,6 +69,7 @@ impl Fractal {
         if squares == 0.0 {
             return 0.0;
         }
+        // constant: the variance of a lattice value, uniform in -1..1, is 1/3
         largest * largest * weights / ((squares / 3.0).sqrt() * least)
     }
 }

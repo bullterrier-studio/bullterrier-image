@@ -129,7 +129,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         );
         // each wave has mean 0 and variance 1/2 (a cosine), times 1/3 more for a linen thread's strength (a uniform 0..1 has
         // second moment 1/3); the two axes are independent, so the weave has variance 2 x that, and is divided by its root
-        let wave_variance: f64 = if params.kind == Kind::Linen { 1.0 / 6.0 } else { 0.5 }; // constant: see above
+        let wave_variance: f64 = if params.kind == Kind::Linen { 1.0 / 6.0 } else { 0.5 }; // constant: linen thread variance derived in the comment above
         let (weave_share, fibre_share) = (f64::from(1.0 - params.fibre).sqrt(), f64::from(params.fibre).sqrt());
         // weave and fibres are independent with variance 1 each, so their mix with shares whose squares sum to 1 has it too
         texture = (0..height * width)
