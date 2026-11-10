@@ -17,6 +17,8 @@ allow = [
     "Unicode-3.0",
     "ISC",  # delaunator (shatter's triangles)
     "Zlib",  # foldhash, which serde_json hashes its ordered map with (`preserve_order`)
+    "BSD-3-Clause",  # subtle, through rustls (feature onnx: model and runtime downloads)
+    "CDLA-Permissive-2.0",  # webpki-roots: Mozilla's CA list as data (feature onnx)
 ]
 confidence-threshold = 0.93
 
