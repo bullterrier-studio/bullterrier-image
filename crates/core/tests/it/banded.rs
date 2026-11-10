@@ -13,6 +13,7 @@
 
 use std::error::Error;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use bullterrier_image::frame::{Fit, Resample};
@@ -92,6 +93,11 @@ fn difference(whole: &Image, banded: &Image, within: f32) -> Option<String> {
     })
 }
 
+/// `rows` as a band: the type refuses a band of no rows, so a test of one has nowhere to go.
+fn rows_of(rows: usize) -> Result<NonZeroUsize, Box<dyn Error>> {
+    NonZeroUsize::new(rows).ok_or_else(|| "a band of 0 rows".into())
+}
+
 /// The first band size in `bands` at which `recipe` banded (with `options`) is not the whole render, with how.
 fn first_problem(
     values: &[f32],
@@ -102,7 +108,7 @@ fn first_problem(
 ) -> Result<Option<String>, Box<dyn Error>> {
     let whole = render(values, recipe, options)?;
     for &rows in bands {
-        let banded = render(values, recipe, options.with_band(rows))?;
+        let banded = render(values, recipe, options.with_band(rows_of(rows)?))?;
         if let Some(found) = difference(&whole, &banded, within) {
             return Ok(Some(format!("band {rows}: {found}")));
         }
@@ -437,16 +443,6 @@ fn a_relief_effect_with_a_steep_height_and_a_wide_blur_is_the_same_banded() -> O
 }
 
 #[test]
-fn a_band_of_no_rows_is_refused_naming_it() {
-    let values = varied(HEIGHT, WIDTH);
-    let result = render(&values, &Recipe::new([grade()]), Options::default().with_band(0));
-    assert!(
-        matches!(&result, Err(error) if error.to_string().contains("band")),
-        "{result:?}"
-    );
-}
-
-#[test]
 fn the_same_banded_picture_comes_at_any_number_of_threads() -> Outcome {
     let values = varied(HEIGHT, WIDTH);
     let recipe = Recipe::new([
@@ -456,9 +452,13 @@ fn the_same_banded_picture_comes_at_any_number_of_threads() -> Outcome {
         Step::new("grain"),
         blur(2.0),
     ]);
-    let one = render(&values, &recipe, Options::default().with_band(7))?;
+    let one = render(&values, &recipe, Options::default().with_band(rows_of(7)?))?;
     for threads in [2, 3, 10] {
-        let other = render(&values, &recipe, Options::default().with_band(7).with_threads(threads))?;
+        let other = render(
+            &values,
+            &recipe,
+            Options::default().with_band(rows_of(7)?).with_threads(threads),
+        )?;
         let found = difference(&one, &other, 0.0);
         assert!(found.is_none(), "threads {threads}: {found:?}");
     }
@@ -561,7 +561,7 @@ fn the_runner_trusts_a_footprint_and_a_place_is_the_band_on_its_canvas() -> Outc
     let liar = Double::registered(5, Some(Footprint::Pixel), false)?;
     let recipe = Recipe::new([Step::new(liar.name())]);
     let whole = render(&values, &recipe, Options::default())?;
-    let banded = render(&values, &recipe, Options::default().with_band(7))?;
+    let banded = render(&values, &recipe, Options::default().with_band(rows_of(7)?))?;
     assert!(difference(&whole, &banded, 0.0).is_some());
     Ok(())
 }

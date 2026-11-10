@@ -784,3 +784,13 @@ def test_a_banded_render_gives_the_picture_of_the_whole_render(photo):
 def test_a_band_that_is_no_number_of_rows_is_refused_naming_it(photo, band):
     with pytest.raises(RecipeError, match="band"):
         facade.render(photo, BANDED, band=band)
+
+
+@pytest.mark.parametrize(
+    "threads",
+    [-1, 257, 2.5, True, "2", 2**64],
+    ids=["negative", "past the most", "fraction", "bool", "text", "past the largest count"],
+)
+def test_a_threads_that_is_no_number_of_threads_is_refused_naming_it(photo, threads):
+    with pytest.raises(RecipeError, match="threads"):
+        facade.render(photo, BANDED, threads=threads)

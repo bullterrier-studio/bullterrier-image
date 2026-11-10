@@ -170,7 +170,9 @@ def test_an_effect_must_return_a_float32_array_a_float64_one_is_a_broken_effect(
 
 
 @pytest.mark.parametrize("size", [0, -1, 16385, 10**8, 1.5, True], ids=repr)
-def test_a_render_size_that_is_no_whole_number_from_1_to_16384_is_refused_before_anything_is_made(photo, size):
+def test_a_render_size_that_is_no_whole_number_of_pixels_the_core_accepts_is_refused_before_anything_is_made(
+    photo, size
+):
     with pytest.raises(RecipeError, match="size"):
         render(photo, Recipe([Step("grade")], name="s"), size=size)
 

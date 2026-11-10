@@ -11,6 +11,7 @@
 mod common;
 
 use std::fmt::Write as _;
+use std::num::NonZeroUsize;
 use std::sync::{Mutex, PoisonError};
 
 use bullterrier_image::frame::Flip;
@@ -231,9 +232,12 @@ fn pixel_steps_peak(options: Options) -> Result<usize, Error> {
     Ok(peak)
 }
 
+/// 64 rows.
+const BAND: NonZeroUsize = NonZeroUsize::MIN.saturating_add(63);
+
 #[test]
 fn a_banded_render_holds_the_image_it_makes_and_a_little_more() -> Result<(), Error> {
-    let peak = pixel_steps_peak(Options::default().with_band(64))?;
+    let peak = pixel_steps_peak(Options::default().with_band(BAND))?;
     assert!(
         peak <= BIG_IMAGE + BIG_IMAGE / 4,
         "a banded render held {peak} bytes, {} % of the image it makes",

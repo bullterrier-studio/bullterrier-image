@@ -97,7 +97,7 @@ def render(
     pictures: Mapping[str, np.ndarray] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
-    threads: int = 1,
+    threads: int | None = None,
     band: int | None = None,
 ) -> np.ndarray: ...
 def trace(
@@ -110,7 +110,7 @@ def trace(
     pictures: Mapping[str, np.ndarray] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
-    threads: int = 1,
+    threads: int | None = None,
 ) -> list[tuple[str, int | str | None, np.ndarray]]: ...
 def read(path: str | os.PathLike[str]) -> np.ndarray: ...
 def read_map(path: str | os.PathLike[str]) -> np.ndarray: ...

@@ -1,12 +1,13 @@
 //! `_core.render` and `_core.trace`: a recipe run on a numpy photo by the core's runner.
 
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use bullterrier_image::{Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage};
 use numpy::{AllowTypeChange, PyArray1, PyArray3, PyArrayLike2, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::types::{PyBool, PyDict, PyList, PyTuple};
 use serde_json::json;
 
 use super::lut::tables_of;
@@ -46,14 +47,13 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, pi
 /// `presets` holds the presets the steps name, by effect: the TOML text of the effect's presets file, one `[name]` table
 /// for each preset with its `description` and the effect's parameters (`{"grade": "[warm]\ndescription = ...\n"}`).
 ///
-/// `size` is the longest side in px of the picture the steps work on and the render returns (a whole number from 1 up; a
-/// negative one is an `OverflowError`): the photo and its maps are resampled to it, the aspect kept. Without it the
+/// `size` is the longest side in px of the picture the steps work on and the render returns (a whole number from 1 up): the photo and its maps are resampled to it, the aspect kept. Without it the
 /// recipe's own `size` applies, and without either the photo keeps its size. Every `px` value of the recipe is written
 /// for a longest side of 480 and multiplied by the working picture's longest side over 480, so the look is the same at
 /// any size.
 ///
 /// `threads` is how many threads the render may use for the rows of its work (laying a step over its input, framing and
-/// resizing, an effect that works pixel by pixel): 1 (the default) starts none, 0 is one for each core, and the picture
+/// resizing, an effect that works pixel by pixel): 1 (none: the default) starts none, 0 is one for each core, and the picture
 /// is the same bytes at any number. A number above 256 is a `CoreError` of kind `recipe`. The render itself stays on the
 /// calling thread, so a Python effect it runs keeps its context.
 ///
@@ -64,7 +64,7 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, pi
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=1, band=None))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=None, band=None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -78,15 +78,15 @@ pub(crate) fn render<'py>(
     luts: Option<&Bound<'py, PyDict>>,
     pictures: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
-    size: Option<u32>,
-    threads: usize,
-    band: Option<usize>,
+    size: Option<&Bound<'py, PyAny>>,
+    threads: Option<&Bound<'py, PyAny>>,
+    band: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders, luts, pictures)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = options_of(size, threads, band);
+    let options = options_of(size, threads, band)?;
     let image = py
         .detach(|| photo.render(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -145,7 +145,7 @@ pub(crate) fn known_maps(recipe: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
 /// with its alpha, `(height, width, 4)`. The last stage is exactly what `render` returns. Naming the stages is left to
 /// the caller.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=1))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -159,14 +159,14 @@ pub(crate) fn trace<'py>(
     luts: Option<&Bound<'py, PyDict>>,
     pictures: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
-    size: Option<u32>,
-    threads: usize,
+    size: Option<&Bound<'py, PyAny>>,
+    threads: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyList>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders, luts, pictures)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = options_of(size, threads, None);
+    let options = options_of(size, threads, None)?;
     let stages = py
         .detach(|| photo.trace(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -178,10 +178,46 @@ pub(crate) fn trace<'py>(
 }
 
 /// The options of a render: the longest side `size`, if asked for, `threads` (0: every core) and the `band` of rows.
-fn options_of(size: Option<u32>, threads: usize, band: Option<usize>) -> Options {
-    let options = Options::default().with_threads(threads);
-    let options = size.map_or(options, |size| options.with_size(size));
-    band.map_or(options, |rows| options.with_band(rows))
+///
+/// The one place a value that is no whole number in the type's range (a bool, a float, text, a negative number, one past
+/// the largest) becomes a `CoreError` of kind `recipe` naming the option and the value; the core refuses the rest (a size
+/// of 0, more threads than allowed, a picture over the pixel limit).
+fn options_of(
+    size: Option<&Bound<'_, PyAny>>,
+    threads: Option<&Bound<'_, PyAny>>,
+    band: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Options> {
+    let mut options = Options::default();
+    if let Some(threads) = threads {
+        options = options.with_threads(whole::<usize>("threads", threads)?);
+    }
+    if let Some(size) = size {
+        options = options.with_size(whole::<u32>("size", size)?);
+    }
+    if let Some(band) = band {
+        let rows = NonZeroUsize::new(whole::<usize>("band", band)?).ok_or_else(|| refused("band", band))?;
+        options = options.with_band(rows);
+    }
+    Ok(options)
+}
+
+/// `value` as the whole number the option `name` is: not a bool, and within the range of `T`.
+fn whole<T: TryFrom<u64>>(name: &str, value: &Bound<'_, PyAny>) -> PyResult<T> {
+    if value.is_instance_of::<PyBool>() {
+        return Err(refused(name, value));
+    }
+    let number = value.extract::<u64>().map_err(|_| refused(name, value))?;
+    T::try_from(number).map_err(|_| refused(name, value))
+}
+
+/// The `CoreError` of kind `recipe` for an option `name` given `value`, which is no whole number in range.
+fn refused(name: &str, value: &Bound<'_, PyAny>) -> PyErr {
+    let shown = value
+        .repr()
+        .map_or_else(|_| "an object".to_owned(), |text| text.to_string());
+    core_error(Error::Recipe(format!(
+        "`{name}` must be a whole number in range, got {shown}"
+    )))
 }
 
 /// `photo` with the maps handed in, the finders given and the lookup tables given.

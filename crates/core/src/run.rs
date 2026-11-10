@@ -176,13 +176,10 @@ impl<'a> Photo<'a> {
         presets: &Presets,
         options: Options,
     ) -> Result<Image, Error> {
-        if options.band() == Some(0) {
-            return Err(Error::Recipe("`band` must be >= 1, got 0".to_owned()));
-        }
         par::install(options.threads(), || {
             let mut run = self.start(registry, recipe, presets, options)?;
             match options.band() {
-                Some(rows) => run.advance_banded(rows)?,
+                Some(rows) => run.advance_banded(rows.get())?,
                 None => while run.advance()?.is_some() {},
             }
             run.finish()

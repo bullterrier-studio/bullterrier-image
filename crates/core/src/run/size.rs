@@ -1,6 +1,7 @@
 //! The picture a render works on: [`Options`] (the size), and the working picture, framed and sized, with the ratio of its
 //! pixels to design pixels.
 
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use super::frame::Geometry;
@@ -23,7 +24,7 @@ pub(super) fn ratio_of(picture: &Picture<'_>) -> f64 {
 pub struct Options {
     size: Option<u32>,
     threads: usize,
-    band: Option<usize>,
+    band: Option<NonZeroUsize>,
 }
 
 impl Default for Options {
@@ -101,18 +102,17 @@ impl Options {
     /// more as bands shrink.
     ///
     /// ```text
-    /// let image = photo.render(&look, &presets, Options::default().with_band(64))?;
+    /// let rows = NonZeroUsize::new(64).ok_or("a band has rows")?;
+    /// let image = photo.render(&look, &presets, Options::default().with_band(rows))?;
     /// ```
-    ///
-    /// A `rows` of 0 is refused by the render, naming it, before anything runs ([`Error::Recipe`](crate::Error::Recipe)).
     #[must_use]
-    pub const fn with_band(mut self, rows: usize) -> Self {
+    pub const fn with_band(mut self, rows: NonZeroUsize) -> Self {
         self.band = Some(rows);
         self
     }
 
     /// The rows a band is, if the render is banded.
-    pub(super) const fn band(self) -> Option<usize> {
+    pub(super) const fn band(self) -> Option<NonZeroUsize> {
         self.band
     }
 

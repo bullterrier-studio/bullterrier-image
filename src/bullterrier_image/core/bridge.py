@@ -25,7 +25,7 @@ from bullterrier_image.ops.image import as_image
 
 from . import native, registry
 from .finder import answered, check_map, find_map
-from .steps import MAX_SIZE, MAX_THREADS, Recipe, recipe_dict
+from .steps import Recipe, recipe_dict
 
 Stage = tuple[str, int | str | None, np.ndarray]  # (kind, step number or region name, picture or map); see `trace`
 
@@ -124,29 +124,6 @@ def _needs(recipe: Recipe) -> dict[str, Any]:
         return native.needs(recipe_dict(recipe, hold))
 
 
-def _check_size(size: object) -> None:
-    """RecipeError unless `size` is None or a whole number of pixels, 1 to `MAX_SIZE` (a bool is not a number here)."""
-    if size is not None and (isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= MAX_SIZE):
-        raise RecipeError(f"size must be a whole number of pixels, 1 to {MAX_SIZE}, or None, got {size!r}")
-
-
-_MAX_BAND = 2**64 - 1  # constant: Rust's usize::MAX on the 64-bit targets we build, the extension's row type
-
-
-def _check_band(band: object) -> None:
-    """RecipeError unless `band` is None or a whole number of rows, 1 to `_MAX_BAND` (a bool is not a number here)."""
-    if band is not None and (isinstance(band, bool) or not isinstance(band, int) or not 1 <= band <= _MAX_BAND):
-        raise RecipeError(f"band must be a whole number of rows, 1 to {_MAX_BAND}, or None, got {band!r}")
-
-
-def _check_threads(threads: object) -> None:
-    """RecipeError unless `threads` is a whole number from 0 to `MAX_THREADS` (a bool is not a number here)."""
-    if isinstance(threads, bool) or not isinstance(threads, int) or not 0 <= threads <= MAX_THREADS:
-        raise RecipeError(
-            f"threads must be a whole number of threads, 0 (every core) to {MAX_THREADS}, got {threads!r}"
-        )
-
-
 def _each(
     run: Any,
     rgb: np.ndarray,
@@ -161,9 +138,6 @@ def _each(
     the one handed in, else found once by its finder, and held to the rules of a map (`check_map`). Each recipe is given
     the maps it knows, and the subject finder only if it finds pieces."""
     rgb = as_image(rgb)
-    _check_size(size)
-    _check_threads(threads)
-    _check_band(band)
     maps, finders = dict(maps or {}), dict(finders or {})
     with registry.holding() as hold:
         documents = [recipe_dict(recipe, hold) for recipe in recipes]
