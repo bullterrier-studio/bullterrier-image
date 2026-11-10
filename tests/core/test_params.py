@@ -838,7 +838,7 @@ KIND_SCHEMA = {
     "colors": "array",
     "lut": "string",
     "field": "string",
-}  # the JSON-schema type of each plain kind
+}  # the JSON-schema type of each plain kind (a picture is a union with a string, a colour and none: see below)
 
 
 class Copy(EffectParams, core="grade"):
@@ -885,7 +885,7 @@ def test_each_kind_of_rust_field_is_the_matching_json_schema_type_and_choices_ke
             schema = properties[field["name"]]
             if field["kind"] == "choice":
                 assert schema["enum"] == field["choices"]
-            elif field["kind"] == "color":
+            elif field["kind"] in ("color", "picture"):
                 assert "anyOf" in schema
             elif field["kind"] == "colors":
                 assert schema["type"] == "array"

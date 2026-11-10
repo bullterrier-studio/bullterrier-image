@@ -4,6 +4,7 @@
 //! the source `Cs`; the result is `Co = Cb + alpha (B(Cb, Cs) - Cb)` (section 5.1 for an opaque base), clipped to 0..1.
 
 use super::par;
+use super::place::Rgba;
 use crate::{BlendMode, Image, Layer, Picture};
 
 /// `source` laid over `base` (both of one size) by `mode`, mixed in by `opacity` (0..1) times, where there is a `mask`,
@@ -45,7 +46,7 @@ pub(crate) fn lay(
 
 /// `source` (straight RGBA, one pixel for each of `base`'s, row after row) laid over `base` by `mode`, each pixel mixed in
 /// by its own alpha: a new image in 0..1. Alpha 0 leaves the base exactly; alpha 1 and mode normal leaves the source.
-pub(crate) fn lay_rgba(base: &Picture<'_>, source: &[[f32; 4]], mode: BlendMode) -> Image {
+pub(crate) fn lay_rgba(base: &Picture<'_>, source: &[Rgba], mode: BlendMode) -> Image {
     let width = base.width();
     let mut pixels = vec![[0.0; 3]; base.pixels().len()];
     par::rows(&mut pixels, width, |first_row, band| {

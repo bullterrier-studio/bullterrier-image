@@ -73,7 +73,9 @@ params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect 
 (`Inputs::lut`; none is the identity). A `lut` parameter (`LutName`) holds the name of a table the photo was given
 (`Photo::with_lut(name, Arc<Lut>)`), else the path of a `.cube` file read once per render, else an error naming it; the runner
 finds the table before step 1 and offers it, so the table never travels in the recipe (`crate::Lut`, `lut.rs`, `lut/cube.rs`:
-the `.cube` reader and trilinear lookup are the core's). Rust effects never refer to each other.
+the `.cube` reader and trilinear lookup are the core's). A `picture` parameter (`PictureName`, nullable, none = no picture) is the same route:
+`Photo::with_picture(name, Arc<Image>)` (straight-alpha RGB/RGBA), else the path of an image file read once per render by `files::read`; the effect
+finds it as `Inputs::picture(parameter)`; Python's `Picture` travels as `$picture:<digest>` and `pictures=` (`run/assets.rs`). Rust effects never refer to each other.
 The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
 (`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
 look, `Table::check` those of an effect's parameters (`_core.check`, `_core.check_recipe`, `_core.read_recipe`). The Python
@@ -116,7 +118,7 @@ Python is a facade over the core and runs no recipe itself. It reaches the core 
 found once, by `core/finder.py`'s `find_map`, are its checks; a finder's not-found error is told to the core). `recipe.py`
 binds the default finders and names a trace's stages (drawing the numbered pieces is `ops/pieces`). The registry
 mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture`
-parameter travels as `{"$object": n}` and a `Lut` as the name `$lut:<digest>` of a table the render is given (`registry.holding`);
+parameter travels as the name `$picture:<digest>` and a `Lut` as `$lut:<digest>` of what the render is given (`registry.holding`);
 the Python `Lut` wraps the core's table (`_core.Lut`). `_core.effects()` lists those mirrors too;
 `effects(declared=True)` only the effects whose parameters the core declares.
 **Threads:** `Options::with_threads(n)` (default 1: none started; 0: every core; at most 256, else refused) makes `render` and
@@ -239,8 +241,9 @@ optional, the default lowercase `#rrggbb`; Python sees a `tuple[Color, ...]`), `
 a step gives one, and the `///` doc says what none means; written `nullable`; Python sees `Color | None`), `FieldName`
 (`#[param(default = "depth")]`: the name of the selection the effect works from, which it finds as a `Layer` in `Inputs`
 under the parameter's name, and `Native` lists as one of its `fields()`; Python sees a `FieldName`), `LutName` (`#[param()]`, no
-default: none is the identity table; the table reaches the effect in `Inputs`, see "Rust core"; Python sees a `Lut`) and a
-choice; an effect with any other (`Picture`, text, other optional values) keeps a Python model, each field `param(default, doc=...)`, until its
+default: none is the identity table; the table reaches the effect in `Inputs`, see "Rust core"; Python sees a `Lut`), `PictureName`
+(`#[param()]`, nullable, no default: none is no picture; Python sees `Picture | None`) and a
+choice; an effect with any other (text, other optional values) keeps a Python model, each field `param(default, doc=...)`, until its
 port extends the macro.
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
 

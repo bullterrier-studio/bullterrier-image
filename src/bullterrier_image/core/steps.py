@@ -19,7 +19,7 @@ Promises:
   returns a copy with some set; a step's optional `name` addresses its numbers.
 
 Dependency direction: imports the effect registry, `native` (the core's rules, which a recipe is held to when it is
-made), `framing`, `params`, `regions`, `ops.composite` (the blend modes' names) and `errors` only. The recipe-file
+made), `framing`, `params`, `regions`, `errors` only. The recipe-file
 reader `loader` (TOML to `Recipe`, in the adapters layer) and `bridge` (running a `Recipe` on a photo in the Rust core)
 both build on this module and do not know each other.
 """
@@ -36,7 +36,6 @@ from pydantic import Field, field_validator, model_validator
 from pydantic.fields import FieldInfo
 
 from bullterrier_image.errors import RecipeError
-from bullterrier_image.ops.composite import BlendMode
 
 from . import native, registry
 from .framing import Framing
@@ -48,11 +47,12 @@ from .params import (
     bounds,
     cyclic_of,
     drivable_fields,
+    picture_fields,
     unit_of,
     whole_number_fields,
 )
 from .regions import Kind, check, needs
-from .values import Lut, Picture
+from .values import BlendMode, Lut, Picture
 
 MAX_THREADS = 256  # constant: the most threads a render may ask for; the core refuses more (`par::MOST_THREADS`)
 MAX_SIZE = 16384  # constant: longest side, px; the core also caps the pixels of a picture
@@ -432,7 +432,12 @@ def _entry(step: "Step | Each | None", hold: Hold) -> dict[str, Any] | None:
     else:
         entry = {"effect": step.effect}
         if step.params:
-            entry["params"] = {name: _value(value, hold) for name, value in step.params.items()}
+            pictures = picture_fields(registry.parameters(step.effect))
+            entry["params"] = {
+                # a colour written for a picture is a flat one, in Python only: the core takes names and paths
+                name: _value(Picture.of_color(value) if name in pictures and _is_colour(value) else value, hold)
+                for name, value in step.params.items()
+            }
         if step.partition is not None:
             entry["partition"] = step.partition
     entry |= {"opacity": step.opacity, "blend_mode": step.blend_mode}
@@ -447,6 +452,11 @@ def _region(region: Kind) -> dict[str, Any]:
     `linear_gradient`)."""
     kind = re.sub(r"(?<!^)(?=[A-Z])", "_", type(region).__name__).lower()
     return {"kind": kind, **region.model_dump()}
+
+
+def _is_colour(value: object) -> bool:
+    """Whether `value` is a colour written as text (`'#rrggbb'`, `'#rgb'`)."""
+    return isinstance(value, str) and value.startswith("#")
 
 
 def _value(value: object, hold: Hold) -> object:

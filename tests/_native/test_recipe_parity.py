@@ -19,9 +19,8 @@ from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.presets import SHIPPED as SHIPPED_PRESETS
 from bullterrier_image.core.registry import CATEGORIES, INPUTS, STEP_KEYS
 from bullterrier_image.core.steps import Each, Recipe, Step
-from bullterrier_image.core.values import Lut
+from bullterrier_image.core.values import BlendMode, Lut
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.ops.composite import BlendMode
 
 ROOT = Path(__file__).parents[2]
 

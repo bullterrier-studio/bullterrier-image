@@ -69,7 +69,9 @@ create_exception!(
 /// `size_ratio` (working pixels per design pixel, a finite number above 0), `partition` (an int32 `(height, width)`
 /// array of piece numbers from 0; the pieces are as many as the largest number plus one) and `fields` (a dict from a
 /// field parameter's name to a float32 `(height, width)` array of finite values within 0..1) and `luts` (a dict from a
-/// lookup table parameter's name to its `Lut`; a lookup table parameter not given one is the identity table).
+/// lookup table parameter's name to its `Lut`; a lookup table parameter not given one is the identity table) and `pictures` (a
+/// dict from a picture parameter's name to a float32 `(height, width, 4)` array of straight-alpha RGBA values within 0..1; a
+/// picture parameter not given one is no picture).
 ///
 /// `CoreError` if the effect, its parameters, the array or an input are not what the core expects, or the effect
 /// declares an input that is not on offer: a programming error, since the package validates a user's values before
@@ -81,7 +83,7 @@ create_exception!(
 /// copied (a 1080p float32 frame is about 25 MB, as much work as a whole light effect); `numpy` works the same way on
 /// arrays it is given. A thread that renders must own its frame, or share it read-only.
 #[pyfunction]
-#[pyo3(signature = (effect, rgb, params, *, size_ratio=1.0, partition=None, fields=None, luts=None))]
+#[pyo3(signature = (effect, rgb, params, *, size_ratio=1.0, partition=None, fields=None, luts=None, pictures=None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -95,6 +97,7 @@ fn apply<'py>(
     partition: Option<&Bound<'py, PyAny>>,
     fields: Option<&Bound<'py, PyDict>>,
     luts: Option<&Bound<'py, PyDict>>,
+    pictures: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
@@ -107,6 +110,7 @@ fn apply<'py>(
     let labels = partition.map(labels_of).transpose()?;
     let layers = fields.map(layers_of).transpose()?.unwrap_or_default();
     let tables = lut::tables_of(luts)?;
+    let images = pictures_of(pictures)?;
     let mut inputs = Inputs::default().with_size_ratio(size_ratio);
     if let Some(labels) = &labels {
         inputs = inputs.with_partition(labels);
@@ -116,6 +120,9 @@ fn apply<'py>(
     }
     for (parameter, table) in &tables {
         inputs = inputs.with_lut(parameter.as_str(), table);
+    }
+    for (parameter, image) in &images {
+        inputs = inputs.with_picture(parameter.as_str(), image);
     }
     let image = py
         .detach(|| bullterrier_image::apply(effect, &picture, params, &inputs))
@@ -503,6 +510,31 @@ fn labels_of(partition: &Bound<'_, PyAny>) -> PyResult<Labels> {
         .map_or(0, |largest| usize::try_from(largest).map_or(0, |largest| largest + 1))
         .min(labels.len());
     Labels::new(height, width, labels, pieces).map_err(core_error)
+}
+
+/// The picture of every `(name, array)` in `pictures`: float32 `(height, width, 4)` arrays of straight-alpha RGBA.
+fn pictures_of(pictures: Option<&Bound<'_, PyDict>>) -> PyResult<Vec<(String, Image)>> {
+    pictures
+        .into_iter()
+        .flatten()
+        .map(|(name, array)| {
+            let name = name.extract::<String>()?;
+            let wrong = || {
+                PyValueError::new_err(format!(
+                    "the picture {name:?} must be a float32 array of shape (h, w, 4), got {}",
+                    found(&array)
+                ))
+            };
+            let typed = array.cast::<PyArray3<f32>>().map_err(|_| wrong())?;
+            let &[height, width, 4] = typed.shape() else {
+                return Err(wrong());
+            };
+            let values: Vec<f32> = typed.readonly().as_array().iter().copied().collect();
+            let image = Image::rgba(height, width, &values)
+                .map_err(|error| core_error(Error::Inputs(format!("the picture {name:?}: {error}"))))?;
+            Ok((name, image))
+        })
+        .collect()
 }
 
 /// The map of every `(parameter, array)` in `fields`: float32 `(height, width)` arrays.

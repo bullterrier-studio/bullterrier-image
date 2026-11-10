@@ -7,9 +7,10 @@ effect = "grade"
 saturation = 0                    # only brightness is left to light up
 
 [[step]]
-effect = "blend"
-image = "#30e0ff"                 # the colour of the light
-mode = "multiply"
+effect = "gradient"
+preset = "fill"
+colors = ["#30e0ff"]              # the colour of the light
+blend_mode = "multiply"
 opacity = 0.85
 
 [[step]]

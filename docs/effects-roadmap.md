@@ -174,7 +174,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
-| `hologram` ✓ (a look, [hologram.toml](../src/bullterrier_image/looks/hologram.toml)) | Cyan light, edge glow, scanlines, flicker. | `grade`, `blend` (multiply), `edges` (screen), `scanlines` twice (`softness` 1) |
+| `hologram` ✓ (a look, [hologram.toml](../src/bullterrier_image/looks/hologram.toml)) | Cyan light, edge glow, scanlines, flicker. | `grade`, `gradient` fill (multiply), `edges` (screen), `scanlines` twice (`softness` 1) |
 
 ## Atmosphere
 

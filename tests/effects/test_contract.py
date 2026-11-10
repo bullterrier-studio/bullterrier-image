@@ -16,12 +16,20 @@ from bullterrier_image import fx
 from bullterrier_image import recipe as facade
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the effects the Rust core implements
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import UNITS, Drive, EffectParams, drivable_fields, field_name_fields, param
+from bullterrier_image.core.params import (
+    UNITS,
+    Drive,
+    EffectParams,
+    drivable_fields,
+    field_name_fields,
+    param,
+    picture_fields,
+)
 from bullterrier_image.core.params import signature as signature_of
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step, drives
-from bullterrier_image.core.values import FieldName
+from bullterrier_image.core.values import FieldName, Picture
 from bullterrier_image.errors import MapNotFoundError, RecipeError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import Band, Curve, Edge, Finder, Framing, Given, Grid, Line
@@ -59,7 +67,7 @@ def test_every_shipped_preset_is_valid_for_its_effect_and_makes_a_picture_that_d
     name, preset, photo
 ):
     step = Step(name, preset=preset)  # validated by the effect's own model, like a recipe's step
-    inputs = _inputs(name, photo)
+    inputs = {**_pictures(name), **_inputs(name, photo)}
     out = registry.apply(name, photo, **{**step.params, **inputs})  # a preset names a field; the array replaces it
     assert_a_picture_like(out, photo)
     assert not np.array_equal(out, registry.apply(name, photo, **inputs))
@@ -303,6 +311,12 @@ def _inputs(name: str, photo: np.ndarray) -> dict[str, np.ndarray]:
     }
     fields = dict.fromkeys(field_name_fields(registry.parameters(name)), made["depth"])
     return {**fields, **{key: value for key, value in made.items() if key in registry.inputs(name)}}
+
+
+def _pictures(name: str) -> dict[str, Picture]:
+    """A small picture with some transparency for each picture parameter of the effect (none are set by default)."""
+    asset = Picture(np.random.default_rng(0).random((6, 8, 4), dtype=np.float32))
+    return dict.fromkeys(picture_fields(registry.parameters(name)), asset)
 
 
 def _bounds() -> list[tuple[str, str, str]]:

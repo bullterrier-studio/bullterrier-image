@@ -15,9 +15,9 @@
         colour = np.asarray(params.colour, np.float32)
         return (rgb * (1 - params.amount) + colour * params.amount).astype(np.float32)
 
-A parameter that is a second picture (a texture, a logo) is declared `image: Picture = param("#808080", doc="...")`:
-it holds a `Picture` (read-only RGBA float32 `pixels`, straight alpha, at its own size) and its default is a colour,
-which gives a flat 1x1 picture. A recipe file writes a path, `fx` takes a path, an array, a `Picture` or a colour.
+A parameter that is a second picture (a texture, a logo) is declared `image: Picture | None = param(None, doc="...")`:
+it holds a `Picture` (read-only RGBA float32 `pixels`, straight alpha, at its own size) or none. A recipe file writes a
+path, `fx` takes a path, an array, a `Picture` or a colour.
 A parameter that is a 3D colour lookup table is declared `file: Lut = param(Lut.identity(), doc="...")`: it holds a
 `Lut` (`table` float32 `(n, n, n, 3)` indexed `[red, green, blue]`, with `domain_min`, `domain_max`). A recipe file
 writes a path to a `.cube` file, `fx` takes a path, an `(n, n, n, 3)` array or a `Lut`.

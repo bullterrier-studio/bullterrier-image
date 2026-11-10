@@ -52,9 +52,9 @@ from bullterrier_image.ops.maps import map_problem
 from . import looks as look_files
 from . import native
 from . import presets as preset_files
-from .params import EffectParams, core_effect, field_name_fields, lut_fields, scaled, signature
+from .params import EffectParams, core_effect, field_name_fields, lut_fields, picture_fields, scaled, signature
 from .presets import Preset
-from .values import Lut, core_table
+from .values import Lut, Picture, core_table
 
 # The categories of the effect catalogue in catalogue order, each with the line that says what belongs in it (the
 # catalogue's index shows it). Every effect is in exactly one category. A dict, so no category lacks its description.
@@ -428,13 +428,15 @@ def _core_runner(name: str, fields: tuple[str, ...]) -> Callable[..., np.ndarray
     ) -> np.ndarray:
         values = params.model_dump()
         luts = {field: core_table(values[field]) for field in lut_fields(type(params))}
+        pictures = {field: values[field].pixels for field in picture_fields(type(params)) if values[field] is not None}
         return _core.apply(
             name,
             rgb,
-            values | dict.fromkeys(luts),
+            values | dict.fromkeys(luts) | dict.fromkeys(picture_fields(type(params))),
             size_ratio=size_ratio,
             partition=partition,
             luts=luts,
+            pictures=pictures,
             fields=arrays,
         )
 
@@ -553,8 +555,8 @@ def _mirror(effect: "ModelledEffect") -> None:
     native.register(name, effect.category, effect.opacity, run, inputs=declared, fields=effect.fields_named({}))
 
 
-# The only form a Picture can take in the dict a recipe is run from: a reference to an object the call holds. A Lut is
-# written as the name the core finds its table under (`Held.luts`).
+# The only form any other object can take in the dict a recipe is run from: a reference to an object the call holds. A
+# Lut and a Picture are written as the name the core finds them under (`Held.luts`, `Held.pictures_held`).
 _REFERENCE = "$object"
 
 
@@ -562,15 +564,17 @@ class Held:
     """What a call that runs a recipe in the core keeps (`holding`): the parameters that cannot be written as data.
 
     `hold(obj)` keeps `obj` until the block ends and returns what to put in the recipe's dict in its place: for a
-    `Picture` a reference, for a `Lut` its name, `$lut:` and its digest (one table is held once, however many steps
-    use it).
-    `tables()` gives the core's table of each held `Lut` by name, to hand to the render. A Python effect the core runs
-    receives the objects back where the references and names were.
+    `Picture` its name, `$picture:` and its digest, for a `Lut` its name, `$lut:` and its digest (one is held once,
+    however many steps use it), for anything else a reference.
+    `tables()` gives the core's table of each held `Lut` by name, and `pictures()` the RGBA pixels of each held
+    `Picture`, to hand to the render. A Python effect the core runs receives the objects back where the references and
+    names were.
     """
 
     def __init__(self) -> None:
         self.objects: list[object] = []
         self.luts: dict[str, Lut] = {}
+        self.pictures_held: dict[str, Picture] = {}
 
     def __call__(self, obj: object) -> object:
         """What the recipe's dict has in place of `obj`, which is kept."""
@@ -578,12 +582,20 @@ class Held:
             name = f"$lut:{obj.digest}"
             self.luts[name] = obj
             return name
+        if isinstance(obj, Picture):
+            name = f"$picture:{obj.digest}"
+            self.pictures_held[name] = obj
+            return name
         self.objects.append(obj)
         return {_REFERENCE: len(self.objects) - 1}
 
     def tables(self) -> dict[str, _core.Lut]:
         """The core's table of each held `Lut`, by the name the recipe writes."""
         return {name: core_table(lut) for name, lut in self.luts.items()}
+
+    def pictures(self) -> dict[str, np.ndarray]:
+        """The pixels (float32 RGBA) of each held `Picture`, by the name the recipe writes."""
+        return {name: picture.pixels for name, picture in self.pictures_held.items()}
 
 
 _HELD: ContextVar[Held | None] = ContextVar("held", default=None)
@@ -607,7 +619,7 @@ def _resolved(value: Any) -> Any:
     if held is None:
         return value
     if isinstance(value, str):
-        return held.luts.get(value, value)
+        return held.luts.get(value) or held.pictures_held.get(value) or value
     if isinstance(value, dict):
         if value.keys() == {_REFERENCE}:
             return held.objects[value[_REFERENCE]]

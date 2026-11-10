@@ -41,6 +41,15 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   assets are held as loaded), so a real budget for assets is a decision still to make; another kind of asset file gets its own value type and reader in the adapters layer together with its first effect:
   the `.cube` lookup table is `Lut` (`core/values.py`, wrapping the core's table), read by the core (`imageio.load_lut`; `LutError` names file and line) and held by `lut`'s `file`.
   `lut` interpolates trilinearly with no parameter for it: nearest-entry lookup only bands, so no look needs the choice.
+- **A picture parameter (`PictureName`, kind `picture`) names a picture and is none by default.** Like `lut`, the
+  parameter holds the name of a picture the photo was given (`Photo::with_picture`, an RGB or RGBA `Image` with straight
+  alpha; Python's `Picture` travels as `$picture:<digest>`), else the path of an image file read once per render by
+  `files::read` (its pixel limit applies); the effect finds it in `Inputs::picture`. The colour literal (`blend`'s old
+  default `'#808080'`) is gone: no picture leaves the photo unchanged, and a flat colour is `gradient(preset="fill")` with a
+  step `blend_mode`. *Reason:* a Rust user reaches the feature with no file, and one kind has one meaning in every
+  binding. *Consequence:* the parameter format's `picture` (v2) says "a colour for a flat one" with a colour default; image
+  declares it nullable with a null default and takes no colour (its Python `Picture.of_color` helper remains). `blend` sizes
+  and places only the pixels that show (`ops/place`), so a picture sized far past the photo allocates nothing extra.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
   `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
   point and a third-party package declares its own, written against the public `bullterrier_image.plugin`. *Reason:* importing

@@ -65,6 +65,7 @@ def apply(
     partition: np.ndarray | None = None,
     fields: dict[str, np.ndarray] | None = None,
     luts: Mapping[str, Lut] | None = None,
+    pictures: Mapping[str, np.ndarray] | None = None,
 ) -> np.ndarray: ...
 def check(effect: str, params: dict[str, Any]) -> dict[str, Any]: ...
 def check_recipe(recipe: dict[str, Any], *, presets: Mapping[str, str] | None = None) -> None: ...
@@ -93,6 +94,7 @@ def render(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, _Finder] | None = None,
     luts: Mapping[str, Lut] | None = None,
+    pictures: Mapping[str, np.ndarray] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
     threads: int = 1,
@@ -104,6 +106,7 @@ def trace(
     maps: Mapping[str, np.ndarray] | None = None,
     finders: Mapping[str, _Finder] | None = None,
     luts: Mapping[str, Lut] | None = None,
+    pictures: Mapping[str, np.ndarray] | None = None,
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
     threads: int = 1,

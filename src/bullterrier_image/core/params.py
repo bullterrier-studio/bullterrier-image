@@ -21,8 +21,8 @@ Promises:
 - `EffectParams.signature`, `fields_doc` and `documentation` describe a model for `fx`, `help()`, the catalogue and the
   command line, in a caller's types (a `Color` is shown as the forms one may write).
 - A `Picture` field (a second picture an effect uses: a texture, a logo; named `image` when an effect has one) holds a
-  `Picture`, read-only RGBA pixels with a content digest; it is given a `Picture` or a colour (a flat picture), and
-  must have a default such as `"#808080"`.
+  `Picture`, read-only RGBA pixels with a content digest, or none (`Picture | None`, default none: the step leaves the
+  photo as it is); it is given a `Picture` or a colour (a flat picture).
   Recipe files and `fx` turn a path or an array into a `Picture` before validation (see `loader`).
 - A `FieldName` field (a selection an effect works from: `depth`, `light`, a band of the recipe) holds the name of a
   selection, as a step's `mask` and a `Drive`'s `by` do; the recipe checks the name, the runner builds the field and the
@@ -421,6 +421,7 @@ _PLAIN_KINDS: dict[str, Any] = {
     "color": Color,
     "colors": tuple[Color, ...],
     "lut": Lut,
+    "picture": Picture,
     "field": FieldName,
 }  # the kinds of `Kind` in crates/core/src/params.rs -> their annotation; a "choice" is a `Literal` of its names
 
@@ -546,10 +547,10 @@ def whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
 
 
 def picture_fields(model: type[EffectParams]) -> frozenset[str]:
-    """The fields of `model` that hold a `Picture`: a recipe file writes a path for one, `fx` takes a path or an
-    array."""
+    """The fields of `model` that hold a `Picture` (or none): a recipe file writes a path for one, `fx` takes a path or
+    an array."""
     hints = typing.get_type_hints(model)
-    return frozenset(name for name in model.model_fields if hints[name] is Picture)
+    return frozenset(name for name in model.model_fields if Picture in _scalar(hints[name]))
 
 
 def field_name_fields(model: type[EffectParams]) -> tuple[str, ...]:
@@ -678,8 +679,9 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
             typed = Annotated[annotation, BeforeValidator(_into_turn(constraints["ge"]))]
     elif get_origin(annotation) is tuple:
         typed = Annotated[annotation, BeforeValidator(_as_tuple)]
-    elif annotation is Picture:
-        typed = ValidatedPicture
+    elif Picture in _scalar(annotation):
+        typed = ValidatedPicture | None if type(None) in _members(annotation) else ValidatedPicture
+        constraints = {}  # the validator is the whole check; `strict` has no schema to apply to in a union
     elif annotation is Lut:
         typed = ValidatedLut
     made = Field(

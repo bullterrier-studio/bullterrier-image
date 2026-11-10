@@ -15,7 +15,7 @@ import math
 import os
 import re
 from collections.abc import Sequence
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Literal, Self
 
 import numpy as np
 from PIL import ImageColor
@@ -69,6 +69,12 @@ Color = Annotated[
 ]
 """A colour parameter: written '#rrggbb', '#rgb' or as three numbers 0..1; held as three floats 0..1 (red, green,
 blue): `np.asarray(color, np.float32)` is the colour as an array."""
+
+
+BlendMode = Literal["normal", "multiply", "screen", "overlay", "soft_light", "difference", "color"]
+"""How a step's result combines with the picture below it, and the `blend` effect's picture with the photo: the W3C
+Compositing and Blending Level 1 modes the core implements. The core's `BlendMode::ALL` is the one list; this mirrors
+its names for the models, and `tests/_native/test_recipe_parity.py` holds the two together."""
 
 
 FieldName = Annotated[str, StringConstraints(min_length=1)]

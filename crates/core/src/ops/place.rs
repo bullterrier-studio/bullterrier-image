@@ -8,6 +8,9 @@ use super::resample::{Filter, Resize};
 use crate::Image;
 use crate::params::Choice;
 
+/// A pixel of a picture with transparency: red, green, blue and alpha, the colour straight (not multiplied by alpha).
+pub(crate) type Rgba = [f32; 4]; // constant: red, green, blue and alpha, four channels
+
 /// How a picture is fitted to the photo.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Choice)]
 pub enum Fit {
@@ -118,7 +121,7 @@ pub(crate) struct Placement {
     clippy::cast_possible_wrap,
     reason = "positions are rounded lengths of pictures far below 2^53; a size is at least 1"
 )]
-pub(crate) fn place(asset: &Image, (height, width): (usize, usize), placement: &Placement) -> Vec<[f32; 4]> {
+pub(crate) fn place(asset: &Image, (height, width): (usize, usize), placement: &Placement) -> Vec<Rgba> {
     let Placement {
         fit,
         at,
@@ -163,14 +166,14 @@ pub(crate) fn place(asset: &Image, (height, width): (usize, usize), placement: &
     let (shown_rows, shown_columns) = (shown(height, top, size_h), shown(width, left, size_w));
     let rows: Vec<usize> = shown_rows.iter().flatten().copied().collect();
     let columns: Vec<usize> = shown_columns.iter().flatten().copied().collect();
-    let mut placed = vec![[0.0; 4]; height * width];
+    let mut placed = vec![Rgba::default(); height * width];
     if rows.is_empty() || columns.is_empty() {
         return placed;
     }
 
     // colours weighted by alpha, sized, and weighted back
     let alphas = asset.alpha();
-    let weighted: Vec<[f32; 4]> = asset
+    let weighted: Vec<Rgba> = asset
         .as_picture()
         .pixels()
         .iter()
