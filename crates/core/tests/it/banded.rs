@@ -21,13 +21,13 @@ use bullterrier_image::{
     Category, Each, Effect, Entry, Footprint, Frame, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets,
     Recipe, Step, effect, effects,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::common::Outcome;
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::{asset, varied};
 use crate::common::run::{Registered, unique};
-use crate::common::sweep::{Setting, scaled, variants};
+use crate::common::sweep::{Setting, variants};
 
 /// A tall, narrow picture of odd sides: 64 rows is less than half of it, and a one-row band is a hundred and thirty bands.
 const HEIGHT: usize = 131;
@@ -145,7 +145,6 @@ fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_b
         let partitioned = one.inputs().contains(&Input::Partition);
         let mut is_banded = false;
         for setting in table.as_ref().map_or_else(|| vec![Setting::new()], variants) {
-            let ratio = f64::from(u16::try_from(HEIGHT)?) / 480.0;
             let completed = match &table {
                 Some(table) => match table.check(&name, &setting) {
                     Ok(completed) => completed,
@@ -153,8 +152,8 @@ fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_b
                 },
                 None => setting.clone(),
             };
-            let footprint = one.footprint(&Value::Object(scaled(&*one, &completed, ratio)))?;
-            if footprint.margin().is_none() {
+            // whether an effect is Whole does not depend on the picture's scale
+            if one.footprint(&Value::Object(completed))?.margin().is_none() {
                 continue; // Whole: the same code as the whole render
             }
             is_banded = true;
@@ -187,6 +186,117 @@ fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_b
         "only {banded_effects} effects were banded"
     );
     assert!(cases > 500, "only {cases} cases ran");
+    Ok(())
+}
+
+/// The long sides of the pictures the `px` sweep renders: size ratios 0.2, 0.5, 1 and 2 (the design scale is the long side
+/// over 480).
+const SIDES: [usize; 4] = [96, 240, 480, 960];
+/// The rows of a band in the `px` sweep: small, so a margin is binding at every ratio.
+const SWEEP_BANDS: [usize; 2] = [3, 8];
+
+/// The settings of `table` that sets only `px` parameters (and the defaults): the ones a picture's size changes.
+fn in_px(table: &bullterrier_image::params::Table, setting: &Setting) -> bool {
+    setting.is_empty()
+        || setting.keys().all(|key| {
+            table
+                .fields
+                .iter()
+                .any(|field| field.name == key && field.unit == Some(bullterrier_image::params::Unit::Px))
+        })
+}
+
+/// The effects that blur with a Gaussian, which a Fourier transform sums from 16 working px (`ops/fft`) over a window as
+/// long as the band: their sums differ in the last bits between a band and the whole (measured up to 7.3e-5, `liquid_metal`).
+/// They are held to `TOLERANCE`; every other effect is held to the byte. An effect that fails the byte test for this
+/// reason and is not listed is listed here, once its failure is shown to be only that.
+const FFT_BLURS: [&str; 16] = [
+    "ambient_occlusion",
+    "anamorphic_streaks",
+    "bloom",
+    "drop_shadow",
+    "focus_blur",
+    "gaussian_blur",
+    "grain",
+    "halftone",
+    "highpass",
+    "lens_blur",
+    "lens_drops",
+    "light_wrap",
+    "liquid_metal",
+    "motion_blur",
+    "sharpen",
+    "vhs",
+];
+
+/// The first of the pictures `SIDES` at which one `name` step with `setting` banded is not the whole render, byte for
+/// byte (to `TOLERANCE` for an effect of `FFT_BLURS`).
+fn first_px_problem(
+    name: &str,
+    setting: &Setting,
+    partitioned: bool,
+    within: f32,
+) -> Result<Option<String>, Box<dyn Error>> {
+    let recipe = Recipe::new([step_of(name, setting, partitioned)]);
+    for side in SIDES {
+        let values = varied(side, WIDTH);
+        if let Some(found) = first_problem(&values, &recipe, Options::default(), &SWEEP_BANDS, within)? {
+            return Ok(Some(format!("{name} {setting:?} long side {side}: {found}")));
+        }
+    }
+    Ok(None)
+}
+
+#[test]
+fn every_px_parameter_is_the_same_banded_at_every_size_of_picture() -> Outcome {
+    let mut problems = Vec::new();
+    let mut cases = 0;
+    for name in effects() {
+        let one = effect(&name)?;
+        let Some(table) = one.params() else { continue };
+        let partitioned = one.inputs().contains(&Input::Partition);
+        for setting in variants(&table).iter().filter(|setting| in_px(&table, setting)) {
+            let Ok(completed) = table.check(&name, setting) else {
+                continue; // a combination the effect refuses
+            };
+            if one.footprint(&Value::Object(completed))?.margin().is_none() {
+                continue; // Whole: the same code as the whole render
+            }
+            cases += 1;
+            let within = if FFT_BLURS.contains(&name.as_str()) {
+                TOLERANCE
+            } else {
+                0.0
+            };
+            problems.extend(first_px_problem(&name, setting, partitioned, within)?);
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "{} problems:\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
+    assert!(cases > 100, "only {cases} cases ran");
+    Ok(())
+}
+
+#[test]
+fn a_px_value_that_a_small_picture_raises_to_its_minimum_is_the_same_banded() -> Outcome {
+    // on a picture of long side 96 (ratio 0.2) the runner raises these to the field's minimum, a wider reach than the
+    // value scaled
+    // neither is on the Fourier path (a reach under 16 px), so both are held to the byte
+    let mut problems = Vec::new();
+    for (name, setting) in [
+        ("ambient_occlusion", json!({"radius": 1, "truncate": 4})),
+        ("light_wrap", json!({"blur": 1})),
+    ] {
+        let Value::Object(setting) = setting else {
+            return Err("a row is an object".into());
+        };
+        problems.extend(first_px_problem(name, &setting, false, 0.0)?);
+    }
+    assert!(problems.is_empty(), "{problems:#?}");
     Ok(())
 }
 

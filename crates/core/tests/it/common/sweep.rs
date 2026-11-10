@@ -1,7 +1,6 @@
 //! The parameter settings an effect is tried with across the integration tests: the defaults, then each parameter alone
 //! at each end of its range.
 
-use bullterrier_image::Effect;
 use bullterrier_image::params::{Kind, Scalar, Table, Unit};
 use serde_json::{Map, Value, json};
 
@@ -66,11 +65,4 @@ pub(crate) fn variants(table: &Table) -> Vec<Setting> {
         );
     }
     cases
-}
-
-/// `completed` (checked parameters, as a step writes them) as the runner hands them to `one` for a picture of `ratio`
-/// working px per design px: what its footprint is asked about and what it is rendered with.
-pub(crate) fn scaled(one: &dyn Effect, completed: &Setting, ratio: f64) -> Setting {
-    one.params()
-        .map_or_else(|| completed.clone(), |table| table.scaled(completed.clone(), ratio))
 }

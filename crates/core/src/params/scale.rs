@@ -18,7 +18,7 @@ impl Table {
     /// This is the one place that knows how a picture's size changes a value; the runner renders with the result and
     /// asks an effect's [`footprint`](crate::Effect::footprint) about it.
     #[must_use]
-    pub fn scaled(&self, params: Map<String, Value>, ratio: f64) -> Map<String, Value> {
+    pub(crate) fn scaled(&self, params: Map<String, Value>, ratio: f64) -> Map<String, Value> {
         params
             .into_iter()
             .map(
