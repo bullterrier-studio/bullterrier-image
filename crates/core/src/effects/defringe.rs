@@ -22,8 +22,8 @@ const TRUNCATE: f64 = 4.0; // constant: scipy's default reach for a Gaussian
 /// The blur's sigma as a share of the band's width.
 const SIGMA_PER_WIDTH: f64 = 0.5; // constant: the interior colour is a mean over about the band's depth either side
 
-/// Radius: a pixel needs its depth (`width`), and the interior around it (the kernel's reach, `TRUNCATE * SIGMA_PER_WIDTH
-/// * width` + 0.5 px) with each of those pixels' depth (`width` more), and a pixel for the kernel's rounding.
+/// Radius: a pixel needs its depth (`width`), then the interior around it (the kernel's reach, 4 sigmas of `width` / 2
+/// plus half a px) with each of those pixels' depth (`width` more), and a px for the kernel's rounding.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(f64::from(params.width) * (1.0 + TRUNCATE * SIGMA_PER_WIDTH) + 1.0)
 }
