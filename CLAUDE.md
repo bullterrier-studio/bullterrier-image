@@ -148,9 +148,9 @@ Those rules apply here. What follows is image's own, or where it needs a rule di
 
 ## Image's rules
 
-1. **Effects never import other effects.** Shared logic goes to `ops/`, in a module named for its concept (`warp`, `noise`,
-   `edges`, `colorspace`...), never `utils`/`common`/`helpers`. Extract when a second effect needs it. An `ops` module arrives
-   with its first consumer (`vulture` fails on unused code). `ops` is internal.
+1. **Effects never import other effects.** Shared logic goes to `ops/` (default "One concept, one module": `warp`, `noise`,
+   `edges`, `colorspace`...). An `ops` module arrives with its first consumer (`vulture` fails on unused code). `ops` is
+   internal.
 2. **Presets and looks are data**: a preset is a named parameter set of one effect, `src/bullterrier_image/presets/<effect>.toml`; a look is a multi-step recipe with a `description`, `src/bullterrier_image/looks/<name>.toml`, loaded by name (`load_recipe("crt")`).
 3. **Params are declared once**: in Rust for an effect the core runs, else as a Pydantic model; either way the Pydantic
    model drives validation, defaults, generated docs (`help(fx.<effect>)`, `bt-image effects`, `docs/effects/`,
@@ -172,8 +172,7 @@ Those rules apply here. What follows is image's own, or where it needs a rule di
 
 Rust follows the same rules (effects never refer to each other; shared code in `ops/`, arriving with its first user;
 no hidden tunables: a number is a `Params` field, inside a `#[param(..)]` attribute, trivial, or carries `// constant:
-<reason>`). Also: no `unwrap`, `expect`, `panic!` or printing (clippy fails them): return an `Error`. Core code is safe
-Rust. `pub` only for what the bindings use, the recipe model, the support types the derives write (`crate::params`) and an
+<reason>`). Also: `pub` only for what the bindings use, the recipe model, the support types the derives write (`crate::params`) and an
 effect's typed parameters (`effects::<name>::Params`, its fields and choice enums, documented); else `pub(crate)`: an
 effect's `META` and `render`. Fields are `pub`, so rustc no longer reports one that `render` never reads:
 `crates/core/tests/parameters_are_read.rs` does. A new effect needs nothing there, unless a parameter matters only while
@@ -187,6 +186,8 @@ its parameters.
 
 ## Image's standards
 
+- **Override of the default "Runtime dependencies: none":** numpy is the interface's picture type; Pillow, scipy, pydantic and
+  the finders' runtimes stay until R6 and E7 (reasons in `docs/design-decisions.md`).
 - `src/` holds only code and the data it runs on (presets, looks). Tests, examples and gallery pictures live outside it.
 - **File size:** a source file stays within 1000 lines, a test file within 1500 (`tools/check_file_size.py`, run by the tests;
   `[tool.file-size]`). Split by concept before you reach it. A file already over is listed in `[tool.file-size.exempt]` at its
@@ -331,7 +332,8 @@ On top of `docs/rules.md` ("Testing"):
   leaves the input's range.
 - A registered effect in a Rust test gets a name no other test has (`unique`, a per-module prefix and a counter), and no test
   asserts the whole registry.
-- **Mutation-check your tests, lightly:** when a port or change adds logic with weak oracles (boundaries, numeric primitives,
+- **Mutation-check your tests, lightly** (overrides the default "Mutation-check your tests": about 90 effects make a full pass
+  too slow): when a port or change adds logic with weak oracles (boundaries, numeric primitives,
   parameter checks), break the code on purpose, about five targeted mutants per new kernel or primitive, once per finished kernel,
   not per commit. A survivor gets a test, or is named equivalent or marginal and left. Skip thin kernels whose behaviour tests
   already compare hand-worked values. Before the crate is published, one separate deeper pass over `ops/` and the parameter
@@ -348,12 +350,10 @@ When a test reaches inside (`tests/test_suite_rules.py` fails on private imports
 - Own test effects: `throwaway_effects`, or `fresh_registry` for an empty registry (public interface only).
 - "Work was skipped" shows in the files (an untouched sentinel), not in a spy.
 
-Writing a test file: a new file only for a new module, at the mirror path (`tests/ops/test_maps.py` for `ops/maps.py`); shared
-helpers are fixtures in the nearest `conftest.py`: `tests/conftest.py` (`photo`, `subject`, registry helpers, `echo_model`,
-`tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). One file: `uv run pytest tests/ops/test_maps.py -n 0`.
-**Fast feedback (agents):** the suite is about 14,000 tests and takes minutes. While iterating or doing red-green TDD run only the
-tests covering your change, never the full suite; run the full gate (`uv run poe check`, then `uv run lint-imports`) once when
-the feature work is finished, before you report.
+Test files: the mirror path is `tests/ops/test_maps.py` for `ops/maps.py`; the shared fixtures are `tests/conftest.py` (`photo`,
+`subject`, registry helpers, `echo_model`, `tracked_files`) and `tests/tools/conftest.py` (`project_copy`, `uv_run_env`,
+`git_repo`). One file: `uv run pytest tests/ops/test_maps.py -n 0`. The suite is about 14,000 tests and takes minutes (default
+"Fast feedback"; `-n 2` for an ad-hoc full run, because `tests/finding` uses about 2.4 GB per worker).
 
 ## Skills
 
