@@ -232,16 +232,33 @@ fn problems_of(
 /// Every wrong answer `one` gives, over the variants of its parameters and the ratios.
 fn problems(one: &dyn Effect) -> Result<Vec<String>, Box<dyn Error>> {
     let picture = hashed(HEIGHT * WIDTH * 3, 3);
-    let map = Layer::new(HEIGHT, WIDTH, hashed(HEIGHT * WIDTH, 5))?;
+    // noise has an edge at every pixel, so it cannot show a reach beyond a few rows; a rectangle's edges are far apart:
+    // `inner` lies round the middle band, `outer` round the top and the bottom one
+    let rectangle = |rows: std::ops::Range<usize>| {
+        Layer::new(
+            HEIGHT,
+            WIDTH,
+            (0..HEIGHT * WIDTH)
+                .map(|at| f32::from(u8::from(rows.contains(&(at / WIDTH)) && (4..20).contains(&(at % WIDTH)))))
+                .collect(),
+        )
+    };
+    let maps = [
+        Layer::new(HEIGHT, WIDTH, hashed(HEIGHT * WIDTH, 5))?,
+        rectangle(36..60)?,
+        rectangle(4..HEIGHT - 4)?,
+    ];
     let cases = one
         .params()
         .map_or_else(|| vec![Setting::new()], |table| variants(&table));
     let mut found = Vec::new();
-    for case in &cases {
-        // the size ratio matters to every parameter alike: the second one is tried with the defaults alone
-        let ratios = if case.is_empty() { &RATIOS[..] } else { &RATIOS[..1] };
-        for &ratio in ratios {
-            found.extend(problems_of(one, case, ratio, &picture, &map)?);
+    for map in &maps {
+        for case in &cases {
+            // the size ratio matters to every parameter alike: the second one is tried with the defaults alone
+            let ratios = if case.is_empty() { &RATIOS[..] } else { &RATIOS[..1] };
+            for &ratio in ratios {
+                found.extend(problems_of(one, case, ratio, &picture, map)?);
+            }
         }
     }
     Ok(found)

@@ -16,9 +16,10 @@ pub(crate) const META: Meta = Meta {
     inputs: &[],
 };
 
-/// Whole: a pixel's distance to the shape's edge is found over the whole field.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+/// Radius: a pixel is touched only within the stroke and its halo of the edge (`width + glow`), plus the one-pixel
+/// antialiasing ramp.
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::Radius(f64::from(params.width + params.glow) + 1.0) // constant: the antialiasing ramp's px
 }
 
 /// Which side of the shape's edge the stroke lies on.
