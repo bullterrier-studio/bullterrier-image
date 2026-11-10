@@ -513,6 +513,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   arithmetic) and `bullterrier_image::pipeline::Project` reads `bt-image.toml` or JSON and holds a project made in code to the
   same rules, with the error kind `project` (`ProjectError`). Python keeps `Project` as a frozen dataclass because it is public
   API and holds `Recipe` objects built in Python. *Reason:* one rule, one place; both have the CLI as a first user.
+- **What a remembered result depends on is the core's identity, and a result is remembered in a file of our own.**
+  `pipeline::core_identity()` is the crate version and a SHA-256 that `build.rs` takes of every file that can change what the
+  core makes (its sources, the presets and looks that ship with it, its manifest, the workspace's lock file), so a change to an
+  effect, to shipped data or to a library the core builds with changes every key. `fingerprint` is the one place keys are made
+  (SHA-256 of the parts joined by a NUL). The map cache is `BTIMGMAP`, a version, the height, the width and `f32` values; a file that
+  is not exactly that, of the size asked for, is not found (the map is made again): never an error, never a migration. The
+  Python-source hash and the library versions of the old key are gone: nothing in the result path is Python any more.
 - **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
   its own size with the subject's alpha, after an optional edge clean-up (`--shrink`, `--feather`), and needs no
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
