@@ -271,3 +271,97 @@ fn more_pieces_than_pixels_still_work() -> Result<(), Error> {
     }
     Ok(())
 }
+
+/// Where each pixel of a picture whose red is its column and green its row (both over 256) is read from: bilinear reading
+/// of a linear picture is exact, so the output says where a piece carried every pixel to, as (column, row).
+fn read_from(params: &Params, (height, width): (usize, usize)) -> Result<Vec<[f64; 2]>, Error> {
+    let ramps: Vec<f32> = (0..height * width)
+        .flat_map(|at| [(at % width) as f32 / 256.0, (at / width) as f32 / 256.0, 0.0])
+        .collect();
+    let out = run_picture(params, height, width, &ramps)?;
+    Ok(out
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|pixel| [f64::from(pixel[0]) * 256.0, f64::from(pixel[1]) * 256.0])
+        .collect())
+}
+
+#[test]
+#[expect(clippy::cast_precision_loss, reason = "small pixel indices")]
+fn a_piece_turns_rigidly_about_its_centre_which_is_the_mean_of_its_pixels() -> Result<(), Error> {
+    // offset 0 and angle 45: a pixel p of a piece reads the picture at c + R (p - c), R the piece's own rotation and c its
+    // centre. So its two neighbours' readings are a unit step apart at a right angle (R is orthonormal, positively
+    // oriented), and c, solved from the readings, lies where the piece's pixels average: a piece is a triangle here, whose
+    // centre is the mean of its corners, which the pixel mean is within a fraction of a px of.
+    let (height, width) = (120, 160);
+    let params = Params {
+        pieces: 4,
+        shape: Shape::Triangles,
+        fill: 0.0,
+        offset: 0.0,
+        angle: 45.0,
+        interpolation: Interpolation::Bilinear,
+        ..Params::default()
+    };
+    let reads = read_from(&params, (height, width))?;
+    let ramps: Vec<f32> = (0..height * width)
+        .flat_map(|at| [(at % width) as f32 / 256.0, (at / width) as f32 / 256.0, 0.5])
+        .collect();
+    let pieces = groups(&run_picture(&Params { fill: 1.0, ..params }, height, width, &ramps)?);
+    let mut tested = 0;
+    for piece in pieces.iter().filter(|piece| piece.len() > 300) {
+        let size = piece.len() as f64;
+        let mean = piece.iter().fold([0.0, 0.0], |sum, at| {
+            [sum[0] + (at % width) as f64 / size, sum[1] + (at / width) as f64 / size]
+        });
+        let inside = |at: usize| piece.binary_search(&at).is_ok();
+        // the pixel nearest the mean whose right and lower neighbours are in the piece too
+        let Some(&at) = piece
+            .iter()
+            .filter(|&&at| inside(at + 1) && inside(at + width) && (at % width) + 1 < width)
+            .min_by(|&&a, &&b| {
+                let far = |at: usize| ((at % width) as f64 - mean[0]).hypot((at / width) as f64 - mean[1]);
+                far(a).total_cmp(&far(b))
+            })
+        else {
+            continue;
+        };
+        let (here, right, below) = (reads[at], reads[at + 1], reads[at + width]);
+        let (across, down) = (
+            [right[0] - here[0], right[1] - here[1]],
+            [below[0] - here[0], below[1] - here[1]],
+        );
+        assert!(
+            (across[0].hypot(across[1]) - 1.0).abs() < 1e-3
+                && across[0].mul_add(down[0], across[1] * down[1]).abs() < 1e-3,
+            "step across {across:?}, down {down:?}"
+        );
+        assert!(
+            (across[0].mul_add(down[1], -across[1] * down[0]) - 1.0).abs() < 1e-3,
+            "not a turn: {across:?} {down:?}"
+        );
+        let (cos, sin) = (across[0], -across[1]);
+        if 2.0 - 2.0 * cos < 0.1 {
+            continue; // this piece hardly turns, so its centre is hardly pinned by it
+        }
+        // (I - R) c = q - R p, R = [[cos, sin], [-sin, cos]] on (column, row)
+        let p = [(at % width) as f64, (at / width) as f64];
+        let rhs = [
+            here[0] - (cos * p[0] + sin * p[1]),
+            here[1] - (-sin * p[0] + cos * p[1]),
+        ];
+        let det = 2.0 - 2.0 * cos;
+        let centre = [
+            ((1.0 - cos) * rhs[0] + sin * rhs[1]) / det,
+            (-sin * rhs[0] + (1.0 - cos) * rhs[1]) / det,
+        ];
+        assert!(
+            (centre[0] - mean[0]).abs() < 0.3 && (centre[1] - mean[1]).abs() < 0.3,
+            "centre {centre:?}, pixel mean {mean:?}"
+        );
+        tested += 1;
+    }
+    assert!(tested >= 2, "{tested} pieces turned enough to test");
+    Ok(())
+}
