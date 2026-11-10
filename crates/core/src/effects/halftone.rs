@@ -27,13 +27,13 @@ pub(crate) fn footprint(params: &Params, canvas: &Canvas) -> Footprint {
     // A pixel shows the tone at the centre of its screen cell, at most half a cell diagonal away, and the tone is the
     // blur of the picture there, which reaches `int(truncate x sigma x cell + 0.5)` pixels. The runner rounds `cell` to
     // whole working px (at least 1), so its working size is at most `max(1, cell x ratio + 0.5)`; the reach is worked
-    // out in working px and given in design px. One pixel for rounding the centre to a pixel, one more for the blur's
-    // `+ 0.5`: the margin adds the interpolation rows.
+    // out in working px and given in design px. Half a pixel for rounding the centre to a pixel and half for the
+    // blur's `+ 0.5`; the margin adds the interpolation rows.
     const HALF_DIAGONAL: f64 = std::f64::consts::FRAC_1_SQRT_2; // constant: a cell's corner is this many cells from its centre
     let cell = (f64::from(params.cell) * canvas.ratio + 0.5).max(1.0);
     let blur = f64::from(params.truncate) * f64::from(params.sigma);
     Footprint::reach(
-        ((HALF_DIAGONAL + blur) * cell + 1.5) / canvas.ratio,
+        ((HALF_DIAGONAL + blur) * cell + 1.0) / canvas.ratio,
         params.edge == EdgeOrConstant::Wrap && params.sigma > 0.0,
     )
 }
