@@ -19,11 +19,8 @@ pub(crate) const META: Meta = Meta {
 
 /// What `relight` reads around a pixel: the blur's reach and a pixel on either side for the slope. A blur summed by the
 /// Fourier transform follows the length of its lines, and `height` multiplies that difference into a visible one: the whole.
-pub(crate) fn footprint(params: &Params, canvas: &Canvas) -> Footprint {
-    // the render blurs with `blur` scaled to working px, as an f32
-    #[expect(clippy::cast_possible_truncation, reason = "the f32 the render is given")]
-    let sigma = f64::from((f64::from(params.blur) * canvas.ratio) as f32);
-    if is_fourier(sigma, f64::from(params.truncate)) {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+    if is_fourier(f64::from(params.blur), f64::from(params.truncate)) {
         return Footprint::Whole;
     }
     // constant: the kernel reaches int(truncate x blur + 0.5) px and the slope one more

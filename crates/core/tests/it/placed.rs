@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 
 use crate::common::compare::{first_bit_difference, first_difference_within};
 use crate::common::pictures::{asset, varied};
+use crate::common::sweep::scaled;
 
 /// Odd and even sides that differ; the picture is tall enough for a margin of several rows round a band.
 const HEIGHT: usize = 61;
@@ -204,8 +205,11 @@ fn margin(name: &str, params: &Value) -> Result<Option<usize>, Box<dyn Error>> {
     let given = params.as_object().ok_or("not an object")?;
     let completed = table.check(name, given)?;
     Ok(one
-        .footprint(&Value::Object(completed), &Canvas::new(HEIGHT, WIDTH, 1.0))?
-        .margin(1.0))
+        .footprint(
+            &Value::Object(scaled(&*one, &completed, 1.0)),
+            &Canvas::new(HEIGHT, WIDTH),
+        )?
+        .margin())
 }
 
 /// Rows `from..to` of the whole render of `cases` are what a band told its place renders (with the margin the footprint asks),

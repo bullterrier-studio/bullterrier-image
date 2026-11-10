@@ -14,7 +14,11 @@ impl Table {
     /// pixel value stops at the field's `min`, which keeps a small picture valid (a cell of at least 3 pixels);
     /// growing has no limit at either end, since a range is in design pixels and the result is not checked against
     /// it. Every other unit is unchanged, and a ratio of 1 changes nothing.
-    pub(crate) fn scaled(&self, params: Map<String, Value>, ratio: f64) -> Map<String, Value> {
+    ///
+    /// This is the one place that knows how a picture's size changes a value; the runner renders with the result and
+    /// asks an effect's [`footprint`](crate::Effect::footprint) about it.
+    #[must_use]
+    pub fn scaled(&self, params: Map<String, Value>, ratio: f64) -> Map<String, Value> {
         params
             .into_iter()
             .map(

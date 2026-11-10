@@ -19,7 +19,7 @@ impl Run<'_> {
             let picture = self.working.picture();
             (picture.height(), picture.width())
         };
-        let canvas = Canvas::new(height, width, self.ratio);
+        let canvas = Canvas::new(height, width);
         let margins = steps
             .iter()
             .map(|step| step.margin(&canvas))

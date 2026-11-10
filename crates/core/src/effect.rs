@@ -172,9 +172,11 @@ pub trait Effect: Send + Sync {
         None
     }
 
-    /// What it reads around a pixel when run with `params` on `canvas`, an object with exactly its parameters as a step writes them
-    /// (completed and checked, in design pixels): `Footprint::Whole` unless the effect says it is less. Whatever an
-    /// effect says holds for the picture it is run on (see [`Footprint`]).
+    /// What it reads around a pixel when run with `params` on `canvas`: `Footprint::Whole` unless the effect says it is
+    /// less. `params` are exactly the parameters [`apply`](Self::apply) is given, an object completed, checked and
+    /// scaled to the picture (see [`Table::scaled`]), so a distance in them is already in working pixels, floors
+    /// included; the footprint scales nothing itself. Whatever an effect says holds for the picture it is run on (see
+    /// [`Footprint`]).
     ///
     /// # Errors
     /// [`Error::Params`] if `params` are not the effect's parameters, as for [`apply`](Self::apply).

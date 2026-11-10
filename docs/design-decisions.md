@@ -574,7 +574,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     (`Radius(amplitude)`, sine about the canvas centre; `Whole` for wrap); `chromatic_aberration` (`Radius(amount)`, scale
     about the canvas centre; `Whole` for wrap); `halftone` (screen lattice and cell centre from the canvas
     top; `Radius((half diagonal + truncate x sigma) x cell + 1)` worked out in the working px the runner rounds the cell to
-    and given back in design px, from the canvas's ratio; `Whole` for a wrapping blur). Done in B1b: every A row but `grain`/`vignette` (B1a) reads `Place`; `ripple` and
+    (B5: the scaled `cell`); `Whole` for a wrapping blur). Done in B1b: every A row but `grain`/`vignette` (B1a) reads `Place`; `ripple` and
     `chromatic_aberration` are `Radius(amplitude)` and `Radius(amount)`, the rest `Pixel`.
   - B (sequential seeded stream): done in B2. `dead_pixels`, `slice_shift`, `vhs` (bands, dropouts, row drift) draw lists over
     the canvas from the seed (`Rng`, a few hundred at most, bounded by the parameters' maxima), then take what falls in the
@@ -606,9 +606,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     radius x (side - 1) / ratio)` now statable: at the default 0.5 that is the shorter side, a margin that covers the
     picture whatever the band, and `render` takes its centre from the picture, not the canvas.
 - **Settled: a footprint sees the canvas (banded render, B3a).** `Effect::footprint(&Params, &Canvas)`, `Canvas { height,
-  width, ratio }`; `Radius` stays in design px, and an effect with a reach in rounded working px or a share of a side converts
-  (`ceil(working) / ratio`, `share x side / ratio`). *Reason:* a footprint that could not see the canvas forced four effects
+  width }` (B5 dropped `ratio`); a share of a side is read from it. (B3a had `Radius` in design px with `ratio` in the canvas;
+  B5 supersedes that, next entry.) *Reason:* a footprint that could not see the canvas forced four effects
   (`halftone` blurred, `swirl`, `pinch_bulge`, `ascii`) to `Whole`; only `halftone` is freed by it.
+- **Settled: a footprint is asked about the parameters the render gets (banded render, B5).** `Effect::footprint` receives
+  the step's parameters after `Table::scaled`, floors included, and `Radius` is in working px; `Footprint::margin` takes no
+  ratio. *Reason:* scaling is known in one place; a footprint in design px re-implemented it per effect and missed the floor
+  (a `px` value below its `min` in working px when the picture shrinks), so `ambient_occlusion` radius 1 at ratio 0.2 read 4
+  rows against a margin of 3. The honesty test sweeps every `px` parameter at ratios 0.2 to 2 on `Table::scaled`'s output.
 - **Settled: the band height trades memory for time (banded render).** Measured on 24 MP (4000 x 6000), `grade`,
   `vignette`, `gaussian_blur` radius 2, `grain`; memory is the peak beyond the photo as a multiple of the 288 MB image
   made, time against the whole render at 1 / 4 threads (median of 3):
@@ -1006,7 +1011,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     plumes about 14% thinner that now reach the full amount.
   - *`flow_lines` runs on one thread*: its lines stamp ink into one shared picture.
   - *Footprint is part of the effect contract.* Each effect declares `footprint(&Params) -> Footprint`: `Pixel` (reads nothing
-    around a pixel), `Radius(r)` (design px, rows only; the margin adds 2 rows for interpolation) or `Whole`. `Whole` is the safe
+    around a pixel), `Radius(r)` (working px, rows only; the margin adds 2 rows for interpolation) or `Whole`. `Whole` is the safe
     answer, and the foreign effect default. A generic test (`tests/it/footprint.rs`) renders bands of rows plus their margin and
     compares them with the same rows of the whole render (tolerance 1e-4: crops differ by rounding in blurs), so a wrong claim
     fails; known-bad doubles prove it. *Consequence:* only 22 of the 62 core effects are narrower than `Whole`, and of the E4

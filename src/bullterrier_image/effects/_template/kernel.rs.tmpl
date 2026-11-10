@@ -17,8 +17,9 @@ pub(crate) const META: Meta = Meta {
     inputs: &[],
 };
 
-// What the effect reads around a pixel, for these parameters and the canvas (its size and design-px ratio, for a reach in working px): `Footprint::Pixel` (nothing but the pixel itself, as here),
-// `Footprint::Radius(r)` (rows up to `r` design px away: a blur's radius, a displacement's amount) or `Footprint::Whole`
+// What the effect reads around a pixel, for these parameters (scaled to the picture, as `render` gets them: a `px` value
+// is already in working px) and the canvas (its size): `Footprint::Pixel` (nothing but the pixel itself, as here),
+// `Footprint::Radius(r)` (rows up to `r` working px away: a blur's radius, a displacement's amount) or `Footprint::Whole`
 // (anything else: an effect that knows where a pixel is in the picture, its height, or a statistic of all of it, or
 // when unsure). `crates/core/tests/it/footprint.rs` renders bands of rows with their margin and fails a claim that is
 // less than the truth.

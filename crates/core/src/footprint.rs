@@ -1,11 +1,10 @@
 //! What an effect reads around a pixel: the answer a banded renderer needs to render some rows of a picture without the
 //! rest.
 
-/// The canvas a footprint is asked about: its size in working pixels and the working pixels per design pixel.
+/// The canvas a footprint is asked about: its size in working pixels.
 ///
-/// A reach that is a share of the canvas, or a whole number of working pixels the runner rounds to, is not a fixed
-/// number of design pixels; an effect that has such a reach reads it here and says it in design pixels (see
-/// [`Radius`](Footprint::Radius)).
+/// A reach that is a share of the canvas (of its shorter side, say) is not a number of the effect's parameters; an
+/// effect that has such a reach reads it here and says it in working pixels (see [`Radius`](Footprint::Radius)).
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct Canvas {
@@ -13,19 +12,21 @@ pub struct Canvas {
     pub height: usize,
     /// Columns of the canvas, in working pixels.
     pub width: usize,
-    /// Working pixels per design pixel (more than 0).
-    pub ratio: f64,
 }
 
 impl Canvas {
-    /// The canvas of `height` rows and `width` columns whose design pixel is `ratio` working pixels.
+    /// The canvas of `height` rows and `width` columns.
     #[must_use]
-    pub fn new(height: usize, width: usize, ratio: f64) -> Self {
-        Self { height, width, ratio }
+    pub fn new(height: usize, width: usize) -> Self {
+        Self { height, width }
     }
 }
 
 /// What an effect reads around a pixel, given its parameters (see [`Effect::footprint`](crate::Effect::footprint)).
+///
+/// The parameters are those the effect is rendered with: scaled to the picture, floors included (see
+/// [`Table::scaled`](crate::params::Table::scaled)), so every distance is in working pixels and the footprint and the
+/// render cannot disagree about the scaling.
 ///
 /// It is about rows, the unit a banded renderer cuts a picture by. The promise of [`Pixel`](Self::Pixel) and
 /// [`Radius`](Self::Radius): the rows of the output from `a` to `b` are the same whether the effect runs on the whole
@@ -40,15 +41,14 @@ impl Canvas {
 pub enum Footprint {
     /// Each output pixel is a function of the input pixel in the same place alone.
     Pixel,
-    /// Each output row is a function of the input rows at most this many design pixels away (a finite number of 0 or
-    /// more); it may read the whole of each of them, so a sideways reach costs nothing. Scale it by the size ratio like
-    /// any pixel value, see [`margin`](Self::margin).
+    /// Each output row is a function of the input rows at most this many working pixels away (a finite number of 0 or
+    /// more); it may read the whole of each of them, so a sideways reach costs nothing. See [`margin`](Self::margin).
     Radius(f64),
     /// An output pixel may depend on any input pixel, on the row it is in or on the picture's height.
     Whole,
 }
 
-/// The rows beyond `ceil(radius * ratio)` that a margin keeps for reading between pixels: bicubic interpolation reads from
+/// The rows beyond `ceil(radius)` that a margin keeps for reading between pixels: bicubic interpolation reads from
 /// one row above to two below the row it is at (a window of 3 rows is the widest of any effect's neighbourhood).
 const TAPS: usize = 2; // constant: the extra rows of a bicubic window
 
@@ -60,12 +60,12 @@ impl Footprint {
         if wraps { Self::Whole } else { Self::Radius(radius) }
     }
 
-    /// The rows of margin to render above and below a band of rows for a picture of `ratio` working pixels per design
-    /// pixel: none for [`Pixel`](Self::Pixel); for [`Radius`](Self::Radius) the radius rounded up to a whole row, and two
+    /// The rows of margin to render above and below a band of rows: none for [`Pixel`](Self::Pixel); for
+    /// [`Radius`](Self::Radius) the radius rounded up to a whole row, and two
     /// rows more for the pixels an interpolation reads beside the place it is asked for; `None` for
     /// [`Whole`](Self::Whole), which has no margin short of the picture.
     #[must_use]
-    pub fn margin(self, ratio: f64) -> Option<usize> {
+    pub fn margin(self) -> Option<usize> {
         match self {
             Self::Pixel => Some(0),
             #[expect(
@@ -73,7 +73,7 @@ impl Footprint {
                 clippy::cast_sign_loss,
                 reason = "a radius is a finite number of 0 or more; a margin beyond the picture means the whole of it"
             )]
-            Self::Radius(radius) => Some((radius * ratio).ceil() as usize + TAPS),
+            Self::Radius(radius) => Some(radius.ceil() as usize + TAPS),
             Self::Whole => None,
         }
     }

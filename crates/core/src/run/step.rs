@@ -74,9 +74,8 @@ impl Prepared {
 
 /// The complete parameters a step's effect is run with.
 enum Runs {
-    /// A plain step: one run, with the values scaled to the picture and as the step writes them (completed, in design
-    /// pixels: what a footprint is asked about).
-    One { scaled: Value, design: Value },
+    /// A plain step: one run, with the values completed and scaled to the picture (what a footprint is asked about).
+    One { scaled: Value },
     /// A step with driven parameters: one run for each level, `levels[n]` for level `n` (0 to `top`), mixed by the
     /// selection called `by`.
     Driven { by: String, top: u8, levels: Vec<Value> },
@@ -151,24 +150,21 @@ pub(super) struct StepRun {
     laid: Laid,
 }
 
-/// The parameters `effect` (called `name`) is run with for the values `given`, and the values as checked, unscaled: for
-/// an effect that describes its parameters, checked and scaled to `ratio`, else as given both times.
+/// The parameters `effect` (called `name`) is run with for the values `given`: for an effect that describes its
+/// parameters, checked and scaled to `ratio`, else as given.
 fn complete(
     effect: &dyn Effect,
     name: &str,
     given: Map<String, Value>,
     ratio: f64,
     place: &str,
-) -> Result<(Value, Value), Error> {
+) -> Result<Value, Error> {
     Ok(match effect.params() {
         Some(table) => {
             let design = table.check(name, &given).map_err(|error| error.at(place))?;
-            (
-                Value::Object(table.scaled(design.clone(), ratio)),
-                Value::Object(design),
-            )
+            Value::Object(table.scaled(design, ratio))
         }
-        None => (Value::Object(given.clone()), Value::Object(given)),
+        None => Value::Object(given),
     })
 }
 
@@ -187,7 +183,7 @@ fn tables(
         return Ok(Vec::new());
     };
     let params = match runs {
-        Runs::One { scaled: params, .. } => params,
+        Runs::One { scaled: params } => params,
         Runs::Driven { levels, .. } => &levels[0],
     };
     let mut found = Vec::new();
@@ -218,7 +214,7 @@ fn pictures(
         return Ok(Vec::new());
     };
     let params = match runs {
-        Runs::One { scaled: params, .. } => params,
+        Runs::One { scaled: params } => params,
         Runs::Driven { levels, .. } => &levels[0],
     };
     let mut found = Vec::new();
@@ -264,7 +260,7 @@ impl StepRun {
                     for (name, drive) in &drives {
                         values.insert(name.clone(), Value::from(drive.value(level)));
                     }
-                    complete(&*effect, &step.effect, values, ratio, place).map(|(scaled, _)| scaled)
+                    complete(&*effect, &step.effect, values, ratio, place)
                 })
                 .collect::<Result<_, _>>()?;
             Runs::Driven {
@@ -273,8 +269,9 @@ impl StepRun {
                 levels,
             }
         } else {
-            let (scaled, design) = complete(&*effect, &step.effect, given, ratio, place)?;
-            Runs::One { scaled, design }
+            Runs::One {
+                scaled: complete(&*effect, &step.effect, given, ratio, place)?,
+            }
         };
         let luts = tables(&*effect, &runs, assets, place)?;
         let pictures = pictures(&*effect, &runs, assets, place)?;
@@ -301,7 +298,7 @@ impl StepRun {
     /// [`Error::Params`] if the effect refuses its own parameters.
     pub(super) fn margin(&self, canvas: &Canvas) -> Result<Option<usize>, Error> {
         match &self.runs {
-            Runs::One { design, .. } => Ok(self.effect.footprint(design, canvas)?.margin(canvas.ratio)),
+            Runs::One { scaled } => Ok(self.effect.footprint(scaled, canvas)?.margin()),
             Runs::Driven { .. } => Ok(None),
         }
     }
@@ -348,7 +345,7 @@ impl StepRun {
             offered = offered.with_partition(pieces);
         }
         let after = match &self.runs {
-            Runs::One { scaled, .. } => effect::run(&*self.effect, before, scaled.clone(), &offered)?,
+            Runs::One { scaled } => effect::run(&*self.effect, before, scaled.clone(), &offered)?,
             Runs::Driven { by, top, levels } => {
                 let by = rows_of(regions.selection(by, working)?, at, rows);
                 self.driven(before, &offered, &by, *top, levels)?

@@ -27,7 +27,7 @@ use crate::common::Outcome;
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::{asset, varied};
 use crate::common::run::{Registered, unique};
-use crate::common::sweep::{Setting, variants};
+use crate::common::sweep::{Setting, scaled, variants};
 
 /// A tall, narrow picture of odd sides: 64 rows is less than half of it, and a one-row band is a hundred and thirty bands.
 const HEIGHT: usize = 131;
@@ -153,8 +153,11 @@ fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_b
                 },
                 None => setting.clone(),
             };
-            let footprint = one.footprint(&Value::Object(completed), &Canvas::new(HEIGHT, WIDTH, ratio))?;
-            if footprint.margin(ratio).is_none() {
+            let footprint = one.footprint(
+                &Value::Object(scaled(&*one, &completed, ratio)),
+                &Canvas::new(HEIGHT, WIDTH),
+            )?;
+            if footprint.margin().is_none() {
                 continue; // Whole: the same code as the whole render
             }
             is_banded = true;
@@ -393,11 +396,11 @@ impl Effect for Double {
         }
     }
 
-    fn footprint(&self, _params: &Value, canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
-        // honest: the reach in design px, which the runner scales back by the ratio
-        Ok(self.says.unwrap_or(Footprint::Radius(
-            f64::from(u32::try_from(self.reach).unwrap_or(u32::MAX)) / canvas.ratio,
-        )))
+    fn footprint(&self, _params: &Value, _canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
+        // honest: the reach in working px
+        Ok(self.says.unwrap_or(Footprint::Radius(f64::from(
+            u32::try_from(self.reach).unwrap_or(u32::MAX),
+        ))))
     }
 
     fn apply(
