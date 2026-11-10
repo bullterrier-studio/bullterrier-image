@@ -47,7 +47,7 @@ mod _core {
     use super::lut::PyLut;
 
     #[pymodule_export]
-    use super::run::{check_recipe, known_maps, needs, render, trace};
+    use super::run::{check_recipe, known_maps, needs, refine_edge, render, trace};
 }
 
 create_exception!(

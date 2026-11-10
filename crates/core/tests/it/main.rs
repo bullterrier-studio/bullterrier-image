@@ -74,6 +74,7 @@ mod liquid_metal;
 mod lut;
 mod lut_cube;
 mod lut_effect;
+mod matte;
 mod melt;
 mod motion_blur;
 mod noise;

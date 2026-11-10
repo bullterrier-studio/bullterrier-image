@@ -22,6 +22,14 @@ pub(crate) fn minimum_filter(values: &[f32], height: usize, width: usize, size: 
     transposed(&down, width, height)
 }
 
+/// The `width`-wide rows of `values` with every value replaced by the smallest of the `size` values around it in its own
+/// row (a window as [`minimum_filter`]'s, `edge` beyond the row): the horizontal half of that filter.
+pub(crate) fn minimum_along_rows(values: &[f32], width: usize, size: usize, edge: Extension) -> Vec<f32> {
+    let mut along = values.to_vec();
+    smooth_rows(&mut along, width, size, edge);
+    along
+}
+
 /// [`minimum_filter`] with the largest value of each window in place of the smallest.
 pub(crate) fn maximum_filter(values: &[f32], height: usize, width: usize, size: usize, edge: Extension) -> Vec<f32> {
     // the largest of a window is the smallest of the negated values, negated back (exact in floating point)

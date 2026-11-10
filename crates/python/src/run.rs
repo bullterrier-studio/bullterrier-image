@@ -4,7 +4,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use bullterrier_image::{Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage};
-use numpy::{AllowTypeChange, PyArray1, PyArray3, PyArrayLike2, PyArrayMethods};
+use numpy::{AllowTypeChange, PyArray1, PyArray2, PyArray3, PyArrayLike2, PyArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyList, PyTuple};
@@ -386,6 +386,22 @@ impl Finder for PyFinder {
             layer_of(&self.name, answer)
         })
     }
+}
+
+/// The matte `matte` (a float array `(height, width)` within 0..1) with its edge cleaned up: pulled in by a disc of radius
+/// `shrink` px, then blurred by a Gaussian of sigma `feather` px (0 or less turns either off). A new float32 array.
+///
+/// `CoreError` of kind `map_not_found` if `matte` is no map.
+#[pyfunction]
+pub(crate) fn refine_edge<'py>(
+    py: Python<'py>,
+    matte: &Bound<'py, PyAny>,
+    shrink: f64,
+    feather: f64,
+) -> PyResult<Bound<'py, PyArray2<f32>>> {
+    let layer = layer_of("matte", matte).map_err(core_error)?;
+    let refined = bullterrier_image::refine_edge(&layer, shrink, feather);
+    PyArray1::from_slice(py, refined.values()).reshape([refined.height(), refined.width()])
 }
 
 /// `image` as a numpy array `(height, width, channels)`: 3, or 4 with alpha.

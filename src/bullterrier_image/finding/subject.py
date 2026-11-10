@@ -29,8 +29,8 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from scipy import ndimage
 
+from bullterrier_image.core import native
 from bullterrier_image.core.finder import Finder
 from bullterrier_image.errors import BackendUnavailableError, SubjectNotFoundError
 from bullterrier_image.ops.resample import stretch
@@ -177,11 +177,6 @@ def refine_edge(alpha: np.ndarray, shrink: float, feather: float) -> np.ndarray:
     the edge with a Gaussian of that sigma, which softens it without changing the matte's total. 0 turns either off,
     and so does a negative value (it is not an error).
     `subject_matte` applies this to the model's answer; use it on a matte from anywhere else for the same clean cut.
+    The work is the core's (`bullterrier_image.refine_edge`).
     """
-    if shrink > 0:
-        r = int(np.ceil(shrink))
-        y, x = np.ogrid[-r : r + 1, -r : r + 1]
-        alpha = ndimage.grey_erosion(alpha, footprint=(x * x + y * y) <= shrink * shrink + 1e-9, mode="nearest")
-    if feather > 0:
-        alpha = ndimage.gaussian_filter(alpha, feather)
-    return np.clip(alpha, 0.0, 1.0).astype(np.float32)
+    return native.refine_edge(alpha, shrink, feather)

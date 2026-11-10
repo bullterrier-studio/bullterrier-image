@@ -65,6 +65,11 @@ impl Layer {
         Ok(Self { height, width, values })
     }
 
+    /// The map of `values` that the caller has kept finite and within 0..=1, and `height` x `width` of: not checked again.
+    pub(crate) const fn from_checked(height: usize, width: usize, values: Vec<f32>) -> Self {
+        Self { height, width, values }
+    }
+
     /// The number of rows.
     #[must_use]
     pub fn height(&self) -> usize {
