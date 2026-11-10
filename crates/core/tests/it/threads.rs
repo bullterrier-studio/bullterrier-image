@@ -188,6 +188,11 @@ fn cases() -> Vec<Case> {
                     .param("width", 5)
                     .param("glow", 9)
                     .param("position", "center"),
+                Step::new("reflection")
+                    .param("field", "light")
+                    .param("height", 1)
+                    .param("field_threshold", 0.9)
+                    .param("blur", 3),
                 Step::new("rim_light")
                     .param("field", "light")
                     .param("smoothing", 4)

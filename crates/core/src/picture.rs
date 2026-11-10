@@ -78,6 +78,16 @@ impl<'a> Picture<'a> {
         self.pixels
     }
 
+    /// The first `rows` rows of the picture (1 to its height), a picture of their own: what lies beyond its last row is
+    /// what a filter's edge rule puts there, not the rest of this picture.
+    pub(crate) fn top(&self, rows: usize) -> Self {
+        Self {
+            height: rows,
+            width: self.width,
+            pixels: &self.pixels[..rows * self.width],
+        }
+    }
+
     /// A new image of this picture's size whose every pixel is `change` of the pixel at its place: the shape of an
     /// effect that works pixel by pixel. `change` is called for pixels in any order, and from the threads the render was
     /// given ([`Options::with_threads`](crate::Options::with_threads)): the pixel it gives must depend only on its arguments.

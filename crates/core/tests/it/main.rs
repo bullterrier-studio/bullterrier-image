@@ -104,6 +104,7 @@ mod recipe_model;
 mod recipe_needs;
 mod recipe_references;
 mod recipe_region;
+mod reflection;
 mod region_check;
 mod registry;
 mod relight;

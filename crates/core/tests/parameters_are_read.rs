@@ -553,6 +553,37 @@ fn conditional() -> Vec<Conditional> {
             field: "falloff",
             with: vec![("field", json!("ramp")), ("angle", json!(180.0))],
         },
+        // every row of the test's other selections reaches down to the picture's last: no floor below them to reflect in
+        Conditional {
+            effect: "reflection",
+            field: "height",
+            with: vec![("field", json!("top"))],
+        },
+        Conditional {
+            effect: "reflection",
+            field: "fade",
+            with: vec![("field", json!("top"))],
+        },
+        Conditional {
+            effect: "reflection",
+            field: "blur",
+            with: vec![("field", json!("top"))],
+        },
+        Conditional {
+            effect: "reflection",
+            field: "field_threshold",
+            with: vec![("field", json!("top"))],
+        },
+        Conditional {
+            effect: "reflection",
+            field: "truncate",
+            with: vec![("field", json!("top"))],
+        },
+        Conditional {
+            effect: "reflection",
+            field: "edge",
+            with: vec![("field", json!("top"))],
+        },
     ]
 }
 
@@ -616,7 +647,7 @@ fn candidates(field: &Field) -> Vec<Value> {
             .collect(),
         Kind::Color => vec![json!([0.9, 0.1, 0.2]), json!([0.1, 0.8, 0.3])],
         // a name: the test offers its own selection to any effect that is given one (see `render`)
-        Kind::Field => vec![json!("ramp")],
+        Kind::Field => vec![json!("ramp"), json!("top")],
         // a name: the test offers its own table to any effect that is given one (see `render`)
         Kind::Lut => vec![json!("table")],
         // the shortest list and one element more (where allowed), of colours that are not the default of any effect
@@ -657,20 +688,24 @@ fn render(
             .map(|entry| [entry % 2, entry / 2 % 2, entry / 4].map(|corner| if corner == 1 { 0.0 } else { 1.0 }))
             .collect(),
     )?;
-    // a field named `ramp` is a ramp across the picture, any other name a bumpy selection (hollows and heights, so that an
-    // effect that reads where the selection departs from its surroundings sees some)
+    // a field named `ramp` is a ramp across the picture, `top` the upper half of it (a shape with a lowest row above the
+    // picture's), any other name a bumpy selection (hollows and heights, so that an effect that reads where the selection
+    // departs from its surroundings sees some)
     let selections = table
         .fields
         .iter()
         .filter(|field| field.kind == Kind::Field)
         .map(|field| {
             let side = usize::from(SIDE);
-            let ramp = params[field.name] == "ramp";
+            let name = params[field.name].clone();
             let values: Vec<f32> = (0..SIDE)
                 .flat_map(|row| {
+                    let name = name.clone();
                     (0..SIDE).map(move |column| {
-                        if ramp {
+                        if name == "ramp" {
                             f32::from(column) / f32::from(SIDE - 1)
+                        } else if name == "top" {
+                            f32::from(u8::from(row < SIDE / 2))
                         } else {
                             f32::from((row * 5 + column * 3) % 7) / 6.0
                         }
