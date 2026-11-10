@@ -529,6 +529,31 @@ seed : whole number, count, 0 to 4294967295, default 0
     ...
 
 @_effect
+def defringe(*, field: str = 'subject', width: float = 3.0, amount: float = 1.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Remove the colour halo that a cut-out's edge carries: within `width` px inside the edge of a shape (the subject by default) the picture takes the colour of the shape's interior.  The interior colour is the shape's pixels deeper than `width` from the edge, averaged with a Gaussian of sigma `width` / 2, so it is pulled outward to the edge from the nearest solid colour. A pixel at depth d inside the edge takes `amount * (1 - d / width)` of it: most at the edge, none from `width` in. Pixels outside the shape and deeper than `width` are exactly as they were, and so is a shape too thin to have an interior. Use it after a background replacement, when the old backdrop's colour still tints the matte's edge.
+
+Parameters
+----------
+field : field name, default 'subject'
+    The shape whose edge is cleaned: `subject` (the subject's silhouette), `background`,
+    `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel
+    is inside it from `field_threshold` up.
+width : number, px, 0 to 48, default 3.0
+    Depth of the band inside the shape's edge that is recoloured, in px at the recipe's
+    size: raising it cleans a wider fringe. 0 = nothing is changed.
+amount : number, fraction, 0 to 1, default 1.0
+    How fully the band takes the interior colour at the edge: 0 = unchanged, 1 = the
+    edge pixels are almost wholly the interior colour. It fades to nothing at `width`.
+
+Advanced parameters
+-------------------
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is
+    cleaned: 0.5 = more than half covered. Lowering it takes in more of a soft edge
+    (hair, fur), raising it less."""
+    ...
+
+@_effect
 def dehaze(*, amount: float = 0.9, patch: int = 15, radius: float = 30.0, edge_threshold: float = 0.03, transmission_floor: float = 0.1, airlight_fraction: float = 0.001, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Remove haze and fog by inverting the atmospheric scattering model I = J t + A (1 - t) (He, Sun, Tang 2009).  The dark channel of a haze-free outdoor picture is nearly 0: in any patch of `patch` x `patch` px some pixel has a channel near black. Haze lifts it, so the dark channel of I / A measures 1 - t, the haze at that place. The steps are - the airlight A: the `airlight_fraction` of pixels with the highest dark channel (the haziest) are looked at, and   the colour of the brightest of them (largest red + green + blue) is A, a per channel colour; - the transmission t = 1 - `amount` x dark channel of I / A, refined by a guided filter (`radius`,   `edge_threshold`), guided by the picture's luma, so it follows the edges of the picture, then held between   `transmission_floor` and 1; - the scene J = (I - A) / t + A, held to 0..1.  A picture without haze (a dark channel of 0) comes out as it went in. `edge` says what the patch search sees beyond the picture's border. Colours are those of the sRGB-encoded picture.
 
@@ -887,15 +912,7 @@ palette_quantize : Palette quantize: the picture's own 8 most characteristic col
 
 @_effect
 def drop_shadow(*, field: str = 'subject', copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow', 'layered_cutouts'] | None = None) -> Step:
-    """Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by
-`blur`: a drop shadow, layered paper cutouts or a long shadow.
-
-One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many
-at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour
-from `color` (nearest the shape) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at
-`copy_opacity` falling by `fade`, and the shape on top of all of them, so the shape itself is never changed.
-
-`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+    """Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by `blur`: a drop shadow, layered paper cutouts or a long shadow.  One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour from `color` (nearest the shape) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at `copy_opacity` falling by `fade`, and the shape on top of all of them, so the shape itself is never changed.
 
 Parameters
 ----------
@@ -2127,6 +2144,35 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 @_effect
+def light_wrap(*, field: str = 'subject', width: float = 12.0, amount: float = 0.7, blur: float = 6.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Let the light of the backdrop spill over the edge of a shape (the subject by default), as it does round a real object in front of a bright background.  The backdrop's colour is the picture outside the shape, blurred by `blur` px so that detail does not wrap, and only from the backdrop itself. It is screened over the shape: a pixel at depth d inside the edge gets `amount * (1 - d / width)` of it, most at the edge, none from `width` in. Pixels outside the shape and deeper than `width` are exactly as they were, and since it is screened the shape only ever brightens (a black backdrop adds nothing). Use it after a background replacement, so the subject looks lit by its new surroundings.
+
+Parameters
+----------
+field : field name, default 'subject'
+    The shape the light wraps onto: `subject` (the subject's silhouette), `background`,
+    `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel
+    is inside it from `field_threshold` up, and the backdrop is everything else.
+width : number, px, 0 to 96, default 12.0
+    How far in from the shape's edge the light reaches, in px at the recipe's size:
+    raising it lets the light spill deeper. 0 = nothing is changed.
+amount : number, fraction, 0 to 1, default 0.7
+    How strongly the backdrop's colour is screened over the edge: 0 = off, 1 = the
+    colour at full strength at the edge, fading to nothing at `width`.
+blur : number, px, 1 to 100, default 6.0
+    Gaussian sigma, in px, with which the backdrop's colour is softened: raising it
+    spreads the light evenly and loses the backdrop's detail, lowering it carries the
+    backdrop's shapes onto the edge.
+
+Advanced parameters
+-------------------
+field_threshold : number, fraction, 0 to 1, default 0.5
+    The field's value, 0 to 1, from which a pixel belongs to the shape the light wraps
+    onto: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair,
+    fur), raising it less."""
+    ...
+
+@_effect
 def liquid_metal(*, smoothing: float = 3.0, relief: float = 35.0, horizon: float = 0.65, tint: str | list[float] | tuple[float, float, float] = '#c9d6ff', truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground.  The height is the Rec. 709 luminance smoothed by `smoothing`; only brightness matters, the picture's hues are gone. A viewer straight above sees, in a surface with slopes (dy, dx) down and across the picture, the environment at t = 0.5 + dy / (1 + dx^2 + dy^2) from the ground (0) to the sky (1), 0.5 where the surface is flat. The environment runs linearly from 0 on the ground to 0.5 at `horizon` to 1 at the sky, and the metal colours it from black through `tint` to white.
 
@@ -2320,13 +2366,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def outline(*, field: str = 'subject', width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A coloured stroke of `width` px around a shape (the subject by default), with an optional soft halo of `glow` px.
-
-The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly
-as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft
-the stroke lies behind it. The edge is antialiased over one pixel.
-
-`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+    """A coloured stroke of `width` px around a shape (the subject by default), with an optional soft halo of `glow` px.  The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft the stroke lies behind it. The edge is antialiased over one pixel.
 
 Parameters
 ----------
@@ -2857,16 +2897,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def reflection(*, field: str = 'subject', height: float = 0.4, fade: float = 0.7, blur: float = 2.0, field_threshold: float = 0.5, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A floor mirror: the picture above a shape's lowest row is mirrored about it, softened and fading with depth.
-
-The floor line is the bottom of the shape; the reflection is `height` of the shape's height deep, blurred by
-`blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade`
-at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.
-
-When nothing in the field counts as the shape (see `field_threshold`), there is no floor line and so no
-reflection: the picture comes back unchanged.
-
-`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+    """A floor mirror: the picture above a shape's lowest row is mirrored about it, softened and fading with depth.  The floor line is the bottom of the shape; the reflection is `height` of the shape's height deep, blurred by `blur`, a perfect mirror at the floor line that is mixed into the floor below by less and less, down to 1 - `fade` at its end. It stops at the picture's bottom edge, and the picture above the floor line is never changed.  When nothing in the field counts as the shape (see `field_threshold`), there is no floor line and so no reflection: the picture comes back unchanged.
 
 Parameters
 ----------
@@ -2995,16 +3026,7 @@ anaglyph : A red-cyan 3D anaglyph: red slid left, green and blue right. Grey the
 
 @_effect
 def rim_light(*, field: str = 'subject', angle: float = 320.0, color: str | list[float] | tuple[float, float, float] = '#ff9a4d', width: float = 12.0, amount: float = 1.0, falloff: float = 1.5, smoothing: float = 2.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Light along a shape's edge (the subject by default) from one side: a band of `width` px inside the edge, tinted
-`color`.
-
-Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the
-direction of `angle` (head-on = full, side-on = none, away = none), and the light fades with depth by `falloff`.
-It is screened over the picture, so it only ever brightens, and never reaches outside the shape or its
-interior beyond `width`. The picture's own border is no edge. A shape without an edge (empty or full) lights
-nothing.
-
-`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+    """Light along a shape's edge (the subject by default) from one side: a band of `width` px inside the edge, tinted `color`.  Only the edge that faces the light is lit, by the cosine of the angle between its outward direction and the direction of `angle` (head-on = full, side-on = none, away = none), and the light fades with depth by `falloff`. It is screened over the picture, so it only ever brightens, and never reaches outside the shape or its interior beyond `width`. The picture's own border is no edge. A shape without an edge (empty or full) lights nothing.
 
 Parameters
 ----------
@@ -3123,15 +3145,7 @@ softness : number, fraction, 0 to 1, default 0.0
 
 @_effect
 def seams(*, width: float = 2.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', partition: str | None = None, name: str | None = None) -> Step:
-    """Draw a solid line or band along every border between the pieces of a partition.
-
-The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is
-not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a partition
-(grid, shards, cuts, svg or bands) or a selection such as the subject (counted as two pieces, what it chooses
-and what it does not), which outlines its hard edge. Without a partition (or with a single piece) there is no
-border and the picture is unchanged.
-
-`partition` is filled in by the recipe (never set it in a recipe file): int32 labels, one piece number per pixel.
+    """Draw a solid line or band along every border between the pieces of a partition.  The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is not a border. The pieces come from the step's `partition` key, which names a region of the recipe: a partition (grid, shards, cuts, svg or bands) or a selection such as the subject (counted as two pieces, what it chooses and what it does not), which outlines its hard edge. A partition of a single piece has no border: the picture is unchanged.
 
 Parameters
 ----------

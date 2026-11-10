@@ -6,11 +6,29 @@ Effects that work on the cut-out subject, apart from its background.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
+| <img src="../gallery/defringe.jpg" width="160" alt="defringe"> | `defringe` | Remove the colour halo that a cut-out's edge carries: within `width` px inside the edge of a shape (the subject by default) the picture takes the colour of the shape's interior. | `field='subject'` `width=3.0` `amount=1.0` +1 advanced | [defringe.toml](../../examples/effects/defringe.toml) |
 | <img src="../gallery/disperse.jpg" width="160" alt="disperse"> | `disperse` | One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo). | `field='subject'` `cell=5` `progress=0.0` `top=1.0` `outline=1.0` `sweep=0.0` `reach=1.0` `wind=96.0` `angle=350.0` `seed=0` +30 advanced | [disperse.toml](../../examples/effects/disperse.toml) |
 | <img src="../gallery/drop_shadow.jpg" width="160" alt="drop_shadow"> | `drop_shadow` | Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by `blur`: a drop shadow, layered paper cutouts or a long shadow. | `field='subject'` `copies=1` `offset=22.0` `angle=56.0` `blur=24.0` `color='#000000'` `end_color='#000000'` `copy_opacity=1.0` `fade=0.0` +2 advanced | [drop_shadow.toml](../../examples/effects/drop_shadow.toml) |
+| <img src="../gallery/light_wrap.jpg" width="160" alt="light_wrap"> | `light_wrap` | Let the light of the backdrop spill over the edge of a shape (the subject by default), as it does round a real object in front of a bright background. | `field='subject'` `width=12.0` `amount=0.7` `blur=6.0` +1 advanced | [light_wrap.toml](../../examples/effects/light_wrap.toml) |
 | <img src="../gallery/outline.jpg" width="160" alt="outline"> | `outline` | A coloured stroke of `width` px around a shape (the subject by default), with an optional soft halo of `glow` px. | `field='subject'` `width=6.0` `color='#ffffff'` `position='outside'` `glow=0.0` +1 advanced | [outline.toml](../../examples/effects/outline.toml) |
 | <img src="../gallery/reflection.jpg" width="160" alt="reflection"> | `reflection` | A floor mirror: the picture above a shape's lowest row is mirrored about it, softened and fading with depth. | `field='subject'` `height=0.4` `fade=0.7` `blur=2.0` +3 advanced | [reflection.toml](../../examples/effects/reflection.toml) |
 | <img src="../gallery/rim_light.jpg" width="160" alt="rim_light"> | `rim_light` | Light along a shape's edge (the subject by default) from one side: a band of `width` px inside the edge, tinted `color`. | `field='subject'` `angle=320.0` `color='#ff9a4d'` `width=12.0` `amount=1.0` `falloff=1.5` +4 advanced | [rim_light.toml](../../examples/effects/rim_light.toml) |
+
+### `defringe`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `field` | field name |  |  | `'subject'` | The shape whose edge is cleaned: `subject` (the subject's silhouette), `background`, `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel is inside it from `field_threshold` up. |
+| `width` | number | px | 0 to 48 | `3.0` | Depth of the band inside the shape's edge that is recoloured, in px at the recipe's size: raising it cleans a wider fringe. 0 = nothing is changed. |
+| `amount` | number | fraction | 0 to 1 | `1.0` | How fully the band takes the interior colour at the edge: 0 = unchanged, 1 = the edge pixels are almost wholly the interior colour. It fades to nothing at `width`. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `field_threshold` | number | fraction | 0 to 1 | `0.5` | The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is cleaned: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
+
+</details>
 
 ### `disperse`
 
@@ -104,6 +122,23 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- |
 | `long_shadow` | The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. Shows on light backgrounds; set color for dark ones. |
 | `layered_cutouts` | Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple. |
+
+### `light_wrap`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `field` | field name |  |  | `'subject'` | The shape the light wraps onto: `subject` (the subject's silhouette), `background`, `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel is inside it from `field_threshold` up, and the backdrop is everything else. |
+| `width` | number | px | 0 to 96 | `12.0` | How far in from the shape's edge the light reaches, in px at the recipe's size: raising it lets the light spill deeper. 0 = nothing is changed. |
+| `amount` | number | fraction | 0 to 1 | `0.7` | How strongly the backdrop's colour is screened over the edge: 0 = off, 1 = the colour at full strength at the edge, fading to nothing at `width`. |
+| `blur` | number | px | 1 to 100 | `6.0` | Gaussian sigma, in px, with which the backdrop's colour is softened: raising it spreads the light evenly and loses the backdrop's detail, lowering it carries the backdrop's shapes onto the edge. |
+
+<details><summary>Advanced parameters (1)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `field_threshold` | number | fraction | 0 to 1 | `0.5` | The field's value, 0 to 1, from which a pixel belongs to the shape the light wraps onto: 0.5 = more than half covered. Lowering it takes in more of a soft edge (hair, fur), raising it less. |
+
+</details>
 
 ### `outline`
 
