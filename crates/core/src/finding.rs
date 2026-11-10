@@ -2,6 +2,9 @@
 //! made into the tensor a model takes, and how its answer becomes a map ([`ModelFinder`]). Running the model is
 //! [`Infer`]'s: the one part that needs a runtime.
 
+#[cfg(feature = "onnx")]
+pub mod onnx;
+
 use crate::ops::length::{float, whole};
 use crate::ops::resample::{Filter, Resize};
 use crate::{Error, Finder, Layer, Picture};
