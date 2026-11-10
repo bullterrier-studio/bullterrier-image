@@ -104,6 +104,8 @@ impl Infer for Session {
 #[non_exhaustive]
 pub struct Options {
     model_file: Option<PathBuf>,
+    /// The variable that named `model_file`, when one did: it is what an error names to say where to look.
+    model_variable: Option<&'static str>,
     cache: Option<PathBuf>,
     library: Option<PathBuf>,
     allow_download: bool,
@@ -128,6 +130,7 @@ impl Options {
         };
         Self {
             model_file: var(model).map(PathBuf::from),
+            model_variable: var(model).map(|_| model),
             cache: None,
             library: var("BT_IMAGE_ONNX_LIB").map(PathBuf::from),
             allow_download: var("BT_IMAGE_ALLOW_DOWNLOAD").is_some_and(|value| {
@@ -147,6 +150,7 @@ impl Options {
     #[must_use]
     pub fn with_model_file(mut self, file: impl Into<PathBuf>) -> Self {
         self.model_file = Some(file.into());
+        self.model_variable = None;
         self
     }
 
@@ -201,19 +205,32 @@ pub fn finder(model: &Model, options: &Options) -> Result<ModelFinder<Session>, 
     Ok(ModelFinder::new(model.kind, Session::open(&library, &file)?))
 }
 
+/// The local copy of `model` that `options` name, which must be a file, or none when the standard model is meant.
+///
+/// # Errors
+/// [`Error::BackendUnavailable`] naming the file, and the variable that named it if one did, when it is not a file.
+pub fn local_model<'a>(model: &Model, options: &'a Options) -> Result<Option<&'a Path>, Error> {
+    let Some(local) = options.model_file() else {
+        return Ok(None);
+    };
+    if local.is_file() {
+        return Ok(Some(local));
+    }
+    let by = options.model_variable.map_or_else(
+        || format!("it was named for the {} model", model.name),
+        |variable| format!("{variable} names it"),
+    );
+    Err(Error::BackendUnavailable(format!(
+        "the model file {} is not a file ({by})",
+        local.display()
+    )))
+}
+
 /// The file of `model`: the local copy named by `options`, else the one in the cache folder, downloaded if it is not
 /// there and `options` allow.
 fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
-    if let Some(local) = &options.model_file {
-        return if local.is_file() {
-            Ok(local.clone())
-        } else {
-            Err(Error::BackendUnavailable(format!(
-                "the model file {} is not a file (it was named for the {} model)",
-                local.display(),
-                model.name
-            )))
-        };
+    if let Some(local) = local_model(model, options)? {
+        return Ok(local.to_path_buf());
     }
     let cache = match &options.cache {
         Some(folder) => folder.clone(),

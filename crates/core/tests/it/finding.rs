@@ -261,7 +261,7 @@ fn an_answer_that_is_not_a_number_is_refused_not_taken_for_a_flat_one() -> Outco
         let values = grey(100, 150, 0.5);
         let refused = ModelFinder::new(ModelKind::Depth, stand).find(&Picture::new(100, 150, &values)?);
         assert!(
-            matches!(&refused, Err(Error::Inputs(message)) if message.contains("map")),
+            matches!(&refused, Err(Error::MapNotFound { kind: MapKind::Depth, message, .. }) if message.contains("no map")),
             "{answer}: {refused:?}"
         );
     }

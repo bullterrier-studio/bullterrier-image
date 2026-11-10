@@ -313,7 +313,7 @@ fn subject_map(
             "no subject found in the picture (no person, pet or object stood out)",
         ));
     }
-    let matte = Layer::new(to.0, to.1, stretched(&probability, from, to))?;
+    let matte = model_map("subject", to, stretched(&probability, from, to))?;
     Ok(crate::refine_edge(&matte, shrink, feather))
 }
 
@@ -329,7 +329,7 @@ fn depth_map(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Result
     };
     // a value that is not a number made the spread, and so every value, not a number: the map refuses it here, where
     // every map is checked
-    Layer::new(to.0, to.1, values)
+    model_map("depth", to, values)
 }
 
 /// `answer` (`from` rows x columns) stretched bilinear to `to`, on the model's own scale: the stretch keeps 0..1, so the
@@ -344,6 +344,13 @@ fn inverse_depth(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Ve
         .into_iter()
         .map(|value| value * span + low)
         .collect()
+}
+
+/// The map called `name` that a model's `values` make for a photo of `size` (rows, columns): the one place a model's answer
+/// is held to the rule of a map (finite, within 0..1), and refused as that map's own error when it breaks it.
+fn model_map(name: &str, size: (usize, usize), values: Vec<f32>) -> Result<Layer, Error> {
+    Layer::new(size.0, size.1, values)
+        .map_err(|error| Error::map_not_found(name, format!("the {name} model's answer is no map: {error}")))
 }
 
 /// The smallest of `values` and the distance to the largest. The order is the total one, in which a NaN is the largest

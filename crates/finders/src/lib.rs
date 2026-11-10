@@ -123,16 +123,9 @@ pub fn depth_identity(onnx: &Options) -> Result<String, Error> {
 }
 
 fn model_identity(model: &Model, onnx: &Options) -> Result<String, Error> {
-    let digest = match onnx.model_file() {
+    let digest = match onnx::local_model(model, onnx)? {
         None => model.sha256.to_owned(),
-        Some(file) if file.is_file() => onnx::sha256_of(file)?,
-        Some(file) => {
-            return Err(Error::BackendUnavailable(format!(
-                "the model file {} is not a file (it was named for the {} model)",
-                file.display(),
-                model.name
-            )));
-        }
+        Some(file) => onnx::sha256_of(file)?,
     };
     Ok(format!("onnx:sha256 {digest}"))
 }
