@@ -281,15 +281,26 @@ pub(crate) fn graded_blur(
     mixed
 }
 
-/// The weights of the Gaussian kernel at distance 0, 1, ... from a sample, to its reach, summing to 1 when the other
-/// side is counted too.
+/// How many px either side of a sample a Gaussian of `sigma` px cut off at `truncate` sigmas reaches.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     reason = "scipy's int(): a reach in px, small and positive"
 )]
+fn reach(sigma: f64, truncate: f64) -> usize {
+    (truncate * sigma + 0.5) as usize // constant: how scipy sizes its kernel
+}
+
+/// Whether a Gaussian of `sigma` px cut off at `truncate` sigmas is summed by the Fourier transform, whose sum depends on
+/// the length of the lines it is given (so on the height of a band), and not tap by tap.
+pub(crate) fn is_fourier(sigma: f64, truncate: f64) -> bool {
+    reach(sigma, truncate) >= FFT_FROM_REACH
+}
+
+/// The weights of the Gaussian kernel at distance 0, 1, ... from a sample, to its reach, summing to 1 when the other
+/// side is counted too.
 pub(crate) fn weights(sigma: f64, truncate: f64) -> Vec<f64> {
-    let reach = (truncate * sigma + 0.5) as usize; // constant: how scipy sizes its kernel
+    let reach = reach(sigma, truncate);
     if reach == 0 {
         return vec![1.0]; // also sigma 0, which would divide by zero below
     }

@@ -291,6 +291,41 @@ fn margins_that_reach_the_picture_give_the_whole_render() -> Outcome {
     )
 }
 
+/// A relief effect multiplies a blurred height by a large factor, so a blur summed by the Fourier transform (whose sum
+/// follows the window length) must not show: each case is the effect with two parameters at their limits at once, on a
+/// picture 481 rows high (a design pixel is a working pixel), blurs reaching 8 to 24 px.
+#[test]
+fn a_relief_effect_with_a_steep_height_and_a_wide_blur_is_the_same_banded() -> Outcome {
+    let values = varied(481, WIDTH);
+    let mut cases = Vec::new();
+    for blur in [2.0, 3.0, 4.0, 6.0, 20.0] {
+        cases.push(
+            Step::new("relight")
+                .param("blur", blur)
+                .param("elevation", 1.0)
+                .param("height", 1000.0),
+        );
+        cases.push(
+            Step::new("liquid_metal")
+                .param("smoothing", blur)
+                .param("relief", 200.0),
+        );
+    }
+    let mut problems = Vec::new();
+    for step in cases {
+        let found = first_problem(
+            &values,
+            &Recipe::new([step.clone()]),
+            Options::default(),
+            &[17, 150],
+            TOLERANCE,
+        )?;
+        problems.extend(found.map(|found| format!("{} {:?}: {found}", step.effect, step.params)));
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+    Ok(())
+}
+
 #[test]
 fn a_band_of_no_rows_is_refused_naming_it() {
     let values = varied(HEIGHT, WIDTH);

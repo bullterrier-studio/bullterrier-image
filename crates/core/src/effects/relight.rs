@@ -3,7 +3,7 @@
 use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
-use crate::ops::blur::gaussian_filter_plane;
+use crate::ops::blur::{gaussian_filter_plane, is_fourier};
 use crate::ops::edge::Edge;
 use crate::ops::relief::shade_slopes;
 use crate::params::{FieldName, Params};
@@ -17,8 +17,15 @@ pub(crate) const META: Meta = Meta {
     inputs: &[],
 };
 
-/// What `relight` reads around a pixel: the blur's reach and a pixel on either side for the slope.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+/// What `relight` reads around a pixel: the blur's reach and a pixel on either side for the slope. A blur summed by the
+/// Fourier transform follows the length of its lines, and `height` multiplies that difference into a visible one: the whole.
+pub(crate) fn footprint(params: &Params, canvas: &Canvas) -> Footprint {
+    // the render blurs with `blur` scaled to working px, as an f32
+    #[expect(clippy::cast_possible_truncation, reason = "the f32 the render is given")]
+    let sigma = f64::from((f64::from(params.blur) * canvas.ratio) as f32);
+    if is_fourier(sigma, f64::from(params.truncate)) {
+        return Footprint::Whole;
+    }
     // constant: the kernel reaches int(truncate x blur + 0.5) px and the slope one more
     Footprint::reach(
         f64::from(params.blur * params.truncate) + 1.5,
