@@ -23,7 +23,7 @@ delaunator = { version = "=1.1.0", default-features = false }  # Delaunay triang
 glob = "0.3"  # the photos of a project: globs relative to its file (`pipeline/project.rs`), dotfiles skipped as a shell does
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
 libm = "0.2"  # erfc, for the normal distribution function (`ops/gauss.rs`): pure Rust, MIT, no C
-moxcms = { version = "0.8", default-features = false, features = ["lut"] }  # the colour profiles of image files, to sRGB (`lut` for the CMYK ones; the `image` crate brings it too, with its default features, so its SIMD paths are on)
+moxcms = { version = "0.9", default-features = false, features = ["lut"] }  # the colour profiles of image files, to sRGB (`lut` for the CMYK ones; the `image` crate brings it too, with its default features, so its SIMD paths are on)
 numpy = "0.30"
 # Apple Vision from Rust (`crates/finders/src/vision.rs`, macOS only): the same calls pyobjc made, byte for byte
 objc2 = "0.6"
