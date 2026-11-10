@@ -143,13 +143,29 @@ const SUBJECT_MEAN: f32 = 0.5; // constant: IS-Net's normalisation, v - 0.5 on 0
 pub struct ModelFinder<R> {
     kind: ModelKind,
     runner: R,
+    shrink: f64,
+    feather: f64,
 }
 
 impl<R: Infer> ModelFinder<R> {
     /// A finder for a model of `kind`, run by `runner`.
     #[must_use]
     pub const fn new(kind: ModelKind, runner: R) -> Self {
-        Self { kind, runner }
+        Self {
+            kind,
+            runner,
+            shrink: SHRINK,
+            feather: FEATHER,
+        }
+    }
+
+    /// This finder with the edge clean-up of a subject set to `shrink` and `feather` px ([`refine_edge`](crate::refine_edge)):
+    /// the defaults are 1.5 and 1, for a photo of 1000 to 1600 px. A depth is not cleaned.
+    #[must_use]
+    pub const fn with_edge(mut self, shrink: f64, feather: f64) -> Self {
+        self.shrink = shrink;
+        self.feather = feather;
+        self
     }
 }
 
@@ -170,7 +186,7 @@ impl<R: Infer> Finder for ModelFinder<R> {
             )));
         }
         match self.kind {
-            ModelKind::Subject => subject_map(&answer.values, side, (height, width)),
+            ModelKind::Subject => subject_map(&answer.values, side, (height, width), (self.shrink, self.feather)),
             ModelKind::Depth => depth_map(&answer.values, side, (height, width)),
         }
     }
@@ -230,7 +246,38 @@ fn stretched(values: &[f32], from: (usize, usize), to: (usize, usize)) -> Vec<f3
         .collect()
 }
 
-fn subject_map(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Result<Layer, Error> {
+/// The matte of a photo of `to` (rows, columns) from a subject model's answer: `probability` (0..1, row after row) at the
+/// model's own size `from`. It is stretched to the photo, its edge cleaned ([`refine_edge`](crate::refine_edge), `shrink`
+/// `shrink` and `feather` px; 1.5 and 1 are the defaults) and, if no pixel is at least half sure, the picture has no
+/// subject. This is what
+/// [`ModelFinder`] does with a [`ModelKind::Subject`] answer, for a backend that is not a [`ModelFinder`].
+///
+/// # Errors
+/// [`Error::MapNotFound`] of kind subject if no value is at least 0.5; [`Error::Inputs`] if `probability` is not
+/// `from.0 * from.1` values.
+pub fn subject_matte(
+    probability: &[f32],
+    from: (usize, usize),
+    to: (usize, usize),
+    (shrink, feather): (f64, f64),
+) -> Result<Layer, Error> {
+    if probability.len() != from.0 * from.1 {
+        return Err(Error::Inputs(format!(
+            "{} values are not a map of {} x {} pixels",
+            probability.len(),
+            from.0,
+            from.1
+        )));
+    }
+    subject_map(probability, from, to, (shrink, feather))
+}
+
+fn subject_map(
+    answer: &[f32],
+    from: (usize, usize),
+    to: (usize, usize),
+    (shrink, feather): (f64, f64),
+) -> Result<Layer, Error> {
     let probability: Vec<f32> = answer.iter().map(|value| value.clamp(0.0, 1.0)).collect();
     if !probability.iter().any(|&value| value >= SURE) {
         return Err(Error::map_not_found(
@@ -239,7 +286,7 @@ fn subject_map(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Resu
         ));
     }
     let matte = Layer::new(to.0, to.1, stretched(&probability, from, to))?;
-    Ok(crate::refine_edge(&matte, SHRINK, FEATHER))
+    Ok(crate::refine_edge(&matte, shrink, feather))
 }
 
 fn depth_map(answer: &[f32], from: (usize, usize), to: (usize, usize)) -> Result<Layer, Error> {

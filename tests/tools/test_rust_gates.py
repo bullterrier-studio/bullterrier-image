@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE_FILES = ["pyproject.toml", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "rustfmt.toml", "deny.toml"]
 CORE = "crates/core/src/lib.rs"
 CORE_MANIFEST = "crates/core/Cargo.toml"
+FINDERS = "crates/finders/src/lib.rs"
 
 
 @dataclass(frozen=True)
@@ -138,6 +139,12 @@ OFFENCES = {
         CORE,
         appended("\n/// Probe.\n#[must_use]\npub fn probe(text: &str) -> u8 {\n    text.parse().unwrap()\n}\n"),
         ["unwrap_used", CORE],
+    ),
+    "an unwrap in the finders crate": (
+        "rust-lint",
+        FINDERS,
+        appended("\n/// Probe.\n#[must_use]\npub fn probe(text: &str) -> u8 {\n    text.parse().unwrap()\n}\n"),
+        ["unwrap_used", FINDERS],
     ),
     "an expect": (
         "rust-lint",

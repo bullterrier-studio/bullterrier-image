@@ -1,0 +1,23 @@
+[package]
+name = "bullterrier-image-finders"
+description = "The finders of bullterrier-image that need more than the core: Apple Vision, and the choice of a segmenter by what the platform has."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+bullterrier-image = { workspace = true, features = ["onnx"] }
+image.workspace = true
+
+# Apple Vision, called from Rust (src/vision.rs): macOS only, the one place besides PyO3 with `unsafe` calls
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
+objc2-core-video.workspace = true
+objc2-foundation.workspace = true
+objc2-vision.workspace = true
+
+[lints]
+workspace = true

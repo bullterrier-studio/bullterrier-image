@@ -151,6 +151,14 @@ impl Options {
         self
     }
 
+    /// These options with `file` as the ONNX Runtime library to load, unless the environment named one
+    /// ([`from_env`](Self::from_env)): the variable wins over a default the caller found.
+    #[must_use]
+    pub fn with_default_library(mut self, file: impl Into<PathBuf>) -> Self {
+        self.library.get_or_insert_with(|| file.into());
+        self
+    }
+
     /// These options with the ONNX Runtime library file to load.
     #[must_use]
     pub fn with_library(mut self, file: impl Into<PathBuf>) -> Self {
