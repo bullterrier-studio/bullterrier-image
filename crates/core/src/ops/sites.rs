@@ -1,6 +1,10 @@
-//! The seeds of shards: a jittered honeycomb scattered over a frame, crowded towards an impact point, kept to the pixels a
-//! selection chooses, and made exactly as many as asked for.
+//! The seeds of pieces: a jittered honeycomb scattered over a frame, crowded towards an impact point, kept to the pixels a
+//! selection chooses, and made exactly as many as asked for ([`sites`]); or points anywhere, or where a picture has detail
+//! ([`scatter`], [`detail_weights`]).
 
+use super::color::luminance;
+use super::edge::Edge;
+use super::edges::{at, sobel};
 use super::length;
 use super::outlines::Frame;
 use super::pieces::chosen;
@@ -103,4 +107,133 @@ pub(crate) fn sites(
         }
     }
     kept
+}
+
+/// How likely a point is in each pixel of `pixels` (`height` x `width`, row after row): weights that add up to 1, a mix of
+/// an even share, `1 - detail` of the total (0..1), and a share that follows the picture's edges, `detail` of it, in
+/// proportion to how steeply the brightness changes at the pixel (the Sobel strength of the Rec. 709 luminance). A picture
+/// with no edge at all has only the even share, so it is even whatever `detail` is. `edge` is what lies beyond the picture's
+/// border.
+pub(crate) fn detail_weights(
+    pixels: &[[f32; 3]],
+    (height, width): (usize, usize),
+    detail: f64,
+    edge: Edge,
+) -> Vec<f64> {
+    let plane: Vec<f32> = pixels.iter().map(|&pixel| luminance(pixel)).collect();
+    let slopes = sobel(&plane, (height, width), edge, 1.0);
+    let strength: Vec<f64> = (0..height * width)
+        .map(|index| f64::from(slopes[at(width, index / width, index % width)].strength))
+        .collect();
+    let total: f64 = strength.iter().sum();
+    let even = 1.0 / length::float(height * width);
+    if total == 0.0 {
+        return vec![even; height * width];
+    }
+    strength
+        .iter()
+        .map(|level| (1.0 - detail) * even + detail * level / total)
+        .collect()
+}
+
+/// `count` points over a `height` x `width` picture, `(x, y)` in px: with no `weights` anywhere in the picture, every place
+/// equally likely; with `weights` (non-negative, one for each pixel, row after row, adding up to more than 0) in a pixel with
+/// a probability proportional to its weight, and anywhere inside the pixel. They come from `rng`.
+pub(crate) fn scatter(
+    count: usize,
+    (height, width): (usize, usize),
+    weights: Option<&[f64]>,
+    rng: &mut Rng,
+) -> Vec<[f64; 2]> {
+    let (rows, columns) = (length::float(height), length::float(width));
+    let Some(weights) = weights else {
+        return (0..count)
+            .map(|_| [rng.uniform() * columns, rng.uniform() * rows])
+            .collect();
+    };
+    let mut running = 0.0;
+    let cumulative: Vec<f64> = weights
+        .iter()
+        .map(|weight| {
+            running += weight;
+            running
+        })
+        .collect();
+    (0..count)
+        .map(|_| {
+            let drawn = rng.uniform() * running;
+            let pixel = cumulative.partition_point(|upto| *upto <= drawn).min(weights.len() - 1);
+            [
+                length::float(pixel % width) + rng.uniform(),
+                length::float(pixel / width) + rng.uniform(),
+            ]
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A `height` x `width` grey picture, dark left of column `edge` and bright from it on.
+    fn step(height: usize, width: usize, edge: usize) -> Vec<[f32; 3]> {
+        (0..height * width)
+            .map(|at| [f32::from(u8::from(at % width >= edge)); 3])
+            .collect()
+    }
+
+    #[test]
+    fn detail_weights_add_up_to_1_and_follow_the_edge_by_detail() {
+        let (height, width) = (6, 10);
+        let pixels = step(height, width, 5);
+        let near = |a: f64, b: f64| (a - b).abs() < 1e-12;
+        for detail in [0.0, 0.25, 1.0] {
+            let weights = detail_weights(&pixels, (height, width), detail, Edge::Nearest);
+            assert!(near(weights.iter().sum::<f64>(), 1.0), "detail {detail}");
+            // the share beyond the even one lies on the columns beside the step, 4 and 5, and nowhere else
+            let even = (1.0 - detail) / 60.0;
+            for (at, weight) in weights.iter().enumerate() {
+                let beside = matches!(at % width, 4 | 5);
+                assert!(
+                    if beside {
+                        *weight > even - 1e-15
+                    } else {
+                        near(*weight, even)
+                    },
+                    "detail {detail}, pixel {at}: {weight}"
+                );
+            }
+        }
+        // all of it on the step at detail 1
+        let weights = detail_weights(&pixels, (height, width), 1.0, Edge::Nearest);
+        assert!(near(weights.iter().step_by(width).sum::<f64>(), 0.0));
+    }
+
+    #[test]
+    fn a_picture_with_no_edge_is_even_whatever_the_detail() {
+        let weights = detail_weights(&[[0.4; 3]; 12], (3, 4), 1.0, Edge::Reflect);
+        assert!(weights.iter().all(|weight| (weight - 1.0 / 12.0).abs() < 1e-15));
+    }
+
+    #[test]
+    fn scattered_points_follow_the_weights_and_the_seed() {
+        let mut weights = vec![0.0; 12];
+        weights[7] = 3.0; // row 1, column 3 of a 3 x 4 picture
+        let points = scatter(50, (3, 4), Some(&weights), &mut Rng::seeded(1));
+        assert_eq!(points.len(), 50);
+        assert!(
+            points
+                .iter()
+                .all(|p| (3.0..4.0).contains(&p[0]) && (1.0..2.0).contains(&p[1]))
+        );
+        let anywhere = scatter(200, (3, 4), None, &mut Rng::seeded(1));
+        assert!(
+            anywhere
+                .iter()
+                .all(|p| (0.0..4.0).contains(&p[0]) && (0.0..3.0).contains(&p[1]))
+        );
+        let again = scatter(200, (3, 4), None, &mut Rng::seeded(1));
+        let other = scatter(200, (3, 4), None, &mut Rng::seeded(2));
+        assert!(anywhere == again && anywhere != other);
+    }
 }
