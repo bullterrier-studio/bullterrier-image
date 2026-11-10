@@ -765,13 +765,22 @@ BANDED = Recipe(
 )
 
 
+def test_a_band_taller_than_the_picture_is_the_whole_render(photo):
+    whole = facade.render(photo, BANDED)
+    np.testing.assert_array_equal(facade.render(photo, BANDED, band=2**63), whole)
+
+
 def test_a_banded_render_gives_the_picture_of_the_whole_render(photo):
     whole = facade.render(photo, BANDED)
     np.testing.assert_array_equal(facade.render(photo, BANDED, band=16), whole)
     np.testing.assert_array_equal(facade.render_all(photo, [BANDED], band=16)[0], whole)
 
 
-@pytest.mark.parametrize("band", [0, -3, 2.5, True, "8"], ids=["zero", "negative", "fraction", "bool", "text"])
+@pytest.mark.parametrize(
+    "band",
+    [0, -3, 2.5, True, "8", 2**64, 2**70],
+    ids=["zero", "negative", "fraction", "bool", "text", "past the largest row count", "far past it"],
+)
 def test_a_band_that_is_no_number_of_rows_is_refused_naming_it(photo, band):
     with pytest.raises(RecipeError, match="band"):
         facade.render(photo, BANDED, band=band)

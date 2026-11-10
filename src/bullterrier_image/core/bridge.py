@@ -130,10 +130,13 @@ def _check_size(size: object) -> None:
         raise RecipeError(f"size must be a whole number of pixels, 1 to {MAX_SIZE}, or None, got {size!r}")
 
 
+_MAX_BAND = 2**64 - 1  # constant: Rust's usize::MAX on the 64-bit targets we build, the extension's row type
+
+
 def _check_band(band: object) -> None:
-    """RecipeError unless `band` is None or a whole number of rows, 1 or more (a bool is not a number here)."""
-    if band is not None and (isinstance(band, bool) or not isinstance(band, int) or band < 1):
-        raise RecipeError(f"band must be a whole number of rows, 1 or more, or None, got {band!r}")
+    """RecipeError unless `band` is None or a whole number of rows, 1 to `_MAX_BAND` (a bool is not a number here)."""
+    if band is not None and (isinstance(band, bool) or not isinstance(band, int) or not 1 <= band <= _MAX_BAND):
+        raise RecipeError(f"band must be a whole number of rows, 1 to {_MAX_BAND}, or None, got {band!r}")
 
 
 def _check_threads(threads: object) -> None:
