@@ -2,7 +2,7 @@
 //! global registry, and the declared regions a JSON table writes.
 //!
 //! The registry is the process's: a test that needs an effect of its own registers one under a name no other test uses
-//! ([`Double::register`]); the three that recipes name by a fixed name (`probe`, `seams`, `fielded`) are registered once
+//! ([`Double::register`]); the three that recipes name by a fixed name (`probe`, `bordered`, `fielded`) are registered once
 //! by [`setup`].
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -118,14 +118,14 @@ impl Effect for Double {
 }
 
 /// Register the effects that recipes name by a fixed name, once however many tests ask: `probe` (one parameter of
-/// every kind, described by [`probe_table`]), `seams` (takes a partition and describes no parameters) and `fielded`
+/// every kind, described by [`probe_table`]), `bordered` (takes a partition and describes no parameters) and `fielded`
 /// (one field parameter, `near`, whose default field is `NEAR`).
 pub(crate) fn setup() -> Result<(), Error> {
     static DONE: OnceLock<Result<(), String>> = OnceLock::new();
     DONE.get_or_init(|| {
         let shared = [
             Double::new("probe").with_table(probe_table()),
-            Double::new("seams")
+            Double::new("bordered")
                 .in_category(Category::Stylised)
                 .with_inputs(&[Input::Partition]),
             Double::new("fielded").with_field("near"),

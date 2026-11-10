@@ -6,7 +6,7 @@ use crate::common::recipe::setup;
 use bullterrier_image::{Error, Preset, Presets};
 use serde_json::{Value, json};
 
-/// `presets` with the table `table` added for `effect` (`probe` and `seams` are registered), or why not.
+/// `presets` with the table `table` added for `effect` (`probe` and `bordered` are registered), or why not.
 fn added(effect: &str, table: &Value) -> Result<Presets, Error> {
     setup()?;
     let mut presets = Presets::new();
@@ -80,7 +80,7 @@ fn a_preset_of_an_effect_the_core_describes_is_checked_by_its_table() {
 #[test]
 fn a_preset_of_an_effect_with_no_table_or_not_known_is_kept_as_given() -> Outcome {
     let table = json!({"p": {"description": "D.", "anything": [1, "two"]}});
-    for effect in ["seams", "not_registered_yet"] {
+    for effect in ["bordered", "not_registered_yet"] {
         let presets = added(effect, &table)?;
         assert_eq!(
             presets.get(effect, "p").map(|preset| preset.params.clone()),
@@ -176,7 +176,7 @@ fn toml_a_recipe_has_no_use_for_is_refused_as_a_recipe_file_does() {
         ),
         (
             "nan, effect not described",
-            "seams",
+            "bordered",
             "[w]\ndescription = \"D.\"\nradius = nan\n",
             ["w.radius", "finite"],
         ),
@@ -188,13 +188,13 @@ fn toml_a_recipe_has_no_use_for_is_refused_as_a_recipe_file_does() {
         ),
         (
             "a date, effect not described",
-            "seams",
+            "bordered",
             "[w]\ndescription = \"D.\"\nwhen = 2024-01-01\n",
             ["w.when", "date"],
         ),
         (
             "nan in a list",
-            "seams",
+            "bordered",
             "[w]\ndescription = \"D.\"\nstops = [1.0, nan]\n",
             ["w.stops[1]", "finite"],
         ),

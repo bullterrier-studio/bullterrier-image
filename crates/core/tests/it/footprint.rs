@@ -20,12 +20,14 @@ use std::error::Error;
 use crate::common::Outcome;
 use crate::common::compare::first_difference_within;
 use bullterrier_image::params::{Field, Kind, Scalar, Table, Unit};
-use bullterrier_image::{Category, Effect, Footprint, Image, Input, Inputs, Layer, Picture, effect, effects};
+use bullterrier_image::{Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, effect, effects};
 use serde_json::{Map, Value, json};
 
 /// The picture is tall and narrow: only the rows matter to a band.
 const HEIGHT: usize = 96;
 const WIDTH: usize = 24;
+/// The rows of each piece of the partition an effect that takes one is given.
+const PIECE_ROWS: usize = 20;
 /// The rows of a band, and where each band starts: at the top, in the middle and at the bottom of the picture.
 const BAND: usize = 8;
 const BANDS: [usize; 3] = [0, (HEIGHT - BAND) / 2, HEIGHT - BAND];
@@ -158,6 +160,16 @@ fn run(
     (picture, map): (&[f32], &Layer),
 ) -> Result<Image, Box<dyn Error>> {
     let cropped = Layer::new(to - from, WIDTH, rows(map.values(), 1, from, to).to_vec())?;
+    // an effect that takes a partition gets bands of `PIECE_ROWS` rows, two pieces taking turns: borders far enough
+    // apart that a band can lie beyond a short reach of every one
+    let pieces = Labels::new(
+        to - from,
+        WIDTH,
+        (from..to)
+            .flat_map(|row| std::iter::repeat_n(i32::from(row / PIECE_ROWS % 2 == 1), WIDTH))
+            .collect(),
+        2,
+    )?;
     let mut inputs = Inputs::default().with_size_ratio(ratio);
     for field in table
         .iter()
@@ -165,6 +177,9 @@ fn run(
         .filter(|field| field.kind == Kind::Field)
     {
         inputs = inputs.with_field(field.name, &cropped);
+    }
+    if one.inputs().contains(&Input::Partition) {
+        inputs = inputs.with_partition(&pieces);
     }
     let picture = Picture::new(to - from, WIDTH, rows(picture, 3, from, to))?;
     Ok(one.apply(&picture, Value::Object(params.clone()), &inputs)?)

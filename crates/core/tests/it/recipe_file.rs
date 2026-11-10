@@ -42,7 +42,7 @@ angle = 90.0         # a decimal stays decimal
 tint = [0.0, 0.5, 1.0]
 
 [[step]]
-effect = "seams"
+effect = "bordered"
 partition = "panes"
 
 [[step]]
@@ -74,7 +74,7 @@ fn a_recipe_file_reads_into_the_steps_it_writes() {
         "steps": [
             {"effect": "probe", "params": {"cell": 8, "angle": 90.0, "tint": [0.0, 0.5, 1.0]},
              "preset": "wide", "mask": "subject", "opacity": 0.4, "blend_mode": "screen", "name": "base"},
-            {"effect": "seams", "partition": "panes"},
+            {"effect": "bordered", "partition": "panes"},
             {"effect": "probe", "params": {"cell": {"by": "depth", "start": 4, "end": 100.0}}},
             {"each": "panes", "looks": [{"effect": "probe", "params": {"cells": 7}}, null],
              "assign": "random", "seed": 7, "feather": 3.0, "mask": "background"},

@@ -125,6 +125,7 @@ mod run_size;
 mod run_step;
 mod run_trace;
 mod scale;
+mod seams;
 mod shards;
 mod shards_sites;
 mod sharpen;

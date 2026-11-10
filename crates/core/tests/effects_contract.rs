@@ -25,7 +25,8 @@ use std::sync::Arc;
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
 use bullterrier_image::{
-    Category, Constraint, Effect, Image, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Step, effect, effects,
+    Category, Constraint, Effect, Image, Input, Inputs, Labels, Layer, Options, Photo, Picture, Presets, Recipe, Step,
+    effect, effects,
 };
 use common::compare::first_bit_difference;
 use serde_json::{Map, Value, json};
@@ -120,6 +121,12 @@ fn cone(height: usize, width: usize) -> Result<Layer, Box<dyn Error>> {
     Ok(Layer::new(height, width, values)?)
 }
 
+/// The partition every effect that takes one is given: the two pieces of `map`, below a half and from it up.
+fn halves(map: &Layer) -> Result<Labels, Box<dyn Error>> {
+    let labels = map.values().iter().map(|&value| i32::from(value >= 0.5)).collect();
+    Ok(Labels::new(map.height(), map.width(), labels, 2)?)
+}
+
 /// `effect` applied with `given` (completed and checked by the table) to the `height` x `width` picture `values`.
 fn run(
     one: &dyn Effect,
@@ -131,9 +138,13 @@ fn run(
 ) -> Result<Vec<f32>, Box<dyn Error>> {
     let params = table.check(one.name(), given)?;
     let layer = cone(height, width)?;
+    let pieces = halves(&layer)?;
     let mut inputs = Inputs::default();
     for field in table.fields.iter().filter(|field| field.kind == Kind::Field) {
         inputs = inputs.with_field(field.name, &layer);
+    }
+    if one.inputs().contains(&Input::Partition) {
+        inputs = inputs.with_partition(&pieces);
     }
     let image = one.apply(&Picture::new(height, width, values)?, Value::Object(params), &inputs)?;
     if (image.height(), image.width()) != (height, width) {
@@ -539,8 +550,17 @@ fn photo(picture: Picture<'_>, height: usize, width: usize) -> Result<Photo<'_>,
         .with_map("subject", cone(height, width)?)?)
 }
 
-fn render(photo: &Photo<'_>, name: &str, options: Options) -> Result<Image, Box<dyn Error>> {
-    Ok(photo.render(&Recipe::new([Step::new(name)]), &Presets::new(), options)?)
+/// A step of `one` at its defaults; one that takes a partition draws along the subject's (two pieces).
+fn step(one: &dyn Effect) -> Step {
+    let mut step = Step::new(one.name());
+    if one.inputs().contains(&Input::Partition) {
+        step.partition = Some("subject".to_owned());
+    }
+    step
+}
+
+fn render(photo: &Photo<'_>, one: &dyn Effect, options: Options) -> Result<Image, Box<dyn Error>> {
+    Ok(photo.render(&Recipe::new([step(one)]), &Presets::new(), options)?)
 }
 
 #[test]
@@ -549,8 +569,8 @@ fn every_effect_gives_the_same_bytes_at_one_and_at_three_threads() -> Outcome {
     let photo = photo(Picture::new(61, 37, &values)?, 61, 37)?;
     let mut problems = Vec::new();
     for (one, _) in core_effects()? {
-        let single = render(&photo, one.name(), Options::default())?.into_values();
-        let three = render(&photo, one.name(), Options::default().with_threads(3))?.into_values();
+        let single = render(&photo, &*one, Options::default())?.into_values();
+        let three = render(&photo, &*one, Options::default().with_threads(3))?.into_values();
         if let Some(at) = first_bit_difference(&single, &three) {
             problems.push(format!("{}: threads 1 and 3 differ at value {at}", one.name()));
         }
@@ -655,7 +675,7 @@ fn every_effect_at_its_defaults_looks_the_same_at_its_design_size_and_at_twice_i
     let (plain_small, plain_large) = (at(&untouched, 480)?, at(&untouched, 960)?);
     let mut problems = Vec::new();
     for (one, _) in core_effects()? {
-        let look = Recipe::new([Step::new(one.name())]);
+        let look = Recipe::new([step(&*one)]);
         let (small, large) = (at(&look, 480)?, at(&look, 960)?);
         // the 960 render shrunk back to 480 by averaging each 2 x 2 block: its mean colour against the 480 render's
         let (h, w) = (360_usize, 480_usize);

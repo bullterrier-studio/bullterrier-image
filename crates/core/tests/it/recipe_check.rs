@@ -1,6 +1,6 @@
 //! The rules of a look, through the public API alone: `Recipe::checked` accepts the recipes that follow them and
 //! refuses each that breaks one, naming the step and the trouble. The effects the recipes name are the core's own and
-//! the doubles of `common::recipe` (`probe`, `seams`, `fielded`) registered in the global registry.
+//! the doubles of `common::recipe` (`probe`, `bordered`, `fielded`) registered in the global registry.
 
 use crate::common::Outcome;
 use crate::common::recipe::{drive, regions, setup};
@@ -19,9 +19,9 @@ fn named(name: &str) -> Step {
     step
 }
 
-/// A `seams` step (the effect that takes a partition and describes no parameters) drawing along `partition`.
-fn seams(partition: Option<&str>) -> Step {
-    let mut step = Step::new("seams");
+/// A `bordered` step (the effect that takes a partition and describes no parameters) drawing along `partition`.
+fn bordered(partition: Option<&str>) -> Step {
+    let mut step = Step::new("bordered");
     step.partition = partition.map(str::to_owned);
     step
 }
@@ -95,15 +95,15 @@ fn good() -> Vec<(&'static str, Recipe)> {
         ),
         (
             "a step that takes a partition, given a declared one",
-            with_regions(Recipe::new([seams(Some("panes"))])),
+            with_regions(Recipe::new([bordered(Some("panes"))])),
         ),
         (
             "a built-in selection as a step's partition",
-            Recipe::new([seams(Some("subject"))]),
+            Recipe::new([bordered(Some("subject"))]),
         ),
         (
             "an effect with no table keeps its parameters as given",
-            Recipe::new([seams(Some("subject")).param("anything", json!([1, "two"]))]),
+            Recipe::new([bordered(Some("subject")).param("anything", json!([1, "two"]))]),
         ),
         ("an each step over a declared region", with_regions(Recipe::new([each]))),
         (
@@ -198,7 +198,7 @@ fn bad() -> Vec<(&'static str, Recipe, &'static str)> {
         ("a preset the effect has", Recipe::new([preset_missing]), "no preset"),
         (
             "a partition for the effect that draws along one",
-            Recipe::new([seams(None)]),
+            Recipe::new([bordered(None)]),
             "`partition`",
         ),
         (
@@ -208,7 +208,7 @@ fn bad() -> Vec<(&'static str, Recipe, &'static str)> {
         ),
         (
             "the partition is a region",
-            Recipe::new([seams(Some("nowhere"))]),
+            Recipe::new([bordered(Some("nowhere"))]),
             "nowhere",
         ),
         ("opacity at most 1", Recipe::new([probe().opacity(1.5)]), "`opacity`"),
@@ -532,7 +532,7 @@ fn a_preset_lies_under_the_given_parameters() -> Outcome {
         "{refused:?}"
     );
     // an effect with no presets says so
-    let mut step = seams(Some("subject"));
+    let mut step = bordered(Some("subject"));
     step.preset = Some("any".to_owned());
     let refused = refusal(&Recipe::new([step]), &presets)?.map(|error| error.to_string());
     assert!(

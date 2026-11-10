@@ -49,13 +49,13 @@ fn a_recipe_is_written_in_the_form_a_person_would_and_reads_back_equal() {
     each.opacity = Some(0.5);
     each.blend_mode = BlendMode::Multiply;
     each.name = Some("tiles".to_owned());
-    let mut seams = Step::new("seams");
-    seams.partition = Some("panes".to_owned());
-    seams.preset = Some("thin".to_owned());
-    seams.name = Some("edges".to_owned());
+    let mut bordered = Step::new("bordered");
+    bordered.partition = Some("panes".to_owned());
+    bordered.preset = Some("thin".to_owned());
+    bordered.name = Some("edges".to_owned());
     let mut recipe = Recipe::new([
         Entry::from(Step::new("bloom").param("radius", 12).opacity(0.4)),
-        seams.into(),
+        bordered.into(),
         each.into(),
     ]);
     recipe.name = Some("night".to_owned());
@@ -72,7 +72,7 @@ fn a_recipe_is_written_in_the_form_a_person_would_and_reads_back_equal() {
     let written = json!({
         "steps": [
             {"effect": "bloom", "params": {"radius": 12}, "opacity": 0.4},
-            {"effect": "seams", "preset": "thin", "partition": "panes", "name": "edges"},
+            {"effect": "bordered", "preset": "thin", "partition": "panes", "name": "edges"},
             {"each": "panes", "looks": [{"effect": "grade", "params": {"exposure": 0.5}}, null],
              "assign": "random", "seed": 7, "feather": 3.0, "mask": "background", "opacity": 0.5,
              "blend_mode": "multiply", "name": "tiles"},

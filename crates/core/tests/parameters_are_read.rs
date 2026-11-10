@@ -12,7 +12,8 @@ use std::error::Error;
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table};
 use bullterrier_image::{
-    Category, Constraint, Effect, Error as CoreError, FieldParam, Image, Inputs, Layer, Lut, Picture, effect, effects,
+    Category, Constraint, Effect, Error as CoreError, FieldParam, Image, Input, Inputs, Labels, Layer, Lut, Picture,
+    effect, effects,
 };
 use serde_json::{Map, Value, json};
 
@@ -752,9 +753,20 @@ fn render(
             Layer::new(side, side, values).map(|layer| (field.name, layer))
         })
         .collect::<Result<Vec<_>, _>>()?;
+    // a partition is the picture's left and right halves
+    let side = usize::from(SIDE);
+    let halves = Labels::new(
+        side,
+        side,
+        (0..side * side).map(|at| i32::from(at % side >= side / 2)).collect(),
+        2,
+    )?;
     let mut inputs = Inputs::default();
     for (name, layer) in &selections {
         inputs = inputs.with_field(*name, layer);
+    }
+    if effect.inputs().contains(&Input::Partition) {
+        inputs = inputs.with_partition(&halves);
     }
     for field in table.fields.iter().filter(|field| field.kind == Kind::Lut) {
         if params[field.name].is_string() {

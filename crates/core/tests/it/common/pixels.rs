@@ -1,7 +1,7 @@
 //! Pixels in, pixels out: an effect applied to a picture of the test's own.
 
 use bullterrier_image::params::EffectParams;
-use bullterrier_image::{Error, Inputs, Layer, Picture, apply};
+use bullterrier_image::{Error, Inputs, Labels, Layer, Picture, apply};
 use serde_json::Value;
 
 /// `params` applied to `pixels` (a picture one pixel high).
@@ -78,6 +78,21 @@ pub(crate) fn run_with_field<P: EffectParams>(
         &Picture::new(height, width, values)?,
         Value::Object(params.values()),
         &Inputs::default().with_field(parameter, &layer),
+    )?;
+    Ok(image.into_values())
+}
+
+/// `params` applied to the `height` x `width` picture `values`, with the pieces `partition`.
+pub(crate) fn run_with_partition<P: EffectParams>(
+    params: &P,
+    partition: &Labels,
+    values: &[f32],
+) -> Result<Vec<f32>, Error> {
+    let image = apply(
+        P::EFFECT,
+        &Picture::new(partition.height(), partition.width(), values)?,
+        Value::Object(params.values()),
+        &Inputs::default().with_partition(partition),
     )?;
     Ok(image.into_values())
 }

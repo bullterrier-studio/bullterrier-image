@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::thread;
 
 use bullterrier_image::frame::{Fit, Resample};
+use bullterrier_image::region::{Grid, Shares};
 use bullterrier_image::{
     BlendMode, Error, ErrorKind, Frame, Image, Lut, Options, Photo, Picture, Presets, Recipe, Step,
 };
@@ -75,7 +76,20 @@ fn cases() -> Vec<Case> {
         shapes: shapes.to_vec(),
     };
     let squarish = [(201, 199), (131, 257)];
+    let seams = {
+        let mut step = Step::new("seams").param("width", 5);
+        step.partition = Some("panes".to_owned());
+        Recipe::new([step]).with_region(
+            "panes",
+            Grid {
+                columns: Shares(vec![1.0, 2.0, 1.0]),
+                rows: Shares(vec![1.0; 3]),
+                ..Grid::default()
+            },
+        )
+    };
     vec![
+        case("lines along the borders of a partition", seams, &squarish),
         case(
             "steps laid over their input by blend mode, opacity and mask",
             Recipe::new([

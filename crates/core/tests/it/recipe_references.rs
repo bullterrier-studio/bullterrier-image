@@ -1,7 +1,7 @@
 //! The names a recipe refers to, through the public API alone: `Recipe::checked` holds each name in each place (a
 //! mask, a drive's `by`, a field parameter, a partition, an `each`, a region's `fit`, `of`, `per`) to be a region of the
 //! form the place needs, suggests the closest name, and refuses a circle of regions. The effects the recipes name are
-//! the core's own and the doubles of `common::recipe` (`probe`, `seams`, `fielded`).
+//! the core's own and the doubles of `common::recipe` (`probe`, `bordered`, `fielded`).
 
 use crate::common::Outcome;
 use crate::common::recipe::{regions, setup};
@@ -39,9 +39,9 @@ fn naming(place: &str, name: &str) -> Recipe {
         "by" => Recipe::new([Step::new("probe").param("cell", json!({"by": name, "start": 4, "end": 9}))]),
         "field" => Recipe::new([Step::new("fielded").param("near", name)]),
         "partition" => {
-            let mut seams = Step::new("seams");
-            seams.partition = Some(name.to_owned());
-            Recipe::new([seams])
+            let mut bordered = Step::new("bordered");
+            bordered.partition = Some(name.to_owned());
+            Recipe::new([bordered])
         }
         "each" => Recipe::new([Each::new(name, [None])]),
         _ => Recipe::new([Step::new("probe")]),
