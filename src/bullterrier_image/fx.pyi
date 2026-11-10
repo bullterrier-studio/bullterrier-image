@@ -3224,15 +3224,7 @@ clarity : Local contrast: features stand out against a wide (30 px) blur of thei
 
 @_effect
 def shatter(*, pieces: int = 24, shape: Literal['voronoi', 'triangles'] = 'voronoi', detail: float = 0.0, fill: float = 0.0, offset: float = 10.0, angle: float = 5.0, gap: float = 0.0, color: str | list[float] | tuple[float, float, float] = '#000000', seed: int = 0, interpolation: Literal['nearest', 'bilinear', 'bicubic'] = 'bilinear', edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Break the picture into pieces (Voronoi cells or triangles), move and turn each, optionally flatten each to its
-mean colour (stained glass, low-poly), and draw `gap` px lines between them.
-
-The pieces are the Voronoi cells round `pieces` points (random, or gathered along the picture's edges by `detail`),
-or the triangles of those points and of points round the picture's edge (`shape`). Each draws its own move (up to
-`offset` px each way) and its own turn (up to `angle` degrees, about its centre) from `seed`, and shows the picture
-moved and turned that way: one rigid move of the input per piece, so the picture inside a piece is not bent, only
-cut along the borders. `fill` then pulls each piece's colours to their average. The lines of `color` are drawn
-along the borders of the pieces where they lie, over the pictures.
+    """Break the picture into pieces (Voronoi cells or triangles), move and turn each, optionally flatten each to its mean colour (stained glass, low-poly), and draw `gap` px lines between them.  Broken glass: pieces, each showing the picture a little moved and turned (or flattened to one colour), divided by thin lines. The pieces are the Voronoi cells round `pieces` points (random, or gathered along the picture's edges by `detail`), or the triangles of those points and of points round the picture's edge (`shape`). Each draws its own move (up to `offset` px each way) and its own turn (up to `angle` degrees, about its centre) from `seed`, and shows the picture moved and turned that way: one rigid move of the input per piece, so the picture inside a piece is not bent, only cut along the borders. `fill` then pulls each piece's colours to their average. The lines of `color` are drawn along the borders of the pieces where they lie, over the pictures.
 
 Parameters
 ----------
