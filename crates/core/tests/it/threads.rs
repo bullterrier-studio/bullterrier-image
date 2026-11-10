@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::thread;
 
 use bullterrier_image::frame::{Fit, Resample};
-use bullterrier_image::region::{Grid, Shares};
+use bullterrier_image::region::{Grid, Path, Shares};
 use bullterrier_image::{
     BlendMode, Error, ErrorKind, Frame, Image, Lut, Options, Photo, Picture, Presets, Recipe, Step,
 };
@@ -88,8 +88,21 @@ fn cases() -> Vec<Case> {
             },
         )
     };
+    // a shape whose lowest row lies above the picture's: a floor with room to mirror in
+    let reflected = Recipe::new([Step::new("reflection")
+        .param("field", "upper")
+        .param("height", 1)
+        .param("blur", 3)])
+    .with_region(
+        "upper",
+        Path {
+            d: "M 0.1 0.1 L 0.9 0.2 L 0.5 0.6 Z".to_owned(),
+            ..Path::default()
+        },
+    );
     vec![
         case("lines along the borders of a partition", seams, &squarish),
+        case("a mirror below a shape", reflected, &squarish),
         case(
             "steps laid over their input by blend mode, opacity and mask",
             Recipe::new([
@@ -208,11 +221,6 @@ fn cases() -> Vec<Case> {
                     .param("offset", 4)
                     .param("blur", 3)
                     .param("edge", "wrap"),
-                Step::new("reflection")
-                    .param("field", "light")
-                    .param("height", 1)
-                    .param("field_threshold", 0.9)
-                    .param("blur", 3),
                 Step::new("rim_light")
                     .param("field", "light")
                     .param("smoothing", 4)
