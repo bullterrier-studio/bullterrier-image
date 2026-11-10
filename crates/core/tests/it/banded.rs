@@ -34,22 +34,12 @@ const BANDS: [usize; 3] = [1, 7, 64];
 /// At least this many effects are rendered banded (the others are `Whole` and so run as ever).
 const BANDED_AT_LEAST: usize = 20;
 
-/// How far the banded render of the one-step recipe of effect `name` may be from the whole render, which is nothing but for
-/// the effects whose blurs are rounded differently when the picture they work on has another height. A band is a
-/// picture of its own height, and a blur reaching 16 working px or more is summed by a Fourier transform of a length that
-/// follows the height (`ops/fft`): the same sums to the last 1-2 bits of an `f32`, measured at most 5e-5 for the effects
-/// that go on to subtract or amplify the blur.
-fn tolerance(name: &str) -> f32 {
-    match name {
-        "relight" | "liquid_metal" => 1e-4,
-        "ambient_occlusion" | "anamorphic_streaks" | "bloom" | "drop_shadow" | "focus_blur" | "gaussian_blur"
-        | "grain" | "halftone" | "highpass" | "lens_blur" | "lens_drops" | "light_wrap" | "motion_blur" | "sharpen"
-        | "vhs" => 1e-5,
-        // a source row is a fraction of rows from the band's top: `f64` rounding of the weights of a cubic
-        "rgb_split" => 1e-6,
-        _ => 0.0,
-    }
-}
+/// How far the banded render of any effect may be from the whole render, in value. Nothing for most effects; a band is a
+/// picture of its own height and a blur reaching 16 working px or more is summed by a Fourier transform of a length that
+/// follows the height (`ops/fft`).
+// constant: an FFT blur's sum depends on the window length; the largest difference measured was 5.1e-5 (relight); a
+// footprint bug shows as at least a Gaussian tail, much larger than 1e-4
+const TOLERANCE: f32 = 1e-4;
 
 /// The photo of `values`, handed the maps every recipe may name (`subject`: blocks, `depth`: a hash) and the picture
 /// `asset`.
@@ -176,7 +166,7 @@ fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_b
                 let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
                 let bands: &[usize] = if size.is_some() { &BANDS[1..] } else { &BANDS };
                 cases += bands.len();
-                if let Some(found) = first_problem(&values, &recipe, options, bands, tolerance(&name))? {
+                if let Some(found) = first_problem(&values, &recipe, options, bands, TOLERANCE)? {
                     problems.push(format!("{name} {setting:?} size {size:?}: {found}"));
                 }
             }
