@@ -162,8 +162,10 @@ rust-shear = { cmd = "cargo shear", help = "Find Rust dependencies no code uses 
 rust-deny = { cmd = "cargo deny --offline --locked check bans licenses sources", help = "Check the Rust dependencies offline: banned crates, licences, sources (deny.toml)" }
 stubtest = { cmd = "python -m mypy.stubtest --mypy-config-file pyproject.toml bullterrier_image._native._core", help = "Check the stub _core.pyi against the built extension" }
 rust-test = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast", help = "Run the Rust tests under the memory cap, every binary even after one fails" }
-# The Rust tests `#[ignore = "full: ..."]` (tests/tools/test_rust_full_tier.py): every size or band of a matrix `check` runs one row of
-rust-test-full = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast -- --ignored", help = "Run the Rust tests that only the full tier runs (the whole matrices), under the memory cap" }
+# The Rust tests `#[ignore = "full: ..."]` (tests/tools/test_rust_full_tier.py): every size or band of a matrix `check` runs one row of,
+# and the real models (BT_IMAGE_ONNX_LIB, and the models in the cache folder or BT_IMAGE_ALLOW_DOWNLOAD=1); one test at a time, because
+# two real models in two tests would pass the memory cap together
+rust-test-full = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast -- --ignored --test-threads=1", help = "Run the Rust tests that only the full tier runs (the whole matrices), under the memory cap" }
 # A crate's Rust integration tests are one binary (tests/it/main.rs); tools/check_rust_test_layout.py, the table [tool.rust-tests.own-binaries]
 rust-test-layout = { cmd = "python tools/check_rust_test_layout.py", help = "Check that the Rust integration tests are one binary per crate (tests/it/)" }
 dead-code = { cmd = "vulture src", help = "Find dead code in src (vulture)" }
