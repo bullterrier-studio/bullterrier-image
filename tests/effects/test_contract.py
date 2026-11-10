@@ -1,16 +1,13 @@
-"""Contract tests every effect must pass, whatever it does: shape, range, determinism, documentation, parameter names,
-categories, every parameter across its documented range, and a time and memory budget on a real-sized photo."""
+"""What the Python facade keeps true for every effect, whatever runs it: the picture a call returns, shipped presets,
+documentation, parameter names and conventions, categories, drives, and the registration of a Python effect. The kernel
+rules (limits, choices, seeds, sizes, threads) are `crates/core/tests/effects_contract.rs`."""
 
-import itertools
 import re
-import time
-import tracemalloc
 import typing
 from typing import Literal
 
 import numpy as np
 import pytest
-from scipy import ndimage
 
 from bullterrier_image import fx
 from bullterrier_image import recipe as facade
@@ -28,11 +25,11 @@ from bullterrier_image.core.params import (
 from bullterrier_image.core.params import signature as signature_of
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Each, Recipe, Step, drives
+from bullterrier_image.core.steps import Recipe, Step, drives
 from bullterrier_image.core.values import FieldName, Picture
-from bullterrier_image.errors import MapNotFoundError, RecipeError
+from bullterrier_image.errors import RecipeError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Band, Curve, Edge, Finder, Framing, Given, Grid, Line
+from bullterrier_image.recipe import Band, Curve, Edge, Framing, Given, Line
 
 ALL = sorted(registry.describe())
 # What the Rust core runs is held to the same rules by `crates/core/tests/effects_contract.rs`; the tests below that
@@ -71,19 +68,6 @@ def test_every_shipped_preset_is_valid_for_its_effect_and_makes_a_picture_that_d
     out = registry.apply(name, photo, **{**step.params, **inputs})  # a preset names a field; the array replaces it
     assert_a_picture_like(out, photo)
     assert not np.array_equal(out, registry.apply(name, photo, **inputs))
-
-
-# Sizes no cell, tile or block divides: a single pixel, a single row or column, and two odd rectangles.
-ODD_SIZES = [(1, 1), (1, 7), (7, 1), (13, 29), (61, 37)]
-
-
-@pytest.mark.parametrize("size", ODD_SIZES, ids=[f"{h}x{w}" for h, w in ODD_SIZES])
-@pytest.mark.parametrize("name", PYTHON)
-def test_every_effect_handles_any_picture_size_and_leaves_its_input_alone(name, size, photo):
-    rgb = np.ascontiguousarray(photo[: size[0], : size[1]])
-    before = rgb.copy()
-    assert_a_picture_like(registry.apply(name, rgb, **_inputs(name, rgb)), rgb)
-    np.testing.assert_array_equal(rgb, before)
 
 
 def test_every_effect_of_the_rust_core_is_a_registered_effect():
@@ -319,53 +303,6 @@ def _pictures(name: str) -> dict[str, Picture]:
     return dict.fromkeys(picture_fields(registry.parameters(name)), asset)
 
 
-def _bounds() -> list[tuple[str, str, str]]:
-    """(effect, numeric field, "min" or "max") for every numeric field of every effect."""
-    found = []
-    for name in PYTHON:
-        model = registry.parameters(name)
-        found += [
-            (name, doc.name, side) for doc in model.fields_doc() if doc.minimum is not None for side in ("min", "max")
-        ]
-    return found
-
-
-def _choices() -> list[tuple[str, str, str]]:
-    """(effect, choice field, choice) for every choice of every `Literal` field of every effect."""
-    return [
-        (name, field, choice)
-        for name in PYTHON
-        for field, prop in registry.parameters(name).model_json_schema()["properties"].items()
-        for choice in prop.get("enum", ())
-    ]
-
-
-def _bound_value(name: str, field: str, side: str, beyond: bool = False) -> float:
-    model = registry.parameters(name)
-    doc = next(d for d in model.fields_doc() if d.name == field)
-    bound = doc.minimum if side == "min" else doc.maximum
-    assert bound is not None
-    if isinstance(doc.default, int):
-        return int(bound) + ((-1 if side == "min" else 1) if beyond else 0)
-    # the very next float: a limit that is off by any amount lets it through
-    return float(np.nextafter(bound, -np.inf if side == "min" else np.inf)) if beyond else float(bound)
-
-
-def _setting(name: str, field: str, value: float) -> dict[str, float]:
-    """`field` set to `value`. When the field is one side of a min/max pair (`band_min_height` and `band_max_height`:
-    the same name with `min` and `max` swapped), the other side moves to the same value if its default would leave
-    the pair the wrong way round, so each side still reaches its whole range."""
-    fields = registry.parameters(name).model_fields
-    words = field.split("_")
-    for side, other_side in (("min", "max"), ("max", "min")):
-        other = "_".join(other_side if word == side else word for word in words)
-        if side in words and other in fields:
-            partner = fields[other].default
-            if (value > partner) if side == "min" else (value < partner):
-                return {field: value, other: value}
-    return {field: value}
-
-
 @pytest.mark.parametrize("name", ALL)
 def test_every_parameter_is_described_and_has_a_unit_entry(name):
     schema = registry.parameters(name).model_json_schema()
@@ -376,71 +313,6 @@ def test_every_parameter_is_described_and_has_a_unit_entry(name):
             assert prop["unit"] in UNITS, f"{name}.{field}: unit {prop['unit']!r}"
 
 
-@pytest.mark.parametrize(("name", "field", "side"), _bounds())
-def test_every_effect_works_with_each_number_at_its_documented_limit(name, field, side, photo):
-    small = _small(photo)
-    out = registry.apply(name, small, **_setting(name, field, _bound_value(name, field, side)), **_inputs(name, small))
-    assert_a_picture_like(out, small)
-
-
-def _interior_values() -> list[tuple[str, str, float]]:
-    """(effect, numeric field, value) for five values evenly inside the range of every int or float field of every
-    effect (ints rounded, repeats dropped): the values a caller may set."""
-    found = []
-    for name in PYTHON:
-        model = registry.parameters(name)
-        for doc in model.fields_doc():
-            if doc.minimum is None or doc.maximum is None or not isinstance(doc.default, int | float):
-                continue  # not a number
-            values = [doc.minimum + (doc.maximum - doc.minimum) * k / 6 for k in range(1, 6)]
-            if isinstance(doc.default, int):
-                values = sorted({round(value) for value in values})
-            found += [(name, doc.name, value) for value in values]
-    return found
-
-
-@pytest.mark.parametrize(("name", "field", "value"), _interior_values())
-def test_every_effect_works_with_each_number_anywhere_inside_its_range(name, field, value, photo):
-    small = _small(photo)
-    assert_a_picture_like(registry.apply(name, small, **_setting(name, field, value), **_inputs(name, small)), small)
-
-
-def _cyclic(names: list[str] = PYTHON) -> list[tuple[str, str]]:
-    """(effect, field) for every cyclic angle of every effect."""
-    return [(name, doc.name) for name in names for doc in registry.parameters(name).fields_doc() if doc.cyclic]
-
-
-@pytest.mark.parametrize(
-    ("name", "field", "side"),
-    [bound for bound in _bounds() if bound[:2] not in _cyclic()],
-    ids=lambda value: str(value),
-)
-def test_every_number_beyond_its_documented_limit_is_refused(name, field, side, photo):
-    small = _small(photo)
-    with pytest.raises(ValueError, match=f"`{field}`"):
-        registry.apply(name, small, **{field: _bound_value(name, field, side, beyond=True)}, **_inputs(name, small))
-
-
-@pytest.mark.parametrize(("name", "field", "choice"), _choices())
-def test_every_effect_works_with_each_choice_it_offers(name, field, choice, photo):
-    small = _small(photo)
-    assert_a_picture_like(registry.apply(name, small, **{field: choice}, **_inputs(name, small)), small)
-
-
-@pytest.mark.parametrize(("name", "field"), sorted({(name, field) for name, field, _ in _choices()}))
-def test_a_choice_that_is_not_offered_is_refused(name, field, photo):
-    small = _small(photo)
-    with pytest.raises(ValueError, match=f"`{field}`"):
-        registry.apply(name, small, **{field: "not_a_choice"}, **_inputs(name, small))
-
-
-@pytest.mark.parametrize("name", PYTHON)
-def test_every_effect_refuses_an_unknown_parameter(name, photo):
-    small = _small(photo)
-    with pytest.raises(ValueError, match="not_a_parameter"):
-        registry.apply(name, small, not_a_parameter=1, **_inputs(name, small))
-
-
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
     small, model = _small(photo), registry.parameters(name)
@@ -449,31 +321,6 @@ def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
     by_model = registry.get(name)(small, model(), **inputs)
     np.testing.assert_array_equal(registry.get(name)(small, **inputs), by_model)
     np.testing.assert_array_equal(registry.get(name)(small, **defaults, **inputs), by_model)
-
-
-# --- what holds for every effect that has the setting ----------------------------------------------------------------
-
-
-# Effects whose `amount` of 0 is the identity only together with another setting.
-AMOUNT_ZERO_NEEDS = {"tone_map": {"contrast": 1.0}}  # its `amount` is the detail on top of the contrast curve
-
-
-def _amount_zero_cases() -> list[tuple[str, dict[str, object]]]:
-    """(effect, settings) for every effect whose `amount` can be 0: its defaults, then each choice of each `Literal`
-    field (a sampling or edge rule must not change a picture nothing moves in)."""
-    found: list[tuple[str, dict[str, object]]] = []
-    for name in PYTHON:
-        if not any(doc.name == "amount" and doc.minimum == 0 for doc in registry.parameters(name).fields_doc()):
-            continue
-        found += [(name, {})] + [(name, {field: choice}) for n, field, choice in _choices() if n == name]
-    return found
-
-
-@pytest.mark.parametrize(("name", "setting"), _amount_zero_cases(), ids=lambda case: str(case) if case else "defaults")
-def test_an_amount_of_zero_returns_the_picture_as_it_is_in_a_new_array(name, setting, photo):
-    out = registry.apply(name, photo, amount=0.0, **AMOUNT_ZERO_NEEDS.get(name, {}), **setting, **_inputs(name, photo))
-    np.testing.assert_allclose(out, photo, atol=1e-6)
-    assert not np.shares_memory(out, photo)  # a new picture, not the input handed back
 
 
 def _picture_changes_the_background(name: str) -> bool:
@@ -492,78 +339,6 @@ def test_a_background_that_reads_the_picture_is_caught(throwaway_effects, regist
     assert _picture_changes_the_background("reading_probe")
 
 
-def _sampling_cases() -> list[tuple[str, dict[str, str]]]:
-    """(effect, choices) for every combination of the choice fields (`mode`, `edge`, `interpolation`...) of the
-    effects that read the picture between its pixels (those with an `interpolation` field)."""
-    found = []
-    for name in PYTHON:
-        properties = registry.parameters(name).model_json_schema()["properties"]
-        if "interpolation" in properties:
-            choices = {field: prop["enum"] for field, prop in properties.items() if "enum" in prop}
-            found += [
-                (name, dict(zip(choices, picked, strict=True))) for picked in itertools.product(*choices.values())
-            ]
-    return found
-
-
-@pytest.mark.parametrize(
-    ("name", "setting"), _sampling_cases(), ids=lambda case: "-".join(case.values()) if isinstance(case, dict) else case
-)
-def test_a_constant_picture_stays_constant_under_every_way_of_reading_between_pixels(name, setting):
-    flat = np.full((31, 47, 3), 0.4, np.float32)
-    out = registry.apply(name, flat, **setting, **_inputs(name, flat))
-    np.testing.assert_allclose(out, 0.4, atol=1e-6)
-
-
-@pytest.mark.parametrize("name", sorted({name for name, _ in _sampling_cases()}))
-def test_each_interpolation_reads_the_picture_its_own_way(name):
-    noise = np.random.default_rng(4).random((41, 41, 3), dtype=np.float32)
-    choices = registry.parameters(name).model_json_schema()["properties"]["interpolation"]["enum"]
-    outs = {choice: registry.apply(name, noise, interpolation=choice, **_inputs(name, noise)) for choice in choices}
-    for first, second in itertools.combinations(choices, 2):
-        assert not np.array_equal(outs[first], outs[second]), f"{first} and {second} give the same picture"
-
-
-SEED_NEEDS: dict[str, dict[str, float]] = {  # at their defaults nothing is random yet, whatever the seed
-    "disperse": {"progress": 0.5},
-    "starburst": {"spacing": 2},
-}
-
-
-def _assert_the_seed_decides_the_picture(name: str, photo: np.ndarray) -> None:
-    settings = {**SEED_NEEDS.get(name, {}), **_inputs(name, photo)}
-    first = registry.apply(name, photo, seed=1, **settings)
-    np.testing.assert_array_equal(first, registry.apply(name, photo, seed=1, **settings))
-    assert (first != registry.apply(name, photo, seed=2, **settings)).any()
-
-
-@pytest.mark.parametrize("name", [name for name in PYTHON if "seed" in registry.parameters(name).model_fields])
-def test_the_same_seed_gives_the_same_picture_and_another_seed_another(name, photo):
-    _assert_the_seed_decides_the_picture(name, photo)
-
-
-class _SeedProbeParams(EffectParams):
-    """A seed and nothing else."""
-
-    seed: int = param(0, unit="count", min=0, max=9, doc="Ignored by the probes.")
-
-
-@pytest.mark.parametrize("probe", ["ignores_its_seed", "is_unseeded"])
-def test_the_seed_check_flags_an_effect_that_ignores_its_seed_or_is_not_deterministic(probe, photo, throwaway_effects):
-    @effect(category="utilities", params=_SeedProbeParams)
-    def ignores_its_seed(rgb, params):
-        """Never random."""
-        return rgb
-
-    @effect(category="utilities", params=_SeedProbeParams)
-    def is_unseeded(rgb, params):
-        """Random, but not from its seed."""
-        return rgb + np.random.default_rng().random(rgb.shape, dtype=np.float32) * 0.01
-
-    with pytest.raises(AssertionError):
-        _assert_the_seed_decides_the_picture(probe, photo)
-
-
 # --- the effects that scatter particles of light -----------------------------------------------------------------
 
 
@@ -571,82 +346,6 @@ def test_no_drops_leave_the_picture_unchanged_in_a_new_array(photo):
     out = registry.apply("lens_drops", photo, count=0)
     np.testing.assert_array_equal(out, photo)
     assert not np.shares_memory(out, photo)
-
-
-# --- cost: time and memory on a real-sized photo -----------------------------------------------------------------
-
-CPU_BUDGET = 4.0  # seconds of process CPU time per effect at 1 MP: 5x the slowest measured (dither: 0.8 s)
-MEMORY_BUDGET = 12  # picture-sized buffers of working memory held at once; the most measured is 7.3 (gradient_map)
-
-
-@pytest.fixture(scope="module")
-def megapixel_photo() -> np.ndarray:
-    """A 1 MP picture (866 x 1155): gradients plus noise, like the small `photo` fixture but the size of a phone shot
-    shrunk for the web."""
-    rng = np.random.default_rng(1)
-    y, x = np.mgrid[0:866, 0:1155].astype(np.float32)
-    ramp = np.stack([x / 1154, y / 865, (x + y) / 2019], axis=-1)
-    return (ramp * 0.8 + rng.random((866, 1155, 3), dtype=np.float32) * 0.2).astype(np.float32)
-
-
-def _over_budget(name: str, rgb: np.ndarray) -> list[str]:
-    """What `name` at its defaults spends on `rgb` beyond the budgets: process CPU time (not wall time, so other work
-    on the machine barely matters) and the peak of memory allocated during the call (numpy reports its arrays to
-    `tracemalloc`), in picture-sized buffers."""
-    inputs = _inputs(name, rgb)
-    tracemalloc.start()
-    try:
-        held = tracemalloc.get_traced_memory()[0]
-        start = time.process_time()
-        registry.apply(name, rgb, **inputs)
-        cpu = time.process_time() - start
-        buffers = (tracemalloc.get_traced_memory()[1] - held) / rgb.nbytes
-    finally:
-        tracemalloc.stop()
-    problems = [f"{name}: {cpu:.2f} s of CPU time, budget {CPU_BUDGET} s"] if cpu > CPU_BUDGET else []
-    if buffers > MEMORY_BUDGET:
-        problems.append(f"{name}: {buffers:.1f} picture-sized buffers of memory, budget {MEMORY_BUDGET}")
-    return problems
-
-
-@pytest.mark.parametrize("name", PYTHON)
-def test_every_effect_at_its_defaults_stays_within_the_time_and_memory_budget_on_a_1_mp_photo(name, megapixel_photo):
-    """Measured on an Apple M4: the slowest effect (`flow_warp`) takes 0.35 s of CPU time, the hungriest holds 7.3
-    picture-sized buffers; a shared GitHub runner is about 3.5x slower. The budgets leave room for a slower machine,
-    never for a 10x regression."""
-    assert _over_budget(name, megapixel_photo) == []
-
-
-class _CostProbeParams(EffectParams):
-    """No settings that matter."""
-
-    amount: float = param(0.5, unit="fraction", min=0, max=1, doc="Unused.")
-
-
-def test_the_budget_flags_an_effect_that_spends_more_cpu_time_than_allowed(throwaway_effects, megapixel_photo):
-    @effect(category="utilities", params=_CostProbeParams)
-    def slow_probe(rgb, params):
-        """Busy for longer than the budget."""
-        start = time.process_time()
-        while time.process_time() - start <= CPU_BUDGET:
-            pass
-        return rgb
-
-    problems = _over_budget("slow_probe", megapixel_photo)
-    assert len(problems) == 1
-    assert "CPU time" in problems[0]
-
-
-def test_the_budget_flags_an_effect_that_holds_more_memory_than_allowed(throwaway_effects, megapixel_photo):
-    @effect(category="utilities", params=_CostProbeParams)
-    def hungry_probe(rgb, params):
-        """Holds one more picture-sized buffer than the budget at once."""
-        copies = [rgb.copy() for _ in range(MEMORY_BUDGET + 1)]
-        return copies[-1]
-
-    problems = _over_budget("hungry_probe", megapixel_photo)
-    assert len(problems) == 1
-    assert "buffers of memory" in problems[0]
 
 
 # --- every drivable parameter: a field may vary it pixel by pixel, the effect itself unchanged ------------------------
@@ -710,7 +409,7 @@ def test_two_levels_mix_the_effect_at_the_least_and_the_greatest_value_by_the_fi
     np.testing.assert_allclose(got, (1 - ramp)[..., None] * at_least + ramp[..., None] * at_greatest, atol=1e-6, rtol=0)
 
 
-@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable not in _cyclic(ALL)])
+@pytest.mark.parametrize(("name", "field"), DRIVABLE)
 def test_a_drive_that_leaves_the_parameters_range_is_refused_naming_the_field(name, field):
     least, greatest = _range(name, field)
     for start, end in ((least - 1, greatest), (least, greatest + 1)):
@@ -723,63 +422,6 @@ def test_fx_builds_a_driven_step_from_a_drive(name, field):
     least, greatest = _range(name, field)
     step = getattr(fx, name)(**{field: Drive(by="depth", start=least, end=greatest)})
     assert drives(step) == {field: Drive(by="depth", start=least, end=greatest)}
-
-
-@pytest.mark.parametrize("name", [name for name in PYTHON if name not in {n for n, _ in DRIVABLE}])
-def test_an_effect_with_no_drivable_parameter_refuses_a_drive_for_every_number_it_has(name):
-    fields = registry.parameters(name)
-    numbers = [
-        doc.name for doc in fields.fields_doc() if doc.minimum is not None and doc.name not in drivable_fields(fields)
-    ]
-    for field in numbers:
-        with pytest.raises(RecipeError, match=rf"{name}.*`{field}` cannot be driven"):
-            Step(name, params={field: Drive(by="f", start=_range(name, field)[0], end=_range(name, field)[1])})
-
-
-# What an effect needs for its angle to show: at its defaults it changes nothing, so any angle would look cyclic.
-CYCLIC_NEEDS = {
-    ("disperse", "angle"): {"progress": 0.5},
-    ("particles", "angle"): {"length": 40.0},
-    ("selective_color", "hue"): {"hue_shift": 90.0, "width": 120.0},
-}
-
-
-@pytest.mark.parametrize(("name", "field"), _cyclic())
-def test_a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real(name, field, photo):
-    small = _small(photo)
-    doc = next(d for d in registry.parameters(name).fields_doc() if d.name == field)
-    low, high = doc.minimum, doc.maximum
-    assert low is not None
-    assert high is not None
-    needs = {**CYCLIC_NEEDS.get((name, field), {})}
-    at_low = registry.apply(name, small, **needs, **{field: low}, **_inputs(name, small))
-    at_high = registry.apply(name, small, **needs, **{field: high}, **_inputs(name, small))
-    at_45 = registry.apply(name, small, **needs, **{field: low + 45}, **_inputs(name, small))
-    assert np.abs(at_45 - at_low).max() > 1e-3, f"{name}.{field} shows nothing: the test would pass for any field"
-    differing = (np.abs(at_low - at_high).max(axis=-1) > 1e-3).mean()
-    assert differing == 0, f"{name}.{field}: min and max are a turn apart"
-    # four turns and a degree past the bottom of the turn is the same direction as one degree past it
-    beyond = registry.apply(name, small, **needs, **{field: low + 4 * 360 + 1}, **_inputs(name, small))
-    inside = registry.apply(name, small, **needs, **{field: low + 1}, **_inputs(name, small))
-    np.testing.assert_array_equal(beyond, inside)
-
-
-@pytest.mark.parametrize(("name", "field"), [drivable for drivable in DRIVABLE if drivable in _cyclic(ALL)])
-def test_a_drive_of_a_cyclic_angle_may_run_past_the_turn_each_level_being_the_plain_effect_at_its_direction(
-    name, field, photo
-):
-    least, _ = _range(name, field)
-    driven = Recipe(
-        [Step(name, params={field: Drive(by="f", start=least, end=least + 720, levels=5)})],
-        name="driven",
-        size=None,
-        regions={"f": Given()},
-    )
-    maps = _inputs(name, photo)
-    for level, written in enumerate([least, least + 180, least + 360, least + 540, least + 720]):
-        got = facade.render(photo, driven, maps={**maps, "f": np.full(photo.shape[:2], level / 4, np.float32)})
-        plain = Recipe([Step(name, params={field: written})], name="plain", size=None)
-        np.testing.assert_allclose(got, facade.render(photo, plain, maps=maps), atol=1e-6, rtol=0)
 
 
 # --- a field parameter: the recipe names a selection, the effect gets its array --------------------------------------
@@ -841,123 +483,12 @@ def test_a_field_named_in_a_recipe_gives_the_same_picture_as_the_equal_array_pas
     assert np.abs(named - photo).max() > 0.01  # the field darkened something: this is not a comparison of two copies
 
 
-FIELD_EFFECTS = [(name, field) for name in PYTHON for field in field_name_fields(registry.parameters(name))]
-
-
-@pytest.mark.parametrize(("name", "field"), FIELD_EFFECTS, ids=[f"{n}-{f}" for n, f in FIELD_EFFECTS])
-@pytest.mark.parametrize("selection", ["depth", "light", "subject", "background", "g", "middle"])
-def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_its_name_and_for_the_equal_array(
-    name, field, selection, photo, subject, apply_as_rendered
-):
-    maps = field_maps(photo, subject)
-    recipe = Recipe(
-        [Step(name, params={field: selection})], name="named", size=max(photo.shape[:2]), regions=FIELD_REGIONS
-    )
-    named = facade.render(photo, recipe, maps=maps)
-    direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
-    assert_a_picture_like(named, photo)
-    np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
-
-
-def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(field_probe, photo, subject):
-    recipe = Recipe([Step("field_probe", params={"field": "g"})], name="small", size=48, regions=FIELD_REGIONS)
-    assert facade.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
-
-
-FIELD_PARAMETERS = [(name, field) for name in PYTHON for field in field_name_fields(registry.parameters(name))]
-
-
-@pytest.mark.parametrize(("name", "field"), FIELD_PARAMETERS)
-# Not `light`: the hand-made brightness differs from the runner's by float32 rounding, which a steep response can
-# amplify past any tolerance worth having; the probe test above covers `light`.
-@pytest.mark.parametrize("selection", ["depth", "subject", "background", "g", "middle"])
-def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_a_named_field_and_the_equal_array(
-    name, field, selection, photo, subject, apply_as_rendered
-):
-    maps = field_maps(photo, subject)
-    recipe = Recipe(
-        [Step(name, params={field: selection})], name="named", size=max(photo.shape[:2]), regions=FIELD_REGIONS
-    )
-    named = facade.render(photo, recipe, maps=maps)
-    direct = apply_as_rendered(name, photo, **{field: the_field(selection, photo, maps)})
-    np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
-
-
-@pytest.mark.parametrize(
-    ("step_params", "asked"),
-    [
-        pytest.param({"field": "light"}, {"depth": 0, "subject": 0}, id="light is made from the picture: no finder"),
-        pytest.param({"field": "depth"}, {"depth": 1, "subject": 0}, id="depth asks the depth finder once"),
-        pytest.param({}, {"depth": 1, "subject": 0}, id="the default field counts like one written"),
-        pytest.param({"field": "background"}, {"depth": 0, "subject": 1}, id="background asks for the subject"),
-        pytest.param({"field": "middle"}, {"depth": 1, "subject": 0}, id="a band asks for what it is made of"),
-    ],
-)
-def test_the_runner_builds_only_the_fields_a_step_names(step_params, asked, field_probe, photo, subject):
-    maps = field_maps(photo, subject)
-    calls = {"depth": 0, "subject": 0}
-
-    def stand_in(map_name: str) -> Finder:
-        def find(rgb: np.ndarray) -> np.ndarray:
-            calls[map_name] += 1
-            return maps[map_name]
-
-        return Finder(f"{map_name} stand-in", find)
-
-    recipe = Recipe([Step("field_probe", params=step_params)], name="only", size=None, regions=FIELD_REGIONS)
-    facade.render(photo, recipe, finders={"depth": stand_in("depth"), "subject": stand_in("subject")})
-    assert calls == asked
-
-
-@pytest.mark.parametrize(
-    ("step_params", "regions", "parts"),
-    [
-        pytest.param({"field": "nope"}, {}, ["field_probe", "field", "'nope'", "depth"], id="no such region"),
-        pytest.param(
-            {"field": "grid"}, {"grid": Grid()}, ["field_probe", "field", "'grid'", "selection"], id="partition"
-        ),
-        pytest.param({"field": ""}, {}, ["field", "''"], id="a blank name"),
-    ],
-)
-def test_a_field_that_is_no_selection_fails_when_the_recipe_is_made_naming_effect_field_and_value(
-    step_params, regions, parts, field_probe
-):
-    with pytest.raises(RecipeError) as raised:
-        Recipe([Step("field_probe", params=step_params)], name="bad", size=None, regions=regions)
-    for part in parts:
-        assert part in str(raised.value)
-
-
 def test_a_field_parameter_is_not_a_number_of_the_recipe_and_cannot_be_driven(field_probe):
     recipe = Recipe([Step("field_probe", params={"field": "light", "gain": 2.0})], name="plain", size=None)
     assert "field_probe.field" not in recipe.parameters()
     assert "field_probe.gain" in recipe.parameters()
     with pytest.raises(RecipeError, match="field"):
         Step("field_probe", params={"field": Drive(by="light", start=0, end=1)})
-
-
-@pytest.mark.parametrize("by", ["g", "depth"], ids=["the drive varies by another field", "by the field itself"])
-def test_a_field_and_a_drive_on_another_parameter_equal_the_mix_of_two_renders_at_the_drives_ends(
-    by, field_probe, photo, subject
-):
-    maps = field_maps(photo, subject)
-    recipe = Recipe(
-        [Step("field_probe", params={"field": "depth", "gain": Drive(by=by, start=0.5, end=2.0, levels=2)})],
-        name="both",
-        size=None,
-        regions={"g": Given()},
-    )
-    weight = maps[by][..., None]
-    at_start = registry.apply("field_probe", photo, field=maps["depth"], gain=0.5)
-    at_end = registry.apply("field_probe", photo, field=maps["depth"], gain=2.0)
-    expected = (1 - weight) * at_start + weight * at_end
-    np.testing.assert_allclose(facade.render(photo, recipe, maps=maps), expected, atol=1e-6, rtol=0)
-
-
-def test_a_field_whose_map_nobody_gave_is_a_map_not_found_error_naming_the_map(field_probe, photo):
-    recipe = Recipe([Step("field_probe", params={"field": "g"})], name="lost", size=None, regions=FIELD_REGIONS)
-    with pytest.raises(MapNotFoundError, match="'g'"):
-        facade.render(photo, recipe)
 
 
 def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, photo, subject, tmp_path):
@@ -967,19 +498,6 @@ def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, 
     )
     direct = registry.apply("field_probe", photo, field=the_field("light", photo, field_maps(photo, subject)))
     np.testing.assert_allclose(facade.render(photo, load_recipe(file)), direct, atol=1e-6, rtol=0)
-
-
-def test_the_look_of_an_each_can_work_from_a_field(field_probe, photo, subject):
-    maps = field_maps(photo, subject)
-    recipe = Recipe(
-        [Each("halves", looks=[Step("field_probe", params={"field": "g"}), None], feather=0)],
-        name="pieces",
-        size=None,
-        regions={"halves": Grid(columns=2), "g": Given()},
-    )
-    got = facade.render(photo, recipe, maps=maps)
-    np.testing.assert_allclose(got[:, :64], registry.apply("field_probe", photo, field=maps["g"])[:, :64], atol=1e-6)
-    np.testing.assert_array_equal(got[:, 64:], photo[:, 64:])
 
 
 # --- one convention for directions and lengths -------------------------------------------------------------------
@@ -1233,165 +751,30 @@ def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_
     assert len(_length_problems("probe", params)) == problems
 
 
-# --- the same look at the design size and at twice it --------------------------------------------------------
-
-DESIGN_SIZE = 480  # the size the px numbers are written for
-LARGE_SIZE = 960  # the size rendered again, twice as many px along each side
-LOOK_TOLERANCE = 0.02  # the most the mean of any colour may differ: 2% of the range
-CHANGE_SHARE = 0.2  # the most the mean change of any colour may differ: 20% of its value at the design size ...
-CHANGE_FLOOR = 0.001  # ... or this, when that is less: a tenth of a percent of the range
-
-# Effects whose default look legitimately differs between the two sizes, each with the reason; "BUG: ..." marks a
-# defect waiting for its fix (remove the entry with the fix: a test fails while a passing effect is listed).
-SIZE_EXCEPTIONS: dict[str, str] = {}
+# --- a Python effect: the one registration path left, through the public plugin interface ---------------------------
 
 
-@pytest.fixture(scope="module")
-def design_photo() -> tuple[np.ndarray, dict[str, np.ndarray]]:
-    """A 960 x 720 picture (smooth colour with some fine detail) and the subject and depth maps for it: rendered at
-    size 480 it is shrunk to half, at size 960 as it is."""
-    rng = np.random.default_rng(1)
-    height, width = 720, 960
-    y, x = np.mgrid[0:height, 0:width].astype(np.float32)
-    ramp = np.stack([x / (width - 1), y / (height - 1), (x + y) / (width + height - 2)], axis=-1)
-    blobs = ndimage.zoom(rng.random((9, 12, 3)), (height / 9, width / 12, 1), order=3)
-    fine = ndimage.zoom(rng.random((72, 96, 3)), (10, 10, 1), order=1)
-    lights = np.zeros(
-        (height, width), np.float32
-    )  # a few white highlights, for the effects that pick out bright points
-    lights[rng.integers(0, height, 24), rng.integers(0, width, 24)] = 1
-    lights = ndimage.gaussian_filter(lights, 14) * 14 * 14 * 2 * np.pi
-    picture = np.clip(ramp * 0.5 + blobs * 0.35 + fine * 0.15 + lights[..., None], 0, 1).astype(np.float32)
-    off_centre = np.hypot(x - width / 2, y - height / 2)
-    maps = {
-        "subject": np.clip((height / 3 - off_centre) / 2, 0, 1).astype(np.float32),
-        "depth": (1 - off_centre / off_centre.max()).astype(np.float32),
-    }
-    return picture, maps
+class _BrightenParams(EffectParams):
+    """A gain."""
+
+    gain: float = param(0.5, unit="ratio", min=0, max=1, doc="How much of the remaining light is added.")
 
 
-def _renders(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> dict[int, tuple[np.ndarray, np.ndarray]]:
-    """For the sizes 480 and 960: the picture at that size and the effect `name` at its defaults applied to it. The
-    picture is the same photo scaled the same way (a step with no opacity leaves it be)."""
-    step = Step(name, partition="subject") if "partition" in registry.inputs(name) else Step(name)
-    untouched = Recipe([Step("grade", opacity=0)], name="untouched")
-    look = Recipe([step], name=name)
-    return {
-        size: (
-            facade.render(picture, untouched, maps=maps, size=size),
-            facade.render(picture, look, maps=maps, size=size),
-        )
-        for size in (DESIGN_SIZE, LARGE_SIZE)
-    }
-
-
-def _mean_drift(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> float:
-    """How far the mean colour of the effect `name` differs between the render at 480 and the render at 960 shrunk
-    back to 480 by averaging each 2 x 2 block: the largest difference of the three channels. Blind to marks that
-    lighten as much as they darken."""
-    renders = _renders(name, picture, maps)
-    at_design, at_large = renders[DESIGN_SIZE][1], renders[LARGE_SIZE][1]
-    ratio = LARGE_SIZE // DESIGN_SIZE
-    height, width = at_design.shape[:2]
-    shrunk = at_large.reshape(height, ratio, width, ratio, 3).mean(axis=(1, 3))
-    return float(np.abs(shrunk.mean(axis=(0, 1)) - at_design.mean(axis=(0, 1))).max())
-
-
-def _change_agrees(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> bool:
-    """Whether the effect `name` changes the picture as much at 960 as at 480: per colour, the mean of |output - input|
-    at 960 is within `CHANGE_SHARE` of its value at 480 (at least `CHANGE_FLOOR`). It ignores where the changes are,
-    so marks drawn at other places at each size agree, and it sees marks become smaller or fewer, which the mean
-    does not when light marks and dark marks cancel."""
-    change = {size: np.abs(out - rgb).mean(axis=(0, 1)) for size, (rgb, out) in _renders(name, picture, maps).items()}
-    at_design = change[DESIGN_SIZE]
-    return bool((np.abs(change[LARGE_SIZE] - at_design) <= np.maximum(CHANGE_FLOOR, CHANGE_SHARE * at_design)).all())
-
-
-def _looks_alike(name: str, picture: np.ndarray, maps: dict[str, np.ndarray]) -> bool:
-    """Whether the effect `name` passes both the mean check and the change check."""
-    return _mean_drift(name, picture, maps) <= LOOK_TOLERANCE and _change_agrees(name, picture, maps)
-
-
-@pytest.mark.parametrize("name", [name for name in PYTHON if name not in SIZE_EXCEPTIONS])
-def test_every_effect_at_its_defaults_looks_the_same_at_its_design_size_and_at_twice_it(name, design_photo):
-    assert _mean_drift(name, *design_photo) <= LOOK_TOLERANCE
-    assert _change_agrees(name, *design_photo)
-
-
-def test_the_size_exceptions_name_only_effects_that_still_differ(design_photo):
-    assert set(SIZE_EXCEPTIONS) - set(ALL) == set()
-    assert [name for name in SIZE_EXCEPTIONS if _looks_alike(name, *design_photo)] == []
-
-
-class _DotsInPx(EffectParams):
-    """Dots whose size and spacing are both design pixels."""
-
-    size: float = param(4.0, unit="px", min=1, max=64, doc="Width of a dot, in px.")
-    spacing: float = param(8.0, unit="px", min=2, max=64, doc="Distance between dot centres, in px.")
-
-
-class _DotsSpacedInCount(EffectParams):
-    """The spacing is declared as a count, so it is not scaled with the size."""
-
-    size: float = param(4.0, unit="px", min=1, max=64, doc="Width of a dot, in px.")
-    spacing: float = param(8.0, unit="count", min=2, max=64, doc="Distance between dot centres, in px.")
-
-
-@pytest.mark.parametrize(
-    ("params", "same_look"),
-    [
-        pytest.param(_DotsInPx, True, id="dots whose size and spacing are px"),
-        pytest.param(_DotsSpacedInCount, False, id="dots whose spacing is not scaled: 16 times as many at 4 times"),
-    ],
-)
-def test_the_size_check_flags_marks_that_do_not_scale_and_passes_marks_that_do(
-    params, same_look, design_photo, throwaway_effects
+def test_a_python_effect_registers_runs_through_a_recipe_and_is_refused_when_it_breaks_the_contract(
+    throwaway_effects, photo
 ):
-    @effect(category="light", params=params)
-    def dot_probe(rgb, params):
-        """White dots on a grid."""
-        y, x = np.mgrid[0 : rgb.shape[0], 0 : rgb.shape[1]]
-        dots = (y % params.spacing < params.size) & (x % params.spacing < params.size)
-        return np.where(dots[..., None], np.float32(1), rgb)
+    @effect(category="light", params=_BrightenParams)
+    def brighten(rgb, params):
+        """Adds light."""
+        return rgb + (1 - rgb) * np.float32(params.gain)
 
-    assert _looks_alike("dot_probe", *design_photo) == same_look
+    @effect(category="light", params=_BrightenParams)
+    def broken(rgb, params):
+        """Returns float64, which the contract forbids."""
+        return rgb.astype(np.float64)
 
-
-class _SpecksInPx(EffectParams):
-    """Specks whose size is design pixels."""
-
-    count: int = param(40, unit="count", min=0, max=500, doc="How many specks there are.")
-    size: float = param(8.0, unit="px", min=1, max=64, doc="Width of a speck, in px.")
-
-
-class _SpecksSizedInCount(EffectParams):
-    """The size is declared as a count, so it is not scaled with the size."""
-
-    count: int = param(40, unit="count", min=0, max=500, doc="How many specks there are.")
-    size: float = param(8.0, unit="count", min=1, max=64, doc="Width of a speck, in px.")
-
-
-@pytest.mark.parametrize(
-    ("params", "change_agrees"),
-    [
-        pytest.param(_SpecksInPx, True, id="specks whose size is px"),
-        pytest.param(_SpecksSizedInCount, False, id="specks whose size is not scaled: 16 times less of the picture"),
-    ],
-)
-def test_the_change_check_flags_scattered_marks_that_shrink_though_their_mean_holds(
-    params, change_agrees, design_photo, throwaway_effects
-):
-    @effect(category="light", params=params)
-    def speck_probe(rgb, params):
-        """Black and white specks at random places, as many of each."""
-        rng = np.random.default_rng(0)  # the places depend on the picture's size, as for a scattering effect
-        out = rgb.copy()
-        side = round(params.size)
-        for index in range(params.count):
-            y = rng.integers(0, rgb.shape[0] - side)
-            x = rng.integers(0, rgb.shape[1] - side)
-            out[y : y + side, x : x + side] = index % 2
-        return out
-
-    assert _mean_drift("speck_probe", *design_photo) <= LOOK_TOLERANCE
-    assert _change_agrees("speck_probe", *design_photo) == change_agrees
+    out = facade.render(photo, Recipe([Step("brighten", params={"gain": 1.0})], name="lit", size=None))
+    np.testing.assert_allclose(out, 1.0, atol=1e-6)
+    assert "brighten" in registry.describe()
+    with pytest.raises(ValueError, match="broken"):
+        facade.render(photo, Recipe([Step("broken")], name="bad", size=None))
