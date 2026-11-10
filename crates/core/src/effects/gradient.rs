@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::{gradient, ramp};
 use crate::params::{Choice, Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -13,12 +13,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Backgrounds,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `gradient` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// The layouts of a gradient.
@@ -96,13 +96,17 @@ fn along_colours(t: f32, repeat: i32, reflect: bool) -> f32 {
 }
 
 /// The gradient, in the picture's size: the picture is used only for its height and width.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let (height, width) = (picture.height(), picture.width());
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    let width = picture.width();
+    // the gradient spans the canvas, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
+    let canvas = (place.canvas_height, place.canvas_width);
+    let rows = place.first_row..place.first_row + picture.height();
     let (x, y) = (f64::from(params.x), f64::from(params.y));
     let t = match params.kind {
-        Kind::Linear => gradient::linear(height, width, f64::from(params.angle)),
-        Kind::Radial => gradient::radial(height, width, x, y, f64::from(params.radius)),
-        Kind::Conic => gradient::conic(height, width, x, y, f64::from(params.angle)),
+        Kind::Linear => gradient::linear(canvas, rows, f64::from(params.angle)),
+        Kind::Radial => gradient::radial(canvas, rows, x, y, f64::from(params.radius)),
+        Kind::Conic => gradient::conic(canvas, rows, x, y, f64::from(params.angle)),
     };
     let stops: Vec<[f32; 3]> = params.colors.iter().map(|colour| colour.0).collect();
     picture.map_at(|row, column, _| {

@@ -6,7 +6,7 @@ use std::f64::consts::PI;
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
 
@@ -14,12 +14,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Texture,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `scanlines` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Dark horizontal lines every `spacing` px, each `thickness` x `spacing` thick, darkening by `darkness`.
@@ -66,13 +66,13 @@ fn half_area(away: f64, plateau: f64, reach: f64) -> f64 {
     away.min(plateau) + fall / 2.0 + reach / PI * (PI * share).sin()
 }
 
-/// The multiplier of each of the picture's `height` rows.
+/// The multiplier of each of the `count` rows from canvas row `first`.
 #[expect(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     reason = "a row number is far below 2**52; the gain is applied to f32 pictures"
 )]
-fn gains(height: usize, params: &Params) -> Vec<f32> {
+fn gains(first: usize, count: usize, params: &Params) -> Vec<f32> {
     let (spacing, thickness, offset) = (
         f64::from(params.spacing),
         f64::from(params.thickness),
@@ -82,7 +82,7 @@ fn gains(height: usize, params: &Params) -> Vec<f32> {
     let reach = f64::from(params.softness) * half.min(0.5 - half); // each edge fades this far either side of the hard edge
     // Length of line above each row edge, counting from the first line: whole periods, plus the part of this period,
     // measured from the middle of the nearest line (the profile is the same either side of it).
-    let above: Vec<f64> = (0..=height)
+    let above: Vec<f64> = (first..=first + count)
         .map(|edge| {
             let turns = (edge as f64 - offset) / spacing; // in periods from the first line
             let periods = (turns - half + 0.5).floor();
@@ -97,7 +97,8 @@ fn gains(height: usize, params: &Params) -> Vec<f32> {
 }
 
 /// The picture with its rows darkened.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let gain = gains(picture.height(), params);
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the lines run from the top of the canvas, whatever rows of it the picture holds
+    let gain = gains(inputs.place(picture).first_row, picture.height(), params);
     picture.map_at(|row, _, pixel| pixel.map(|value| value * gain[row]))
 }

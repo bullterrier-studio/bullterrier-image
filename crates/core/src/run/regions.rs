@@ -256,10 +256,10 @@ impl Evaluator {
                 selection(combined)
             }
             Some(Region::LinearGradient(LinearGradient { angle })) => {
-                selection(gradient::linear(height, width, *angle))
+                selection(gradient::linear((height, width), 0..height, *angle))
             }
             Some(Region::RadialGradient(RadialGradient { x, y, radius })) => {
-                selection(gradient::radial(height, width, *x, *y, *radius))
+                selection(gradient::radial((height, width), 0..height, *x, *y, *radius))
             }
             Some(Region::Grid(spec)) => {
                 let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;

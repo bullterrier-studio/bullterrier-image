@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::params::{Choice, Color, Params};
 use crate::{Image, Inputs, Picture};
 
@@ -12,12 +12,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Backgrounds,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `pattern` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// The shapes `pattern` can draw.
@@ -80,14 +80,16 @@ pub struct Params {
     clippy::cast_precision_loss,
     reason = "a pixel index is far below the 2^24 an f32 holds exactly"
 )]
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (sin, cos) = params.angle.to_radians().sin_cos();
     let cell = params.cell;
     let half_line = params.thickness * cell / 2.0;
+    // the pattern runs from the top of the canvas, whatever rows of it the picture holds
+    let first_row = inputs.place(picture).first_row;
     let [foreground, background] = [params.foreground.0, params.background.0];
     picture.map_at(|row, column, _| {
         // the pixel's centre, then its position along the pattern's own axes, in px
-        let (x, y) = (column as f32 + 0.5, row as f32 + 0.5);
+        let (x, y) = (column as f32 + 0.5, (first_row + row) as f32 + 0.5);
         let (u, v) = (x * cos + y * sin, y * cos - x * sin);
         let (in_u, in_v) = (u.rem_euclid(cell), v.rem_euclid(cell)); // inside the cell
         let near_u = in_u.min(cell - in_u); // the distance to the nearest border

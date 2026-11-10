@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
 
@@ -12,12 +12,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Texture,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `pixel_grid` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 const CHANNELS: f64 = 3.0; // constant: one stripe for each of red, green and blue
@@ -57,7 +57,7 @@ pub struct Params {
 /// The picture on the grid. The share of each pixel a stripe lights is worked out in `f64`, as the shares of whole
 /// rows and columns, then mixed in with `amount`.
 #[expect(clippy::cast_possible_truncation, reason = "the gain is applied to f32 pictures")]
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let cell = f64::from(params.cell);
     let amount = f64::from(params.amount);
     let gap = f64::from(params.gap);
@@ -67,9 +67,16 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     // two thirds of the cell and a stripe `1 - gap` of itself, which is exactly nothing at the documented maximum.
     let lit_rows = cell - 2.0 * margin;
     let lit_stripe = stripe * (1.0 - gap);
-    let rows = lit(picture.height(), cell, margin, lit_rows);
+    // the cells start at the top of the canvas, whatever rows of it the picture holds
+    let rows = lit(
+        inputs.place(picture).first_row,
+        picture.height(),
+        cell,
+        margin,
+        lit_rows,
+    );
     let columns: Vec<[f64; 3]> = {
-        let channel = |index: f64| lit(picture.width(), cell, index * stripe + margin, lit_stripe);
+        let channel = |index: f64| lit(0, picture.width(), cell, index * stripe + margin, lit_stripe);
         let [red, green, blue] = [0.0, 1.0, 2.0].map(channel);
         red.iter()
             .zip(&green)
@@ -95,19 +102,19 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     })
 }
 
-/// The share of each of `count` pixels (pixel i spans i to i + 1) covered by the intervals of `length` from `start`
+/// The share of each of the `count` pixels from `first` (pixel i spans i to i + 1) covered by the intervals of `length` from `start`
 /// repeated every `period`, as the difference of the length lit below each pixel edge. `length` is not negative and
 /// at most `period` (the caller works it out as a length, never as the difference of two positions).
 #[expect(
     clippy::cast_precision_loss,
     reason = "a pixel index is far below the 2^53 an f64 holds exactly"
 )]
-fn lit(count: usize, period: f64, start: f64, length: f64) -> Vec<f64> {
+fn lit(first: usize, count: usize, period: f64, start: f64, length: f64) -> Vec<f64> {
     let lit_below = |edge: usize| {
         let edge = edge as f64;
         (edge / period).floor() * length + (edge.rem_euclid(period) - start).clamp(0.0, length)
     };
-    (0..count)
+    (first..first + count)
         .map(|index| lit_below(index + 1) - lit_below(index))
         .collect()
 }

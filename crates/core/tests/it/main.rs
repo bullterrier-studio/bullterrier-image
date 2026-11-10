@@ -99,6 +99,7 @@ mod pieces;
 mod pinch_bulge;
 mod pixel_grid;
 mod pixel_sort;
+mod placed;
 mod polar;
 mod presets;
 mod quadtree;
