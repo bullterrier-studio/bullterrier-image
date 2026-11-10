@@ -391,12 +391,15 @@ mod tests {
         Ok(())
     }
 
-    /// Every character the font has a glyph for, at the smallest, a middle and the largest size.
+    /// Every character the font has a glyph for, at the smallest, a middle and the largest size. An atlas keeps a cell of
+    /// coverage per glyph (some 0.4 MB each at 200 px), so the characters go in 128 at a time, not all at once (5 GB).
     #[test]
     fn every_glyph_of_the_font_is_drawn() -> Result<(), String> {
-        let everything: String = (0x20..0x3000).filter_map(char::from_u32).collect();
+        let everything: Vec<char> = (0x20..0x3000).filter_map(char::from_u32).collect();
         for cell in [1, 12, 200] {
-            Atlas::try_new(&everything, cell)?;
+            for some in everything.chunks(128) {
+                Atlas::try_new(&some.iter().collect::<String>(), cell)?;
+            }
         }
         Ok(())
     }
