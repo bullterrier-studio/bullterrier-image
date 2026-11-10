@@ -6,7 +6,7 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
-| <img src="../gallery/displace.jpg" width="160" alt="displace"> | `displace` | Move every pixel by two independent noise fields (down and right), the longest move being `amount` px: warp, tearing, scatter, frosted glass. | `amount=12.0` `scale=80.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `seed=0` +2 advanced | [displace.toml](../../examples/effects/displace.toml) |
+| <img src="../gallery/displace.jpg" width="160" alt="displace"> | `displace` | Move every pixel by two independent noise fields (down and right), by `amount` px typically: warp, tearing, scatter, frosted glass. | `amount=4.0` `scale=80.0` `octaves=3` `persistence=0.5` `lacunarity=2.0` `seed=0` +2 advanced | [displace.toml](../../examples/effects/displace.toml) |
 | <img src="../gallery/droste.jpg" width="160" alt="droste"> | `droste` | Show the picture again in its own middle, `scale` times as large and turned by `turn`, up to `repeats` times. | `scale=0.5` `turn=20.0` `repeats=4` +2 advanced | [droste.toml](../../examples/effects/droste.toml) |
 | <img src="../gallery/flow_warp.jpg" width="160" alt="flow_warp"> | `flow_warp` | Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise. | `amount=20.0` `scale=80.0` `octaves=3` `seed=0` `angle=0.0` `variation=60.0` +5 advanced | [flow_warp.toml](../../examples/effects/flow_warp.toml) |
 | <img src="../gallery/kaleidoscope.jpg" width="160" alt="kaleidoscope"> | `kaleidoscope` | Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a kaleidoscope, or with one segment a plain mirror. | `segments=6` `angle=0.0` `x=0.5` `y=0.5` +2 advanced | [kaleidoscope.toml](../../examples/effects/kaleidoscope.toml) |
@@ -29,7 +29,7 @@ Warps that bend, ripple or displace the picture's geometry.
 
 | Parameter | Type | Unit | Range | Default | Description |
 | --- | --- | --- | --- | --- | --- |
-| `amount` | number (drivable) | px | 0 to 500 | `12.0` | The farthest any pixel's move is, in pixels: the moves are scaled so that the largest one, wherever the noise is strongest, is exactly this far. Raising it tears the picture up more; 0 leaves it unchanged. |
+| `amount` | number (drivable) | px | 0 to 500 | `4.0` | The typical distance a pixel moves, in px (its standard deviation); a few move up to about 3 times as far. Raising it tears the picture up more; 0 leaves it unchanged. |
 | `scale` | number | px | 1 to 1024 | `80.0` | Size of the coarsest waves of the displacement in pixels, the spacing of the first noise lattice. Larger = broad, slow wobbles that bend the picture; small = fine, jittery tearing; 1 (with 1 octave and 'nearest') = every pixel moves on its own, frosted glass. |
 | `octaves` | whole number | count | 1 to 8 | `3` | How many layers of noise are summed, each finer than the last (by `lacunarity`) and weaker (by `persistence`). 1 = smooth waves, more = more fine, ragged detail. Layers finer than one pixel are dropped. |
 | `persistence` | number | ratio | 0 to 1 | `0.5` | How much weaker each finer layer is than the one before: each layer's weight is this to the power of its number. 0 = only the coarsest layer, 1 = every layer equally strong (very rough). |
