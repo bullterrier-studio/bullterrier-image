@@ -33,7 +33,10 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
 }
 
 /// Whether the clouds are read at the pixel itself.
-#[expect(clippy::float_cmp, reason = "1 and 0 are the parameters' own values, at which a read is exactly in place")]
+#[expect(
+    clippy::float_cmp,
+    reason = "1 and 0 are the parameters' own values, at which a read is exactly in place"
+)]
 fn reads_in_place(params: &Params) -> bool {
     params.rise == 1.0 && params.turbulence == 0.0
 }

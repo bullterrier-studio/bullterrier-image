@@ -64,7 +64,18 @@ fn cases() -> Vec<(&'static str, Value)> {
         ),
         ("ripple", json!({"amplitude": 5.0, "wavelength": 13.0, "angle": 30.0})),
         ("chromatic_aberration", json!({"amount": 6.0, "x": 0.3, "y": 0.6})),
-        // seeded noise: dense enough that its marks fall in rows 13..30 and cross both edges of the bands
+        ("halftone", json!({"sigma": 0.0, "cell": 6, "angle": 30.0})),
+        (
+            "halftone",
+            json!({"sigma": 0.0, "cell": 5, "angle": 15.0, "separation": "cmyk", "paper": "#ffffff"}),
+        ),
+    ]
+}
+
+/// The effects that draw from a seed (noise, marks, glitches) and a setting dense enough that its marks fall in the rows
+/// of the bands and cross their edges.
+fn seeded_cases() -> Vec<(&'static str, Value)> {
+    vec![
         ("grain", json!({"size": 0.0, "amount": 0.3, "color": true, "seed": 5})),
         (
             "grain",
@@ -113,10 +124,33 @@ fn cases() -> Vec<(&'static str, Value)> {
             "flow_lines",
             json!({"density": 8.0, "length": 40.0, "step": 1.5, "scale": 15.0, "thickness": 2.0, "seed": 4}),
         ),
-        ("halftone", json!({"sigma": 0.0, "cell": 6, "angle": 30.0})),
         (
-            "halftone",
-            json!({"sigma": 0.0, "cell": 5, "angle": 15.0, "separation": "cmyk", "paper": "#ffffff"}),
+            "dust_scratches",
+            json!({"density": 5.0, "size": 20.0, "hairs": 0.5, "scratches": 8, "angle": 20.0, "width": 2.0, "seed": 3}),
+        ),
+        (
+            "particles",
+            json!({"density": 150.0, "size": 8.0, "length": 9.0, "angle": 70.0, "layers": 3, "seed": 5}),
+        ),
+        (
+            "dead_pixels",
+            json!({"count": 150, "size": 2, "stuck": 0.5, "color": "#ff8000", "seed": 4}),
+        ),
+        (
+            "slice_shift",
+            json!({"slices": 12, "amount": 6.0, "bands": 5, "band_min_height": 3.0, "band_max_height": 9.0, "seed": 5}),
+        ),
+        (
+            "light_leak",
+            json!({"blobs": 5, "size": 20.0, "angle": 40.0, "amount": 1.0, "seed": 2}),
+        ),
+        (
+            "lens_drops",
+            json!({"count": 40, "radius": 8.0, "refraction": 1.5, "blur": 1.0, "highlight": 0.5, "seed": 3}),
+        ),
+        (
+            "lens_drops",
+            json!({"count": 30, "radius": 6.0, "refraction": 0.5, "blur": 0.0, "interpolation": "bicubic", "edge": "mirror", "seed": 7}),
         ),
     ]
 }
@@ -189,8 +223,9 @@ fn check(
 
 #[test]
 fn rows_told_their_place_are_the_same_rows_of_the_whole_and_rows_not_told_are_not() -> Result<(), Box<dyn Error>> {
+    let every: Vec<_> = cases().into_iter().chain(seeded_cases()).collect();
     check(
-        &cases(),
+        &every,
         (HEIGHT, WIDTH),
         [(0, 9), (13, 30), (30, HEIGHT), (HEIGHT - 1, HEIGHT)],
         0.0,

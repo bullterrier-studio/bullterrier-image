@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::light::screen;
 use crate::ops::random::Rng;
 use crate::params::{Color, Params};
@@ -14,12 +14,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Light,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `light_leak` reads around a pixel.
+/// What `light_leak` reads around a pixel: none but its own; the patches lie on the canvas.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Add `blobs` seeded patches of warm light coming in from the side `angle` points to, tinted `color` and screened
@@ -97,9 +97,11 @@ fn patches(params: &Params, half_edge: f64) -> Vec<Patch> {
 }
 
 /// The picture with the leak screened over it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    let place = inputs.place(picture);
+    // the leak is that of the canvas (at most 16 patches, the parameter's maximum), whichever rows are drawn
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
-    let (height, width) = (picture.height() as f64, picture.width() as f64);
+    let (height, width) = (place.canvas_height as f64, place.canvas_width as f64);
     // the maths below turns counterclockwise on the picture, `angle` clockwise
     let (sin, cos) = (-f64::from(params.angle).to_radians()).sin_cos();
     // how far the side lies from the centre and how far the picture reaches along it, at this angle
@@ -114,7 +116,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     )]
     picture.map_at(|row, column, pixel| {
         let right = column as f64 - (width - 1.0) / 2.0;
-        let up = (height - 1.0) / 2.0 - row as f64;
+        let up = (height - 1.0) / 2.0 - (place.first_row + row) as f64; // the canvas row
         let depth = half_depth - (right * cos + up * sin); // px in from the side
         let along = up * cos - right * sin; // px along that side, counterclockwise
         let wash: f64 = patches

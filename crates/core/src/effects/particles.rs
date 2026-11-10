@@ -3,7 +3,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::length;
 use crate::ops::light::screen;
 use crate::ops::random::{mix, unit};
@@ -15,12 +15,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Atmosphere,
     opacity: 0.8, // constant: the default opacity of a step: light screened partway keeps the picture showing
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `particles` reads around a pixel: particles lie at random places over the whole picture.
+/// What `particles` reads around a pixel: none but its own; the particles lie at random places over the canvas.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`: snow, rain,
@@ -80,10 +80,13 @@ pub struct Params {
 }
 
 /// The picture with the particles screened over it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    let place = inputs.place(picture);
     let mut layer = vec![0.0_f32; height * width];
-    let (rows, columns) = (length::float(height), length::float(width));
+    // the particles are those of the canvas, whichever rows are drawn; their number, at most 300 per 1000 px^2 times the
+    // canvas's area, is bounded by the density's maximum and the files' pixel limit (a row in `limits.rs`)
+    let (rows, columns) = (length::float(place.canvas_height), length::float(width));
     // constant: density counts particles per 1000 square px
     let count = length::whole(f64::from(params.density) * rows * columns / 1000.0);
     let heading = f64::from(params.angle).to_radians();
@@ -105,6 +108,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         draw(
             &mut layer,
             (height, width),
+            place.first_row,
             &Segment {
                 start,
                 end: (start.0 + reach * heading.cos(), start.1 + reach * heading.sin()),

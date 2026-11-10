@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::blur::gaussian_filter;
 use crate::ops::edge::Edge;
 use crate::ops::random::Rng;
@@ -17,12 +17,17 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Atmosphere,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `lens_drops` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+/// What `lens_drops` reads around a pixel: a pixel at offset d from a drop's middle shows the blurred scene at -`refraction` x d
+/// from it, so at most (1 + `refraction`) x `radius` away, and the blur reads `truncate` x `blur` further. The drops lie on
+/// the canvas. A wrapped edge reads the opposite side.
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    Footprint::reach(
+        f64::from((1.0 + params.refraction) * params.radius + params.truncate * params.blur),
+        params.edge == Edge::Wrap,
+    )
 }
 
 /// Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.
@@ -103,15 +108,18 @@ impl Drop {
 }
 
 /// The picture with the drops laid on it, one after the other.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    let place = inputs.place(picture);
+    // the drops (at most 200, the parameter's maximum) are those of the canvas, whichever rows are drawn
+    let canvas = place.canvas_height;
     let mut rng = Rng::seeded(params.seed);
     let drops: Vec<Drop> = (0..params.count)
         .map(|_| {
             // constant: three draws for each drop, in this order: its x, its y and its size
             let (x, y, size) = (rng.uniform(), rng.uniform(), rng.uniform());
             Drop {
-                middle_row: y * length::float(height),
+                middle_row: y * length::float(canvas),
                 middle_column: x * length::float(width),
                 reach: f64::from(params.radius) * (1.0 - f64::from(params.size_variation) * (1.0 - size)),
             }
@@ -127,10 +135,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let (refraction, highlight) = (f64::from(params.refraction), f64::from(params.highlight));
     let mut out = picture.pixels().to_vec();
     // a pixel is laid on by the drops that reach it, in their order, whichever band it is in
-    par::rows(&mut out, width, |first_row, band| {
-        let last_row = first_row + band.len() / width;
+    // `first` counts the picture's rows, a drop's place and a row's the canvas's
+    let above = place.first_row;
+    par::rows(&mut out, width, |first, band| {
+        let (first_row, last_row) = (above + first, above + first + band.len() / width);
         for drop in &drops {
-            let ((top, bottom), (left, right)) = drop.bounds(height, width);
+            let ((top, bottom), (left, right)) = drop.bounds(canvas, width);
             for row in top.max(first_row)..bottom.min(last_row) {
                 for column in left..right {
                     let down = length::float(row) - drop.middle_row;
@@ -141,9 +151,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
                     if cover <= 0.0 {
                         continue;
                     }
+                    // a whole number of rows off the canvas's row is exact, so the sampler meets the same weights
                     let shown = sampler
                         .at(
-                            drop.middle_row - refraction * down,
+                            drop.middle_row - refraction * down - length::float(above),
                             drop.middle_column - refraction * across,
                         )
                         .map(|level| level.clamp(0.0, 1.0));

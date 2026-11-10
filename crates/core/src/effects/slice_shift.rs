@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::random::Rng;
 use crate::ops::shift::{Band, slide_bands};
 use crate::params::Params;
@@ -14,12 +14,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Distortion,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `slice_shift` reads around a pixel.
+/// What `slice_shift` reads around a pixel: a row reads only its own row; the strips and bands are those of the canvas.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Glitch tearing: the picture cut into strips and bands that slide sideways by random distances, wrapping around.
@@ -105,8 +105,11 @@ fn band(rng: &mut Rng, height: usize, lowest: f64, tallest: f64, amount: f64) ->
 }
 
 /// The picture with strips and bands slid sideways.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    let place = inputs.place(picture);
+    // the strips and bands (at most 500 of each, the parameters' maximum) are those of the canvas, whichever rows are drawn
+    let canvas = place.canvas_height;
     let mut rng = Rng::seeded(params.seed);
     let mut moves = Vec::new();
     if params.slices > 0 {
@@ -119,7 +122,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             params.slices as usize,
             f64::from(params.amount).round_ties_even() as usize,
         );
-        moves = strips(&mut rng, height, count, furthest);
+        moves = strips(&mut rng, canvas, count, furthest);
     }
     let (lowest, tallest, amount) = (
         f64::from(params.band_min_height),
@@ -127,7 +130,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         f64::from(params.amount),
     );
     for _ in 0..params.bands {
-        moves.push(band(&mut rng, height, lowest, tallest, amount));
+        moves.push(band(&mut rng, canvas, lowest, tallest, amount));
     }
-    Image::from_pixels(height, width, slide_bands(picture.pixels(), height, width, &moves))
+    Image::from_pixels(
+        height,
+        width,
+        slide_bands(picture.pixels(), (height, width), place.first_row, &moves),
+    )
 }

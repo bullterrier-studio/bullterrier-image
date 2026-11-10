@@ -1,10 +1,12 @@
 //! `dead_pixels`: a screen's faulty pixels, some stuck on a colour and some dead black. What it does is documented once, on
 //! `Params`.
 
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::length;
 use crate::ops::random::Rng;
 use crate::params::{Color, Params};
@@ -14,12 +16,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Glitch,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `dead_pixels` reads around a pixel.
+/// What `dead_pixels` reads around a pixel: none but its own; the faulty cells are those of the canvas.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Make `count` cells of `size` px faulty: a share `stuck` of them shows `color`, the rest black.
@@ -54,29 +56,34 @@ pub struct Params {
     pub seed: u32,
 }
 
-/// What a cell of the grid shows.
+/// What a faulty cell of the grid shows.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Cell {
-    Fine,
     Stuck,
     Dead,
 }
 
 /// The picture with its faulty pixels.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    let place = inputs.place(picture);
     let size = params.size.cast_unsigned() as usize;
-    let columns = picture.width().div_ceil(size);
-    let cells = picture.height().div_ceil(size) * columns; // the last cells are cut off by the edge
+    // the cells are those of the canvas: exactly `count` of them (at most 100000, the parameter's maximum) are drawn once
+    // from the seed, whichever rows are rendered, and the picture takes those in its rows
+    let columns = place.canvas_width.div_ceil(size);
+    let cells = place.canvas_height.div_ceil(size) * columns; // the last cells are cut off by the edge
     let faulty = Rng::seeded(params.seed).shuffled(cells, (params.count.cast_unsigned() as usize).min(cells));
     // the first `count` x `stuck` of them (halves to the even number) are stuck
     let stuck = length::whole(length::float(faulty.len()) * f64::from(params.stuck));
-    let mut grid = vec![Cell::Fine; cells];
-    for (rank, &cell) in faulty.iter().enumerate() {
-        grid[cell] = if rank < stuck { Cell::Stuck } else { Cell::Dead };
-    }
-    picture.map_at(|row, column, pixel| match grid[row / size * columns + column / size] {
-        Cell::Fine => pixel,
-        Cell::Stuck => params.color.0,
-        Cell::Dead => [0.0; 3], // constant: a dead pixel emits no light
-    })
+    let grid: HashMap<usize, Cell> = faulty
+        .iter()
+        .enumerate()
+        .map(|(rank, &cell)| (cell, if rank < stuck { Cell::Stuck } else { Cell::Dead }))
+        .collect();
+    picture.map_at(
+        |row, column, pixel| match grid.get(&((place.first_row + row) / size * columns + column / size)) {
+            None => pixel,
+            Some(Cell::Stuck) => params.color.0,
+            Some(Cell::Dead) => [0.0; 3], // constant: a dead pixel emits no light
+        },
+    )
 }

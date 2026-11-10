@@ -83,19 +83,27 @@ pub(crate) struct Band {
     pub(crate) distance: i64,
 }
 
-/// The `height` x `width` `pixels` (both at least 1) with each of `bands` slid sideways by whole pixels, what leaves one
-/// side coming back on the other, the rest of the picture as it was.
+/// The `height` x `width` `pixels` (both at least 1), the rows from canvas row `first_row` on, with each of `bands` (rows of
+/// the canvas) slid sideways by whole pixels, what leaves one side coming back on the other, the rest of the picture as it was.
 ///
 /// A row in several bands moves by the sum of their distances; the order of the bands does not matter. Every row keeps
 /// exactly the pixels it had, rotated. Each output row reads only its own input row, so the result is the same at any
 /// thread count.
-pub(crate) fn slide_bands(pixels: &[[f32; 3]], height: usize, width: usize, bands: &[Band]) -> Vec<[f32; 3]> {
-    let mut slide = vec![0_i64; height];
-    for band in bands {
-        for row in slide.iter_mut().skip(band.top).take(band.rows) {
-            *row += band.distance;
-        }
-    }
+pub(crate) fn slide_bands(
+    pixels: &[[f32; 3]],
+    (height, width): (usize, usize),
+    first_row: usize,
+    bands: &[Band],
+) -> Vec<[f32; 3]> {
+    let slide: Vec<i64> = (first_row..first_row + height)
+        .map(|row| {
+            bands
+                .iter()
+                .filter(|band| (band.top..band.top + band.rows).contains(&row))
+                .map(|band| band.distance)
+                .sum()
+        })
+        .collect();
     #[expect(clippy::cast_possible_wrap, reason = "a picture side is far below 2**63")]
     let columns = width as i64;
     let mut out = vec![[0.0; 3]; height * width];
@@ -150,8 +158,8 @@ mod tests {
         ] {
             let out = slide_bands(
                 &numbered(3),
-                3,
-                5,
+                (3, 5),
+                0,
                 &[Band {
                     top: 1,
                     rows: 1,
@@ -178,13 +186,13 @@ mod tests {
                 distance: 3,
             },
         ];
-        let out = slide_bands(&numbered(3), 3, 5, &bands);
+        let out = slide_bands(&numbered(3), (3, 5), 0, &bands);
         assert_eq!(
             (row(&out, 0), row(&out, 1), row(&out, 2)),
             (vec![4, 0, 1, 2, 3], vec![1, 2, 3, 4, 0], vec![2, 3, 4, 0, 1])
         );
         let reversed = [bands[1], bands[0]];
-        assert_eq!(slide_bands(&numbered(3), 3, 5, &reversed), out);
+        assert_eq!(slide_bands(&numbered(3), (3, 5), 0, &reversed), out);
     }
 
     #[test]

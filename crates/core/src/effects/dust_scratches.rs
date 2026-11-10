@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::length;
 use crate::ops::random::{mix, unit};
 use crate::ops::segments::{Point, Segment, draw};
@@ -15,12 +15,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Texture,
     opacity: 0.8, // constant: the default opacity of a step: a worn print shows its marks partway
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `dust_scratches` reads around a pixel.
+/// What `dust_scratches` reads around a pixel: none but its own; the marks are those of the canvas.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Draw light and dark specks, hairs and scratches at random places over the picture.
@@ -70,10 +70,11 @@ pub struct Params {
 
 /// Draws the segment from `start` to `end` (a speck has equal ends), `radius` px wide each side, into `cover`: solid inside, soft by
 /// one pixel.
-fn stamp(cover: &mut [f32], shape: (usize, usize), start: Point, end: Point, radius: f64) {
+fn stamp(cover: &mut [f32], shape: (usize, usize), first_row: usize, start: Point, end: Point, radius: f64) {
     draw(
         cover,
         shape,
+        first_row,
         &Segment {
             start,
             end,
@@ -85,13 +86,17 @@ fn stamp(cover: &mut [f32], shape: (usize, usize), start: Point, end: Point, rad
 }
 
 /// The picture with the marks drawn on it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    let place = inputs.place(picture);
+    let first_row = place.first_row;
     let (mut light, mut dark) = (vec![0.0_f32; height * width], vec![0.0_f32; height * width]);
     // mark number `mark` of `stream`, its `part`-th number: a hash, so a higher count keeps every mark of a lower one
     let draw = |stream: u64, mark: usize, part: u64| unit(mix(params.seed, &[stream, mark as u64, part]));
     let size = f64::from(params.size);
-    let (rows, columns) = (length::float(height), length::float(width));
+    // the marks are those of the canvas, whichever rows are drawn: their number is the density (at most 5 per 1000 px^2)
+    // times the canvas's area, which the files' pixel limit bounds
+    let (rows, columns) = (length::float(place.canvas_height), length::float(width));
     let dust = length::whole(f64::from(params.density) * rows * columns / 1000.0); // constant: density counts marks per 1000 square px
     for mark in 0..dust {
         // constant: the numbers of the six draws that make a dust mark
@@ -102,10 +107,17 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             // a hair, up to `size` long, in any direction, one pixel wide: half a pixel each side of its line
             let (reach, turn) = (size * (0.5 + extent / 2.0), std::f64::consts::TAU * direction);
             let end = (centre.0 + reach * turn.cos(), centre.1 + reach * turn.sin());
-            stamp(cover, (height, width), centre, end, 0.5); // constant: half a pixel each side
+            stamp(cover, (height, width), first_row, centre, end, 0.5); // constant: half a pixel each side
         } else {
             // a speck: many small, few large
-            stamp(cover, (height, width), centre, centre, size / 2.0 * extent * extent);
+            stamp(
+                cover,
+                (height, width),
+                first_row,
+                centre,
+                centre,
+                size / 2.0 * extent * extent,
+            );
         }
     }
     for mark in 0..params.scratches.cast_unsigned() as usize {
@@ -116,7 +128,14 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         let start = (x * columns, (rows - reach) * extent);
         let end = (start.0 + reach * turn.tan(), start.1 + reach);
         let cover = if tone < 0.5 { &mut light } else { &mut dark };
-        stamp(cover, (height, width), start, end, f64::from(params.width) / 2.0);
+        stamp(
+            cover,
+            (height, width),
+            first_row,
+            start,
+            end,
+            f64::from(params.width) / 2.0,
+        );
     }
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;
