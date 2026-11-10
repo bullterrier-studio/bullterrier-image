@@ -97,7 +97,7 @@ fn a_width_of_one_screens_the_backdrop_over_the_outermost_ring_at_full_amount() 
     let after = run(&params(1.0, 1.0), &field(), &before)?;
     for (at, (got, was)) in after.iter().zip(&before).enumerate() {
         let (row, column) = (at / SIZE, at % SIZE);
-        if depth(row, column) == 1.0 {
+        if (1.0..2.0).contains(&depth(row, column)) {
             let wanted = [0, 1, 2].map(|c| SUBJECT_COLOUR[c] + BACKDROP[c] * (1.0 - SUBJECT_COLOUR[c]));
             assert!(near(*got, wanted), "ring pixel ({row}, {column}): {got:?}");
         } else {
