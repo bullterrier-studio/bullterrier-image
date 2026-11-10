@@ -9,6 +9,7 @@ values are validated by the parameter model first).
 import math
 import pickle
 import threading
+import weakref
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
@@ -448,8 +449,30 @@ def on_the_smallest_stack(work: Callable[[], Any]) -> Any:
     finally:
         threading.stack_size(previous)
     if "error" in outcome:
-        raise outcome["error"]
+        # pop: the error's traceback holds this frame, so an `outcome` still holding the error is a cycle that keeps
+        # `work`'s values alive until the GC frees them on some later, small-stack thread
+        raise outcome.pop("error")
     return outcome["value"]
+
+
+def test_an_error_raised_on_the_smallest_stack_does_not_keep_what_the_work_held_alive():
+    class Held:
+        pass
+
+    def failing_work() -> tuple[Callable[[], None], weakref.ref[Held]]:
+        held = Held()
+
+        def work() -> None:
+            _ = held
+            raise ValueError("raised in the thread")
+
+        return work, weakref.ref(held)
+
+    work, alive = failing_work()
+    with pytest.raises(ValueError, match="raised in the thread"):
+        on_the_smallest_stack(work)
+    del work
+    assert alive() is None  # a reference cycle would keep it until the GC frees it on some later, small-stack thread
 
 
 NESTED_JSON = 123  # the deepest a step's parameter can nest in a JSON recipe: serde_json allows 128 levels in all
