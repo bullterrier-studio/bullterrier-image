@@ -11,6 +11,8 @@ publish.workspace = true
 [features]
 # Running models through ONNX Runtime (`finding::onnx`): the library is loaded at run time, none is bundled. The published wheel enables it.
 onnx = ["dep:ort", "dep:sha2", "dep:ureq"]
+# Apple Vision (`finding::vision`): the default subject finder on macOS 14 and later; no effect on other platforms. The macOS wheel enables it.
+vision = []
 
 [dependencies]
 bullterrier-image-derive.workspace = true
@@ -37,6 +39,12 @@ zune-jpeg.workspace = true
 [dev-dependencies]
 peak_alloc.workspace = true
 proptest.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
+objc2-core-video.workspace = true
+objc2-foundation.workspace = true
+objc2-vision.workspace = true
 
 [lints]
 workspace = true

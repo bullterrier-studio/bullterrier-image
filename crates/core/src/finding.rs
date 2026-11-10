@@ -18,8 +18,9 @@ pub enum ModelKind {
     /// A salient-object model (IS-Net): the photo as a 1024 x 1024 square, answering the probability that each pixel
     /// belongs to the subject.
     Subject,
-    /// A monocular depth model (Depth Anything V2): the photo with its short side 518 px and both sides multiples of 14,
-    /// answering relative inverse depth, larger nearer, in no fixed unit.
+    /// A monocular depth model (Depth Anything V2): the photo with its short side 518 px and both sides multiples of 14
+    /// (a long strip is scaled down until its long side is at most 1092 px, which bounds the memory), answering relative
+    /// inverse depth, larger nearer, in no fixed unit.
     Depth,
 }
 
@@ -123,6 +124,11 @@ const SUBJECT_SIDE: usize = 1024; // constant: the input size IS-Net was trained
 /// The short side a depth model takes, px, and the patch its sides are a whole number of.
 const DEPTH_SHORT_SIDE: f64 = 518.0; // constant: Depth Anything's trained input size (37 patches of 14 px)
 const DEPTH_PATCH: f64 = 14.0; // constant: the ViT-S/14 encoder's patch size
+/// The longest side a depth model is given, px: the model's attention grows with the square of the number of 14 px patches,
+/// so a long strip is scaled down to fit. Measured on the model (ONNX Runtime, CPU), peak memory with a 518 px short side:
+/// 0.55 GB at 686, 1.3 GB at 1400, 2.7 GB at 2254; with IS-Net loaded too (2.9 GB at 686) a long side of 1092 (78 patches)
+/// keeps both under 3.3 GB, well under the 4 GB a process may take.
+const DEPTH_MAX_LONG_SIDE: f64 = 1092.0; // constant: 78 patches of 14 px; the largest long side whose measured peak leaves headroom
 /// `ImageNet`'s mean and std per channel (`torchvision`), which Depth Anything was trained with.
 const DEPTH_MEAN: [f32; 3] = [0.485, 0.456, 0.406]; // constant: ImageNet's per-channel mean
 const DEPTH_STD: [f32; 3] = [0.229, 0.224, 0.225]; // constant: ImageNet's per-channel std
@@ -198,11 +204,15 @@ fn subject_input(picture: &Picture<'_>) -> Tensor {
     )
 }
 
-/// The tensor a depth model takes for `picture` and its size: scaled so the short side is 518 px, then each side to the
-/// nearest multiple of 14 (the short side stays 518, itself a multiple).
+/// The tensor a depth model takes for `picture` and its size: scaled so the short side is 518 px, or, for a long strip,
+/// so the long side is 1092 px, then each side to the nearest multiple of 14 (at least one patch).
 fn depth_input(picture: &Picture<'_>) -> (Tensor, (usize, usize)) {
-    let scale = DEPTH_SHORT_SIDE / float(picture.height().min(picture.width()));
-    let side = |length: usize| whole(float(length) * scale / DEPTH_PATCH) * whole(DEPTH_PATCH);
+    let (short, long) = (
+        picture.height().min(picture.width()),
+        picture.height().max(picture.width()),
+    );
+    let scale = (DEPTH_SHORT_SIDE / float(short)).min(DEPTH_MAX_LONG_SIDE / float(long));
+    let side = |length: usize| whole(float(length) * scale / DEPTH_PATCH).max(1) * whole(DEPTH_PATCH);
     let to = (side(picture.height()), side(picture.width()));
     (planes(picture, to, Filter::Bicubic, DEPTH_MEAN, DEPTH_STD), to)
 }

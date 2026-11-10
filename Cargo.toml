@@ -23,6 +23,11 @@ image = { version = "0.25", default-features = false, features = ["bmp", "gif", 
 libm = "0.2"  # erfc, for the normal distribution function (`ops/gauss.rs`): pure Rust, MIT, no C
 moxcms = { version = "0.8", default-features = false, features = ["lut"] }  # the colour profiles of image files, to sRGB (`lut` for the CMYK ones; the `image` crate brings it too, with its default features, so its SIMD paths are on)
 numpy = "0.30"
+# Apple Vision from Rust (`finding/vision.rs`, feature `vision`, macOS only): the same calls pyobjc made, byte for byte
+objc2 = "0.6"
+objc2-core-video = { version = "0.3", default-features = false, features = ["std", "CVPixelBuffer", "CVBuffer", "CVReturn", "CVImageBuffer"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSData", "NSDictionary", "NSError", "NSObject", "NSProcessInfo"] }
+objc2-vision = { version = "0.3", default-features = false, features = ["std", "VNRequest", "VNRequestHandler", "VNGenerateForegroundInstanceMaskRequest", "VNObservation", "VNTypes", "objc2-core-video"] }
 # ONNX Runtime, loaded at run time from a library the user has or fetches (`finding/onnx.rs`, feature `onnx`): pinned exactly, a release candidate whose API has moved between candidates
 ort = { version = "=2.0.0-rc.15", default-features = false, features = ["load-dynamic", "std"] }
 peak_alloc = "0.3"

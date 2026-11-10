@@ -127,3 +127,25 @@ fn the_real_subject_model_finds_the_dog_and_the_real_depth_model_puts_it_nearer_
     );
     Ok(())
 }
+
+#[test]
+#[ignore = "full: runs both real models on a banner (peak about 3.3 GB, alone): needs them in the cache folder and BT_IMAGE_ONNX_LIB"]
+fn the_real_models_run_on_a_banner_within_the_memory_cap() -> Outcome {
+    // 736 x 3210: before the depth input was bounded, its 518 x 2254 input took 2.7 GB and the two models together passed 4 GB
+    let (height, width) = (736, 3210);
+    let values: Vec<f32> = (0..height * width * 3)
+        .map(|index| f32::from(u8::try_from(index % 251).unwrap_or(0)) / 251.0)
+        .collect();
+    let picture = bullterrier_image::Picture::new(height, width, &values)?;
+    let library = library()?;
+    let options = |kind| Options::from_env(kind).with_library(&library);
+    let depth = finder(&DEPTH_ANYTHING_V2_SMALL, &options(ModelKind::Depth))?.find(&picture)?;
+    assert_eq!((depth.height(), depth.width()), (height, width));
+    // IS-Net may find nothing in noise: that is an answer too, and still ran within the cap
+    let subject = finder(&IS_NET, &options(ModelKind::Subject))?.find(&picture);
+    assert!(
+        subject.is_ok() || matches!(subject, Err(Error::MapNotFound { .. })),
+        "{subject:?}"
+    );
+    Ok(())
+}

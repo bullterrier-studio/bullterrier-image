@@ -21,5 +21,8 @@ numpy.workspace = true
 pyo3.workspace = true
 serde_json.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+bullterrier-image = { workspace = true, features = ["vision"] }
+
 [lints]
 workspace = true

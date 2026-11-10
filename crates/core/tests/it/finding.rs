@@ -101,6 +101,34 @@ fn a_depth_model_is_given_the_photo_with_its_short_side_518_and_both_sides_multi
 }
 
 #[test]
+fn a_depth_input_stays_within_the_budget_however_long_the_picture_is() -> Outcome {
+    // (height, width): the short side stays 518 while the long side fits; past that both scale down to fit
+    for (height, width, wanted) in [
+        (736, 3210, [252, 1092]), // a banner: a 518 x 2254 input needs 2.7 GB, so the long side is held to 1092
+        (3210, 736, [1092, 252]),
+        (100, 700, [154, 1092]),
+        (2000, 2000, [518, 518]),
+        (480, 768, [518, 826]), // within the budget: as before
+        (1, 5000, [14, 1092]),  // an extreme strip still has a whole patch
+    ] {
+        let stand = leaked(Stand::new(|input| {
+            let (rows, columns) = (input.shape()[2], input.shape()[3]);
+            Tensor::new(vec![1, rows, columns], vec![0.5; rows * columns])
+        }));
+        let values = grey(height, width, 0.5);
+        ModelFinder::new(ModelKind::Depth, stand).find(&Picture::new(height, width, &values)?)?;
+        let seen = stand.seen.lock().map_err(|_| "poisoned")?;
+        let [rows, columns] = [seen[0].shape()[2], seen[0].shape()[3]];
+        assert_eq!([rows, columns], wanted, "{height} x {width}");
+        assert!(
+            rows % 14 == 0 && columns % 14 == 0 && rows.max(columns) <= 1092,
+            "{rows} x {columns}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn a_subjects_probability_comes_back_as_a_map_of_the_photos_size_with_the_edge_cleaned() -> Outcome {
     // the left half of the 1024 square is the subject
     let stand = leaked(Stand::new(|_| {
