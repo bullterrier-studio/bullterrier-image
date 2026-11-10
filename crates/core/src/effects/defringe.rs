@@ -69,7 +69,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     if params.width <= 0.0 || params.amount <= 0.0 {
         return Image::from_pixels(height, width, pixels.to_vec());
     }
-    let inside: Vec<bool> = field.values().iter().map(|&value| value >= params.field_threshold).collect();
+    let inside: Vec<bool> = field
+        .values()
+        .iter()
+        .map(|&value| value >= params.field_threshold)
+        .collect();
     // > 0 outside the shape, < 0 inside it; an infinite depth (no edge in reach) is deeper than any band
     let signed = signed(&inside, (height, width));
     let band = params.width;

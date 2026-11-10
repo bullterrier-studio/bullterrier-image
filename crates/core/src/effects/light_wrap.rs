@@ -73,7 +73,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     if params.width <= 0.0 || params.amount <= 0.0 {
         return Image::from_pixels(height, width, pixels.to_vec());
     }
-    let inside: Vec<bool> = field.values().iter().map(|&value| value >= params.field_threshold).collect();
+    let inside: Vec<bool> = field
+        .values()
+        .iter()
+        .map(|&value| value >= params.field_threshold)
+        .collect();
     let signed = signed(&inside, (height, width)); // < 0 inside the shape; an infinite depth is deeper than any band
     let backdrop: Vec<f32> = inside.iter().map(|&within| f32::from(u8::from(!within))).collect();
     let light = weighted_gaussian(picture, &backdrop, f64::from(params.blur), TRUNCATE, Extension::Reflect);
