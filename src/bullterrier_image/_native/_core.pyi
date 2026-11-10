@@ -15,6 +15,8 @@ __all__ = [
     "check_recipe",
     "effect",
     "effects",
+    "find_depth",
+    "find_subject",
     "known_maps",
     "needs",
     "params",
@@ -78,6 +80,25 @@ def needs(recipe: dict[str, Any], *, presets: Mapping[str, str] | None = None) -
 def params(effect: str) -> dict[str, Any]: ...
 def effect(effect: str) -> dict[str, Any]: ...
 def read_recipe(text: str, syntax: str) -> dict[str, Any]: ...
+def find_subject(
+    rgb: np.ndarray,
+    *,
+    segmenter: str | None = None,
+    shrink: float = 1.5,
+    feather: float = 1.0,
+    library: str | os.PathLike[str] | None = None,
+    model_file: str | os.PathLike[str] | None = None,
+    cache: str | os.PathLike[str] | None = None,
+    allow_download: bool = False,
+) -> np.ndarray: ...
+def find_depth(
+    rgb: np.ndarray,
+    *,
+    library: str | os.PathLike[str] | None = None,
+    model_file: str | os.PathLike[str] | None = None,
+    cache: str | os.PathLike[str] | None = None,
+    allow_download: bool = False,
+) -> np.ndarray: ...
 def refine_edge(matte: np.ndarray, shrink: float, feather: float) -> np.ndarray: ...
 def region_presets(kind: str) -> dict[str, dict[str, Any]]: ...
 def shipped_presets() -> dict[str, str]: ...

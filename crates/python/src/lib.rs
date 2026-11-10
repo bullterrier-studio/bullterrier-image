@@ -2,6 +2,7 @@
 //! porting one never changes it.
 
 mod files;
+mod finding;
 mod lut;
 mod run;
 
@@ -45,6 +46,9 @@ mod _core {
 
     #[pymodule_export]
     use super::lut::PyLut;
+
+    #[pymodule_export]
+    use super::finding::{find_depth, find_subject};
 
     #[pymodule_export]
     use super::run::{check_recipe, known_maps, needs, refine_edge, render, trace};

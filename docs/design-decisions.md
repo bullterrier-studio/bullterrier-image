@@ -493,6 +493,21 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   when a project moves between a Mac and Linux. The test suite pins `onnx` so it runs alike on every OS. The portable model (about 180 MB) is downloaded on first use into the
   user's cache, verified against a pinned SHA-256, never at import, never left half-written; `BT_IMAGE_SUBJECT_MODEL` points at a local
   copy for offline use.
+- **The finders run in Rust, in two places.** The core (`bullterrier_image::finding`) holds the model catalogue, what a model is given
+  and what its answer becomes, ONNX Runtime loaded at run time (feature `onnx`, `ort` pinned exactly: a release candidate) and
+  the verified https download; `crates/finders` holds Apple Vision (`objc2`, the one crate besides PyO3 with `unsafe` calls)
+  and the choice of a segmenter, made once by what the platform supports (Vision on macOS 14 and later, the portable model
+  elsewhere), never by trying one and falling back; Vision asked for where it cannot run is an error that names the fix.
+  The wheel enables `onnx` on every platform (it bundles no library) and Vision on macOS; `cargo test --workspace` in
+  `check` builds the same features, so CI tests what ships. *Reason:* the core forbids `unsafe`; the download needs
+  rustls (licences BSD-3-Clause and CDLA-Permissive-2.0 were added to `deny.toml` for it, behind the feature only).
+- **The model input is resized in f32, not rounded to 8 bit.** IS-Net cuts on stylised renders may move by up to about 0.6 %
+  of the pixels versus the Python finder (natural photos about 0.005 %), which is the same size as Python's own 8-bit versus
+  float difference through the same ONNX Runtime: the model is that sensitive to 1/255 of input. Measured on 88 gallery
+  photos in R6b. Same inputs on the same machine and versions still give the same output.
+- **A depth input fits a budget.** The depth model's attention grows with the square of the 14 px patches, so a long strip
+  (736 x 3210 would be 518 x 2254) took 2.7 GB and, with IS-Net loaded, passed the 4000 MB cap. The long side is held to 1092 px
+  (78 patches; measured peak with both models about 2.5 GB), both sides staying multiples of 14. IS-Net is a fixed 1024 square.
 - **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
   its own size with the subject's alpha, after an optional edge clean-up (`--shrink`, `--feather`), and needs no
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the

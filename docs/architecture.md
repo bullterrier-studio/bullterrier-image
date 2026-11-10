@@ -4,7 +4,8 @@ The Rust core, the runner, regions, files and the Python bindings. The rules tha
 ("Architecture rules"); read this before touching the runner, regions, files, threads or bindings.
 
 **Rust core:** `crates/core` (crate `bullterrier-image`, pure Rust: `ops/` by concept, one `effects/<name>.rs` per
-ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` derives) and `crates/python` (PyO3
+ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` derives), `crates/finders` (Apple Vision through `objc2`, the choice of a segmenter by
+what the platform supports; the models, ONNX Runtime and the download are the core's `finding`, feature `onnx`) and `crates/python` (PyO3
 bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect has **no Python folder**: the registry registers every
 effect the core declares (`registry._register_core_effects`) with a function that calls `_core.apply("<name>", rgb,
 params.model_dump())`. Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
