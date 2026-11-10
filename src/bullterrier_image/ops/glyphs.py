@@ -1,9 +1,8 @@
 """Text characters as pixels: the shared machinery behind every effect that draws with glyphs.
 
-The module promises two things. `cell_size` says how big one character cell is, so effects can lay a grid over a
-picture. `glyph_atlas` gives the ink coverage of each distinct character of a palette, ordered from least to most ink,
-so a brightness maps straight to an atlas index. (The `ascii` effect draws its glyphs in Rust, from the core's copy of
-the font; this module remains for the Python users of the font: `disperse`, the numbered pieces and the sheet.)
+`glyph_atlas` gives the ink coverage of each distinct character of a palette, ordered from least to most ink, so a
+brightness maps straight to an atlas index. (`ascii` and `disperse` draw and size their glyphs in Rust, from the core's
+copy of the font; this module remains for the Python user of the font: the numbered pieces of a trace.)
 
 Every glyph is drawn with the one font in `FONT`, never a system font, so a look is the same on every platform
 (within float tolerance). It is JetBrains Mono Regular (SIL OFL 1.1, `LICENSE-FONT`), monospaced, with Latin letters
@@ -25,24 +24,14 @@ _FULL_INK = 255  # constant: full scale of an 8-bit grey canvas, where a glyph i
 _LAYOUT = ImageFont.Layout.BASIC
 
 
-def cell_size(cell: int) -> tuple[int, int]:
-    """(width, height) in px of one character cell when characters are `cell` px wide.
-
-    `cell` = character width in px (a positive int). The width is always exactly `cell`; the height comes from the font
-    and grows with `cell`.
-    This is the grid every glyph drawn by `glyph_atlas` lives on, so callers can lay out whole characters.
-    """
-    ascent, descent = _load_font(cell).getmetrics()
-    return cell, ascent + descent
-
-
 def glyph_atlas(chars: str, cell: int) -> np.ndarray:
     """Ink coverage of each distinct character of `chars`, ordered from least to most ink.
 
     `chars` = the palette (at least two distinct characters), in any order; repeated characters count once. `cell` =
     character width in px. Returns a float32 array of shape (n_glyphs, cell_h, cell_w) with coverage in 0..1 (0 = no
-    ink, 1 = fully inked), where (cell_w, cell_h) == `cell_size(cell)`. Index 0 is the lightest glyph, the last index
-    the densest. The result is cached and shared between callers, so it is read-only: copy it before editing.
+    ink, 1 = fully inked), where cell_w == `cell` and cell_h comes from the font and grows with `cell`. Index 0 is the
+    lightest glyph, the last index the densest. The result is cached and shared between callers, so it is read-only:
+    copy it before editing.
     """
     return _atlas(chars, cell)
 

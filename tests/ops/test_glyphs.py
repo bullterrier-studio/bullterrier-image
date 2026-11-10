@@ -3,9 +3,15 @@ import pytest
 from PIL import Image, ImageDraw, ImageFont
 
 from bullterrier_image import RecipeError, fx
-from bullterrier_image.ops.glyphs import FONT, cell_size, glyph_atlas
+from bullterrier_image.ops.glyphs import FONT, glyph_atlas
 
 CELLS = [5, 8, 13, 20]
+
+
+def cell_size(cell: int) -> tuple[int, int]:
+    """(width, height) of the cells `glyph_atlas` draws at `cell` px wide."""
+    _, height, width = glyph_atlas(" ", cell).shape
+    return width, height
 
 
 def ink(atlas: np.ndarray) -> np.ndarray:

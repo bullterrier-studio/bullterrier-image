@@ -344,7 +344,6 @@ convention = "google"
 "tools/**" = ["T20"]
 "docs/*.py" = ["T20"]
 "examples/*.py" = ["T20"]
-"src/bullterrier_image/effects/**" = ["A001"]  # the `ascii` effect function shadows a builtin by design
 "**/__init__.py" = ["F401"]
 
 # Pyright is the language server behind editor and Claude Code navigation (pyright-lsp); mypy stays the type gate. It only
@@ -423,6 +422,10 @@ ignore_names = [
     "octaves",
     "persistence",
     "samples",
+    "angle",  # fields of `Framing` and the regions, as above; the last Python effect that read these names (disperse) is gone
+    "edge",
+    "jitter",
+    "threshold",
     "amount",  # `Edge.amount`; the last ascii text-art code that read a name `amount` is gone
     "model_config",  # pydantic reads each model's settings from this class attribute
     "model_construct",  # `ValidatedModel.model_construct` overrides pydantic's to raise: a guard, called by no one

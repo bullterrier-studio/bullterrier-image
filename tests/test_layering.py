@@ -92,8 +92,8 @@ FORBIDDEN = {
         f"bullterrier_image.effects.{HOST}.effect",
         EFFECTS_APART,
     ),
-    "ops to core": ("ops/cells.py", "import bullterrier_image.core.params", "bullterrier_image.ops.cells", LAYERS),
-    "errors to ops": ("errors.py", "import bullterrier_image.ops.cells", "bullterrier_image.errors", LAYERS),
+    "ops to core": ("ops/maps.py", "import bullterrier_image.core.params", "bullterrier_image.ops.maps", LAYERS),
+    "errors to ops": ("errors.py", "import bullterrier_image.ops.maps", "bullterrier_image.errors", LAYERS),
     "errors to core": ("errors.py", "import bullterrier_image.core.params", "bullterrier_image.errors", LAYERS),
     "core to effects": ("core/steps.py", "import bullterrier_image.effects", "bullterrier_image.core.steps", LAYERS),
     "core to imageio": ("core/bridge.py", "import bullterrier_image.imageio", "bullterrier_image.core.bridge", LAYERS),
@@ -145,20 +145,20 @@ FORBIDDEN = {
         CORE_ORDER,
     ),
     "ops to the package root": (
-        "ops/cells.py",
+        "ops/maps.py",
         "from bullterrier_image import Recipe",
-        "bullterrier_image.ops.cells",
+        "bullterrier_image.ops.maps",
         LAYERS,
     ),
     "ops to the package root, relatively": (
-        "ops/cells.py",
+        "ops/maps.py",
         "from .. import Recipe",
-        "bullterrier_image.ops.cells",
+        "bullterrier_image.ops.maps",
         LAYERS,
     ),
     "the Rust extension's home to ops": (
         "_native/__init__.py",
-        "import bullterrier_image.ops.cells",
+        "import bullterrier_image.ops.maps",
         "bullterrier_image._native",
         LAYERS,
     ),
@@ -180,10 +180,10 @@ def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract
 
 
 ALLOWED = {
-    "core to ops": ("core/steps.py", "import bullterrier_image.ops.cells"),
+    "core to ops": ("core/steps.py", "import bullterrier_image.ops.maps"),
     "core to errors": ("core/vocabulary.py", "import bullterrier_image.errors"),
-    "ops to errors": ("ops/cells.py", "import bullterrier_image.errors"),
-    "ops to the Rust extension": ("ops/cells.py", "from bullterrier_image._native import _core"),
+    "ops to errors": ("ops/maps.py", "import bullterrier_image.errors"),
+    "ops to the Rust extension": ("ops/maps.py", "from bullterrier_image._native import _core"),
     "an effect to the Rust extension": (f"effects/{HOST}/effect.py", "from bullterrier_image._native import _core"),
 }
 

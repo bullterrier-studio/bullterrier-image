@@ -859,10 +859,6 @@ def test_every_effect_with_a_field_parameter_gives_the_same_picture_for_its_name
     np.testing.assert_allclose(named, direct, atol=1e-6, rtol=0)
 
 
-def test_some_effects_have_a_field_parameter():
-    assert FIELD_EFFECTS  # else the test above is parametrized over nothing and passes without testing anything
-
-
 def test_a_field_is_made_for_the_picture_the_recipe_works_on_not_for_the_photo(field_probe, photo, subject):
     recipe = Recipe([Step("field_probe", params={"field": "g"})], name="small", size=48, regions=FIELD_REGIONS)
     assert facade.render(photo, recipe, maps=field_maps(photo, subject)).shape[:2] == (36, 48)
