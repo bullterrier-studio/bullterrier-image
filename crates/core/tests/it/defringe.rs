@@ -1,6 +1,7 @@
 //! `defringe`: a square subject (green) on a white backdrop, its outermost ring of pixels pink (a matte's fringe). The
-//! signed distance of every ring pixel to the backdrop is 1 (a corner too: its nearest backdrop pixel is beside it), so
-//! with a band of `width` the ring takes `amount * (1 - 1 / width)` of the interior colour, worked by hand.
+//! signed distance of every ring pixel to the backdrop is 1 (a corner too: its nearest backdrop pixel is beside it). A
+//! pixel at depth d takes `amount * (1 - (d - 1) / width)` of the interior colour for d up to `width`, none deeper, so
+//! the ring (d = 1) takes `amount`, worked by hand.
 
 use bullterrier_image::Error;
 use bullterrier_image::effects::defringe;
@@ -13,6 +14,7 @@ const SUBJECT: std::ops::Range<usize> = 3..12;
 const WHITE: [f32; 3] = [1.0; 3];
 const PINK: [f32; 3] = [1.0, 0.4, 0.7];
 const GREEN: [f32; 3] = [0.1, 0.6, 0.2];
+const GREY: [f32; 3] = [0.5; 3];
 
 fn inside(row: usize, column: usize) -> bool {
     SUBJECT.contains(&row) && SUBJECT.contains(&column)
@@ -69,7 +71,7 @@ fn the_ring_takes_the_interior_colour_by_depth_and_nothing_else_changes() -> Res
         for (at, (got, was)) in after.iter().zip(&before).enumerate() {
             let (row, column) = (at / SIZE, at % SIZE);
             let wanted = if ring(row, column) {
-                mix(PINK, GREEN, amount * (1.0 - 1.0 / width)) // depth 1
+                mix(PINK, GREEN, amount) // depth 1: 1 - (1 - 1) / width = 1
             } else {
                 *was // the backdrop, and the interior, which is at least 2 deep (and its own colour at any depth)
             };
@@ -82,22 +84,49 @@ fn the_ring_takes_the_interior_colour_by_depth_and_nothing_else_changes() -> Res
     Ok(())
 }
 
-#[test]
-fn pixels_as_deep_as_the_width_or_deeper_are_exactly_as_they_were() -> Result<(), Error> {
-    // a second, grey ring (depth 2) under the pink one: with width 2 it is out of the band
+/// The 9 x 9 square with a grey ring (depth 2) under the pink one (depth 1); the core (depth 3 and more) is green.
+fn three_rings() -> Vec<[f32; 3]> {
     let mut before = photo();
     for (at, pixel) in before.iter_mut().enumerate() {
         let (row, column) = (at / SIZE, at % SIZE);
-        if inside(row, column) && !ring(row, column) && !(SUBJECT.start + 2..SUBJECT.end - 2).contains(&row)
-            || inside(row, column) && !ring(row, column) && !(SUBJECT.start + 2..SUBJECT.end - 2).contains(&column)
-        {
-            *pixel = [0.5; 3];
+        let core = |at: usize| (SUBJECT.start + 2..SUBJECT.end - 2).contains(&at);
+        if inside(row, column) && !ring(row, column) && !(core(row) && core(column)) {
+            *pixel = GREY;
         }
     }
+    before
+}
+
+#[test]
+fn a_width_of_one_recolours_the_outermost_ring_fully_and_nothing_deeper() -> Result<(), Error> {
+    // d = 1 = width: 1 - (1 - 1) / 1 = 1, so the pink ring becomes the interior colour (here the mean of the grey and
+    // green pixels deeper than 1, which is neither pink); d = 2 = width + 1 is not in the band
+    let before = three_rings();
+    let after = run(&params(1.0, 1.0), &field(), &before)?;
+    for (at, (got, was)) in after.iter().zip(&before).enumerate() {
+        let (row, column) = (at / SIZE, at % SIZE);
+        if ring(row, column) {
+            assert!(!near(*got, PINK) && got[1] > 0.4, "ring pixel ({row}, {column}) unchanged: {got:?}");
+        } else {
+            assert_eq!(got, was, "pixel ({row}, {column})");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_band_is_width_rings_and_a_pixel_just_beyond_it_is_exactly_as_it_was() -> Result<(), Error> {
+    // width 2, amount 1: d = 1 takes 1 - 0 / 2 = 1 of the interior colour (the green core, depth > 2), d = 2 takes
+    // 1 - 1 / 2 = 1/2, d = 3 is out of the band
+    let before = three_rings();
     let after = run(&params(2.0, 1.0), &field(), &before)?;
     for (at, (got, was)) in after.iter().zip(&before).enumerate() {
         let (row, column) = (at / SIZE, at % SIZE);
-        if !ring(row, column) {
+        if ring(row, column) {
+            assert!(near(*got, GREEN), "depth 1, pixel ({row}, {column}): {got:?}");
+        } else if *was == GREY {
+            assert!(near(*got, mix(GREY, GREEN, 0.5)), "depth 2, pixel ({row}, {column}): {got:?}");
+        } else {
             assert_eq!(got, was, "pixel ({row}, {column})");
         }
     }

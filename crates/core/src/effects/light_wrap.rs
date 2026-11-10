@@ -31,10 +31,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
 /// in front of a bright background.
 ///
 /// The backdrop's colour is the picture outside the shape, blurred by `blur` px so that detail does not wrap, and only
-/// from the backdrop itself. It is screened over the shape: a pixel at depth d inside the edge gets `amount * (1 - d /
-/// width)` of it, most at the edge, none from `width` in. Pixels outside the shape and deeper than `width` are exactly
-/// as they were, and since it is screened the shape only ever brightens (a black backdrop adds nothing). Use it after a
-/// background replacement, so the subject looks lit by its new surroundings.
+/// from the backdrop itself. It is screened over the shape: a pixel at depth d inside the edge gets
+/// `amount * (1 - (d - 1) / width)` of it: the outermost ring (d = 1) gets `amount`, the band is the `width` rings
+/// d = 1 to `width`. Pixels outside the shape and deeper than `width` are exactly as they were, and since it is
+/// screened the shape only ever brightens (a black backdrop adds nothing). Use it after a background replacement, so the
+/// subject looks lit by its new surroundings.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
@@ -48,7 +49,7 @@ pub struct Params {
     #[param(default = 12.0, unit = px, min = 0, max = 96)]
     pub width: f32,
     /// How strongly the backdrop's colour is screened over the edge: 0 = off, 1 = the colour at full strength at the
-    /// edge, fading to nothing at `width`.
+    /// edge, fading to nothing just beyond `width`.
     #[param(default = 0.7, unit = fraction, min = 0, max = 1)]
     pub amount: f32,
     /// Gaussian sigma, in px, with which the backdrop's colour is softened: raising it spreads the light evenly and loses
@@ -84,13 +85,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;
         let depth = -signed[at];
-        if !inside[at] || depth >= params.width {
+        if !inside[at] || depth - 1.0 >= params.width {
             return pixel;
         }
         let Some(colour) = light[at] else {
             return pixel;
         };
-        let share = params.amount * (1.0 - depth / params.width);
+        let share = params.amount * (1.0 - (depth - 1.0) / params.width);
         screen(pixel, colour.map(|channel| channel * share))
     })
 }

@@ -33,8 +33,9 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
 ///
 /// The interior colour is the shape's pixels deeper than `width` from the edge, averaged with a Gaussian of sigma
 /// `width` / 2, so it is pulled outward to the edge from the nearest solid colour. A pixel at depth d inside the edge
-/// takes `amount * (1 - d / width)` of it: most at the edge, none from `width` in. Pixels outside the shape and deeper
-/// than `width` are exactly as they were, and so is a shape too thin to have an interior. Use it after a background
+/// takes `amount * (1 - (d - 1) / width)` of it: the outermost ring (d = 1) takes `amount`, the band is the `width`
+/// rings d = 1 to `width`, and nothing deeper changes. Pixels outside the shape and deeper than `width` are exactly as
+/// they were, and so is a shape too thin to have an interior. Use it after a background
 /// replacement, when the old backdrop's colour still tints the matte's edge.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
@@ -48,7 +49,7 @@ pub struct Params {
     #[param(default = 3.0, unit = px, min = 0, max = 48)]
     pub width: f32,
     /// How fully the band takes the interior colour at the edge: 0 = unchanged, 1 = the edge pixels are almost wholly
-    /// the interior colour. It fades to nothing at `width`.
+    /// the interior colour. It fades to nothing just beyond `width`.
     #[param(default = 1.0, unit = fraction, min = 0, max = 1)]
     pub amount: f32,
     /// The field's value, 0 to 1, from which a pixel belongs to the shape whose edge is cleaned: 0.5 = more than half
@@ -87,13 +88,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;
         let depth = -signed[at];
-        if !inside[at] || depth >= band {
+        if !inside[at] || depth - 1.0 >= band {
             return pixel;
         }
         let Some(target) = solid[at] else {
             return pixel;
         };
-        let share = params.amount * (1.0 - depth / band);
+        let share = params.amount * (1.0 - (depth - 1.0) / band);
         [0, 1, 2].map(|channel| pixel[channel] + (target[channel] - pixel[channel]) * share)
     })
 }

@@ -1,6 +1,6 @@
 //! `light_wrap`: a square subject (grey) on a flat backdrop colour. The backdrop's blurred colour is that colour
 //! everywhere it can be seen from, so a subject pixel at depth d (1 on the outermost ring, corners too) is the screen of
-//! the colour at weight `amount * (1 - d / width)`: `base + weight * colour * (1 - base)`, worked by hand.
+//! the colour at weight `amount * (1 - (d - 1) / width)`: `base + weight * colour * (1 - base)`, worked by hand.
 
 use bullterrier_image::Error;
 use bullterrier_image::effects::light_wrap;
@@ -71,13 +71,13 @@ fn the_backdrop_colour_is_screened_over_the_edge_by_depth_and_nothing_else_chang
         for (at, (got, was)) in after.iter().zip(&before).enumerate() {
             let (row, column) = (at / SIZE, at % SIZE);
             let d = depth(row, column);
-            let wanted = if d == 0.0 || d >= width {
-                *was // the backdrop, and the subject as deep as the width or deeper: exactly as it was
+            let wanted = if d == 0.0 || d > width {
+                *was // the backdrop, and the subject deeper than the width: exactly as it was
             } else {
-                let weight = amount * (1.0 - d / width);
+                let weight = amount * (1.0 - (d - 1.0) / width); // d = 1: amount
                 [0, 1, 2].map(|c| SUBJECT_COLOUR[c] + weight * BACKDROP[c] * (1.0 - SUBJECT_COLOUR[c]))
             };
-            if d == 0.0 || d >= width {
+            if d == 0.0 || d > width {
                 assert_eq!(got, &wanted, "width {width} amount {amount}, pixel ({row}, {column})");
             } else {
                 assert!(
@@ -85,6 +85,23 @@ fn the_backdrop_colour_is_screened_over_the_edge_by_depth_and_nothing_else_chang
                     "width {width} amount {amount}, pixel ({row}, {column}): {got:?}"
                 );
             }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_width_of_one_screens_the_backdrop_over_the_outermost_ring_at_full_amount() -> Result<(), Error> {
+    // d = 1 = width: weight 1 * (1 - 0 / 1) = 1; the ring is base + colour * (1 - base), and d = 2 is untouched
+    let before = photo(BACKDROP);
+    let after = run(&params(1.0, 1.0), &field(), &before)?;
+    for (at, (got, was)) in after.iter().zip(&before).enumerate() {
+        let (row, column) = (at / SIZE, at % SIZE);
+        if depth(row, column) == 1.0 {
+            let wanted = [0, 1, 2].map(|c| SUBJECT_COLOUR[c] + BACKDROP[c] * (1.0 - SUBJECT_COLOUR[c]));
+            assert!(near(*got, wanted), "ring pixel ({row}, {column}): {got:?}");
+        } else {
+            assert_eq!(got, was, "pixel ({row}, {column})");
         }
     }
     Ok(())
