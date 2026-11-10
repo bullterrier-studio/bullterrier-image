@@ -299,6 +299,16 @@ fn bad() -> Vec<(&'static str, &'static str, &'static str)> {
             "opacity",
         ),
         (
+            "a table written where text is wanted shows what was written",
+            "[[step]]\neffect = [\"grade\"]\n",
+            "[\"grade\"]",
+        ),
+        (
+            "a look is named by its place, counted from 1 as everywhere else",
+            "format = 2\n[[step]]\neach = \"p\"\nlooks = [{ effect = \"a\" }, { opacity = 1 }]\n",
+            "look 2",
+        ),
+        (
             "a refusal names the step",
             "[[step]]\neffect = \"a\"\n[[step]]\neffect = 3\n",
             "step 2",

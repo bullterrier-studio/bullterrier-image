@@ -367,7 +367,7 @@ impl Recipe {
         serde_json::from_str::<Unique>(text).map_err(|error| Error::Recipe(format!("not a recipe: {error}")))?;
         let mut deserializer = serde_json::Deserializer::from_str(text);
         serde_path_to_error::deserialize(&mut deserializer)
-            .map_err(|error| Error::Recipe(format!("not a recipe: {}", describe(&error))))
+            .map_err(|error| Error::Recipe(format!("not a recipe: {}", describe(&error, None))))
     }
 }
 
@@ -430,19 +430,63 @@ impl<'de> Visitor<'de> for UniqueVisitor {
     }
 }
 
-/// The `T` that `value` writes, or what is wrong, naming the key it is about.
+/// The `T` that `value` writes, or what is wrong, naming the key it is about and, when that is a table or a list, what was
+/// written there.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "the callers hand the table over; only the error reads it again"
+)]
 fn read<T: serde::de::DeserializeOwned>(value: Value) -> Result<T, String> {
-    serde_path_to_error::deserialize(value).map_err(|error| describe(&error))
+    serde_path_to_error::deserialize(&value).map_err(|error| describe(&error, Some(&value)))
 }
 
-/// `error` led by the key it is about (`opacity`, `steps[1]`), when it is about one.
-fn describe<E: std::fmt::Display>(error: &serde_path_to_error::Error<E>) -> String {
+/// `error` led by the key it is about (`opacity`, `steps[1]`, `look 2`), when it is about one. Given the `root` it was
+/// read from, a mistyped table or list is shown as written: the type error alone says only "sequence".
+fn describe<E: std::fmt::Display>(error: &serde_path_to_error::Error<E>, root: Option<&Value>) -> String {
     let path = error.path().to_string();
-    if path == "." {
-        error.inner().to_string()
-    } else {
-        format!("{path}: {}", error.inner())
+    let mut message = error.inner().to_string();
+    if message.starts_with("invalid type")
+        && let Some(written) = root.and_then(|root| written_at(root, error.path()))
+        && matches!(written, Value::Array(_) | Value::Object(_))
+    {
+        message = format!("{message}, got {written}");
     }
+    if path == "." {
+        message
+    } else {
+        format!("{}: {message}", counted_looks(&path))
+    }
+}
+
+/// What `root` holds at `path`, if anything.
+fn written_at<'a>(root: &'a Value, path: &serde_path_to_error::Path) -> Option<&'a Value> {
+    use serde_path_to_error::Segment;
+    path.iter().try_fold(root, |value, segment| match segment {
+        Segment::Map { key } => value.get(key),
+        Segment::Seq { index } => value.get(*index),
+        Segment::Enum { .. } | Segment::Unknown => None,
+    })
+}
+
+/// `path` with each `looks[N]` as `look N+1`: the places of a message count from 1, as `look 1 is ...` does.
+fn counted_looks(path: &str) -> String {
+    let mut counted = String::new();
+    let mut rest = path;
+    while let Some(at) = rest.find("looks[") {
+        let after = &rest[at + "looks[".len()..];
+        let Some((index, end)) = after
+            .find(']')
+            .and_then(|end| after[..end].parse::<usize>().ok().map(|index| (index, end)))
+        else {
+            break;
+        };
+        counted.push_str(&rest[..at]);
+        counted.push_str("look ");
+        counted.push_str(&(index + 1).to_string());
+        rest = &after[end + 1..];
+    }
+    counted.push_str(rest);
+    counted
 }
 
 /// The softness of a piece's border, in px, when none is written.
