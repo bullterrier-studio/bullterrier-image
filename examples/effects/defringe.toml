@@ -1,0 +1,7 @@
+# Cleans the colour the backdrop leaves on the subject's edge after a cut-out: the edge takes the subject's own colour.
+name = "defringe"
+size = 480
+
+[[step]]
+effect = "defringe"
+width = 6

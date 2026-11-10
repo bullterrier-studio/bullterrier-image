@@ -1,0 +1,9 @@
+# The backdrop's light spills over the subject's edge, as round a real object in front of a bright background.
+name = "light_wrap"
+size = 480
+
+[[step]]
+effect = "light_wrap"
+width = 24
+amount = 0.9
+blur = 14

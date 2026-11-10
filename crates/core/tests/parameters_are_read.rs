@@ -554,6 +554,23 @@ fn conditional() -> Vec<Conditional> {
             field: "falloff",
             with: vec![("field", json!("ramp")), ("angle", json!(180.0))],
         },
+        // the test's selection is all edge, with no pixel deeper than the band to take a colour from; the ramp's shape is
+        // half the picture, deeper than the default band
+        Conditional {
+            effect: "defringe",
+            field: "width",
+            with: vec![("field", json!("ramp"))],
+        },
+        Conditional {
+            effect: "defringe",
+            field: "amount",
+            with: vec![("field", json!("ramp"))],
+        },
+        Conditional {
+            effect: "defringe",
+            field: "field_threshold",
+            with: vec![("field", json!("ramp"))],
+        },
         // the default offset (22 px) moves every copy off the test's 12 px picture, where the edge rule repeats a corner
         // the shape does not cover; the farthest copy's colour and how much it fades matter only with more than one copy
         Conditional {

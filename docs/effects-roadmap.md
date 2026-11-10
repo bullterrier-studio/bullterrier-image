@@ -222,6 +222,8 @@ Use the subject cut-out, so they target the subject or the background.
 | `drop_shadow` ✓ | Soft shadow behind the subject; `copies` stack offset copies, from `color` to `end_color`, as cut paper. | `fx.drop_shadow(offset=22, angle=56, blur=24)` |
 | `long_shadow` ✓ | Flat-design shadow at an angle. A preset of `drop_shadow`. | `fx.drop_shadow(preset="long_shadow", angle=45)` |
 | `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=320, color="#ff9a4d")` |
+| `defringe` ✓ | Removes the backdrop's colour halo a cut-out's edge carries: the edge takes the subject's interior colour. | `fx.defringe(width=3)` |
+| `light_wrap` ✓ | The backdrop's light spills onto the subject's edge (screen, fading over `width`). | `fx.light_wrap(width=12, amount=0.7)` |
 | `reflection` ✓ | Floor mirror with fade. | `fx.reflection(height=0.4, fade=0.7)` |
 | `background` ✓ | Replace the background: colour, gradient, blur or image. A recipe step, no effect: `mask = "background"` on `gradient` (one colour = flat fill) or any other effect. | `gradient with mask = "background"` |
 | `background_blur` ✓ | Portrait-mode blur. A recipe step: `gaussian_blur` with `mask = "background"`. | `gaussian_blur(radius=24) with mask = "background"` |
@@ -320,8 +322,6 @@ onto `field` leaves one mechanism; the owner schedules it.
 
 **Feature batch after E5 (E5b) ✓.** Halftone inks with a per-ink offset, line screens, ink separation and dither inks, then
 the risograph recipe. The Rust port of those effects (E5) stayed a parity port; the new capability followed it.
-
-**E6 additions.** `defringe` (halo removal) and `light_wrap`, next to `outline`, `rim_light` and `blend`.
 
 **Subject matte (R6).** Matte refinement as a post-process of the subject matte (the guided filter is the primitive), choosing
 one instance among several (several people, pick one), and an AI upscaler as a model kind in the model catalogue.

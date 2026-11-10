@@ -151,6 +151,38 @@ pub(crate) fn gaussian_filter(picture: &Picture<'_>, sigma: f64, truncate: f64, 
     blurred
 }
 
+/// The colour each pixel of `picture` has among the pixels that count, found by normalised convolution: the Gaussian
+/// blur (as [`gaussian_filter`]) of the picture weighted by `weight` (0..1, one value per pixel, row after row), divided by
+/// the blur of `weight` alone, so a pixel that does not count takes no part and one that half counts takes half.
+///
+/// `None` where the blurred weight is under `MIN_COVER`: nothing that counts lies within the kernel's reach. Every
+/// colour is a weighted mean of the picture's, so it stays in 0..1. A pixel's answer reads only the pixels within the
+/// kernel's reach (`int(truncate * sigma + 0.5)` px), which makes a band of rows with that margin give the whole's rows.
+pub(crate) fn weighted_gaussian(
+    picture: &Picture<'_>,
+    weight: &[f32],
+    sigma: f64,
+    truncate: f64,
+    edge: Extension,
+) -> Vec<Option<[f32; 3]>> {
+    /// A blurred weight under this is rounding, not a pixel that counts.
+    const MIN_COVER: f32 = 1e-4; // constant: far above f32 rounding of a sum of weights up to 1, far below any real share
+    let dims = (picture.height(), picture.width());
+    let pixels = picture.pixels();
+    let cover = gaussian_filter_owned(weight.to_vec(), dims, sigma, truncate, edge);
+    let planes: Vec<Vec<f32>> = (0..3)
+        .map(|channel| {
+            let plane = pixels.iter().zip(weight).map(|(pixel, w)| pixel[channel] * w).collect();
+            gaussian_filter_owned(plane, dims, sigma, truncate, edge)
+        })
+        .collect();
+    (0..pixels.len())
+        .map(|at| {
+            (cover[at] >= MIN_COVER).then(|| [0, 1, 2].map(|channel| (planes[channel][at] / cover[at]).clamp(0.0, 1.0)))
+        })
+        .collect()
+}
+
 /// The rows of `width` values that `lines` holds, one after the other, each blurred in place by a Gaussian of `sigma` px
 /// along itself only, as [`gaussian_filter`] does along the rows and nothing down the columns: same kernel, same `edge`,
 /// a sigma under about `0.5 / truncate` px leaving the rows as they are. Rows are independent, so the result is the same at

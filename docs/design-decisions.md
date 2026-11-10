@@ -1173,3 +1173,9 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   within budget fails the gate, so the list empties as files are split or deleted. *Reason:* agents read in chunks, and a
   huge file costs them tokens and makes edits land in the wrong place; no linter measures file length. *Consequence:* a
   growing file is split by concept, never exempted.
+- **`defringe` and `light_wrap` weight by `1 - depth / width`.** A pixel's depth is 1 on the outermost ring, so the edge
+  takes `1 - 1 / width` of the effect and a pixel `width` deep none: the band is exactly the pixels shallower than `width`.
+  Both gather their colour by normalised convolution (`blur::weighted_gaussian`), so only the pixels that count (the
+  interior beyond the band, the backdrop) contribute. *Footprint:* `light_wrap` reads one blur's reach whatever `width` is
+  (a pixel changes only where the backdrop is in reach, and the nearest backdrop pixel is then too); proven on rectangles
+  with distant edges, which also let `outline` say `Radius(width + glow + 1)`.

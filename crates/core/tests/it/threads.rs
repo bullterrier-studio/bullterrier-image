@@ -225,6 +225,11 @@ fn cases() -> Vec<Case> {
                     .param("field", "light")
                     .param("smoothing", 4)
                     .param("edge", "wrap"),
+                Step::new("defringe").param("field", "light").param("width", 5),
+                Step::new("light_wrap")
+                    .param("field", "light")
+                    .param("width", 9)
+                    .param("blur", 4),
                 Step::new("liquid_metal").param("smoothing", 3).param("edge", "mirror"),
                 Step::new("liquid_metal").param("smoothing", 14).param("edge", "wrap"),
                 Step::new("ambient_occlusion")
