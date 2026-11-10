@@ -41,7 +41,9 @@ fn params(angle: f32) -> rim_light::Params {
 fn light(params: &rim_light::Params, field: &[f32]) -> Result<Vec<f32>, Error> {
     let out = run_with_field(params, "field", field, SIZE, SIZE, &vec![GREY; SIZE * SIZE * 3])?;
     Ok(out
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .map(|pixel| (pixel[0] - GREY) / (1.0 - GREY))
         .collect())
 }
