@@ -51,7 +51,7 @@ pub struct Params {
     /// How many simulation steps run. 0 shows only the seed; more lets the pattern grow outward from it and costs time in
     /// proportion (and more cells, so smaller `cell`, cost more per step).
     #[param(default = 300, unit = count, min = 0, max = 5000)]
-    pub steps: i32,
+    pub steps: usize,
     /// The size of one simulation cell in px: the model runs on a coarse grid and is read back over the picture by
     /// `resampling`. 1 simulates every pixel (slow on large pictures); larger = a coarser, larger-scale pattern that runs
     /// faster. Tuned for a picture about 480 px high.
@@ -103,7 +103,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         &seeded,
         (rows, columns),
         (params.feed, params.kill),
-        usize::try_from(params.steps).unwrap_or_default(),
+        params.steps,
         edge,
     );
     let dropped: Vec<[f32; 3]> = chemical.iter().map(|&u| [1.0 - u; 3]).collect();

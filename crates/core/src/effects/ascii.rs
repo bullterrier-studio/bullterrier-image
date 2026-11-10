@@ -31,7 +31,7 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
 pub struct Params {
     /// Width of one character, 1 to 200 px; the height follows from the font. Smaller = finer detail, more characters.
     #[param(default = 10, unit = px, min = 1, max = 200)]
-    pub cell: i32,
+    pub cell: usize,
     /// The character palette, in any order, at least two different characters. It is sorted by how much ink each glyph puts
     /// down, so the densest is used for the brightest areas on dark paper and the darkest on light paper (see `paper`). Try
     /// ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the Latin letters and the block elements,
@@ -71,7 +71,7 @@ pub struct Params {
 /// a test excludes) leaves the picture as it is.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let style = Style {
-        cell: usize::try_from(params.cell).unwrap_or(1),
+        cell: params.cell,
         chars: &params.chars,
         ink: params.ink.map(|ink| ink.0),
         ink_floor: params.ink_floor,

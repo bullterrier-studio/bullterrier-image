@@ -16,7 +16,7 @@ const CHARS: &str = " .:-=+*#%@";
 const WHITE: Color = Color([1.0; 3]);
 
 /// White characters on black paper, the palette ten glyphs from blank to dense, in cells `cell` px wide.
-fn white_on_black(cell: i32) -> Params {
+fn white_on_black(cell: usize) -> Params {
     Params {
         cell,
         chars: CHARS.to_owned(),

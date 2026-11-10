@@ -55,7 +55,7 @@ pub struct Params {
     /// to any other, so the average piece is the picture's area divided by this); with 'triangles' the points are corners of
     /// triangles, and there are more pieces than points (see `shape`). More = smaller pieces.
     #[param(default = 24, unit = count, min = 4, max = 500)]
-    pub pieces: i32,
+    pub pieces: usize,
     /// The pieces' shape. 'voronoi' = the cells round the points, as broken glass; 'triangles' = the Delaunay triangles of
     /// the points and of points added round the picture's edge, about as far apart as the others are (about 4 times the
     /// square root of `pieces` of them), as in a low-poly picture. That makes 2 x `pieces` + b - 2 triangles for b edge
@@ -127,7 +127,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let mut rng = Rng::seeded(params.seed);
     let weights = (params.detail > 0.0)
         .then(|| detail_weights(picture.pixels(), (height, width), f64::from(params.detail), params.edge));
-    let pieces = usize::try_from(params.pieces).unwrap_or(0);
+    let pieces = params.pieces;
     // (x, y) in px from the top left corner
     let points = scatter(pieces, (height, width), weights.as_deref(), &mut rng);
     // each pixel's piece, and each piece's centre in pixel indices, where a pixel's centre is a whole number

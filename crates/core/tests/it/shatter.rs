@@ -21,7 +21,7 @@ fn shatter(params: &Params) -> Result<Vec<f32>, Error> {
 }
 
 /// Pieces in place and flat: nothing moves, each piece one colour.
-fn flat(pieces: i32, shape: Shape, seed: u32) -> Params {
+fn flat(pieces: usize, shape: Shape, seed: u32) -> Params {
     Params {
         pieces,
         shape,
@@ -80,11 +80,7 @@ fn with_no_move_no_turn_and_no_lines_the_picture_is_unchanged() -> Result<(), Er
 fn a_voronoi_picture_has_as_many_pieces_as_pieces_asked_for() -> Result<(), Error> {
     for pieces in [4, 12, 24] {
         let out = shatter(&flat(pieces, Shape::Voronoi, 3))?;
-        assert_eq!(
-            groups(&out).len(),
-            usize::try_from(pieces).unwrap_or(0),
-            "{pieces} pieces"
-        );
+        assert_eq!(groups(&out).len(), pieces, "{pieces} pieces");
     }
     Ok(())
 }

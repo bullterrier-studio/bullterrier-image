@@ -504,3 +504,26 @@ fn a_seed_takes_every_unsigned_32_bit_number_and_nothing_below_or_above() {
     };
     assert_eq!(params.values()["seed"], json!(u32::MAX));
 }
+
+#[test]
+fn a_count_held_as_usize_is_a_whole_number_in_the_table_and_the_values() {
+    let given = |value: Value| json!({ "pieces": value }).as_object().cloned().unwrap_or_default();
+    let checked = |value: Value| {
+        bullterrier_image::effects::shatter::Params::table()
+            .check("shatter", &given(value))
+            .map(|values| values["pieces"].clone())
+    };
+    assert_eq!(checked(json!(7)).ok(), Some(json!(7)));
+    for bad in [json!(-1), json!(1.5), json!(1_000_000)] {
+        assert!(
+            matches!(checked(bad.clone()), Err(Error::Invalid { field, .. }) if field == "pieces"),
+            "{bad} is no count of pieces"
+        );
+    }
+    // the typed struct holds a usize and writes it back as written
+    let params = bullterrier_image::effects::shatter::Params {
+        pieces: 7_usize,
+        ..Default::default()
+    };
+    assert_eq!(params.values()["pieces"], json!(7));
+}
