@@ -227,7 +227,11 @@ fn smooth(t: f64) -> f64 {
 /// Where in the leaving order each piece is, 0 = first, 1 = last: a mix of its height, its closeness to the outline and
 /// its side, spread to the extremes of the pieces that count and then loosened by `jitter`.
 fn leaving_order(params: &Params, grid: &Grid, present: &[bool], depth: &[f32], size: (usize, usize)) -> Vec<f64> {
-    let (top, outline, sweep) = (f64::from(params.top), f64::from(params.outline), f64::from(params.sweep));
+    let (top, outline, sweep) = (
+        f64::from(params.top),
+        f64::from(params.outline),
+        f64::from(params.sweep),
+    );
     let total = top + outline + sweep.abs();
     let mut order: Vec<f64> = (0..grid.len())
         .map(|cell| {
@@ -242,7 +246,13 @@ fn leaving_order(params: &Params, grid: &Grid, present: &[bool], depth: &[f32], 
             (top * y + outline * closeness + sweep.abs() * from_side) / total
         })
         .collect();
-    let counted = || order.iter().zip(present).filter(|(_, here)| **here).map(|(value, _)| *value);
+    let counted = || {
+        order
+            .iter()
+            .zip(present)
+            .filter(|(_, here)| **here)
+            .map(|(value, _)| *value)
+    };
     let (low, high) = counted().fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), value| {
         (low.min(value), high.max(value))
     });
@@ -300,8 +310,13 @@ fn fly(params: &Params, fate: &Fate) -> Mover {
     let wind = f64::from(params.wind);
     // Primary layer: pieces that are winding up or in flight.
     let t = age.clamp(0.0, 1.0); // how far through its flight
-    let speed = lerp(f64::from(params.distance_minimum), 1.0, noise(params.seed, cell, DRAW_SPEED));
-    let direction = (heading + (0.5 - noise(params.seed, cell, DRAW_ANGLE)) * f64::from(params.angle_spread)).to_radians();
+    let speed = lerp(
+        f64::from(params.distance_minimum),
+        1.0,
+        noise(params.seed, cell, DRAW_SPEED),
+    );
+    let direction =
+        (heading + (0.5 - noise(params.seed, cell, DRAW_ANGLE)) * f64::from(params.angle_spread)).to_radians();
     let journey = wind.abs() * speed; // this piece's whole journey
     let thrown = f64::from(params.outward) * f64::from(params.outward_distance);
     let [normal_x, normal_y] = fate.direction.map(f64::from);
@@ -336,12 +351,20 @@ fn fly(params: &Params, fate: &Fate) -> Mover {
         * t
         * (tau * (f64::from(params.sway_cycles) * t + phase)).sin();
     // Secondary layer: a brief glow just after leaving, then the fade.
-    let glow = 1.0 + f64::from(params.flare) * (std::f64::consts::PI * (t / f64::from(params.flare_span)).clamp(0.0, 1.0)).sin();
-    let dimmed = if age > 0.0 { (1.0 - t).powf(f64::from(params.falloff)) } else { 1.0 };
+    let glow = 1.0
+        + f64::from(params.flare) * (std::f64::consts::PI * (t / f64::from(params.flare_span)).clamp(0.0, 1.0)).sin();
+    let dimmed = if age > 0.0 {
+        (1.0 - t).powf(f64::from(params.falloff))
+    } else {
+        1.0
+    };
     #[expect(clippy::cast_possible_truncation, reason = "a brightness in f32")]
     Mover {
         cell,
-        shift: (whole_shift(along * journey_y + bob), whole_shift(along * journey_x + sway)),
+        shift: (
+            whole_shift(along * journey_y + bob),
+            whole_shift(along * journey_x + sway),
+        ),
         brightness: (dimmed * glow) as f32,
     }
 }
@@ -438,7 +461,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     // The glow and the shimmer brighten; on what is already white they would leave the 0..1 range, so they stop there.
     for mover in &movers {
         for (y, x) in grid.pixels(mover.cell) {
-            let (Some(to_y), Some(to_x)) = (y.checked_add_signed(mover.shift.0), x.checked_add_signed(mover.shift.1)) else {
+            let (Some(to_y), Some(to_x)) = (y.checked_add_signed(mover.shift.0), x.checked_add_signed(mover.shift.1))
+            else {
                 continue;
             };
             if to_y >= height || to_x >= width {

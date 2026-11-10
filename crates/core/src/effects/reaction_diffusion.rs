@@ -99,13 +99,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             }
         }
     });
-    let chemical = grow(
-        &seeded,
-        (rows, columns),
-        (params.feed, params.kill),
-        params.steps,
-        edge,
-    );
+    let chemical = grow(&seeded, (rows, columns), (params.feed, params.kill), params.steps, edge);
     let dropped: Vec<[f32; 3]> = chemical.iter().map(|&u| [1.0 - u; 3]).collect();
     let back = Sampler::new(&dropped, rows, columns, params.resampling, edge);
     let stops: Vec<[f32; 3]> = params.colors.iter().map(|colour| colour.0).collect();
