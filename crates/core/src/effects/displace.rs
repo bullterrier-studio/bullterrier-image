@@ -47,13 +47,12 @@ pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
 /// Each pixel shows the picture at its own place plus a move (down, right) from two fractal noise fields of the same
 /// `scale`, `octaves`, `persistence` and `lacunarity`, drawn from `seed` independently of each other. A field has
 /// standard deviation 1 at every place, whatever the picture around it, and is multiplied by `amount`: the moves
-/// are `amount` px typically, and a move of several times that is rare, so the `edge` rule matters near the border.
+/// are `amount` px typically, and a few reach about 3 times that, so the `edge` rule matters near the border.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
-    /// The typical move of a pixel, in pixels: the standard deviation of each of the two moves, so a pixel moves about this
-    /// far down and about this far across, and now and then up to several times as far. Raising it tears the picture up
-    /// more; 0 leaves it unchanged.
+    /// The typical distance a pixel moves, in px (its standard deviation); a few move up to about 3 times as far. Raising it
+    /// tears the picture up more; 0 leaves it unchanged.
     #[param(default = 4.0, unit = px, min = 0, max = 500, drivable)]
     pub amount: f32,
     /// Size of the coarsest waves of the displacement in pixels, the spacing of the first noise lattice. Larger = broad,
