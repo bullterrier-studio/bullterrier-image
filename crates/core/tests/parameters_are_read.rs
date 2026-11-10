@@ -541,6 +541,18 @@ fn conditional() -> Vec<Conditional> {
             field: "glow",
             with: vec![("width", json!(0.0))],
         },
+        // the test's selection is all edge, every pixel of it 1 px deep, where the band is full whatever its width and
+        // falloff; the ramp's shape is half the picture, whose edge faces left, toward a light from the left
+        Conditional {
+            effect: "rim_light",
+            field: "width",
+            with: vec![("field", json!("ramp")), ("angle", json!(180.0))],
+        },
+        Conditional {
+            effect: "rim_light",
+            field: "falloff",
+            with: vec![("field", json!("ramp")), ("angle", json!(180.0))],
+        },
     ]
 }
 

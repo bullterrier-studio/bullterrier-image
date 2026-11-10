@@ -110,6 +110,7 @@ mod relight;
 mod render;
 mod resample;
 mod rgb_split;
+mod rim_light;
 mod ripple;
 mod rotate;
 mod rounding;
