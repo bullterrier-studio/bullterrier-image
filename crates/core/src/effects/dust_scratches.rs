@@ -6,8 +6,8 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::length;
-use crate::ops::segments::{Point, Segment, draw};
 use crate::ops::random::{mix, unit};
+use crate::ops::segments::{Point, Segment, draw};
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
 
@@ -78,7 +78,7 @@ fn stamp(cover: &mut [f32], shape: (usize, usize), start: Point, end: Point, rad
             start,
             end,
             radius,
-            weight: 1.0, // constant: a mark is solid
+            weight: 1.0,  // constant: a mark is solid
             feather: 1.0, // constant: one pixel of anti-aliasing
         },
     );
