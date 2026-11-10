@@ -51,6 +51,7 @@ mod matte;
 mod ops;
 pub mod params;
 mod picture;
+pub mod pipeline;
 mod presets;
 mod recipe;
 mod registry;

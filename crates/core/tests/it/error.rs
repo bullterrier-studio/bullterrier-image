@@ -57,6 +57,10 @@ fn rows() -> Vec<(Error, ErrorKind)> {
             Error::Lut("cannot read film.cube as a .cube file: not UTF-8".to_owned()),
             ErrorKind::Lut,
         ),
+        (
+            Error::Project("bt-image.toml: unknown keys ['colour']".to_owned()),
+            ErrorKind::Project,
+        ),
         (Error::Duplicate("grade".to_owned()), ErrorKind::Other),
         (Error::Inputs("no partition".to_owned()), ErrorKind::Other),
         (Error::foreign("fx", "broke"), ErrorKind::Other),

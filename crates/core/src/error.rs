@@ -24,6 +24,7 @@ use crate::params::Scalar;
 /// | [`Error::ImageWrite`] | `ImageWrite` | `ImageWriteError` |
 /// | [`Error::BackendUnavailable`] | `BackendUnavailable` | `BackendUnavailableError` |
 /// | [`Error::Lut`] | `Lut` | `LutError` |
+/// | [`Error::Project`] | `Project` | `ProjectError` |
 /// | [`Error::Duplicate`], [`Error::Params`], [`Error::Inputs`], [`Error::Foreign`] | `Other` | none: a `ValueError` |
 ///
 /// The ones in the last row are the caller's programming errors, or, for [`Error::Foreign`], whatever an effect that
@@ -71,6 +72,9 @@ pub enum Error {
     /// not UTF-8 or malformed, or entries and a domain that make no table. The text names the file and, for a fault in
     /// one, the line.
     Lut(String),
+    /// A project (`bt-image.toml`, or one made in code) breaks a rule: a file that is not TOML, an unknown key, globs that
+    /// match nothing, a value out of range. The text names the file or the setting and the value.
+    Project(String),
     /// A parameter value breaks a rule of the effect's declaration.
     Invalid {
         /// Where in a recipe the effect was: `step 2`, `step 2, look 1`. None when the parameters were checked on
@@ -148,6 +152,8 @@ pub enum ErrorKind {
     BackendUnavailable,
     /// A colour lookup table is unusable.
     Lut,
+    /// A project breaks a rule.
+    Project,
     /// Anything else: a programming error of the caller, or a failure outside the core. Bindings raise their plain
     /// error (a `ValueError` in Python).
     Other,
@@ -167,6 +173,7 @@ impl ErrorKind {
         Self::ImageWrite,
         Self::BackendUnavailable,
         Self::Lut,
+        Self::Project,
         Self::Other,
     ];
 
@@ -185,6 +192,7 @@ impl ErrorKind {
             Self::ImageWrite => "image_write",
             Self::BackendUnavailable => "backend_unavailable",
             Self::Lut => "lut",
+            Self::Project => "project",
             Self::Other => "other",
         }
     }
@@ -281,6 +289,7 @@ impl Error {
             Self::ImageWrite(_) => ErrorKind::ImageWrite,
             Self::BackendUnavailable(_) => ErrorKind::BackendUnavailable,
             Self::Lut(_) => ErrorKind::Lut,
+            Self::Project(_) => ErrorKind::Project,
             Self::Duplicate(_) | Self::Params { .. } | Self::Inputs(_) | Self::Foreign { .. } => ErrorKind::Other,
         }
     }
@@ -372,6 +381,7 @@ impl fmt::Display for Error {
             | Self::ImageWrite(message)
             | Self::BackendUnavailable(message)
             | Self::Lut(message)
+            | Self::Project(message)
             | Self::MapNotFound { message, .. } => formatter.write_str(message),
             Self::Foreign { effect, source } => write!(formatter, "the effect {effect:?} failed: {source}"),
             Self::Params { effect, source } => write!(formatter, "the parameters of {effect:?} do not fit: {source}"),
@@ -406,6 +416,7 @@ impl std::error::Error for Error {
             | Self::ImageWrite(_)
             | Self::BackendUnavailable(_)
             | Self::Lut(_)
+            | Self::Project(_)
             | Self::Size { .. } => None,
         }
     }

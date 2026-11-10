@@ -109,6 +109,7 @@ mod pixel_sort;
 mod placed;
 mod polar;
 mod presets;
+mod project;
 mod quadtree;
 mod radial_blur;
 mod random;

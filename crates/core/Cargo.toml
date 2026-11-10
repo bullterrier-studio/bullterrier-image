@@ -15,6 +15,7 @@ onnx = ["dep:ort", "dep:sha2", "dep:ureq"]
 [dependencies]
 bullterrier-image-derive.workspace = true
 delaunator.workspace = true
+glob.workspace = true
 image.workspace = true
 libm.workspace = true
 moxcms.workspace = true
