@@ -6,9 +6,10 @@
 /// It is about rows, the unit a banded renderer cuts a picture by. The promise of [`Pixel`](Self::Pixel) and
 /// [`Radius`](Self::Radius): the rows of the output from `a` to `b` are the same whether the effect runs on the whole
 /// picture or only on the rows of the input from `radius` rows above `a` to `radius` rows below `b` (fewer where the
-/// picture ends), with the same size ratio and the maps the effect is given cut to the same rows. So the effect reads
-/// no row farther than that, and its answer does not depend on the row it is at, the picture's height or a statistic
-/// of the whole picture: an effect that does is [`Whole`](Self::Whole), as is any whose answer is not worked out.
+/// picture ends), with the same size ratio, the same [`Place`](crate::Place) on the canvas and the maps the effect is given cut to the
+/// same rows. So the effect reads no row farther than that, and its answer does not depend on the row it is at or the
+/// picture's height except through the place it is told, nor on a statistic of the whole picture: an effect that does is
+/// [`Whole`](Self::Whole), as is any whose answer is not worked out.
 /// Whole is always true; a smaller answer must hold.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
