@@ -20,7 +20,7 @@ Effects that work on the cut-out subject, apart from its background.
 | --- | --- | --- | --- | --- | --- |
 | `field` | field name |  |  | `'subject'` | The shape whose edge is cleaned: `subject` (the subject's silhouette), `background`, `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel is inside it from `field_threshold` up. |
 | `width` | number | px | 0 to 48 | `3.0` | Depth of the band inside the shape's edge that is recoloured, in px at the recipe's size: raising it cleans a wider fringe. 0 = nothing is changed. |
-| `amount` | number | fraction | 0 to 1 | `1.0` | How fully the band takes the interior colour at the edge: 0 = unchanged, 1 = the edge pixels are almost wholly the interior colour. It fades to nothing at `width`. |
+| `amount` | number | fraction | 0 to 1 | `1.0` | How fully the band takes the interior colour at the edge: 0 = unchanged, 1 = the edge pixels are almost wholly the interior colour. It fades to nothing just beyond `width`. |
 
 <details><summary>Advanced parameters (1)</summary>
 
@@ -129,7 +129,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- | --- | --- | --- | --- |
 | `field` | field name |  |  | `'subject'` | The shape the light wraps onto: `subject` (the subject's silhouette), `background`, `light`, `depth`, or a region of the recipe (text, a logo, a drawn shape). A pixel is inside it from `field_threshold` up, and the backdrop is everything else. |
 | `width` | number | px | 0 to 96 | `12.0` | How far in from the shape's edge the light reaches, in px at the recipe's size: raising it lets the light spill deeper. 0 = nothing is changed. |
-| `amount` | number | fraction | 0 to 1 | `0.7` | How strongly the backdrop's colour is screened over the edge: 0 = off, 1 = the colour at full strength at the edge, fading to nothing at `width`. |
+| `amount` | number | fraction | 0 to 1 | `0.7` | How strongly the backdrop's colour is screened over the edge: 0 = off, 1 = the colour at full strength at the edge, fading to nothing just beyond `width`. |
 | `blur` | number | px | 1 to 100 | `6.0` | Gaussian sigma, in px, with which the backdrop's colour is softened: raising it spreads the light evenly and loses the backdrop's detail, lowering it carries the backdrop's shapes onto the edge. |
 
 <details><summary>Advanced parameters (1)</summary>

@@ -530,7 +530,7 @@ seed : whole number, count, 0 to 4294967295, default 0
 
 @_effect
 def defringe(*, field: str = 'subject', width: float = 3.0, amount: float = 1.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Remove the colour halo that a cut-out's edge carries: within `width` px inside the edge of a shape (the subject by default) the picture takes the colour of the shape's interior.  The interior colour is the shape's pixels deeper than `width` from the edge, averaged with a Gaussian of sigma `width` / 2, so it is pulled outward to the edge from the nearest solid colour. A pixel at depth d inside the edge takes `amount * (1 - d / width)` of it: most at the edge, none from `width` in. Pixels outside the shape and deeper than `width` are exactly as they were, and so is a shape too thin to have an interior. Use it after a background replacement, when the old backdrop's colour still tints the matte's edge.
+    """Remove the colour halo that a cut-out's edge carries: within `width` px inside the edge of a shape (the subject by default) the picture takes the colour of the shape's interior.  The interior colour is the shape's pixels deeper than `width` from the edge, averaged with a Gaussian of sigma `width` / 2, so it is pulled outward to the edge from the nearest solid colour. A pixel at depth d inside the edge takes `amount * (1 - (d - 1) / width)` of it: the outermost ring (d = 1) takes `amount`, the band is the `width` rings d = 1 to `width`, and nothing deeper changes. Pixels outside the shape and deeper than `width` are exactly as they were, and so is a shape too thin to have an interior. Use it after a background replacement, when the old backdrop's colour still tints the matte's edge.
 
 Parameters
 ----------
@@ -543,7 +543,8 @@ width : number, px, 0 to 48, default 3.0
     size: raising it cleans a wider fringe. 0 = nothing is changed.
 amount : number, fraction, 0 to 1, default 1.0
     How fully the band takes the interior colour at the edge: 0 = unchanged, 1 = the
-    edge pixels are almost wholly the interior colour. It fades to nothing at `width`.
+    edge pixels are almost wholly the interior colour. It fades to nothing just beyond
+    `width`.
 
 Advanced parameters
 -------------------
@@ -2145,7 +2146,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def light_wrap(*, field: str = 'subject', width: float = 12.0, amount: float = 0.7, blur: float = 6.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """Let the light of the backdrop spill over the edge of a shape (the subject by default), as it does round a real object in front of a bright background.  The backdrop's colour is the picture outside the shape, blurred by `blur` px so that detail does not wrap, and only from the backdrop itself. It is screened over the shape: a pixel at depth d inside the edge gets `amount * (1 - d / width)` of it, most at the edge, none from `width` in. Pixels outside the shape and deeper than `width` are exactly as they were, and since it is screened the shape only ever brightens (a black backdrop adds nothing). Use it after a background replacement, so the subject looks lit by its new surroundings.
+    """Let the light of the backdrop spill over the edge of a shape (the subject by default), as it does round a real object in front of a bright background.  The backdrop's colour is the picture outside the shape, blurred by `blur` px so that detail does not wrap, and only from the backdrop itself. It is screened over the shape: a pixel at depth d inside the edge gets `amount * (1 - (d - 1) / width)` of it: the outermost ring (d = 1) gets `amount`, the band is the `width` rings d = 1 to `width`. Pixels outside the shape and deeper than `width` are exactly as they were, and since it is screened the shape only ever brightens (a black backdrop adds nothing). Use it after a background replacement, so the subject looks lit by its new surroundings.
 
 Parameters
 ----------
@@ -2158,7 +2159,7 @@ width : number, px, 0 to 96, default 12.0
     raising it lets the light spill deeper. 0 = nothing is changed.
 amount : number, fraction, 0 to 1, default 0.7
     How strongly the backdrop's colour is screened over the edge: 0 = off, 1 = the
-    colour at full strength at the edge, fading to nothing at `width`.
+    colour at full strength at the edge, fading to nothing just beyond `width`.
 blur : number, px, 1 to 100, default 6.0
     Gaussian sigma, in px, with which the backdrop's colour is softened: raising it
     spreads the light evenly and loses the backdrop's detail, lowering it carries the
@@ -2480,15 +2481,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
 
 @_effect
 def particles(*, density: float = 1.0, size: float = 6.0, length: float = 0.0, angle: float = 90.0, softness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#ffffff', layers: int = 0, size_falloff: float = 0.5, brightness_falloff: float = 0.5, seed: int = 0, mask: str | None = None, opacity: float = 0.8, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['embers', 'floating_dust', 'rain', 'snow', 'starfield'] | None = None) -> Step:
-    """Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`: snow,
-rain, embers, floating dust, stars.
-
-Every particle lies at a random nearness d from 0 (farthest) to 1 (nearest), or in one of `layers` planes k / n.
-Its width and streak length are `size` and `length` times 1 - `size_falloff` x (1 - d), and it screens
-1 - `brightness_falloff` x (1 - d) of `color` along its middle, with an edge `softness` of its radius soft, so the
-picture has depth. Where particles overlap the brighter one shows; they are cut off by the picture's edge and
-only lighten it. A higher `density` keeps every particle of a lower one and adds more; the same `seed` always
-gives the same particles.
+    """Screen `density` particles of `color` per 1000 px² at random places, each a dot or a streak along `angle`: snow, rain, embers, floating dust, stars.  Every particle lies at a random nearness d from 0 (farthest) to 1 (nearest), or in one of `layers` planes k / n. Its width and streak length are `size` and `length` times 1 - `size_falloff` x (1 - d), and it screens 1 - `brightness_falloff` x (1 - d) of `color` along its middle, with an edge `softness` of its radius soft, so the picture has depth. Where particles overlap the brighter one shows; they are cut off by the picture's edge and only lighten it. A higher `density` keeps every particle of a lower one and adds more; the same `seed` always gives the same particles.
 
 Parameters
 ----------
