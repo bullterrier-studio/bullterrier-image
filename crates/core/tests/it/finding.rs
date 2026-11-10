@@ -213,7 +213,10 @@ fn the_inverse_depth_is_the_models_answer_at_the_photos_size_on_its_own_scale() 
         .iter()
         .fold((f32::MAX, f32::MIN), |(l, h), &v| (l.min(v), h.max(v)));
     // the stretch mixes neighbours, so the ends move in a little, never out: within the answer's 2..12 and on its scale
-    assert!(low >= 2.0 && low < 2.1 && high <= 12.0 && high > 11.9, "{low} {high}");
+    assert!(
+        (2.0..2.1).contains(&low) && (11.9..=12.0).contains(&high),
+        "{low} {high}"
+    );
     assert!(raw.values()[75 * 150 + 10] < raw.values()[75 * 150 + 140]);
     Ok(())
 }

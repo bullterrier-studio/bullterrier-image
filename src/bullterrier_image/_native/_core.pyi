@@ -13,9 +13,11 @@ __all__ = [
     "apply",
     "check",
     "check_recipe",
+    "depth_finder_identity",
     "effect",
     "effects",
     "find_depth",
+    "find_inverse_depth",
     "find_subject",
     "known_maps",
     "needs",
@@ -29,6 +31,7 @@ __all__ = [
     "render",
     "shipped_looks",
     "shipped_presets",
+    "subject_finder_identity",
     "trace",
     "unregister",
     "vocabulary",
@@ -99,6 +102,18 @@ def find_depth(
     cache: str | os.PathLike[str] | None = None,
     allow_download: bool = False,
 ) -> np.ndarray: ...
+def find_inverse_depth(
+    rgb: np.ndarray,
+    *,
+    library: str | os.PathLike[str] | None = None,
+    model_file: str | os.PathLike[str] | None = None,
+    cache: str | os.PathLike[str] | None = None,
+    allow_download: bool = False,
+) -> np.ndarray: ...
+def subject_finder_identity(
+    *, segmenter: str | None = None, model_file: str | os.PathLike[str] | None = None
+) -> str: ...
+def depth_finder_identity(*, model_file: str | os.PathLike[str] | None = None) -> str: ...
 def refine_edge(matte: np.ndarray, shrink: float, feather: float) -> np.ndarray: ...
 def region_presets(kind: str) -> dict[str, dict[str, Any]]: ...
 def shipped_presets() -> dict[str, str]: ...

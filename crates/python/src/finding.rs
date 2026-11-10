@@ -4,7 +4,9 @@ use std::path::PathBuf;
 
 use bullterrier_image::finding::ModelKind;
 use bullterrier_image::finding::onnx::Options;
-use bullterrier_image_finders::{Segmenter, depth_finder, subject_finder};
+use bullterrier_image_finders::{
+    Segmenter, depth_finder, depth_identity, inverse_depth, subject_finder, subject_identity,
+};
 use numpy::{PyArray1, PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 
@@ -92,4 +94,52 @@ pub(crate) fn find_depth<'py>(
     let onnx = options(ModelKind::Depth, library, model_file, cache, allow_download);
     let depth = py.detach(|| depth_finder(&onnx)?.find(&picture)).map_err(core_error)?;
     PyArray1::from_slice(py, depth.values()).reshape([depth.height(), depth.width()])
+}
+
+/// The model's relative inverse depth of `rgb` (a float32 `(height, width, 3)` array), the photo's size, float32, larger =
+/// nearer, on the model's own scale (not scaled to the photo). The keywords are as for `find_depth`.
+///
+/// `CoreError` of kind `backend_unavailable` for what cannot run here (the message says what to do).
+#[pyfunction]
+#[pyo3(signature = (rgb, *, library=None, model_file=None, cache=None, allow_download=false))]
+pub(crate) fn find_inverse_depth<'py>(
+    py: Python<'py>,
+    rgb: &Bound<'py, PyAny>,
+    library: Option<PathBuf>,
+    model_file: Option<PathBuf>,
+    cache: Option<PathBuf>,
+    allow_download: bool,
+) -> PyResult<Bound<'py, PyArray2<f32>>> {
+    let readonly = photo_array(rgb)?;
+    let picture = picture_of(&readonly)?;
+    let onnx = options(ModelKind::Depth, library, model_file, cache, allow_download);
+    let answer = py.detach(|| inverse_depth(&picture, &onnx)).map_err(core_error)?;
+    let shape = [answer.shape()[0], answer.shape()[1]];
+    PyArray1::from_slice(py, answer.values()).reshape(shape)
+}
+
+/// What the answers of the subject finder `find_subject` would make depend on, as text: the SHA-256 of the portable model
+/// (`onnx:sha256 ...`; the catalogue's for the standard model, else of the local `model_file` or
+/// `BT_IMAGE_SUBJECT_MODEL`), or the macOS version for Apple Vision (`vision:macOS ...`). `segmenter` is as for
+/// `find_subject`.
+///
+/// `CoreError` of kind `backend_unavailable` for an unknown segmenter, Vision where it cannot run, or a model file that
+/// is not a file.
+#[pyfunction]
+#[pyo3(signature = (*, segmenter=None, model_file=None))]
+pub(crate) fn subject_finder_identity(segmenter: Option<&str>, model_file: Option<PathBuf>) -> PyResult<String> {
+    let segmenter = segmenter.map(Segmenter::named).transpose().map_err(core_error)?;
+    let onnx = options(ModelKind::Subject, None, model_file, None, false);
+    subject_identity(segmenter, &onnx).map_err(core_error)
+}
+
+/// What the answers of the depth finder depend on, as text: `onnx:sha256 ` and the SHA-256 of the model (the catalogue's
+/// for the standard model, else of the local `model_file` or `BT_IMAGE_DEPTH_MODEL`).
+///
+/// `CoreError` of kind `backend_unavailable` for a model file that is not a file.
+#[pyfunction]
+#[pyo3(signature = (*, model_file=None))]
+pub(crate) fn depth_finder_identity(model_file: Option<PathBuf>) -> PyResult<String> {
+    let onnx = options(ModelKind::Depth, None, model_file, None, false);
+    depth_identity(&onnx).map_err(core_error)
 }

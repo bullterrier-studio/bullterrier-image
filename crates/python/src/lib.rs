@@ -48,7 +48,9 @@ mod _core {
     use super::lut::PyLut;
 
     #[pymodule_export]
-    use super::finding::{find_depth, find_subject};
+    use super::finding::{
+        depth_finder_identity, find_depth, find_inverse_depth, find_subject, subject_finder_identity,
+    };
 
     #[pymodule_export]
     use super::run::{check_recipe, known_maps, needs, refine_edge, render, trace};
