@@ -205,16 +205,16 @@ mode : one of 'linked', 'per_channel', default 'per_channel'
     ...
 
 @_effect
-def blend(*, image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] = '#808080', mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'width', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['overlay'] | None = None) -> Step:
-    """Lay a second picture over the photo with a blend mode (overlay a logo, double exposure), fitted by cover,
-contain, stretch, width or tile.
+def blend(*, image: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'multiply', fit: Literal['cover', 'contain', 'stretch', 'width', 'tile'] = 'cover', at: Literal['top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right'] = 'center', scale: float = 1.0, margin: float = 0.0, resample: Literal['nearest', 'bilinear', 'bicubic', 'lanczos'] = 'lanczos', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['overlay'] | None = None) -> Step:
+    """Lay a second picture over the photo with a blend mode (overlay a logo, double exposure), fitted by cover, contain, stretch, width or tile.  The picture's own transparency is respected: where it is transparent the photo shows. Without a picture the photo is left as it is.
 
 Parameters
 ----------
-image : picture, default '#808080'
-    The picture laid over the photo (a texture, a light leak): a path in a recipe file
-    (relative to the file), a colour such as '#808080' (a flat picture) or, in Python, a
-    Picture or an array. Its own transparency is respected.
+image : picture or none, default None
+    The picture laid over the photo (a texture, a light leak, a logo): the path of an
+    image file in a recipe file (relative to the file) or in `fx`, or, in Python, a
+    Picture or an array; in Rust, the name of a picture the photo was given or the path
+    of an image file. Its own transparency is respected. None leaves the photo as it is.
 mode : one of 'normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color', default 'multiply'
     How the picture combines with the photo, as the W3C Compositing and Blending Level 1
     modes: 'normal' shows the picture, 'multiply' darkens, 'screen' lightens, 'overlay'
@@ -231,21 +231,24 @@ fit : one of 'cover', 'contain', 'stretch', 'width', 'tile', default 'cover'
 at : one of 'top_left', 'top', 'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom', 'bottom_right', default 'center'
     Where the fitted picture sits, or which tile sits there: 'top_left', 'top',
     'top_right', 'left', 'center', 'right', 'bottom_left', 'bottom' or 'bottom_right'.
-    It decides what 'cover' crops.
+    It decides what 'cover' crops. Needs a picture.
 scale : number, ratio, 0.01 to 2, default 1.0
     The fitted picture's size as a multiple of the size `fit` gives it: 1 as fitted, 0.5
     half as wide and tall. With 'width' it is the picture's width as a share of the
-    photo's (0.2 a fifth); with 'tile', 0.25 puts four tiles across the photo.
+    photo's (0.2 a fifth); with 'tile', 0.25 puts four tiles across the photo. Needs a
+    picture.
 margin : number, px, 0 to 216, default 0.0
     Space kept clear around the fitted picture on every side, 0 to 216 px (never more
     than leaves a pixel of the shorter side). Raising it shrinks what 'cover', 'contain'
-    and 'stretch' fill and moves a smaller picture at an edge or corner inward.
+    and 'stretch' fill and moves a smaller picture at an edge or corner inward. Needs a
+    picture.
 
 Advanced parameters
 -------------------
 resample : one of 'nearest', 'bilinear', 'bicubic', 'lanczos', default 'lanczos'
     The filter that sizes the picture: 'nearest' keeps hard pixels, 'bilinear' is soft,
-    'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking.
+    'bicubic' is sharper, 'lanczos' is sharpest and the best for shrinking. Needs a
+    picture.
 
 Presets
 -------
