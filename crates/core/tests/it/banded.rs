@@ -327,8 +327,8 @@ fn the_same_banded_picture_comes_at_any_number_of_threads() -> Outcome {
     Ok(())
 }
 
-/// A vertical box blur of `reach` working rows each side that claims `says` and, if `uses_place`, adds a stripe by the
-/// canvas row; it is registered under a name of its own.
+/// A vertical box blur of `reach` working rows each side that claims `says`, dims by the size ratio and, if `uses_place`,
+/// adds a stripe by the canvas row; it is registered under a name of its own.
 struct Double {
     name: String,
     reach: usize,
@@ -358,7 +358,11 @@ impl Effect for Double {
     }
 
     fn inputs(&self) -> &[Input] {
-        if self.uses_place { &[Input::Place] } else { &[] }
+        if self.uses_place {
+            &[Input::Place, Input::SizeRatio]
+        } else {
+            &[Input::SizeRatio]
+        }
     }
 
     fn footprint(&self, _params: &Value, canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
@@ -394,7 +398,10 @@ impl Effect for Double {
                 1.0
             };
             let _ = pixel;
-            sum.map(|total| total / count * stripe)
+            // the light the design scale lets through: the canvas's, never the band's
+            #[expect(clippy::cast_possible_truncation, reason = "a ratio of a few")]
+            let scale = 1.0 - 0.5 * inputs.size_ratio() as f32;
+            sum.map(|total| total / count * stripe * scale)
         }))
     }
 }
