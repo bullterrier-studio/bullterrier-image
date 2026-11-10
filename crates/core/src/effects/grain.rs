@@ -23,7 +23,11 @@ pub(crate) const META: Meta = Meta {
 pub(crate) fn footprint(params: &Params) -> Footprint {
     // Noise that is not clumped is a hash of the pixel's place. Any clumping size above 0 design px can be above 1 working
     // px (the footprint does not see the size ratio), and clumped noise is blurred and standardised over the picture.
-    if params.size == 0.0 { Footprint::Pixel } else { Footprint::Whole }
+    if params.size == 0.0 {
+        Footprint::Pixel
+    } else {
+        Footprint::Whole
+    }
 }
 
 /// Where the noise values come from.
