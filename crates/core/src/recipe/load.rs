@@ -50,7 +50,9 @@ fn found_beside(recipe: &mut Value, folder: &Path) {
     };
     for step in steps {
         if let Some(Value::Array(looks)) = step.get_mut("looks") {
-            looks.iter_mut().for_each(|look| step_files(look, folder));
+            for look in looks.iter_mut() {
+                step_files(look, folder);
+            }
         } else {
             step_files(step, folder);
         }
