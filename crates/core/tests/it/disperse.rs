@@ -496,8 +496,7 @@ fn a_cell_draws_its_speed_its_direction_and_its_flight_independently() -> Result
 }
 
 #[test]
-fn outward_throws_a_cell_down_off_a_floor_and_up_where_nothing_is_near() -> Result<(), Error>
-{
+fn outward_throws_a_cell_down_off_a_floor_and_up_where_nothing_is_near() -> Result<(), Error> {
     // as for the wall, half way through the flight a cell has gone 5/12 of outward x outward_distance 20 = 8.33: 8 px
     let picture = one_cell(3, 15, 0.8);
     let throw = |figure: &[f32]| {
