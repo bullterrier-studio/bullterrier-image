@@ -434,6 +434,31 @@ fn ascii_at_its_widest_cell_and_longest_palette_finishes_and_one_past_is_refused
 }
 
 #[test]
+fn disperse_at_its_narrowest_and_widest_cell_finishes_and_one_past_is_refused() -> Outcome {
+    // a cell is one piece, so the narrowest cell makes the most pieces (a picture's width by its height over 7); the widest
+    // is 64 px by some 107 high (see `ops/glyphs.rs`)
+    let pixels = vec![0.5; 40 * 40 * 3];
+    let photo = Photo::new(Picture::new(40, 40, &pixels)?);
+    let disperse = |cell: u32| {
+        Recipe::new([Step::new("disperse")
+            .param("field", "light")
+            .param("cell", cell)
+            .param("progress", 0.5)])
+    };
+    for cell in [1, 64] {
+        let done = photo.render(&disperse(cell), &Presets::new(), Options::default());
+        assert!(done.is_ok(), "cell {cell}: {done:?}");
+    }
+    for (cell, value) in [(0, "0"), (65, "65")] {
+        let past = photo
+            .render(&disperse(cell), &Presets::new(), Options::default())
+            .map(drop);
+        assert!(refused(&past, &["cell", value]), "cell {cell}: {past:?}");
+    }
+    Ok(())
+}
+
+#[test]
 fn blend_at_its_largest_scale_and_margin_sizes_only_what_shows_and_one_past_is_refused() -> Outcome {
     // a picture of 1 x 4000 pixels covering a 300 x 300 photo at twice its size would be 2.4 million x 600 pixels (some
     // 23 GB of four floats) if it were made whole; only the 300 x 300 that show are

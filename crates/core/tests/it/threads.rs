@@ -606,6 +606,14 @@ fn cases() -> Vec<Case> {
                     .param("photo", 0.3)
                     .param("paper", "#f4efe4")
                     .param("gamma", 1.6),
+                Step::new("disperse")
+                    .param("field", "light")
+                    .param("cell", 6)
+                    .param("progress", 0.5)
+                    .param("hover", 0.2)
+                    .param("outward", 0.5)
+                    .param("ambient", 0.05)
+                    .param("edge", "wrap"),
                 Step::new("ascii").param("ink", "#ff8000").param("cell", 13),
                 Step::new("ascii"),
                 Step::new("halftone")

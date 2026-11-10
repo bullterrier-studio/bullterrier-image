@@ -10,14 +10,25 @@ use crate::ops::par;
 /// pixel where `targets` is true: 0 on a target, 1 beside it, then 1.41, 2 and so on; `f32::INFINITY` everywhere when no
 /// pixel is a target. Exact (the squared distances are whole numbers, worked in f64), so the same at any thread count.
 /// `targets` holds `height * width` values, both at least 1.
-pub(crate) fn to_nearest(targets: &[bool], (height, width): (usize, usize)) -> Vec<f32> {
+pub(crate) fn to_nearest(targets: &[bool], dims: (usize, usize)) -> Vec<f32> {
+    to_nearest_sampled(targets, dims, (1.0, 1.0)) // constant: one px between neighbours
+}
+
+/// [`to_nearest`] for a grid whose neighbours are not 1 apart: `(row_step, column_step)` is the distance between the
+/// centres of two vertically and two horizontally neighbouring elements (a grid of characters is taller than wide), and
+/// the distances are in that unit. Both steps are above 0; whole steps keep the squared distances exact.
+pub(crate) fn to_nearest_sampled(
+    targets: &[bool],
+    (height, width): (usize, usize),
+    (row_step, column_step): (f64, f64),
+) -> Vec<f32> {
     // along each row: the squared distance to the nearest target in the same row
     let mut across = vec![0.0; height * width];
     par::rows(&mut across, width, |first_row, band| {
         let mut envelope = Envelope::default();
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
             let row = &targets[(first_row + offset) * width..][..width];
-            envelope.lower(|at| if row[at] { Some(0.0) } else { None }, line);
+            envelope.lower(|at| if row[at] { Some(0.0) } else { None }, column_step, line);
         }
     });
     // down each column, over the rows' squared distances: the squared distance to the nearest target anywhere
@@ -28,6 +39,7 @@ pub(crate) fn to_nearest(targets: &[bool], (height, width): (usize, usize)) -> V
             let column = first_column + offset;
             envelope.lower(
                 |row| Some(across[row * width + column]).filter(|squared: &f64| squared.is_finite()),
+                row_step,
                 line,
             );
         }
@@ -73,17 +85,18 @@ struct Envelope {
 }
 
 impl Envelope {
-    /// `out[x]` = the least `(x - site)^2 + height(site)` over the positions `site` of the line where `height` is some
-    /// (finite) value, `f64::INFINITY` at every `x` if there is none. `out` is as long as the line.
+    /// `out[x]` = the least `(step * (x - site))^2 + height(site)` over the positions `site` of the line where `height`
+    /// is some (finite) value, `f64::INFINITY` at every `x` if there is none. `out` is as long as the line, its elements
+    /// `step` apart.
     #[expect(
         clippy::cast_precision_loss,
         reason = "a position in a picture side, far below 2**52"
     )]
-    fn lower(&mut self, height: impl Fn(usize) -> Option<f64>, out: &mut [f64]) {
+    fn lower(&mut self, height: impl Fn(usize) -> Option<f64>, step: f64, out: &mut [f64]) {
         self.parts.clear();
         for site in 0..out.len() {
             let Some(rise) = height(site) else { continue };
-            let at = site as f64;
+            let at = site as f64 * step;
             // drop the parabolas this one lies below from where they start to be the lowest; the first never is
             let mut start = f64::NEG_INFINITY;
             while let Some(&(before, below, from)) = self.parts.last() {
@@ -102,7 +115,7 @@ impl Envelope {
         }
         let mut lowest = 0; // constant: the walk starts at the leftmost parabola
         for (x, value) in out.iter_mut().enumerate() {
-            let at = x as f64;
+            let at = x as f64 * step;
             while self.parts.get(lowest + 1).is_some_and(|&(_, _, from)| from < at) {
                 lowest += 1;
             }
@@ -118,7 +131,7 @@ mod tests {
     //! use it see the distance only through a coverage ramp one pixel wide, so the exact distance of every pixel is
     //! checked here, next to the op.
 
-    use super::{signed, to_nearest};
+    use super::{signed, to_nearest, to_nearest_sampled};
 
     /// `count` booleans, each true with a chance of about `share` in 256, from a hash of their place and `seed`.
     fn mask(count: usize, seed: u32, share: u32) -> Vec<bool> {
@@ -212,5 +225,30 @@ mod tests {
         );
         // a pixel beside the other side is 1 from it, and the picture's border is no edge
         assert_eq!(signed(&[true, true, false], (1, 3)), [-2.0, -1.0, 1.0]);
+    }
+
+    #[test]
+    fn a_grid_of_oblong_elements_measures_in_its_own_unit() {
+        // elements 3 apart down and 2 across: the squared distance is (3 dy)^2 + (2 dx)^2, found by trying every element
+        for (height, width) in SHAPES {
+            for seed in 0..12 {
+                let targets = mask(height * width, seed, [3, 40, 200][seed as usize % 3]);
+                let found = to_nearest_sampled(&targets, (height, width), (3.0, 2.0));
+                for (at, &got) in found.iter().enumerate() {
+                    let wanted = (0..height * width)
+                        .filter(|&other| targets[other])
+                        .map(|other| {
+                            let dy = (at / width).abs_diff(other / width) * 3;
+                            let dx = (at % width).abs_diff(other % width) * 2;
+                            f64::from(u32::try_from(dy * dy + dx * dx).unwrap_or(u32::MAX)).sqrt()
+                        })
+                        .fold(f64::INFINITY, f64::min);
+                    assert!(
+                        (f64::from(got) - wanted).abs() < 1e-5 || got.is_infinite() && wanted.is_infinite(),
+                        "{height} x {width}, seed {seed}, element {at}: {got}, brute force {wanted}"
+                    );
+                }
+            }
+        }
     }
 }

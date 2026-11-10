@@ -472,6 +472,9 @@ fn seed_needs(effect: &str) -> Setting {
         setting(&[("spacing", json!(3.0))])
     } else if effect == "jpeg_crush" {
         setting(&[("hits", json!(40))])
+    } else if effect == "disperse" {
+        // nothing happens at progress 0, and the picture is two rows of cells at cell 2
+        setting(&[("progress", json!(0.5)), ("cell", json!(2)), ("jitter", json!(1.0))])
     } else {
         Setting::new()
     }
@@ -517,6 +520,8 @@ fn cyclic_needs(effect: &str, field: &str) -> Setting {
         ]),
         // only a streak shows its direction
         ("particles", "angle") => setting(&[("length", json!(40.0)), ("density", json!(8.0))]),
+        // the wind shows once pieces are on their way
+        ("disperse", "angle") => setting(&[("progress", json!(0.5)), ("cell", json!(2))]),
         ("dither", "offset_angle") => setting(&[("separation", json!("inks")), ("offset", json!(5.0))]),
         _ => Setting::new(),
     }

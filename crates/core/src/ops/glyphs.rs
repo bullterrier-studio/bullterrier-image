@@ -82,6 +82,14 @@ impl Face {
     }
 }
 
+/// `(width, height)` in px of one character cell when characters are `cell` px wide: the width is `cell`, the height comes
+/// from the font. The grid every glyph of [`Atlas`] lives on, for callers that lay a grid of whole characters over a
+/// picture without drawing them.
+pub(crate) fn cell_size(cell: usize) -> (usize, usize) {
+    let atlas = Atlas::new(" ", cell);
+    (atlas.width(), atlas.height())
+}
+
 /// The glyphs of a palette as ink coverage, each one cell, ordered from the least ink to the most.
 #[derive(Clone, Debug)]
 pub(crate) struct Atlas {

@@ -25,6 +25,7 @@ mod debug;
 mod deep;
 mod defringe;
 mod dehaze;
+mod disperse;
 mod displace;
 mod dither;
 mod drop_shadow;

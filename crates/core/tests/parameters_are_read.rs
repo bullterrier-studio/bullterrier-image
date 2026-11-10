@@ -23,6 +23,15 @@ type Outcome = Result<(), Box<dyn Error>>;
 /// `contrast` of 1 is not bit-exact.
 const TOLERANCE: f32 = 1e-4;
 const SIDE: u8 = 12;
+/// The side of the picture for `disperse`, whose pieces are cells of several px and whose bottom border takes a figure at
+/// least that wide to show (a figure 12 px across is never farther from a side than from the bottom), and a whole number of
+/// rows of cells (4 of 7 px), or the last row is cut off and is never part of the figure.
+const SIDE_OF_DISPERSE: u8 = 28;
+
+/// The side of the square picture `effect` is tried on.
+fn side_of(effect: &str) -> u8 {
+    if effect == "disperse" { SIDE_OF_DISPERSE } else { SIDE }
+}
 
 /// A parameter that changes the result only while other parameters have set values.
 struct Conditional {
@@ -38,7 +47,7 @@ struct Conditional {
     reason = "a table, one row for each parameter that matters only under a condition"
 )]
 fn conditional() -> Vec<Conditional> {
-    vec![
+    let mut rows = vec![
         // contrast leaves values where they are at 1, whatever the pivot
         Conditional {
             effect: "grade",
@@ -724,18 +733,110 @@ fn conditional() -> Vec<Conditional> {
             field: "edge",
             with: vec![("field", json!("top"))],
         },
-    ]
+    ];
+    rows.extend(disperse_rows());
+    rows
 }
 
-/// A 12 x 12 picture with a different, non-grey colour at (almost) every pixel, so a parameter of any colour step shows;
+/// `disperse` shows nothing at its defaults (progress 0, no shimmer): every parameter but those two shows once pieces are on
+/// their way, in cells small enough for the 12 x 12 picture to have rows of them, and some only with the part they tune on.
+fn disperse_rows() -> Vec<Conditional> {
+    // flights long enough for most pieces to be in the air at progress 0.5, and a wind short enough to stay in the picture
+    let in_the_air = [
+        ("progress", json!(0.5)),
+        ("cell", json!(2)),
+        ("wind", json!(6.0)),
+        ("flight", json!(0.5)),
+        ("finish", json!(1.0)),
+    ];
+    let thrown = [
+        ("outward", json!(1.0)),
+        ("outward_distance", json!(8.0)),
+        ("normal_smoothing", json!(3.0)),
+        // the default selection is bumpy and has no cell above the threshold; the ramp is a figure on the right, and at a
+        // threshold of 0.2 it reaches the bottom row of cells, which the picture cuts off
+        ("field", json!("ramp")),
+        ("field_threshold", json!(0.2)),
+    ];
+    let floating = [("progress", json!(0.2)), ("hover", json!(0.3))];
+    let rows: [(&'static str, &[(&'static str, Value)]); 38] = [
+        ("field", &[]),
+        ("cell", &[]),
+        ("top", &[]),
+        ("outline", &[]),
+        ("sweep", &[]),
+        ("reach", &[]),
+        ("wind", &[]),
+        ("angle", &[]),
+        ("hover", &[]),
+        ("outward", &[]),
+        ("seed", &[]),
+        ("outline_depth", &[]),
+        ("jitter", &[]),
+        ("anticipation", &[]),
+        // a piece eases back only in the moments before it goes
+        ("pullback", &[("progress", json!(0.25))]),
+        ("flight", &[]),
+        ("flight_variation", &[]),
+        ("finish", &[]),
+        ("bob", &floating),
+        ("bob_cycles", &floating),
+        (
+            "hover_spread",
+            &[("progress", json!(0.2)), ("hover", json!(0.3)), ("wind", json!(24.0))],
+        ),
+        ("angle_spread", &[]),
+        ("distance_minimum", &[]),
+        ("outward_distance", &[("outward", json!(1.0))]),
+        ("acceleration", &[]),
+        ("sway", &[]),
+        ("sway_cycles", &[]),
+        ("falloff", &[]),
+        // the glow lasts the first fifth of a flight
+        ("flare", &[("progress", json!(0.12))]),
+        ("flare_span", &[("progress", json!(0.12))]),
+        // the shimmer is of the pieces that stay: all of them at progress 0
+        ("ambient_phase", &[("progress", json!(0.0)), ("ambient", json!(0.1))]),
+        (
+            "ambient_wavelength",
+            &[("progress", json!(0.0)), ("ambient", json!(0.1))],
+        ),
+        ("open_bottom", &thrown),
+        ("normal_smoothing", &thrown),
+        ("normal_truncate", &thrown),
+        ("edge", &thrown),
+        ("field_threshold", &[]),
+        ("background_threshold", &[]),
+    ];
+    rows.into_iter()
+        .map(|(field, extra)| Conditional {
+            effect: "disperse",
+            field,
+            with: in_the_air.iter().chain(extra).cloned().collect(),
+        })
+        .collect()
+}
+
+/// A `side` x `side` picture with a different, non-grey colour at (almost) every pixel, so a parameter of any colour step shows;
 /// green and blue are squeezed to a shorter range than red, so a step that treats channels alike or apart shows too.
-fn picture_values() -> Vec<f32> {
-    (0..SIDE)
-        .flat_map(|row| (0..SIDE).flat_map(move |column| (0..3_u8).map(move |channel| (row, column, channel))))
+fn picture_values(side: u8) -> Vec<f32> {
+    (0..u16::from(side))
+        .flat_map(|row| {
+            (0..u16::from(side)).flat_map(move |column| (0..3_u16).map(move |channel| (row, column, channel)))
+        })
         .map(|(row, column, channel)| {
             f32::from((row * 7 + column * 13 + channel * 5) % 23) / (22.0 + 8.0 * f32::from(channel))
         })
         .collect()
+}
+
+/// `part` / `whole` as a level (both small).
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "a pixel position of a picture a few dozen px across"
+)]
+fn length_share(part: usize, whole: usize) -> f32 {
+    part as f32 / whole as f32
 }
 
 fn whole(bound: Option<Scalar>) -> Option<i64> {
@@ -851,18 +952,18 @@ fn render(
         .iter()
         .filter(|field| field.kind == Kind::Field)
         .map(|field| {
-            let side = usize::from(SIDE);
+            let side = picture.height();
             let name = params[field.name].clone();
-            let values: Vec<f32> = (0..SIDE)
+            let values: Vec<f32> = (0..side)
                 .flat_map(|row| {
                     let name = name.clone();
-                    (0..SIDE).map(move |column| {
+                    (0..side).map(move |column| {
                         if name == "ramp" {
-                            f32::from(column) / f32::from(SIDE - 1)
+                            length_share(column, side - 1)
                         } else if name == "top" {
-                            f32::from(u8::from(row < SIDE / 2))
+                            f32::from(u8::from(row < side / 2))
                         } else {
-                            f32::from((row * 5 + column * 3) % 7) / 6.0
+                            length_share((row * 5 + column * 3) % 7, 6)
                         }
                     })
                 })
@@ -871,7 +972,7 @@ fn render(
         })
         .collect::<Result<Vec<_>, _>>()?;
     // a partition is the picture's left and right halves
-    let side = usize::from(SIDE);
+    let side = picture.height();
     let halves = Labels::new(
         side,
         side,
@@ -925,8 +1026,9 @@ fn changes(
     field: &Field,
     context: &Map<String, Value>,
 ) -> Result<bool, Box<dyn Error>> {
-    let values = picture_values();
-    let picture = Picture::new(SIDE.into(), SIDE.into(), &values)?;
+    let side = side_of(effect.name());
+    let values = picture_values(side);
+    let picture = Picture::new(side.into(), side.into(), &values)?;
     let baseline = render(effect, table, context, &picture)?;
     for candidate in candidates(field) {
         let mut given = context.clone();
