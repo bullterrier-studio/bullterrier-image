@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
 
@@ -12,12 +12,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Light,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `vignette` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Fade the picture toward `color` from `radius` out to its corners, the centre untouched.
@@ -49,16 +49,17 @@ pub struct Params {
     pub color: Color,
 }
 
-/// How far a pixel centre is from the middle along one axis of `length` pixels: 0 in the middle, near 1 at the edge.
+/// How far the pixel centres `first..first + count` of an axis of `length` pixels are from its middle: 0 in the middle,
+/// near 1 at the edge.
 #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
-fn offsets(length: usize) -> Vec<f64> {
-    (0..length)
+fn offsets(first: usize, count: usize, length: usize) -> Vec<f64> {
+    (first..first + count)
         .map(|index| (2.0 * index as f64 + 1.0 - length as f64).abs() / length as f64)
         .collect()
 }
 
 /// The picture faded toward the colour.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (amount, radius, feather) = (
         f64::from(params.amount),
         f64::from(params.radius),
@@ -67,7 +68,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     // The norm with exponent p = 2 / roundness, scaled so that a corner is at 1 (p = infinity, a rectangle, is the
     // larger offset). Dividing by the larger offset first keeps the power from underflowing when p is large.
     let exponent = (params.roundness > 0.0).then(|| 2.0 / f64::from(params.roundness));
-    let (down, across) = (offsets(picture.height()), offsets(picture.width()));
+    // the distance is from the middle of the canvas, whatever rows of it the picture holds
+    let place = inputs.place(picture);
+    let (down, across) = (
+        offsets(place.first_row, picture.height(), place.canvas_height),
+        offsets(0, picture.width(), place.canvas_width),
+    );
     let tint = params.color.0.map(f64::from);
     #[expect(
         clippy::cast_possible_truncation,

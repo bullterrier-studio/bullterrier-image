@@ -1,7 +1,7 @@
 //! Pixels in, pixels out: an effect applied to a picture of the test's own.
 
 use bullterrier_image::params::EffectParams;
-use bullterrier_image::{Error, Inputs, Labels, Layer, Picture, apply};
+use bullterrier_image::{Error, Inputs, Labels, Layer, Picture, Place, apply};
 use serde_json::Value;
 
 /// `params` applied to `pixels` (a picture one pixel high).
@@ -58,6 +58,30 @@ pub(crate) fn run_picture<P: EffectParams>(
         &Picture::new(height, width, values)?,
         Value::Object(params.values()),
         &Inputs::default(),
+    )?;
+    Ok(image.into_values())
+}
+
+/// Rows `from..to` of the `height` x `width` picture `values`, run as a picture of their own: `placed` tells the effect
+/// where they lie on the canvas that is the whole picture, else it is told nothing.
+pub(crate) fn run_rows<P: EffectParams>(
+    params: &P,
+    (height, width): (usize, usize),
+    values: &[f32],
+    (from, to): (usize, usize),
+    placed: bool,
+) -> Result<Vec<f32>, Error> {
+    let band = &values[from * width * 3..to * width * 3];
+    let offered = if placed {
+        Inputs::default().with_place(Place::new(height, width, from))
+    } else {
+        Inputs::default()
+    };
+    let image = apply(
+        P::EFFECT,
+        &Picture::new(to - from, width, band)?,
+        Value::Object(params.values()),
+        &offered,
     )?;
     Ok(image.into_values())
 }

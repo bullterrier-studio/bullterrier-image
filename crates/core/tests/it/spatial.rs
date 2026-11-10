@@ -6,8 +6,9 @@ use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
 use serde_json::Value;
 
-use crate::common::compare::assert_close;
-use crate::common::pixels::run;
+use crate::common::compare::{assert_close, first_bit_difference};
+use crate::common::pictures::varied;
+use crate::common::pixels::{run, run_picture, run_rows};
 
 const TOLERANCE: f32 = 1e-5;
 
@@ -29,6 +30,31 @@ fn grid<P: EffectParams>(params: &P, height: usize, width: usize, grey: f32) -> 
 }
 
 // --- vignette ----------------------------------------------------------------------------------------------------
+
+#[test]
+fn rows_of_the_canvas_told_their_place_are_the_same_rows_of_the_whole_and_rows_not_told_are_not() -> Result<(), Error> {
+    // odd and even sides that differ, so that a row and a column cannot be swapped; a fade that reaches the centre
+    let (height, width) = (37, 20);
+    let picture = varied(height, width);
+    for params in [vignette::Params { radius: 0.0, ..to_white(1.0) }, to_white(0.0)] {
+        let whole = run_picture(&params, height, width, &picture)?;
+        for (from, to) in [(0, 9), (13, 30), (30, 37), (36, 37)] {
+            let band = run_rows(&params, (height, width), &picture, (from, to), true)?;
+            assert_eq!(
+                first_bit_difference(&band, &whole[from * width * 3..to * width * 3]),
+                None,
+                "rows {from}..{to} told their place, {params:?}"
+            );
+        }
+        // known bad: the same band not told where it lies sees itself as the canvas and is another vignette
+        let alone = run_rows(&params, (height, width), &picture, (13, 30), false)?;
+        assert!(
+            first_bit_difference(&alone, &whole[13 * width * 3..30 * width * 3]).is_some(),
+            "a band not told its place matched the whole: the test proves nothing"
+        );
+    }
+    Ok(())
+}
 
 /// Black fading to white from 0.5 out over 0.5, so a pixel's value is its smoothstep share.
 fn to_white(roundness: f32) -> vignette::Params {

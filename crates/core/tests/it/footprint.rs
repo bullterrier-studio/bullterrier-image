@@ -21,7 +21,7 @@ use crate::common::Outcome;
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::asset;
 use bullterrier_image::params::{Field, Kind, Scalar, Table, Unit};
-use bullterrier_image::{Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, effect, effects};
+use bullterrier_image::{Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect, effects};
 use serde_json::{Map, Value, json};
 
 /// The picture is tall and narrow: only the rows matter to a band.
@@ -172,7 +172,10 @@ fn run(
             .collect(),
         2,
     )?;
-    let mut inputs = Inputs::default().with_size_ratio(ratio);
+    // the band lies where it was cut from, on the canvas that is the whole picture
+    let mut inputs = Inputs::default()
+        .with_size_ratio(ratio)
+        .with_place(Place::new(HEIGHT, WIDTH, from));
     for field in table
         .iter()
         .flat_map(|table| &table.fields)
@@ -381,6 +384,37 @@ impl Effect for Ruler {
     }
 }
 
+/// The canvas row of the picture's row as the pixel: it reads nothing around a pixel, and it is told where the pixel is.
+struct PlacedRuler;
+
+impl Effect for PlacedRuler {
+    fn name(&self) -> &'static str {
+        "footprint_double_placed_ruler"
+    }
+
+    fn category(&self) -> Category {
+        Category::Utilities
+    }
+
+    fn inputs(&self) -> &[Input] {
+        &[Input::Place]
+    }
+
+    fn footprint(&self, _params: &Value) -> Result<Footprint, bullterrier_image::Error> {
+        Ok(Footprint::Pixel)
+    }
+
+    fn apply(
+        &self,
+        picture: &Picture<'_>,
+        _params: Value,
+        inputs: &Inputs<'_>,
+    ) -> Result<Image, bullterrier_image::Error> {
+        let first = inputs.place(picture).first_row;
+        Ok(picture.map_at(|row, _, _| [f32::from(u16::try_from(first + row).unwrap_or(0)) / 255.0; 3]))
+    }
+}
+
 #[test]
 fn a_blur_that_says_it_reads_nothing_around_a_pixel_or_too_little_fails() -> Outcome {
     for says in [Footprint::Pixel, Footprint::Radius(0.5), Footprint::Radius(2.0)] {
@@ -405,6 +439,13 @@ fn an_effect_that_knows_the_place_of_a_pixel_cannot_say_pixel() -> Outcome {
         !problems(&Ruler)?.is_empty(),
         "Pixel passed for an effect that draws the row"
     );
+    Ok(())
+}
+
+#[test]
+fn an_effect_that_reads_its_place_from_the_input_can_say_pixel() -> Outcome {
+    let found = problems(&PlacedRuler)?;
+    assert!(found.is_empty(), "Pixel failed for an effect that draws the canvas row: {found:?}");
     Ok(())
 }
 
