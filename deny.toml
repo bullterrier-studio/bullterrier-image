@@ -15,6 +15,7 @@ allow = [
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "Unicode-3.0",
+    "ISC",  # delaunator (shatter's triangles)
     "Zlib",  # foldhash, which serde_json hashes its ordered map with (`preserve_order`)
 ]
 confidence-threshold = 0.93

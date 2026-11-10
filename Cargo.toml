@@ -18,6 +18,7 @@ publish = false
 bullterrier-image = { path = "crates/core" }
 bullterrier-image-derive = { path = "crates/derive" }
 # the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring
+delaunator = { version = "=1.1.0", default-features = false }  # Delaunay triangulation, a hard algorithm; used only in `ops/triangles.rs`
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
 libm = "0.2"  # erfc, for the normal distribution function (`ops/gauss.rs`): pure Rust, MIT, no C
 moxcms = { version = "0.8", default-features = false, features = ["lut"] }  # the colour profiles of image files, to sRGB (`lut` for the CMYK ones; the `image` crate brings it too, with its default features, so its SIMD paths are on)
