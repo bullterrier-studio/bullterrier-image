@@ -439,3 +439,131 @@ fn the_shimmer_of_the_cells_that_stay_follows_a_sine_wave_against_the_wind() -> 
     assert!(white.iter().all(|&level| (0.0..=1.0).contains(&level)));
     Ok(())
 }
+
+/// The Pearson correlation of two samples.
+fn correlation(a: &[f64], b: &[f64]) -> f64 {
+    let n = a.len() as f64;
+    let (mean_a, mean_b) = (a.iter().sum::<f64>() / n, b.iter().sum::<f64>() / n);
+    let covariance: f64 = a.iter().zip(b).map(|(x, y)| (x - mean_a) * (y - mean_b)).sum();
+    let spread = |v: &[f64], mean: f64| v.iter().map(|x| (x - mean).powi(2)).sum::<f64>().sqrt();
+    covariance / (spread(a, mean_a) * spread(b, mean_b))
+}
+
+#[test]
+fn a_cell_draws_its_speed_its_direction_and_its_flight_independently() -> Result<(), Error> {
+    // One lit cell in flight, once per seed. With falloff 1 and no glow its brightness is 1 - t, t its share of the flight
+    // (a draw of `flight`); with steady speed (acceleration 0) it has moved t x journey, whose length (a draw of speed)
+    // and direction (a draw of angle) are read from its px. Pieces' draws of different kinds must not follow each other.
+    let picture = one_cell(4, 10, 1.0);
+    let (mut shares, mut speeds, mut angles) = (vec![], vec![], vec![]);
+    for seed in 0..60 {
+        let params = Params {
+            seed,
+            acceleration: 0.0,
+            falloff: 1.0,
+            wind: 40.0,
+            angle_spread: 180.0,
+            distance_minimum: 0.2,
+            flight: 0.1,
+            flight_variation: 0.5,
+            ..plain(0.085)
+        };
+        let out = run(&params, &picture)?;
+        let lit: Vec<(usize, usize)> = (0..HEIGHT * WIDTH)
+            .filter(|&at| out[at * 3] > 0.0)
+            .map(|at| (at / WIDTH, at % WIDTH))
+            .collect();
+        let top = lit.iter().map(|p| p.0).min().unwrap_or(0);
+        let left = lit.iter().map(|p| p.1).min().unwrap_or(0);
+        let share = 1.0 - f64::from(out[(top * WIDTH + left) * 3]);
+        let (dy, dx) = (
+            (top as f64) - 4.0 * CELL_HEIGHT as f64,
+            (left as f64) - 10.0 * CELL as f64,
+        );
+        shares.push(share);
+        speeds.push(dy.hypot(dx) / share);
+        angles.push(dy.atan2(dx));
+    }
+    for (name, a, b) in [
+        ("flight and speed", &shares, &speeds),
+        ("flight and angle", &shares, &angles),
+        ("speed and angle", &speeds, &angles),
+    ] {
+        let r = correlation(a, b);
+        assert!(r.abs() < 0.6, "{name} are drawn alike: correlation {r}");
+    }
+    Ok(())
+}
+
+#[test]
+fn outward_throws_a_cell_down_off_a_floor_and_up_where_nothing_is_near() -> Result<(), Error>
+{
+    // as for the wall, half way through the flight a cell has gone 5/12 of outward x outward_distance 20 = 8.33: 8 px
+    let picture = one_cell(3, 15, 0.8);
+    let throw = |figure: &[f32]| {
+        let params = Params {
+            wind: 0.0,
+            outward: 1.0,
+            outward_distance: 20.0,
+            normal_smoothing: 0.0,
+            ..plain(0.16)
+        };
+        with_field(&params, "field", figure, &picture)
+    };
+    // the figure fills the rows above the cell's bottom edge: the cell is its last row, the way out is down
+    let ceiling = field(|y, _| y < 4 * CELL_HEIGHT);
+    assert_eq!(
+        first_bit_difference(&throw(&ceiling)?, &moved(&picture, 8, 0)),
+        None,
+        "off a floor"
+    );
+    // no figure anywhere: the distance is flat and "out" is up, where things drift by default
+    let nowhere = field(|_, _| false);
+    assert_eq!(
+        first_bit_difference(&throw(&nowhere)?, &moved(&picture, -8, 0)),
+        None,
+        "nothing near"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_bottom_border_is_no_edge_while_open_and_the_figure_ends_above_its_threshold() -> Result<(), Error> {
+    let picture = varied();
+    // outline only, reach 0.5, finished: what is nearest an edge goes, the farthest stays. The bottom-middle cell is 7 px
+    // from the border below when that is an edge (it goes with the other edge cells) and farther than any inner cell when not
+    let leaving = Params {
+        top: 0.0,
+        outline: 1.0,
+        reach: 0.5,
+        ..plain(1.0)
+    };
+    let whole = vec![1.0; HEIGHT * WIDTH];
+    for (open_bottom, goes) in [(false, true), (true, false)] {
+        let out = with_field(
+            &Params {
+                open_bottom,
+                ..leaving.clone()
+            },
+            "field",
+            &whole,
+            &picture,
+        )?;
+        assert_eq!(cell_black(&out, 7, 15), goes, "open_bottom {open_bottom}");
+    }
+    // a field of exactly the threshold is not above it: no figure, so every cell is outside it and all go together
+    let half = vec![0.5; HEIGHT * WIDTH];
+    for (field_threshold, goes) in [(0.5, true), (0.49, false)] {
+        let out = with_field(
+            &Params {
+                field_threshold,
+                ..leaving.clone()
+            },
+            "field",
+            &half,
+            &picture,
+        )?;
+        assert_eq!(cell_black(&out, 4, 15), goes, "field_threshold {field_threshold}");
+    }
+    Ok(())
+}
