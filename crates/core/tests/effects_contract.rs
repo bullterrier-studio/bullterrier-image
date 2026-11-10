@@ -505,6 +505,8 @@ fn cyclic_needs(effect: &str, field: &str) -> Setting {
             ("paper", json!("#ffffff")),
             ("offset", json!(5.0)),
         ]),
+        // only a streak shows its direction
+        ("particles", "angle") => setting(&[("length", json!(40.0)), ("density", json!(8.0))]),
         ("dither", "offset_angle") => setting(&[("separation", json!("inks")), ("offset", json!(5.0))]),
         _ => Setting::new(),
     }

@@ -43,6 +43,7 @@ pub(crate) mod relief;
 pub(crate) mod resample;
 pub(crate) mod rotate;
 pub(crate) mod sample;
+pub(crate) mod segments;
 pub(crate) mod shift;
 pub(crate) mod sites;
 pub(crate) mod svg;

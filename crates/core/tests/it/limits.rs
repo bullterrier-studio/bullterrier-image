@@ -381,6 +381,34 @@ fn drop_shadow_at_its_most_copies_and_widest_blur_finishes_and_one_copy_more_is_
     Ok(())
 }
 
+#[test]
+fn particles_at_their_largest_density_size_and_length_finish_and_one_past_is_refused() -> Outcome {
+    // every particle is drawn over its own box, whose edge is the size and the length: the most work is the most particles
+    // at the largest size and length, here on a picture of 120 x 120 px (4 320 particles)
+    let pixels = vec![0.5; 120 * 120 * 3];
+    let photo = Photo::new(Picture::new(120, 120, &pixels)?);
+    let particles = |density: f64, size: u32, length: u32| {
+        Recipe::new([Step::new("particles")
+            .param("density", density)
+            .param("size", size)
+            .param("length", length)
+            .param("layers", 10)])
+    };
+    let most = photo.render(&particles(300.0, 200, 200), &Presets::new(), Options::default());
+    assert!(most.is_ok(), "{most:?}");
+    for (density, size, length, field, value) in [
+        (301.0, 200, 200, "density", "301"),
+        (300.0, 201, 200, "size", "201"),
+        (300.0, 200, 201, "length", "201"),
+    ] {
+        let past = photo
+            .render(&particles(density, size, length), &Presets::new(), Options::default())
+            .map(drop);
+        assert!(refused(&past, &[field, value]), "{field}: {past:?}");
+    }
+    Ok(())
+}
+
 // ---- the files an svg region reads --------------------------------------------------------------------------------
 
 const NS: &str = r#"xmlns="http://www.w3.org/2000/svg""#;

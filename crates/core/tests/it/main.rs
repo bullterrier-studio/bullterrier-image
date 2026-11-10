@@ -84,6 +84,7 @@ mod params_field;
 mod params_lut;
 mod params_order;
 mod params_scale;
+mod particles;
 mod path_coverage;
 mod paths;
 mod pattern;

@@ -151,6 +151,12 @@ fn cases() -> Vec<Case> {
                 Step::new("lut").param("file", "film").param("amount", 0.8),
                 Step::new("vignette").param("roundness", 0.6).param("feather", 0.2),
                 Step::new("scanlines").param("spacing", 2.5).param("softness", 0.5),
+                Step::new("particles")
+                    .param("density", 8)
+                    .param("length", 12)
+                    .param("angle", 30)
+                    .param("layers", 3)
+                    .param("seed", 5),
             ]),
             &thin_and_odd,
         ),

@@ -448,6 +448,54 @@ fn conditional() -> Vec<Conditional> {
             field: "seed",
             with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
         },
+        // the 12 px picture is too small for the default density to make a single particle; at the largest density it has
+        // dozens
+        Conditional {
+            effect: "particles",
+            field: "size",
+            with: vec![("density", json!(300.0))],
+        },
+        Conditional {
+            effect: "particles",
+            field: "length",
+            with: vec![("density", json!(300.0))],
+        },
+        Conditional {
+            effect: "particles",
+            field: "softness",
+            with: vec![("density", json!(300.0))],
+        },
+        Conditional {
+            effect: "particles",
+            field: "color",
+            with: vec![("density", json!(300.0))],
+        },
+        Conditional {
+            effect: "particles",
+            field: "layers",
+            with: vec![("density", json!(300.0))],
+        },
+        Conditional {
+            effect: "particles",
+            field: "size_falloff",
+            with: vec![("density", json!(300.0))],
+        },
+        Conditional {
+            effect: "particles",
+            field: "brightness_falloff",
+            with: vec![("density", json!(300.0))],
+        },
+        Conditional {
+            effect: "particles",
+            field: "seed",
+            with: vec![("density", json!(300.0))],
+        },
+        // a streak's direction shows only where there is a streak
+        Conditional {
+            effect: "particles",
+            field: "angle",
+            with: vec![("density", json!(300.0)), ("length", json!(30.0))],
+        },
         // the 12 px picture is too small for the default density to make a single speck; at the largest density it has
         // one, and one mark of a seed is a hair or a speck, light or dark
         Conditional {

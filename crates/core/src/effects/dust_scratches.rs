@@ -6,6 +6,7 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::length;
+use crate::ops::segments::{Point, Segment, draw};
 use crate::ops::random::{mix, unit};
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -67,39 +68,20 @@ pub struct Params {
     pub seed: u32,
 }
 
-/// A point (x, y) of the picture, in px.
-type Point = (f64, f64);
-
-/// Draws the segment from `start` to `end` (a speck has equal ends), `radius` px wide each side, into `cover` (`height` x
-/// `width`): each pixel takes the larger of its value and how far the shape covers it, 0..1, soft by one pixel.
-fn stamp(cover: &mut [f32], (height, width): (usize, usize), start: Point, end: Point, radius: f64) {
-    // shortcut: the box around the shape, so a long leaning scratch visits its whole slanted box; a row-by-row span would
-    // visit only the line, worth it once scratches lean far on a very large picture
-    let reach = radius + 1.0;
-    // the pixels the shape can touch (`whole` of a negative number is 0)
-    let first = |coordinate: f64| length::whole(coordinate.floor());
-    let top = first(start.1.min(end.1) - reach);
-    let bottom = (first(start.1.max(end.1) + reach) + 1).min(height);
-    let left = first(start.0.min(end.0) - reach);
-    let right = (first(start.0.max(end.0) + reach) + 1).min(width);
-    let along = (end.0 - start.0, end.1 - start.1);
-    let length = along.0 * along.0 + along.1 * along.1;
-    for row in top..bottom {
-        for column in left..right {
-            let (x, y) = (length::float(column) - start.0, length::float(row) - start.1);
-            // how far along the segment (0..1) its nearest point to the pixel lies; a speck has no length to divide by
-            let nearest = if length > 0.0 {
-                ((x * along.0 + y * along.1) / length).clamp(0.0, 1.0)
-            } else {
-                0.0 // constant: a speck is its one point
-            };
-            let distance = (x - nearest * along.0).hypot(y - nearest * along.1);
-            // a pixel is a unit box: covered fully within `radius` - 0.5 of the shape, not at all beyond `radius` + 0.5
-            let covered = (radius + 0.5 - distance).clamp(0.0, 1.0);
-            let cell = &mut cover[row * width + column];
-            *cell = cell.max(crate::ops::cast::single(covered));
-        }
-    }
+/// Draws the segment from `start` to `end` (a speck has equal ends), `radius` px wide each side, into `cover`: solid inside, soft by
+/// one pixel.
+fn stamp(cover: &mut [f32], shape: (usize, usize), start: Point, end: Point, radius: f64) {
+    draw(
+        cover,
+        shape,
+        &Segment {
+            start,
+            end,
+            radius,
+            weight: 1.0, // constant: a mark is solid
+            feather: 1.0, // constant: one pixel of anti-aliasing
+        },
+    );
 }
 
 /// The picture with the marks drawn on it.
