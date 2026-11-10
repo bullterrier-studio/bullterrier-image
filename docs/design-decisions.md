@@ -51,6 +51,22 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   declares it nullable with a null default and takes no colour (its Python `Picture.of_color` helper remains). Naming rule: kind names follow the format (`Kind::Picture`, `PictureName`, Python's `Picture`),
   value accessors follow the Rust type (`with_image`, `Inputs::image`; the core's `Picture<'_>` is the photo itself). `blend` sizes
   and places only the pixels that show (`ops/place`), so a picture sized far past the photo allocates nothing extra.
+- **Text is a parameter kind (`String`, kind `text`) with three rules: `min_length`, `max_length`, `min_distinct`.** Lengths
+  count characters, not bytes. `min_distinct` (the fewest different characters) is general, beside the lengths, checked by
+  `Table::check` and by the Python model (an `AfterValidator`), so `ascii`'s "at least two different characters" is declared once, in
+  its `chars` field, not in Python. *Consequence:* the parameter format v2 names `text` with the two lengths and has no word for
+  `min_distinct` (an unknown key its schema lets through); it joins the format at v3. `ascii`'s `chars` is capped at 128 characters:
+  the glyph atlas holds a cell of coverage for each (54 MB at the widest cell), so the maximum has a row in `limits.rs`.
+- **Glyphs are drawn in the core with `read-fonts` and image's own rasteriser.** `ops/glyphs.rs` reads the bundled JetBrains
+  Mono Regular (`crates/core/data/fonts/`, with its SIL OFL 1.1 text `OFL.txt`, a copy of the repository's `LICENSE-FONT`, itself
+  the font authors' notice) with `read-fonts =0.46.0` (no default features, `libm`: the same pin as bullterrier-vector, which
+  needs more of the font stack, so image takes only the reader), draws each glyph's outline, flattens it with `ops/outlines` and measures
+  its coverage with `ops/raster`: no rasteriser crate. One monospaced glyph fills a cell (no shaping). The cell is the Python rule: the font is set
+  so that an 'M' is `cell` px wide, and the cell's height is the font's `hhea` ascent plus descent, each rounded up (`cell_size`
+  agrees with the Pillow atlas's for every cell from 1 to 200). Pillow hints its glyphs and image's are unhinted, so strokes
+  differ by anti-aliasing (a mean absolute coverage of 0.01 to 0.1 per glyph, Pillow's a little heavier), never in the order
+  of a palette or the size of a cell. *Transitional:* the Python copy of the font (`src/bullterrier_image/fonts/`) stays until
+  its last Python readers go: `disperse` (E6-4b), the numbered pieces and the sheet's labels (Pillow, R6).
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
   `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
   point and a third-party package declares its own, written against the public `bullterrier_image.plugin`. *Reason:* importing

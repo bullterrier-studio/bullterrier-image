@@ -242,8 +242,10 @@ a step gives one, and the `///` doc says what none means; written `nullable`; Py
 (`#[param(default = "depth")]`: the name of the selection the effect works from, which it finds as a `Layer` in `Inputs`
 under the parameter's name, and `Native` lists as one of its `fields()`; Python sees a `FieldName`), `LutName` (`#[param()]`, no
 default: none is the identity table; the table reaches the effect in `Inputs`, see "Rust core"; Python sees a `Lut`), `PictureName`
-(`#[param()]`, nullable, no default: none is no picture; Python sees `Picture | None`) and a
-choice; an effect with any other (text, other optional values) keeps a Python model, each field `param(default, doc=...)`, until its
+(`#[param()]`, nullable, no default: none is no picture; Python sees `Picture | None`), `String` (text:
+`#[param(default = " .:-=+*#%@", min_length = 2, max_length = 128, min_distinct = 2)]`, each rule optional and counting characters,
+`min_distinct` the fewest different ones; Python sees `str`) and a
+choice; an effect with any other (other optional values) keeps a Python model, each field `param(default, doc=...)`, until its
 port extends the macro.
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
 
