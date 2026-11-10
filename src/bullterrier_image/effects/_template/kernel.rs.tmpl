@@ -9,7 +9,7 @@ use crate::params::Params;
 use crate::{Canvas, Footprint, Image, Inputs, Picture};
 
 // What the effect declares besides its parameters: its section of the catalogue, the opacity of a step of it that sets
-// none (below 1 for an effect meant to be mixed in partway) and the inputs it takes (none yet: list `Input::Partition`
+// none (below 1 for an effect meant to be mixed in partway) and the inputs it takes (none yet: list `Input::Partition`,
 // `Input::SizeRatio` or `Input::Place` (where the picture lies on the canvas) to receive them in `render`'s `inputs`).
 pub(crate) const META: Meta = Meta {
     category: Category::$Category,
