@@ -58,87 +58,22 @@ ops        pure numeric primitives                                    (may impor
 errors     BullterrierImageError and its subclasses                            (imports nothing from bullterrier_image)
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
 ```
-**Rust core:** `crates/core` (crate `bullterrier-image`, pure Rust: `ops/` by concept, one `effects/<name>.rs` per
-ported effect, found by `build.rs`), `crates/derive` (the `Params` and `Choice` derives) and `crates/python` (PyO3
-bindings building `bullterrier_image._native._core`; generic, names no effect). A ported effect has **no Python folder**: the registry registers every
-effect the core declares (`registry._register_core_effects`) with a function that calls `_core.apply("<name>", rgb,
-params.model_dump())`. Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
-opacity and inputs (`pub(crate) const META: Meta`) and has `pub(crate) fn render(picture: &Picture, params: &Params, inputs: &Inputs) -> Image`; its
-documentation is the `///` doc of `Params`, its Python model `class XParams(EffectParams, core="x")` is built from that
-declaration, and category and opacity come from the core (`@effect(params=XParams)` on a hand-written Python model of a core
-effect refuses them). The core's registry (`Effect` trait, `register`) also
-takes foreign effects, such as a Python function (`_core.register(name, category, opacity, fn, *, inputs=, fields=)`; `fn(rgb,
-params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect only the inputs it declares: `size_ratio`
-(1 if undeclared), `partition` (`Labels`), under each field parameter's name a `Layer` and under each lookup table parameter's name a `Lut`
-(`Inputs::lut`; none is the identity). A `lut` parameter (`LutName`) holds the name of a table the photo was given
-(`Photo::with_lut(name, Arc<Lut>)`), else the path of a `.cube` file read once per render, else an error naming it; the runner
-finds the table before step 1 and offers it, so the table never travels in the recipe (`crate::Lut`, `lut.rs`, `lut/cube.rs`:
-the `.cube` reader and trilinear lookup are the core's). A `picture` parameter (`PictureName`, nullable, none = no picture) is the same route:
-`Photo::with_image(name, Arc<Image>)` (straight-alpha RGB/RGBA), else the path of an image file read once per render by `files::read`; the effect
-finds it as `Inputs::image(parameter)`; Python's `Picture` travels as `$picture:<digest>` and `pictures=` (`run/assets.rs`). Rust effects never refer to each other.
-The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
-(`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
-look, `Table::check` those of an effect's parameters (`_core.check`, `_core.check_recipe`, `_core.read_recipe`). The Python
-`Step`, `Recipe`, regions and `Framing` are Pydantic builders over these types: their models validate (and document) first,
-and a `Recipe` is then held to `Recipe::checked`, which alone reads a region's path data.
-**The runner is Rust too** (`crates/core/src/run.rs`): `Photo::new(Picture)` borrows the picture; `with_map(name, Layer)` hands
-a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; its answer for the whole photo is kept and asked once;
-a `Subject` region found `per` piece also asks the `subject` finder, uncached, about the crop of each piece);
-`photo.render(&Recipe, &Presets, Options)` and `photo.trace(..) -> Vec<Stage>` run one engine (`Stage`: `Input`, `Subject`,
-`Depth`, `Selection { name, layer }`, `Partition { name, labels }` (each region the steps use, in declaration order),
-`Step { number, image }`, `CutOut(image)`; numbered-piece drawing and labels are the facade's). The recipe's `frame` (typed `Frame`, checked by
-`Recipe::checked`) frames the photo and its maps first (flip, turn, crop, borders: `ops/frame`, `ops/rotate`, one `Geometry`
-planned from the shape and the subject, applied to each plane), then `Options::with_size` or the recipe's `size` resamples them
-(`ops/resample`); the ratio of design px (480 on the longest side) is derived from that working picture, never passed in. Each
-step's parameters are completed (preset, defaults, `Table::check`) and scaled by it (`Table::scaled`, from the declared units),
-the result is laid over its input by `ops/blend` (blend mode, opacity, mask), and a `Drive` is a mix of runs at `levels` values
-(`ops/levels`). After the last step `frame.transparent` gives the `Image` an alpha (`channels()` 3|4; `into_values` is
-`channels()` per pixel, straight alpha; `ops/cutout`); effects read a `Picture` and never see it. `Layer` (an h x w map, finite,
-0..1) and `Labels` (piece numbers) are the maps. **Files** (`crates/core/src/files.rs`, `files/`): `read` (RGB or RGBA with straight alpha, upright, first frame, an embedded
-profile converted to sRGB), `read_map`, `write` and `write_with_quality` (png, jpg, webp; only the sRGB profile
-embedded); a fixed pixel limit and a decoder memory cap; `ErrorKind::ImageRead`, `ImageWrite` and `BackendUnavailable`.
-`imageio.py` calls them through `core/native.py` and keeps what is Python's (composite over white, array checks, Pillow
-conversions). `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
-for every binding). **Regions:** `Recipe.regions` is an ordered `Regions` of the 13 typed kinds in `bullterrier_image::region`
-(`Region`, `kind` required; ranges in `Region::check`); `Recipe::needs(&Presets) -> Needs { maps, finds_pieces }` and
-`Recipe::known_maps()` say what a photo must be given or find. Maps are found before step 1; every other region is made the first
-time a step asks (`run/regions.rs`, `Evaluator`) and dropped after the last step that needs it. `each` is `run/each.rs`
-(`ops/blur`, `ops/random`: xoshiro256++, not NumPy's stream). Every region kind runs in the core, a torn `edge`
-included. The core opens one file, `Svg.file` (`run/laid.rs`: read through `take(max_kilobytes * 1024 + 1)`; `ops/svg` takes the
-bytes: UTF-8 only, `<!ENTITY` refused before the parser, nothing in the file opened or run), and its limits are `Limits` in
-`ops/outlines` (`Limits::STANDARD`; tests pass a small one). `Pick` by `id` reads the ids an `Svg` made (`Made::Pieces`);
-a relative file path in a recipe file is the loader's to resolve. `Shards.preset` is expanded when the region is read
-(`recipe/region/presets.rs`, from `crates/core/data/regions/shards.toml`; Python reads them through `_core.region_presets`). Every user number that drives
-allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of
-`Region::check` with neither a row nor a reason.
-Python is a facade over the core and runs no recipe itself. It reaches the core through `core/native.py` (every entry point raises the `BullterrierImageError` subclass of the
-`kind` of the `_core.CoreError` the extension raises; any other exception, such as a Python effect's, passes unchanged) and
-`core/bridge.py` (`render`, `render_all`, `trace`, `maps_needed`, `needs_finder`, `known_maps`: a `Recipe` as the dict
-`steps.recipe_dict` writes; `size` a whole number, a name in `maps` or `finders` no recipe has, and each map the recipes need
-found once, by `core/finder.py`'s `find_map`, are its checks; a finder's not-found error is told to the core). `recipe.py`
-binds the default finders and names a trace's stages (drawing the numbered pieces is `ops/pieces`). The registry
-mirrors every Python-registered effect, but those with a Rust model (`core=`), into the core at registration; a `Picture`
-parameter travels as the name `$picture:<digest>` and a `Lut` as `$lut:<digest>` of what the render is given (`registry.holding`);
-the Python `Lut` wraps the core's table (`_core.Lut`). `_core.effects()` lists those mirrors too;
-`effects(declared=True)` only the effects whose parameters the core declares.
-**Threads:** `Options::with_threads(n)` (default 1: none started; 0: every core; at most 256, else refused) makes `render` and
-`trace` install a rayon pool of that size (`ops/par.rs`); the render stays on the calling thread, only row bands run on the
-pool, and rayon's global pool is never used. A kernel fills its output with `par::rows(out, row_len, |first_row, band| ..)`
-(`Picture::map` and `map_at` do, so a per-pixel effect is threaded as written); outside a pool it runs inline, and
-`Effect::apply` takes no thread parameter. Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only
-input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count). Never add
-real complexity for the last bit: if a kernel's rounding differs between runs with no visible effect, compare within a small
-tolerance. Tests: render at threads 1, 2, 3, 10 and compare (`crates/core/tests/it/threads.rs`). Python: `render`/`trace`/`render_all`
-take `threads=`; `Step.apply` and `fx` use 1.
+**Architecture rules.** Reference for the Rust core, runner, regions, files, threads and bindings: `docs/architecture.md`; read it before touching them.
+- A ported effect has **no Python folder**
+- Rust effects never refer to each other.
+- The ratio of design px (480 on the longest side) is derived from that working picture, never passed in.
+- Every user number that drives allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of `Region::check` with neither a row nor a reason.
+- Python is a facade over the core and runs no recipe itself.
+- rayon's global pool is never used
+- `Effect::apply` takes no thread parameter
+- Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count).
+- Never add real complexity for the last bit: if a kernel's rounding differs between runs with no visible effect, compare within a small tolerance.
+
 
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
 Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
 checkout, `uv sync` installs ours; without it no effect is found.
-The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
-(`finders={"subject": ...}`); the core's `Photo` takes the same (`with_map`, `with_finder`). `subject`, `depth` and `light` (made
-from the working picture: framed and sized, before any step) are built in, and `background` is 1 - `subject`; any other map is a recipe's `given` region.
-`bullterrier_image.recipe` binds the default `subject` and `depth` finders when a recipe needs them.
 
 ## Rules
 
@@ -226,37 +161,15 @@ strength is below full declares its steps' default opacity, `@effect(..., opacit
 ## Parameters
 
 A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, strict).
-An effect the core runs **declares its fields in Rust**, on its public `Params` struct (`#[derive(Debug, Clone, PartialEq, Deserialize, Params)]`, from
-`crate::params`): each field a type, a `///` doc comment and `#[param(default = .., unit = px, min = .., max = ..,
-at_most = other, drivable, advanced, cyclic)]` (`at_most = other`: the number may not exceed the number field `other`, of the
-same unit, as `band_min_height` stays below `band_max_height`; `Table::check` and the Python model both apply it); a choice is a fieldless `#[derive(Choice)]` enum (`default = Variant`). The struct's own
-doc is the model's docstring, a field's doc its help text in Python: plain text, no rustdoc links, a blank `///` line
-becomes a double space. The build refuses a broken declaration, naming the field (an unknown unit is rustc's own
-error; that a choice's doc names every variant is checked when Python builds the model). The Python class is
-`class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust
-declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python's model validates a
-user's values when a step is made; `Table::check` in Rust is the same rules, compared with Python's by parity tests
-(`tests/_native`); running an effect trusts its parameters. Rust kinds: `f32`, `i32`, `u32` (a seed: 0..4294967295), `bool`, `Color`, `Vec<Color>`
-(`#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`: `min_length` of at least 1 required, `max_length`
-optional, the default lowercase `#rrggbb`; Python sees a `tuple[Color, ...]`), `Option<Color>` (`#[param()]`, no default: none until
-a step gives one, and the `///` doc says what none means; written `nullable`; Python sees `Color | None`), `FieldName`
-(`#[param(default = "depth")]`: the name of the selection the effect works from, which it finds as a `Layer` in `Inputs`
-under the parameter's name, and `Native` lists as one of its `fields()`; Python sees a `FieldName`), `LutName` (`#[param()]`, no
-default: none is the identity table; the table reaches the effect in `Inputs`, see "Rust core"; Python sees a `Lut`), `PictureName`
-(`#[param()]`, nullable, no default: none is no picture; Python sees `Picture | None`), `String` (text:
-`#[param(default = " .:-=+*#%@", min_length = 2, max_length = 128, min_distinct = 2)]`, each rule optional and counting characters,
-`min_distinct` the fewest different ones; Python sees `str`) and a
-choice; an effect with any other (other optional values) keeps a Python model, each field `param(default, doc=...)`, until its
-port extends the macro.
-Every field has a default and a description (what it does, unit and range in words, what raising it does).
+Parameter declarations in Rust, the kinds and the Python seam: `docs/parameters.md`; read it before adding or changing a parameter. Binding sentences:
+- An effect the core runs **declares its fields in Rust**
+- The struct's own doc is the model's docstring, a field's doc its help text in Python: plain text, no rustdoc links, a blank `///` line becomes a double space.
+- The Python class is `class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`)
+- Python's model validates a user's values when a step is made; `Table::check` in Rust is the same rules, compared with Python's by parity tests (`tests/_native`); running an effect trusts its parameters.
+- The copy is not edited: a change is a new version in the ecosystem's format first, then a new copy here.
+- `picture` (`PictureName`) is a name or path, never a colour, and `usize` counts are kind `int`.
 
-**The format.** What a parameter is, as JSON (keys, kinds, the closed list of units, ranges, `cyclic`, `drivable`,
-`advanced`), is the ecosystem's parameter format, version 3: [docs/parameter-format/parameters.md](docs/parameter-format/parameters.md),
-with its [schema](docs/parameter-format/schemas/parameter-3.schema.json) and
-[fixtures](docs/parameter-format/fixtures/parameters). The copy is not edited: a change is a new version in the
-ecosystem's format first, then a new copy here. `tests/_native/test_parameter_format.py` validates every field of every
-Rust-declared effect. The Rust declaration covers every kind but a nullable `text`/`field` and a number list; `picture` (`PictureName`)
-is a name or path, never a colour, and `usize` counts are kind `int`. What follows is what image adds.
+Every field has a default and a description (what it does, unit and range in words, what raising it does).
 - **Numeric** (`int`, `float`): a `unit` from the format's list and inclusive `min`/`max` that hold the default.
 - **Counts and densities:** a few marks read as a `count` (their sizes are `px`, so the same count looks alike at any
   size). Numerous marks take `density`: marks per 1000 design px², the one meaning everywhere (`params.scaled`
