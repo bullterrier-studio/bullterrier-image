@@ -3,13 +3,13 @@
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use ort::session::Session as OrtSession;
 use ort::value::Tensor as OrtTensor;
 use sha2::{Digest, Sha256};
 
-use super::{Infer, Model, Tensor};
+use super::{Infer, Model, ModelFinder, ModelKind, Tensor, download};
 use crate::Error;
 
 /// A model file loaded into ONNX Runtime, kept for the next photo (loading takes a second).
@@ -35,11 +35,8 @@ impl Session {
                 file.display()
             ))
         };
-        let environment = ort::environment::init_from(library)
-            .map_err(|error| unavailable(&error))?
-            .build()
-            .map_err(|error| unavailable(&error))?;
-        let session = OrtSession::builder(&environment)
+        let environment = environment(library).map_err(|error| unavailable(&error))?;
+        let session = OrtSession::builder(environment)
             .and_then(|mut builder| builder.commit_from_file(file))
             .map_err(|error| unavailable(&error))?;
         let input = session
@@ -51,6 +48,26 @@ impl Session {
             inner: Mutex::new(session),
             input,
         })
+    }
+}
+
+/// The one ONNX Runtime environment of this process, made on first use from `library`: ONNX Runtime allows no second, so
+/// every session shares it and a later call with another library is refused.
+fn environment(library: &Path) -> Result<&'static ort::environment::Environment, String> {
+    static ENVIRONMENT: OnceLock<(PathBuf, Result<ort::environment::Environment, String>)> = OnceLock::new();
+    let (loaded, made) = ENVIRONMENT.get_or_init(|| {
+        let made = ort::environment::init_from(library)
+            .map_err(|error| error.to_string())
+            .and_then(|builder| builder.build().map_err(|error| error.to_string()));
+        (library.to_path_buf(), made)
+    });
+    match made {
+        Ok(_) if loaded != library => Err(format!(
+            "ONNX Runtime is already loaded from {}, and a process loads one library only",
+            loaded.display()
+        )),
+        Ok(environment) => Ok(environment),
+        Err(error) => Err(error.clone()),
     }
 }
 
@@ -80,6 +97,130 @@ impl Infer for Session {
             values.to_vec(),
         )
     }
+}
+
+/// Where a model finder gets its model file and its ONNX Runtime library, and whether it may download.
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct Options {
+    model_file: Option<PathBuf>,
+    cache: Option<PathBuf>,
+    library: Option<PathBuf>,
+    allow_download: bool,
+}
+
+impl Options {
+    /// The defaults: the model in the cache folder ([`cache_dir`]), downloaded never, the library as `from_env` says.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The options the environment asks for: `BT_IMAGE_ONNX_LIB` (the library file), `BT_IMAGE_ALLOW_DOWNLOAD` (`1`,
+    /// `true` or `yes`), and for a subject model `BT_IMAGE_SUBJECT_MODEL`, for a depth model `BT_IMAGE_DEPTH_MODEL` (a
+    /// local copy of the model, used as it is and never downloaded).
+    #[must_use]
+    pub fn from_env(kind: ModelKind) -> Self {
+        let var = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
+        let model = match kind {
+            ModelKind::Subject => "BT_IMAGE_SUBJECT_MODEL",
+            ModelKind::Depth => "BT_IMAGE_DEPTH_MODEL",
+        };
+        Self {
+            model_file: var(model).map(PathBuf::from),
+            cache: None,
+            library: var("BT_IMAGE_ONNX_LIB").map(PathBuf::from),
+            allow_download: var("BT_IMAGE_ALLOW_DOWNLOAD").is_some_and(|value| {
+                let value = value.to_string_lossy().to_lowercase();
+                matches!(value.as_str(), "1" | "true" | "yes")
+            }),
+        }
+    }
+
+    /// These options with a local copy of the model, used as it is and never downloaded.
+    #[must_use]
+    pub fn with_model_file(mut self, file: impl Into<PathBuf>) -> Self {
+        self.model_file = Some(file.into());
+        self
+    }
+
+    /// These options with the folder the model is kept in and downloaded to, instead of [`cache_dir`].
+    #[must_use]
+    pub fn with_cache(mut self, folder: impl Into<PathBuf>) -> Self {
+        self.cache = Some(folder.into());
+        self
+    }
+
+    /// These options with the ONNX Runtime library file to load.
+    #[must_use]
+    pub fn with_library(mut self, file: impl Into<PathBuf>) -> Self {
+        self.library = Some(file.into());
+        self
+    }
+
+    /// These options allowing, or not, the download of the model when it is not in the cache folder.
+    #[must_use]
+    pub const fn with_download(mut self, allow: bool) -> Self {
+        self.allow_download = allow;
+        self
+    }
+}
+
+/// A [`ModelFinder`] for `model`, run by ONNX Runtime: finds the model file (the local copy, else the cache folder,
+/// downloading it there if `options` allow), finds the library and loads both.
+///
+/// The library never prints and never asks: a missing piece is an error that says how to get it.
+///
+/// # Errors
+/// [`Error::BackendUnavailable`] naming what is missing and the way to get it: the model file (where it is expected,
+/// where it comes from, and how to allow the download), the library (which variable or option names it), or why
+/// ONNX Runtime cannot use them.
+pub fn finder(model: &Model, options: &Options) -> Result<ModelFinder<Session>, Error> {
+    let file = model_file(model, options)?;
+    let library = options.library.clone().ok_or_else(|| {
+        Error::BackendUnavailable(
+            "the ONNX Runtime library is not given: set BT_IMAGE_ONNX_LIB to the file of the library \
+             (libonnxruntime.so, libonnxruntime.dylib or onnxruntime.dll), or install the Python package onnxruntime"
+                .to_owned(),
+        )
+    })?;
+    Ok(ModelFinder::new(model.kind, Session::open(&library, &file)?))
+}
+
+/// The file of `model`: the local copy named by `options`, else the one in the cache folder, downloaded if it is not
+/// there and `options` allow.
+fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
+    if let Some(local) = &options.model_file {
+        return if local.is_file() {
+            Ok(local.clone())
+        } else {
+            Err(Error::BackendUnavailable(format!(
+                "the model file {} is not a file (it was named for the {} model)",
+                local.display(),
+                model.name
+            )))
+        };
+    }
+    let cache = match &options.cache {
+        Some(folder) => folder.clone(),
+        None => cache_dir()?,
+    };
+    let file = cache.join(format!("{}.onnx", model.name));
+    if is_model(model, &file).unwrap_or(false) {
+        return Ok(file);
+    }
+    if !options.allow_download {
+        return Err(Error::BackendUnavailable(format!(
+            "the {} model ({} MB) is not in {}: allow downloading it (BT_IMAGE_ALLOW_DOWNLOAD=1, or the option of the \
+             call), or download {} by hand and save it as that file, or point to a local copy",
+            model.name,
+            model.size / 1_000_000,
+            cache.display(),
+            model.url
+        )));
+    }
+    download::fetch(model.url, model.sha256, model.size, &file)?;
+    Ok(file)
 }
 
 /// The SHA-256 of the file at `path`, as 64 lowercase hex digits.
