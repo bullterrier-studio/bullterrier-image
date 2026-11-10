@@ -23,7 +23,7 @@ const DARK: f32 = 0.6; // constant: the dark grey of the board
 /// The type sizes of a label, px: the largest, and the smallest it shrinks to before it is cut.
 const LABEL_SIZE: usize = 16; // constant: the label's type size
 const LABEL_SMALLEST: usize = 10; // constant: the smallest type size before the label is cut
-/// The width of a character of the monospaced font as a share of its size (JetBrains Mono's advance is 0.6 em).
+/// The width of a character of the monospaced font as a share of its size (`JetBrains Mono`'s advance is 0.6 em).
 const ADVANCE: f64 = 0.6; // constant: JetBrains Mono's advance width, in em
 
 /// One result of a sheet: its picture and the label under it.
@@ -105,7 +105,7 @@ fn scaled(image: &Image, side: usize) -> Result<(Vec<[f32; 3]>, usize, usize), E
         .enumerate()
         .map(|(index, (pixel, &opacity))| {
             let (row, column) = (index / width, index % width);
-            let board = if (row / CHECKER + column / CHECKER) % 2 == 0 {
+            let board = if (row / CHECKER + column / CHECKER).is_multiple_of(2) {
                 LIGHT
             } else {
                 DARK
@@ -143,9 +143,9 @@ fn label(sheet: &mut [[f32; 3]], sheet_width: usize, origin: (usize, usize), roo
             if covered > 0.0
                 && let Some(pixel) = sheet.get_mut((origin.1 + row) * sheet_width + origin.0 + column)
             {
-                pixel
-                    .iter_mut()
-                    .for_each(|channel| *channel += (INK - *channel) * covered);
+                for channel in pixel.iter_mut() {
+                    *channel += (INK - *channel) * covered;
+                }
             }
         }
     }

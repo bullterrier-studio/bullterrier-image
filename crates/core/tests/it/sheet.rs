@@ -62,12 +62,12 @@ fn a_tile_is_scaled_to_fit_and_centred_in_its_square() -> Outcome {
 fn a_picture_with_transparency_is_shown_over_a_checkerboard_so_the_colour_under_it_never_shows() -> Outcome {
     let clear = clear_red(8)?;
     let sheet = contact_sheet(&[Tile::new("clear", &clear)], 3, 64)?;
-    let mut seen: Vec<[i32; 3]> = Vec::new();
+    let mut seen: Vec<[String; 3]> = Vec::new();
     for row in GAP..GAP + 64 {
         for column in GAP..GAP + 64 {
             let pixel = at(&sheet, row, column);
             assert!(pixel[0] - pixel[1] < 0.1, "red shows at {row},{column}");
-            let rounded = [0, 1, 2].map(|channel| (pixel[channel] * 1000.0).round() as i32);
+            let rounded = [0, 1, 2].map(|channel| format!("{:.3}", pixel[channel]));
             if !seen.contains(&rounded) {
                 seen.push(rounded);
             }
@@ -96,9 +96,9 @@ fn an_opaque_four_channel_picture_is_its_colour_and_a_half_clear_one_a_mix_of_co
         contact_sheet(&[Tile::new("a", &clear_red(8)?)], 3, 64)?,
     );
     for (row, column) in [(GAP, GAP), (GAP, GAP + 8), (GAP + 20, GAP + 30)] {
-        for channel in 0..3 {
-            let expected = 0.5 * colour[channel] + 0.5 * at(&board, row, column)[channel];
-            assert!((at(&mixed, row, column)[channel] - expected).abs() < 1e-5);
+        let (shown, under) = (at(&mixed, row, column), at(&board, row, column));
+        for (channel, value) in colour.iter().enumerate() {
+            assert!((shown[channel] - (0.5 * value + 0.5 * under[channel])).abs() < 1e-5);
         }
     }
     Ok(())
