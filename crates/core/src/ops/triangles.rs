@@ -256,4 +256,13 @@ mod tests {
             assert_eq!(labels(size.0, size.1, &mesh).len(), 600);
         }
     }
+
+    #[test]
+    fn a_centre_on_a_shared_side_goes_to_the_first_triangle() {
+        // a 2 x 2 picture cut along its diagonal: the centres (0.5, 0.5) and (1.5, 1.5) lie on it
+        let upper_right: Triangle = [[0.0, 0.0], [2.0, 0.0], [2.0, 2.0]];
+        let lower_left: Triangle = [[0.0, 0.0], [2.0, 2.0], [0.0, 2.0]];
+        assert_eq!(labels(2, 2, &[upper_right, lower_left]), [0, 0, 1, 0]);
+        assert_eq!(labels(2, 2, &[lower_left, upper_right]), [0, 1, 0, 0]);
+    }
 }
