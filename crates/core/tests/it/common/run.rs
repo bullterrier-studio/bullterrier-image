@@ -12,7 +12,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use bullterrier_image::params::{Field, Kind, Scalar, Table, Unit};
 use bullterrier_image::{
-    Category, Effect, Error, FieldParam, Finder, Image, Input, Inputs, Layer, Picture, Place, Regions, register, unregister,
+    Category, Effect, Error, FieldParam, Finder, Image, Input, Inputs, Layer, Picture, Place, Regions, register,
+    unregister,
 };
 use serde_json::Value;
 

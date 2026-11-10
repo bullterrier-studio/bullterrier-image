@@ -21,7 +21,9 @@ use crate::common::Outcome;
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::asset;
 use bullterrier_image::params::{Field, Kind, Scalar, Table, Unit};
-use bullterrier_image::{Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect, effects};
+use bullterrier_image::{
+    Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect, effects,
+};
 use serde_json::{Map, Value, json};
 
 /// The picture is tall and narrow: only the rows matter to a band.
@@ -445,7 +447,10 @@ fn an_effect_that_knows_the_place_of_a_pixel_cannot_say_pixel() -> Outcome {
 #[test]
 fn an_effect_that_reads_its_place_from_the_input_can_say_pixel() -> Outcome {
     let found = problems(&PlacedRuler)?;
-    assert!(found.is_empty(), "Pixel failed for an effect that draws the canvas row: {found:?}");
+    assert!(
+        found.is_empty(),
+        "Pixel failed for an effect that draws the canvas row: {found:?}"
+    );
     Ok(())
 }
 

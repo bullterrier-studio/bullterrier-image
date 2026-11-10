@@ -97,7 +97,10 @@ fn a_place_that_does_not_hold_the_picture_refuses_the_run_naming_the_effect() ->
     let takes = Registered::new(Recorder::new(PLACE, &[]))?;
     // (the place offered, what the message must say): rows 4..6 of a canvas of 5 rows, a canvas of another width;
     // rows 3..5 of 5 and the first row of a canvas of exactly the picture's size are fine
-    for (place, said) in [(Place::new(5, 3, 4), "rows 4..6"), (Place::new(10, 4, 0), "canvas is 4 wide")] {
+    for (place, said) in [
+        (Place::new(5, 3, 4), "rows 4..6"),
+        (Place::new(10, 4, 0), "canvas is 4 wide"),
+    ] {
         let result = apply(takes.name(), &picture, json!({}), &Inputs::default().with_place(place));
         assert!(
             matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains(takes.name()) && error.to_string().contains(said)),

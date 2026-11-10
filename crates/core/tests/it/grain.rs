@@ -8,7 +8,7 @@ use bullterrier_image::{Edge, Error};
 use crate::common::compare::first_bit_difference;
 use crate::common::numbers::float;
 use crate::common::pictures::varied;
-use crate::common::pixels::run_picture;
+use crate::common::pixels::{run_picture, run_rows};
 use crate::common::stats::{correlation, deviation, mean, neighbour_correlation};
 
 const SIDE: usize = 128;
@@ -311,5 +311,40 @@ fn the_result_is_clipped_to_the_picture_range() -> Result<(), Error> {
     let smallest = out.iter().fold(1.0_f32, |least, value| least.min(*value));
     assert!((largest - 1.0).abs() < f32::EPSILON); // never above white
     assert!(smallest < 0.9); // darkened where the noise is negative
+    Ok(())
+}
+
+#[test]
+fn unclumped_grain_on_rows_of_the_canvas_told_their_place_is_the_same_rows_of_the_whole() -> Result<(), Error> {
+    // odd and even sides that differ, so that a row and a column cannot be swapped
+    let (height, width) = (37, 20);
+    let picture = varied(height, width);
+    for distribution in [Distribution::Gaussian, Distribution::Uniform] {
+        for (size, color) in [(0.0, false), (1.0, true)] {
+            let params = Params {
+                amount: 0.2,
+                size,
+                color,
+                distribution,
+                seed: 5,
+                ..Params::default()
+            };
+            let whole = run_picture(&params, height, width, &picture)?;
+            for (from, to) in [(0, 9), (13, 30), (30, 37), (36, 37)] {
+                let band = run_rows(&params, (height, width), &picture, (from, to), true)?;
+                assert_eq!(
+                    first_bit_difference(&band, &whole[from * width * 3..to * width * 3]),
+                    None,
+                    "rows {from}..{to} told their place, {params:?}"
+                );
+            }
+            // known bad: not told where it lies, the band draws the grain of the top of the canvas
+            let alone = run_rows(&params, (height, width), &picture, (13, 30), false)?;
+            assert!(
+                first_bit_difference(&alone, &whole[13 * width * 3..30 * width * 3]).is_some(),
+                "a band not told its place matched the whole: the test proves nothing, {params:?}"
+            );
+        }
+    }
     Ok(())
 }

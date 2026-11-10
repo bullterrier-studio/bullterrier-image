@@ -36,7 +36,13 @@ fn rows_of_the_canvas_told_their_place_are_the_same_rows_of_the_whole_and_rows_n
     // odd and even sides that differ, so that a row and a column cannot be swapped; a fade that reaches the centre
     let (height, width) = (37, 20);
     let picture = varied(height, width);
-    for params in [vignette::Params { radius: 0.0, ..to_white(1.0) }, to_white(0.0)] {
+    for params in [
+        vignette::Params {
+            radius: 0.0,
+            ..to_white(1.0)
+        },
+        to_white(0.0),
+    ] {
         let whole = run_picture(&params, height, width, &picture)?;
         for (from, to) in [(0, 9), (13, 30), (30, 37), (36, 37)] {
             let band = run_rows(&params, (height, width), &picture, (from, to), true)?;

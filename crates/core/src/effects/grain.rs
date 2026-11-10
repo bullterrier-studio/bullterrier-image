@@ -3,7 +3,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::cast;
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
@@ -16,12 +16,14 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Texture,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `grain` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    // Noise that is not clumped is a hash of the pixel's place. Any clumping size above 0 design px can be above 1 working
+    // px (the footprint does not see the size ratio), and clumped noise is blurred and standardised over the picture.
+    if params.size == 0.0 { Footprint::Pixel } else { Footprint::Whole }
 }
 
 /// Where the noise values come from.
@@ -78,30 +80,32 @@ pub struct Params {
     pub edge: Edge,
 }
 
-/// The noise of channel `stream`, `height` x `width`: mean 0 and deviation 1, clumped into specks about `size` px wide.
-fn noise(height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32> {
+/// The noise of channel `stream`, `height` x `width`: mean 0 and deviation 1, clumped into specks about `size` px wide. `first` is the canvas index of the picture's first pixel, which numbers the draws.
+fn noise(height: usize, width: usize, first: usize, params: &Params, stream: u64) -> Vec<f32> {
     clumped(
         (height, width),
         f64::from(params.size),
         f64::from(params.truncate),
         params.edge.extension(),
         |at| match params.distribution {
-            Distribution::Gaussian => standard_normal(params.seed, stream, at),
+            Distribution::Gaussian => standard_normal(params.seed, stream, first + at),
             // uniform on -b..b has deviation b / sqrt(3), so b = sqrt(3) gives 1
             Distribution::Uniform => cast::single(
-                (2.0 * unit(mix(params.seed, &[stream, at as u64, 0])) - 1.0) * 3.0_f64.sqrt(), // constant: the uniform's deviation
+                (2.0 * unit(mix(params.seed, &[stream, (first + at) as u64, 0])) - 1.0) * 3.0_f64.sqrt(), // constant: the uniform's deviation
             ),
         },
     )
 }
 
 /// The picture with the grain laid over it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    // a pixel's draw is numbered by its place on the canvas, so a band draws what the whole picture does there
+    let first = inputs.place(picture).first_row * width;
     // one noise for all three channels, or one for each
     let channels = if params.color { 3 } else { 1 }; // constant: colour grain is one noise per red, green, blue
     let planes: Vec<Vec<f32>> = (0..channels)
-        .map(|stream| noise(height, width, params, stream))
+        .map(|stream| noise(height, width, first, params, stream))
         .collect();
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;
