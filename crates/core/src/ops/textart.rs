@@ -34,11 +34,8 @@ pub(crate) struct Style<'a> {
 /// the right or bottom edge is measured as if the border pixels went on. Each cell is the average colour of its pixels; its
 /// ink amount is that colour's luminance on a dark paper and its complement on a light one, to the power `gamma`, and the
 /// character is the one at that share of the way along the palette sorted by ink.
-///
-/// # Errors
-/// A message if the bundled font cannot be read (see [`Atlas::new`]).
-pub(crate) fn text_art(picture: &Picture<'_>, style: &Style<'_>) -> Result<Image, String> {
-    let atlas = Atlas::new(style.chars, style.cell)?;
+pub(crate) fn text_art(picture: &Picture<'_>, style: &Style<'_>) -> Image {
+    let atlas = Atlas::new(style.chars, style.cell);
     let (cell_width, cell_height) = (atlas.width(), atlas.height());
     let (height, width) = (picture.height(), picture.width());
     let (rows, columns) = (height.div_ceil(cell_height), width.div_ceil(cell_width));
@@ -84,5 +81,5 @@ pub(crate) fn text_art(picture: &Picture<'_>, style: &Style<'_>) -> Result<Image
             }
         }
     });
-    Ok(Image::from_pixels(height, width, out))
+    Image::from_pixels(height, width, out)
 }

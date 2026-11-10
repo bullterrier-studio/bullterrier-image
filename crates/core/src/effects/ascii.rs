@@ -67,8 +67,7 @@ pub struct Params {
     pub photo: f32,
 }
 
-/// The picture redrawn in characters. The bundled font is read here for the cell grid, so a font that cannot be read (which
-/// a test excludes) leaves the picture as it is.
+/// The picture redrawn in characters.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let style = Style {
         cell: params.cell,
@@ -80,5 +79,5 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         gamma: params.gamma,
         photo: params.photo,
     };
-    text_art(picture, &style).unwrap_or_else(|_| picture.map(|pixel| pixel))
+    text_art(picture, &style)
 }

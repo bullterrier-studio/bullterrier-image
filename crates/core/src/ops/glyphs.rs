@@ -5,6 +5,8 @@
 //! ligatures, no kerning. A character the font lacks shows as its missing-glyph box. Outlines are flattened by
 //! [`outlines`](super::outlines) and measured by [`raster`](super::raster).
 
+use std::sync::LazyLock;
+
 use read_fonts::model::Font;
 use read_fonts::model::glyph::outline::{DrawMemory, DrawOptions, PathElement};
 use read_fonts::types::GlyphId;
@@ -36,6 +38,9 @@ struct Face {
     /// Advance of 'M' in font units: the cell's width is this wide at the size the font is set at.
     advance: f64,
 }
+
+/// The bundled font, read once. It is a build asset: whether it reads is proven by a test, not handled at run time.
+static FACE: LazyLock<Result<Face, String>> = LazyLock::new(face);
 
 fn face() -> Result<Face, String> {
     let font = Font::new(FONT, 0).ok_or("the bundled font cannot be read")?;
@@ -92,10 +97,23 @@ impl Atlas {
     /// ascent and descent) over the middle of the cell, each in whole px with a half rounded up. Glyphs of equal ink keep
     /// the order the characters came in.
     ///
-    /// # Errors
-    /// A message if the bundled font cannot be read or a glyph cannot be drawn, which a test excludes.
-    pub(crate) fn new(chars: &str, cell: usize) -> Result<Self, String> {
-        let face = face()?;
+    /// `cell` is at least 1 (the `Params` of `ascii` hold it to its range); `chars` may hold any character, one the font
+    /// lacks shows as its missing-glyph box.
+    ///
+    /// # Panics
+    /// If the bundled font cannot be read or one of its glyphs cannot be drawn: a build defect, which the tests
+    /// `the_bundled_font_is_read` and `every_glyph_of_the_font_is_drawn` exclude, so a render never degrades silently.
+    #[expect(
+        clippy::expect_used,
+        reason = "bundled font; read and drawn by the tests named above"
+    )]
+    pub(crate) fn new(chars: &str, cell: usize) -> Self {
+        Self::try_new(chars, cell).expect("the bundled font draws every glyph")
+    }
+
+    /// [`Atlas::new`], reporting what it would panic on.
+    fn try_new(chars: &str, cell: usize) -> Result<Self, String> {
+        let face = FACE.as_ref().map_err(Clone::clone)?;
         let layout = face.layout(cell);
         let (width, height) = (cell, layout.ascent + layout.descent);
         let outlines = face.font.outline_glyphs();
@@ -209,11 +227,11 @@ fn polygons(path: &[PathElement], to_px: impl Fn(f32, f32) -> [f64; 2]) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{Atlas, length};
+    use super::{Atlas, FACE, length};
 
     /// `(width, height)` of the cells of an atlas of `cell` px.
     fn cell_size(cell: usize) -> Result<(usize, usize), String> {
-        let atlas = Atlas::new(" ", cell)?;
+        let atlas = Atlas::try_new(" ", cell)?;
         Ok((atlas.width(), atlas.height()))
     }
 
@@ -236,9 +254,9 @@ mod tests {
     /// character alone beside a space, which is index 0 of that atlas).
     #[test]
     fn the_ascii_palette_is_ordered_by_ink() -> Result<(), String> {
-        let all = Atlas::new(" .:-=+*#%@", 12)?;
+        let all = Atlas::try_new(" .:-=+*#%@", 12)?;
         for (index, character) in " .-:=+*#%@".chars().enumerate() {
-            let alone = Atlas::new(&format!(" {character}"), 12)?;
+            let alone = Atlas::try_new(&format!(" {character}"), 12)?;
             assert_eq!(
                 all.glyph(index),
                 alone.glyph(alone.len() - 1),
@@ -260,7 +278,7 @@ mod tests {
 
     #[test]
     fn coverage_is_a_share_and_a_space_is_empty() -> Result<(), String> {
-        let atlas = Atlas::new(" .:-=+*#%@", 12)?;
+        let atlas = Atlas::try_new(" .:-=+*#%@", 12)?;
         for index in 0..atlas.len() {
             assert!(atlas.glyph(index).iter().all(|&share| (0.0..=1.0).contains(&share)));
         }
@@ -270,7 +288,7 @@ mod tests {
 
     #[test]
     fn glyphs_are_ordered_by_increasing_ink_and_repeats_count_once() -> Result<(), String> {
-        let atlas = Atlas::new("@ .@:", 12)?;
+        let atlas = Atlas::try_new("@ .@:", 12)?;
         assert_eq!(atlas.len(), 4);
         let ink: Vec<f64> = (0..atlas.len())
             .map(|index| atlas.glyph(index).iter().map(|&share| f64::from(share)).sum())
@@ -284,7 +302,7 @@ mod tests {
     /// (the cell cuts it at 10) and 1.32 * 17 = 22.44 px high, inside the cell's 24 rows.
     #[test]
     fn a_full_block_covers_exactly_its_outline() -> Result<(), String> {
-        let atlas = Atlas::new(" \u{2588}", 10)?;
+        let atlas = Atlas::try_new(" \u{2588}", 10)?;
         let ink: f64 = atlas.glyph(1).iter().map(|&share| f64::from(share)).sum();
         let wanted = 10.0 * 1.32 * 17.0;
         assert!((ink - wanted).abs() < 0.05, "{ink} px of ink, {wanted} wanted");
@@ -296,7 +314,7 @@ mod tests {
     /// off by the bottom: row 0 is empty, row 1 is nine tenths covered (to 1/16 of a row) and rows 2 to 26 are full.
     #[test]
     fn the_line_is_centred_with_a_half_pixel_rounded_up() -> Result<(), String> {
-        let atlas = Atlas::new(" \u{2588}", 12)?;
+        let atlas = Atlas::try_new(" \u{2588}", 12)?;
         let rows: Vec<f32> = atlas
             .glyph(1)
             .as_chunks::<12>()
@@ -315,7 +333,7 @@ mod tests {
     /// 7.2 px wide covers the first column and 6.7 px of the cell, 0.7 of the last column.
     #[test]
     fn the_advance_is_centred_with_a_half_pixel_rounded_up() -> Result<(), String> {
-        let atlas = Atlas::new(" \u{2588}", 7)?;
+        let atlas = Atlas::try_new(" \u{2588}", 7)?;
         let middle = atlas.height() / 2;
         let row = &atlas.glyph(1)[middle * 7..][..7];
         assert!((row[0] - 1.0).abs() < 1e-4 && (row[6] - 0.7).abs() < 1e-4, "{row:?}");
@@ -325,7 +343,7 @@ mod tests {
     /// 'I' is symmetric in the font, so the middle of its ink is the middle of the cell.
     #[test]
     fn a_symmetric_glyph_sits_in_the_middle_of_its_cell() -> Result<(), String> {
-        let atlas = Atlas::new(" I", 12)?;
+        let atlas = Atlas::try_new(" I", 12)?;
         let (width, height) = (atlas.width(), atlas.height());
         let glyph = atlas.glyph(1);
         let (mut weight, mut moment) = (0.0_f64, 0.0_f64);
@@ -341,6 +359,37 @@ mod tests {
             (middle - length::float(width) / 2.0).abs() < 0.5,
             "ink centred at {middle}, cell {width} wide"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_bundled_font_is_read() {
+        assert!(FACE.is_ok(), "{:?}", FACE.as_ref().err());
+    }
+
+    /// `Atlas::new` panics on what `try_new` refuses, so a palette that `try_new` builds at every size `ascii` takes (1 to
+    /// 200 px) can never panic: printable ASCII, the block elements and a character the font lacks (the missing-glyph box).
+    #[test]
+    fn the_atlas_of_a_palette_builds_at_every_cell_size_ascii_takes() -> Result<(), String> {
+        let palette: String = (0x20..0x7f)
+            .chain(0x2580..0x25a0)
+            .filter_map(char::from_u32)
+            .chain(['\u{e000}'])
+            .collect();
+        for cell in 1..=200 {
+            let atlas = Atlas::try_new(&palette, cell)?;
+            assert_eq!(atlas.width(), cell);
+        }
+        Ok(())
+    }
+
+    /// Every character the font has a glyph for, at the smallest, a middle and the largest size.
+    #[test]
+    fn every_glyph_of_the_font_is_drawn() -> Result<(), String> {
+        let everything: String = (0x20..0x3000).filter_map(char::from_u32).collect();
+        for cell in [1, 12, 200] {
+            Atlas::try_new(&everything, cell)?;
+        }
         Ok(())
     }
 }
