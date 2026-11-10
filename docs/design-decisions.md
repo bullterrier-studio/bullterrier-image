@@ -551,7 +551,51 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   grain than its neighbour, and a band of rows would scale, centre and seed by the band instead of the canvas. One input
   would give all three: the full canvas size, the band's row offset and the design scale, set by the caller. It reverses the
   rule that the ratio is derived from the working picture, and with position-hashed noise it is what lets the 40 effects that
-  declare the whole picture band. `Options` has `size` and `threads` only. Design it once, with the banded render.
+  declare the whole picture band. `Options` has `size` and `threads` only. Settled below (the frame of reference, B1).
+- **Settled: the frame of reference (banded render, B1).** The design scale (px per design px) comes from the canvas, the
+  working picture's longest side over 480, and is carried in the frame (`Place`); there is no public setter. A public
+  `Options::with_canvas` is a later, additive change when a caller (video, placing a tile on a larger canvas) needs it.
+  `Place { canvas_height, canvas_width, first_row }` is an input an effect declares like `size_ratio`.
+- **Footprints of the 57 whole-picture effects, by reason (audit for B1/B2).** Of the 57 files that name `Footprint::Whole`,
+  56 say it for every parameter set; `edges` says it only for `canny` (sobel and dog already reach). A footprint is about
+  the *input* rows an output row reads: an effect that draws objects or noise from the seed over the canvas and reads no
+  input row beyond its own is `Pixel` once it knows its place. Reasons: **A** position only (own pixel plus canvas
+  position); **B** sequential seeded stream (`Rng`) the rows above cannot be skipped in; **C** per-object (the object list
+  is generated from the seed over the canvas, then drawn); **D** global statistic (quantile, histogram, mean, or noise
+  `standardised` over the picture); **E** whole-picture structure (a warp that reads far, a field over the figure, an
+  iteration, a sort over columns); **F** a bounded neighbourhood with no claim made yet. Each row: effect, reason, footprint
+  it can have after B1/B2, why.
+  - A (B1; `Pixel` unless noted): `vignette` (canvas size and row); `grain` (draw index is the canvas pixel; `Pixel` only
+    while the noise is not clumped, size 0 in design px, else D); `scanlines` (row of the canvas, `offset`); `pixel_grid`
+    (cell phase of row and column); `pattern` (x, y from the origin); `gradient` (canvas size, row); `fractal` (canvas
+    centre and size); `lens_flare` (bump centres from canvas size); `interlace` (row parity); `ntsc` (row parity, column
+    mod 4, row-local smear); `aurora` (`base` x canvas height, row; noise is one row over the width); `torn_edge` (tears
+    are 1-D noise over the canvas width and height); `blend` (the asset placed on the canvas size); `ripple`
+    (`Radius(amplitude)`, sine about the canvas centre; `Whole` for wrap); `chromatic_aberration` (`Radius(amount)`, scale
+    about the canvas centre; `Whole` for wrap); `halftone` (`Radius` of its blur, screen lattice from the origin; unclear:
+    the screen code was not read in full).
+  - B (B2, counter-based draws): `dead_pixels` (a shuffle picks exactly `count` cells: a per-cell chance would change
+    "exactly" to "on average"; unclear, leader's call); `slice_shift` (`Rng` strips and bands over the height; `Pixel`);
+    `vhs` (`Rng` bands and dropouts, a row drift from 1-D noise; `Whole` while `noise` > 0 with `noise_size` > 1, D);
+    `jpeg_crush` (`Rng` hits and DC differences along a row of blocks: E, stays `Whole`).
+  - C (B2, objects generated once per band, count bounded by `limits.rs`; `Pixel` input-wise): `dust_scratches`,
+    `particles`, `light_leak` (patch list), `lens_drops` (`Radius(radius + blur reach + refraction)`).
+  - D (stay `Whole`): `auto_levels`, `dehaze` (airlight, dark channel), `equalize` (tile histograms), `gradient_map`
+    (quantiles), `displace`, `flow_warp`, `flow_lines` (also B), `fog`, `noise_field`, `paper_texture` (the fractal and
+    clumped fields are `standardised` over the picture: a mean and a deviation of everything); `starburst` (`Radius(spikes)`
+    while `limit` is 1, D for the quantile threshold below it), `radial_blur` (also E).
+  - E (stay `Whole`): `droste`, `kaleidoscope`, `lens_distortion`, `perspective`, `polar`, `light_rays`, `pinch_bulge`,
+    `swirl` (reach is a share of the canvas, not a design px value), `tile` (cells average the whole picture), `quadtree`,
+    `dither` (palette and error diffusion), `disperse` (grid ordered over the figure), `shatter` (also B),
+    `reaction_diffusion` (iteration), `reflection`, `rim_light` (distance from the figure).
+  - F (no Place needed, a claim to make): `pixel_sort` (`axis` horizontal: row-local, `Radius(0)`; vertical sorts whole
+    columns: E), `stretch` (horizontal: row-local; vertical reads `from[row]` over the canvas: E), `topographic`
+    (`Radius(smoothing reach + 1)` on its field), `edges` (`canny` hysteresis: `Whole`), `ascii` (cells anchored at the canvas
+    top, `Radius(cell height)`; unclear: the cell height is the atlas's, not a design px value).
+  - Open for the leader: the `standardised` noise fields (D) hold 9 effects `Whole`; an analytic normalisation (the
+    lattice noise has a known deviation) would turn them to A or `Radius` at the price of a visible change; `grain`'s
+    claim depends on the size in *working* px (design size x ratio), which `footprint(&Params)` cannot see, so it is `Pixel`
+    only at size 0.
 - **Open: alpha through effects that move pixels.** `Picture` is RGB by type and only the cut-out after the last step adds
   alpha. A look applied to an already transparent picture (cut out, then sliced, displaced or torn) moves the colour but not the
   alpha. No decision.
