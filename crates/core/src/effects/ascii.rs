@@ -32,10 +32,10 @@ pub struct Params {
     /// Width of one character, 1 to 200 px; the height follows from the font. Smaller = finer detail, more characters.
     #[param(default = 10, unit = px, min = 1, max = 200)]
     pub cell: usize,
-    /// The character palette, in any order, at least two different characters. It is sorted by how much ink each glyph puts
-    /// down, so the densest is used for the brightest areas on dark paper and the darkest on light paper (see `paper`). Try
-    /// ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the Latin letters and the block elements,
-    /// not braille.
+    /// The character palette, in any order: at least two different characters, at most 128 characters long. It is sorted
+    /// by how much ink each glyph puts down, so the densest is used for the brightest areas on dark paper and the darkest
+    /// on light paper (see `paper`). Try ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the
+    /// Latin letters and the block elements, not braille.
     #[param(default = " .:-=+*#%@", min_length = 2, max_length = 128, min_distinct = 2)]
     pub chars: String,
     /// The ink colour of every character ('#rrggbb', '#rgb' or [r, g, b] 0..1); none (the default) colours each character
