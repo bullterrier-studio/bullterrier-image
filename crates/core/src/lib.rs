@@ -53,6 +53,7 @@ mod presets;
 mod recipe;
 mod registry;
 mod run;
+pub mod shipped;
 
 pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error, ErrorKind, MapKind};

@@ -5,6 +5,7 @@ mod files;
 mod lut;
 mod run;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use bullterrier_image::{
@@ -35,7 +36,8 @@ mod _core {
 
     #[pymodule_export]
     use super::{
-        CoreError, apply, check, effect, effects, params, read_recipe, region_presets, register, unregister, vocabulary,
+        CoreError, apply, check, effect, effects, params, read_recipe, region_presets, register, shipped_looks,
+        shipped_presets, unregister, vocabulary,
     };
 
     #[pymodule_export]
@@ -269,6 +271,18 @@ fn region_presets<'py>(py: Python<'py>, kind: &str) -> PyResult<Bound<'py, PyAny
         })
         .collect();
     from_json(py, &Value::Object(presets))
+}
+
+/// The preset files that ship with the core, `{effect: TOML text}`, each text one `[name]` table per preset.
+#[pyfunction]
+fn shipped_presets() -> HashMap<&'static str, &'static str> {
+    bullterrier_image::shipped::presets().iter().copied().collect()
+}
+
+/// The looks that ship with the core, `{name: TOML text of the recipe file}`, in name order.
+#[pyfunction]
+fn shipped_looks() -> Vec<(&'static str, &'static str)> {
+    bullterrier_image::shipped::looks().to_vec()
 }
 
 /// Add the Python function `function(rgb, params, **inputs) -> rgb` to the core's effects as `name`, in `category` (a

@@ -115,14 +115,14 @@ print(json.dumps(sorted({i.status for i in run(load_project(sys.argv[1]))})))
     ("change", "status"),
     [
         pytest.param(
-            lambda package: edit(package / "presets" / "gradient_map.toml", "#8a5a30", "#305a8a"),
+            lambda package: write(package / "added-data.txt", "x"),
             "done",
-            id="an edited preset file is shipped data that shapes the result",
+            id="a file added to what ships changes the result",
         ),
         pytest.param(
-            lambda package: (package / "presets" / "curves.toml").rename(package / "presets" / "curves_renamed.toml"),
+            lambda package: (package / "py.typed").rename(package / "py_typed"),
             "done",
-            id="a data file renamed with identical bytes is another file",
+            id="a file renamed with identical bytes is another file",
         ),
         pytest.param(lambda package: None, "skipped", id="no change: nothing is made again"),
         pytest.param(

@@ -30,6 +30,18 @@ impl Presets {
         Self::default()
     }
 
+    /// The presets that ship with the crate ([`shipped::presets`](crate::shipped::presets)), for every effect that has some.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] if a shipped file breaks a rule of its effect: a defect of the crate, which its tests exclude.
+    pub fn shipped() -> Result<Self, Error> {
+        let mut presets = Self::new();
+        for (effect, text) in crate::shipped::presets() {
+            presets.add_toml(effect, text)?;
+        }
+        Ok(presets)
+    }
+
     /// Add the presets of `effect`, replacing any added for it before. `table` has one table for each preset, named
     /// as the preset is: its `description` (one sentence saying what the look is, not blank) and the effect's
     /// parameters. For an effect the core describes the parameters are checked as a step's would be; for any other,

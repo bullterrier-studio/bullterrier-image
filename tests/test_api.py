@@ -6,7 +6,6 @@ import re
 import subprocess
 import sys
 import tomllib
-from importlib.resources import files
 from pathlib import Path
 from typing import Literal
 
@@ -265,14 +264,17 @@ def test_a_misspelt_parameter_suggests_the_nearest():
         fx.bloom(radiuss=3)
 
 
+DATA = Path(__file__).parent.parent / "crates" / "core" / "data"
+
+
 def _toml(folder: str, name: str) -> dict:
     """A shipped data file, read with tomllib, not through the library."""
-    path = files("bullterrier_image") / folder / f"{name}.toml"
+    path = DATA / folder / f"{name}.toml"
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
 def test_looks_lists_every_shipped_look_by_name_with_its_description():
-    shipped = sorted(path.name.removesuffix(".toml") for path in (files("bullterrier_image") / "looks").iterdir())
+    shipped = sorted(path.stem for path in (DATA / "looks").iterdir())
     listed = bullterrier_image.looks()
     assert sorted(listed) == shipped
     assert listed["glitch"] == _toml("looks", "glitch")["description"]

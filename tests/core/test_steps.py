@@ -6,7 +6,7 @@ import inspect
 import json
 import pickle
 import tomllib
-from importlib.resources import files
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -1021,9 +1021,8 @@ def test_nothing_builds_an_unchecked_value_with_model_construct(cls):
 
 def _shipped(effect: str, preset: str) -> dict:
     """What the shipped file says about a preset, read with tomllib, not through the library, without its text."""
-    table = tomllib.loads((files("bullterrier_image") / "presets" / f"{effect}.toml").read_text(encoding="utf-8"))[
-        preset
-    ]
+    file = Path(__file__).parents[2] / "crates" / "core" / "data" / "presets" / f"{effect}.toml"
+    table = tomllib.loads(file.read_text(encoding="utf-8"))[preset]
     return {key: value for key, value in table.items() if key != "description"}
 
 

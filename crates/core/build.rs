@@ -1,5 +1,6 @@
-//! Writes the effect list the core compiles in: one module per file in `src/effects/`, and the function that makes every
-//! effect. Adding an effect adds its file and edits nothing else.
+//! Writes what the core compiles in: the effect list (one module per file in `src/effects/`, and the function that makes
+//! every effect; adding an effect adds its file and edits nothing else) and the text of the presets and looks that ship
+//! with it (`data/presets/*.toml`, `data/looks/*.toml`).
 
 use std::fmt::{self, Write as _};
 use std::path::{Path, PathBuf};
@@ -12,7 +13,38 @@ fn main() -> io::Result<()> {
     let folder = Path::new(&manifest).join("src").join("effects");
     println!("cargo::rerun-if-changed={}", folder.display());
     let code = table(&effect_files(&folder)?).map_err(io::Error::other)?;
-    fs::write(PathBuf::from(out).join("effects.rs"), code)
+    fs::write(PathBuf::from(&out).join("effects.rs"), code)?;
+    let mut shipped = String::new();
+    for (name, kind) in [("presets", "PRESETS"), ("looks", "LOOKS")] {
+        let data = Path::new(&manifest).join("data").join(name);
+        println!("cargo::rerun-if-changed={}", data.display());
+        writeln!(shipped, "pub(crate) const {kind}: &[(&str, &str)] = &[").map_err(io::Error::other)?;
+        for (stem, path) in toml_files(&data)? {
+            writeln!(
+                shipped,
+                "    ({stem:?}, include_str!({:?})),",
+                path.display().to_string()
+            )
+            .map_err(io::Error::other)?;
+        }
+        writeln!(shipped, "];").map_err(io::Error::other)?;
+    }
+    fs::write(PathBuf::from(out).join("shipped.rs"), shipped)
+}
+
+/// The `.toml` files in `folder` as `(name without the extension, path)`, sorted by name.
+fn toml_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(folder)? {
+        let path = entry?.path();
+        if path.extension().is_some_and(|extension| extension == "toml")
+            && let Some(name) = path.file_stem().and_then(|stem| stem.to_str())
+        {
+            files.push((name.to_owned(), path.clone()));
+        }
+    }
+    files.sort();
+    Ok(files)
 }
 
 /// The effect files in `folder` (each `<name>.rs`), sorted by name; none if the folder does not exist.

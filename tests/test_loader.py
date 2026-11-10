@@ -773,16 +773,17 @@ def test_a_step_naming_something_that_is_no_effect_says_where_the_name_lives(tmp
 # --- built-in looks, loaded by name ------------------------------------------------------------------------------
 
 
-def test_a_look_loads_by_name_as_its_file_does():
-    shipped = looks.read()["crt"]
-    assert load_recipe("crt") == load_recipe(shipped.file)
+def test_a_look_loads_by_name_as_its_file_does(tmp_path):
+    (tmp_path / "crt.toml").write_text(looks.read()["crt"].text, encoding="utf-8")
+    assert load_recipe("crt") == load_recipe(tmp_path / "crt.toml")
     assert load_recipe("crt").name == "crt"
 
 
 def test_a_str_that_is_a_look_name_is_the_look_even_beside_a_file_of_that_name(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "crt").write_text(STEP, encoding="utf-8")
-    assert load_recipe("crt") == load_recipe(looks.read()["crt"].file)
+    (tmp_path / "crt.toml").write_text(looks.read()["crt"].text, encoding="utf-8")
+    assert load_recipe("crt") == load_recipe(tmp_path / "crt.toml")
     assert len(load_recipe("./crt").steps) == 1  # the file, spelt as a path
 
 

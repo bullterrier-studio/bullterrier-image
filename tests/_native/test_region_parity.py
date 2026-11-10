@@ -22,7 +22,7 @@ from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, Subje
 from bullterrier_image.loader import load_recipe
 
 ROOT = Path(__file__).resolve().parents[2]
-SHIPPED = sorted((ROOT / "src" / "bullterrier_image" / "looks").glob("*.toml"))
+SHIPPED = sorted((ROOT / "crates" / "core" / "data" / "looks").glob("*.toml"))
 EXAMPLES = sorted(path for path in (ROOT / "examples").rglob("*.toml") if path.name != "bt-image.toml")
 FILES = [*SHIPPED, *EXAMPLES]
 

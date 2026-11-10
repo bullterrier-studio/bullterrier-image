@@ -71,8 +71,7 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   finding/                 subject_matte(rgb) -> alpha, depth_map(rgb) -> depth, inverse_depth(rgb) (before per-photo
                            scaling). Which model finds them (IS-Net, Depth Anything V2 on ONNX Runtime; or Apple Vision
                            for subject, when asked) is hidden here
-  presets/                 named parameter sets of built-in effects, one TOML per effect (data, not code)
-  looks/                   built-in multi-step recipes, one TOML each, loaded by name (`load_recipe("crt")`; data, not code)
+  (presets/ and looks/     moved to crates/core/data/ and compiled into the core: data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies
   plugin.py                effect-author API, also for other packages (EffectParams, param, Color, Picture, effect)

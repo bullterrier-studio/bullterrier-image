@@ -16,7 +16,6 @@ import pytest
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's models
 from bullterrier_image.core import regions, registry
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.presets import SHIPPED as SHIPPED_PRESETS
 from bullterrier_image.core.registry import CATEGORIES, INPUTS, STEP_KEYS
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.core.values import BlendMode, Lut
@@ -255,7 +254,7 @@ def test_the_core_and_python_accept_and_refuse_the_same_parameters_and_make_the_
 
 # --- files: read_recipe against load_recipe -----------------------------------------------------------------------
 
-SHIPPED = sorted((ROOT / "src" / "bullterrier_image" / "looks").glob("*.toml"))
+SHIPPED = sorted((ROOT / "crates" / "core" / "data" / "looks").glob("*.toml"))
 EXAMPLES = sorted(path for path in (ROOT / "examples").rglob("*.toml") if path.name != "bt-image.toml")
 FILES = [pytest.param(path, id=str(path.relative_to(ROOT))) for path in [*SHIPPED, *EXAMPLES]]
 
@@ -850,5 +849,6 @@ def test_the_core_and_python_accept_and_refuse_the_same_references(tmp_path, wha
 
 @pytest.mark.parametrize("path", FILES)
 def test_the_core_accepts_every_shipped_look_and_example_as_python_does(path):
-    presets = {file.stem: file.read_text(encoding="utf-8") for file in SHIPPED_PRESETS.glob("*.toml")}
+    shipped = ROOT / "crates" / "core" / "data" / "presets"
+    presets = {file.stem: file.read_text(encoding="utf-8") for file in shipped.glob("*.toml")}
     assert core_accepts_file(path.read_text(encoding="utf-8"), presets)

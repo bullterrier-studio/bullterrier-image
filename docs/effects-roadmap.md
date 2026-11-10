@@ -8,7 +8,7 @@ Only looks that read as made, not as a one-click photo filter, are proposed. Cut
 watercolor, woodcut, pop art, film emulation, pixel and brick novelties, novelty text looks and reveal wipes.
 
 Looks that are one effect with a set of values ship as presets of that effect (`fx.gradient_map(preset="sepia")`, data in
-`src/bullterrier_image/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
+`crates/core/data/presets/`) rather than as separate code; looks that combine several effects (VHS, Polaroid, pop art) are
 recipes. A new look first extends an existing effect when every one of its parameters still matters for every look;
 it becomes a new effect only when it is a new idea. The effect set is consolidated: a name that is no longer an effect is a preset, a look or a parameter of the effect that took it over (`bt-image effects NAME` finds it).
 
@@ -73,7 +73,7 @@ it becomes a new effect only when it is a new idea. The effect set is consolidat
 | `pixel_grid` ✓ | LCD sub-pixel grid; `keep_brightness` for a shadow mask that does not dim. | `fx.pixel_grid(cell=4)` |
 | `dust_scratches` ✓ | Specks, hairs and scratches. | `fx.dust_scratches(density=0.3, seed=1)` |
 | `paper_texture` ✓ | Procedural paper, canvas or linen surface. | `fx.paper_texture(kind="canvas", amount=0.3)` |
-| `crt` ✓ (a look, [crt.toml](../src/bullterrier_image/looks/crt.toml)) | Bulged glass in a bezel, bloom, soft scanlines, shadow mask, vignette. | `lens_distortion` (`fit` centre, `border`), `bloom`, `scanlines` (`softness` 1), `pixel_grid` (`gap` 0, `keep_brightness`), `vignette` |
+| `crt` ✓ (a look, [crt.toml](../crates/core/data/looks/crt.toml)) | Bulged glass in a bezel, bloom, soft scanlines, shadow mask, vignette. | `lens_distortion` (`fit` centre, `border`), `bloom`, `scanlines` (`softness` 1), `pixel_grid` (`gap` 0, `keep_brightness`), `vignette` |
 | `vhs` ✓ | Tracking bands, dropouts, chroma bleed, tape noise, wobble; preset `signal_noise` (analog static, white dropouts). | `fx.vhs(tracking=0.06, bleed=5)` |
 | `ntsc` ✓ | Chroma smear and dot crawl. | `fx.ntsc(sigma=4)` |
 | `torn_edge` ✓ | Ragged paper edge. | `fx.torn_edge(roughness=0.6, seed=2)` |
@@ -95,8 +95,8 @@ belong to a layout package, not here.
 | line and CMYK screens ✓ (on `halftone`) | `shape` = dot or line (lines whose width carries tone); `separation` = none, cmyk (four process inks at the classic screen angles) or spot (up to four `inks`, unmixed from the photo); `offset` and `offset_angle` misregister the inks. Replaces `line_halftone` and `cmyk_halftone`. | `fx.halftone(shape="line", cell=8, angle=30)`, `fx.halftone(separation="cmyk", paper="#ffffff", angle=0, cell=9, offset=1.5)`, `fx.halftone(separation="spot", inks=["#ff4d6d", "#2b59ff"], paper="#f4efe4")` |
 | `engraving` | Banknote-style flowing lines. | `fx.engraving(spacing=5)` |
 | `stipple` | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
-| `voronoi_mosaic` ✓ (the look `stained-glass`: `shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Look](../src/bullterrier_image/looks/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
-| `low_poly` ✓ (the look `low-poly`: `shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Look](../src/bullterrier_image/looks/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
+| `voronoi_mosaic` ✓ (the look `stained-glass`: `shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Look](../crates/core/data/looks/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
+| `low_poly` ✓ (the look `low-poly`: `shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Look](../crates/core/data/looks/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
 | `risograph` ✓ ([recipe](../examples/recipes/risograph.toml)) | Spot-colour layers, misregistration, grain: `halftone` with spot inks, each offset, then paper texture and `grain`. | `fx.halftone(separation="spot", inks=["#ff4d6d","#2b59ff"], paper="#f4efe4", offset=2.5)` |
 
 ## Computational and experimental
@@ -174,7 +174,7 @@ of the picture, so a look does not depend on the resolution. `Framing.documentat
 | `interlace` ✓ | Even/odd line offset and combing. | `fx.interlace(offset=6)` |
 | `echo` ✓ | Offset translucent copies. | `fx.echo(copies=4, dx=14, fade=0.5)` |
 | `dead_pixels` ✓ | Stuck and dead LCD pixels. | `fx.dead_pixels(count=120, seed=1)` |
-| `hologram` ✓ (a look, [hologram.toml](../src/bullterrier_image/looks/hologram.toml)) | Cyan light, edge glow, scanlines, flicker. | `grade`, `gradient` fill (multiply), `edges` (screen), `scanlines` twice (`softness` 1) |
+| `hologram` ✓ (a look, [hologram.toml](../crates/core/data/looks/hologram.toml)) | Cyan light, edge glow, scanlines, flicker. | `grade`, `gradient` fill (multiply), `edges` (screen), `scanlines` twice (`softness` 1) |
 
 ## Atmosphere
 
@@ -229,7 +229,7 @@ Use the subject cut-out, so they target the subject or the background.
 | `sticker` ✓ | White border and shadow: a die-cut sticker. A recipe: `outline` then `drop_shadow` (examples/recipes/sticker.toml). | `outline(width=14) + drop_shadow` |
 | `silhouette` ✓ | Flat colour subject. A recipe: `gradient` with one colour masked to the subject, then to the background. | `gradient(colors=["#000"]) mask = "subject"` |
 | `color_pop` ✓ | Subject in colour, background in grey. A recipe: `channel_mixer(preset="black_and_white")` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `channel_mixer preset = "black_and_white", mask = "background"` |
-| `spotlight` ✓ | Light the subject, darken the rest. A recipe: `vignette` with `mask = "background"` (src/bullterrier_image/looks/spotlight.toml). | `vignette mask = "background"` |
+| `spotlight` ✓ | Light the subject, darken the rest. A recipe: `vignette` with `mask = "background"` (crates/core/data/looks/spotlight.toml). | `vignette mask = "background"` |
 | `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
 | `subject` selection | Pick `largest`, `all` or the n-th subject when there are several. | `subject="largest"` on any masked step |
 | decisions layer (future) | Optional, bring-your-own-key: a vision model you configure decides which subjects to select (the person, not the dog), off by default and never needed. | `subject="the person on the left"` with your own API key |
@@ -257,7 +257,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `gradient` ✓ | Linear, radial, conic or mesh gradient; one colour is a flat fill (preset `fill`). | `fx.gradient(colors=["#12002b","#ff2bd6"], kind="radial")` |
 | `noise_field` ✓ | Value, Perlin, Worley or sine noise as colour, with a domain `warp`; preset `plasma`. | `fx.noise_field(kind="perlin", scale=200, seed=1)` |
 | `pattern` ✓ | Stripes, checks, dots, grid. | `fx.pattern(kind="grid", cell=40)` |
-| `voronoi_cells` ✓ (the look `voronoi-cells`: `noise_field`, then `shatter` with `fill`) | Flat Voronoi cells in a colour ramp, leaded. [Look](../src/bullterrier_image/looks/voronoi-cells.toml). | `fx.shatter(pieces=200, offset=0, angle=0, fill=1, gap=1.5)` over `fx.noise_field(kind="value", scale=50, octaves=3)` |
+| `voronoi_cells` ✓ (the look `voronoi-cells`: `noise_field`, then `shatter` with `fill`) | Flat Voronoi cells in a colour ramp, leaded. [Look](../crates/core/data/looks/voronoi-cells.toml). | `fx.shatter(pieces=200, offset=0, angle=0, fill=1, gap=1.5)` over `fx.noise_field(kind="value", scale=50, octaves=3)` |
 | `topographic` ✓ | Contour lines of luminance, depth or any field. | `fx.topographic(levels=14)` |
 | `flow_lines` ✓ | Streamlines through a noise flow field. | `fx.flow_lines(density=0.004, seed=1)` |
 | `aurora` ✓ | Soft vertical light curtains. | `fx.aurora(colors=["#2bff9a","#7a2cff"])` |

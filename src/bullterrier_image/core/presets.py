@@ -1,4 +1,4 @@
-"""Presets: named parameter sets for one effect, shipped in `presets/<name>.toml`.
+"""Presets: named parameter sets for one effect, shipped in the core (`crates/core/data/presets/<name>.toml`).
 
     [sepia]                                  # one table per preset, named as the preset is
     description = "Warm brown monochrome."   # required, one sentence
@@ -7,9 +7,9 @@
 `read` returns the presets of an effect by name, each checked by its own parameter model exactly as a
 recipe's step is (a misspelt or out-of-range key, or `subject`, which a recipe supplies itself, is a `RecipeError`
 naming the preset). A file is read and checked once, the first time it is asked for. Without a file there are no
-presets. The folder is a parameter only so that a test can read a throwaway one.
+presets. The folder is a parameter only so that a test can read a throwaway one; none reads the files the core ships.
 
-Dependency direction: imports `params` and `errors` only; the registry and `steps` build on it.
+Dependency direction: imports `params`, `native` and `errors` only; the registry and `steps` build on it.
 """
 
 import tomllib
@@ -19,9 +19,8 @@ from typing import Any, NamedTuple
 
 from bullterrier_image.errors import RecipeError
 
+from . import native
 from .params import EffectParams
-
-SHIPPED = Path(__file__).parent.parent / "presets"
 
 
 class Preset(NamedTuple):
@@ -32,14 +31,18 @@ class Preset(NamedTuple):
 
 
 @cache
-def read(name: str, model: type[EffectParams], folder: Path = SHIPPED) -> dict[str, Preset]:
+def read(name: str, model: type[EffectParams], folder: Path | None = None) -> dict[str, Preset]:
     """The presets of the effect called `name` (its parameter model is `model`) by name, in file order;
     empty when it has none. RecipeError when a preset lacks its `description` or `model` refuses its parameters."""
-    file = folder / f"{name}.toml"
-    if not file.is_file():
+    if folder is None:
+        text = native.shipped_presets().get(name)
+    else:
+        file = folder / f"{name}.toml"
+        text = file.read_text(encoding="utf-8") if file.is_file() else None
+    if text is None:
         return {}
     presets = {}
-    for preset, table in tomllib.loads(file.read_text(encoding="utf-8")).items():
+    for preset, table in tomllib.loads(text).items():
         owner = f"preset {preset!r} of {name!r}"
         params = dict(table)
         description = params.pop("description", "")

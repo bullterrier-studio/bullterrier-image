@@ -221,11 +221,15 @@ def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[
     return arrays_as_values(model, resolved)
 
 
-def _read(path: Path) -> dict:
-    """The file's top-level table, checked: UTF-8 TOML, a format this release reads, and only the known keys."""
+def _read(path: Path, text: str | None = None) -> dict:
+    """The file's top-level table (`text` is what a built-in look's file holds), checked: UTF-8 TOML, a format this
+    release reads, and only the known keys."""
     try:
-        with path.open("rb") as f:
-            raw = tomllib.load(f)
+        if text is None:
+            with path.open("rb") as f:
+                raw = tomllib.load(f)
+        else:
+            raw = tomllib.loads(text)
     except tomllib.TOMLDecodeError as error:  # its message keeps the line and column
         raise RecipeError(f"{path.name}: {error}") from None
     except UnicodeDecodeError as error:
@@ -254,14 +258,16 @@ def load_recipe(path: str | Path) -> Recipe:
     the file's name, then the step and the offending key; OSError (FileNotFoundError...) if the file cannot be opened.
     """
     shipped = looks.read()
+    text = None
     if isinstance(path, str) and path in shipped:
-        path = shipped[path].file
+        text = shipped[path].text
+        path = f"{path}.toml"
     elif isinstance(path, str) and not Path(path).exists():
         near = ", ".join(f'load_recipe("{look}")' for look in difflib.get_close_matches(path, list(shipped), n=3))
         hint = f"did you mean {near}? " if near else ""
         raise RecipeError(f"no look or file {path!r}: {hint}the looks: {', '.join(shipped)}")
     path = Path(path)
-    raw = _read(path)
+    raw = _read(path, text)
     table = raw.get("frame", {})
     if not isinstance(table, dict):
         raise RecipeError(

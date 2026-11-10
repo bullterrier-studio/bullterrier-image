@@ -85,7 +85,7 @@ Those rules apply here. What follows is image's own, or where it needs a rule di
 1. **Effects never import other effects.** Shared logic goes to `ops/` (default "One concept, one module": `warp`, `noise`,
    `edges`, `colorspace`...). An `ops` module arrives with its first consumer (`vulture` fails on unused code). `ops` is
    internal.
-2. **Presets and looks are data**: a preset is a named parameter set of one effect, `src/bullterrier_image/presets/<effect>.toml`; a look is a multi-step recipe with a `description`, `src/bullterrier_image/looks/<name>.toml`, loaded by name (`load_recipe("crt")`).
+2. **Presets and looks are data**: a preset is a named parameter set of one effect, `crates/core/data/presets/<effect>.toml`; a look is a multi-step recipe with a `description`, `crates/core/data/looks/<name>.toml`, loaded by name (`load_recipe("crt")`).
 3. **Params are declared once**: in Rust for an effect the core runs, else as a Pydantic model; either way the Pydantic
    model drives validation, defaults, generated docs (`help(fx.<effect>)`, `bt-image effects`, `docs/effects/`,
    `fx.pyi`), `fx` signatures and the JSON schema. See "Parameters".
