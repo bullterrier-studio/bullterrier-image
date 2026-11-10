@@ -239,7 +239,11 @@ fn problems(one: &dyn Effect) -> Result<Vec<String>, Box<dyn Error>> {
             HEIGHT,
             WIDTH,
             (0..HEIGHT * WIDTH)
-                .map(|at| f32::from(u8::from(rows.contains(&(at / WIDTH)) && (4..20).contains(&(at % WIDTH)))))
+                .map(|at| {
+                    f32::from(u8::from(
+                        rows.contains(&(at / WIDTH)) && (4..20).contains(&(at % WIDTH)),
+                    ))
+                })
                 .collect(),
         )
     };

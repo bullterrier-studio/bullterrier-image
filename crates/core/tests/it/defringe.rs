@@ -19,7 +19,8 @@ fn inside(row: usize, column: usize) -> bool {
 }
 
 fn ring(row: usize, column: usize) -> bool {
-    inside(row, column) && !(inside(row - 1, column) && inside(row + 1, column) && inside(row, column - 1) && inside(row, column + 1))
+    inside(row, column)
+        && !(inside(row - 1, column) && inside(row + 1, column) && inside(row, column - 1) && inside(row, column + 1))
 }
 
 fn field() -> Vec<f32> {
@@ -72,7 +73,10 @@ fn the_ring_takes_the_interior_colour_by_depth_and_nothing_else_changes() -> Res
             } else {
                 *was // the backdrop, and the interior, which is at least 2 deep (and its own colour at any depth)
             };
-            assert!(near(*got, wanted), "width {width} amount {amount}, pixel ({row}, {column}): {got:?}");
+            assert!(
+                near(*got, wanted),
+                "width {width} amount {amount}, pixel ({row}, {column}): {got:?}"
+            );
         }
     }
     Ok(())

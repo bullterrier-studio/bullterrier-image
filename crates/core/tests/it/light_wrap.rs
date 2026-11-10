@@ -34,7 +34,13 @@ fn field() -> Vec<f32> {
 
 fn photo(backdrop: [f32; 3]) -> Vec<[f32; 3]> {
     (0..SIZE * SIZE)
-        .map(|at| if inside(at / SIZE, at % SIZE) { SUBJECT_COLOUR } else { backdrop })
+        .map(|at| {
+            if inside(at / SIZE, at % SIZE) {
+                SUBJECT_COLOUR
+            } else {
+                backdrop
+            }
+        })
         .collect()
 }
 
@@ -74,7 +80,10 @@ fn the_backdrop_colour_is_screened_over_the_edge_by_depth_and_nothing_else_chang
             if d == 0 || d as f32 >= width {
                 assert_eq!(got, &wanted, "width {width} amount {amount}, pixel ({row}, {column})");
             } else {
-                assert!(near(*got, wanted), "width {width} amount {amount}, pixel ({row}, {column}): {got:?}");
+                assert!(
+                    near(*got, wanted),
+                    "width {width} amount {amount}, pixel ({row}, {column}): {got:?}"
+                );
             }
         }
     }
@@ -87,7 +96,10 @@ fn a_black_backdrop_adds_no_light_and_the_subject_never_darkens() -> Result<(), 
     assert_eq!(run(&params(4.0, 1.0), &field(), &black)?, black);
     let bright = photo([1.0, 0.9, 0.2]);
     for (after, before) in run(&params(6.0, 1.0), &field(), &bright)?.iter().zip(&bright) {
-        assert!((0..3).all(|c| after[c] >= before[c] && after[c] <= 1.0), "{after:?} from {before:?}");
+        assert!(
+            (0..3).all(|c| after[c] >= before[c] && after[c] <= 1.0),
+            "{after:?} from {before:?}"
+        );
     }
     Ok(())
 }
@@ -119,11 +131,17 @@ fn the_light_is_only_the_backdrops_not_the_subjects_and_blur_softens_its_detail(
         })
         .collect();
     let pixel_at = |blur: f32| -> Result<[f32; 3], Error> {
-        let p = light_wrap::Params { blur, ..params(4.0, 1.0) };
+        let p = light_wrap::Params {
+            blur,
+            ..params(4.0, 1.0)
+        };
         Ok(run(&p, &field(), &split)?[7 * SIZE + 3]) // the middle of the left edge
     };
     let (sharp, soft) = (pixel_at(1.0)?, pixel_at(8.0)?);
     assert!(sharp[2] - SUBJECT_COLOUR[2] < 1e-3, "blue on the red side: {sharp:?}");
-    assert!(soft[2] - SUBJECT_COLOUR[2] > 0.05, "no blue mixed in by a wide blur: {soft:?}");
+    assert!(
+        soft[2] - SUBJECT_COLOUR[2] > 0.05,
+        "no blue mixed in by a wide blur: {soft:?}"
+    );
     Ok(())
 }
