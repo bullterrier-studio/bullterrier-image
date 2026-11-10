@@ -10,7 +10,7 @@ impl Table {
     ///
     /// The result has every parameter, in normal form: a parameter not given has its declared default; a decimal is a
     /// float even when given as a whole number; a colour is three numbers 0..1 (given as `'#rrggbb'`, `'#rgb'` in
-    /// either case, spaces around allowed, or three numbers); a lookup table is a non-empty string (a name or a path) or `null`; a picture is a non-empty string (a name or a path) and, as it is `nullable`, `null`; a field is a non-empty string; a `nullable` parameter also takes `null`; a list of colours is a list of those, between its
+    /// either case, spaces around allowed, or three numbers); a text is a string within its `min_length` .. `max_length` characters with at least `min_distinct` different ones; a lookup table is a non-empty string (a name or a path) or `null`; a picture is a non-empty string (a name or a path) and, as it is `nullable`, `null`; a field is a non-empty string; a `nullable` parameter also takes `null`; a list of colours is a list of those, between its
     /// `min_length` and `max_length` long (the spellings may be mixed; the first element that is no colour is named by
     /// its place, counting from 0). Rules: a name the effect does not declare is refused,
     /// listing the declared ones; a decimal takes any number but not a switch or text; a whole number takes only a
@@ -124,6 +124,7 @@ impl Field {
                 .ok_or(Constraint::OneOf(self.choices)),
             Kind::Color => colour(value).map(Value::from).ok_or(Constraint::Colour),
             Kind::Colors => self.colours(value),
+            Kind::Text => self.text(value),
             Kind::Field => match value {
                 Value::String(name) if !name.is_empty() => Ok(value.clone()),
                 _ => Err(Constraint::FieldName),
@@ -138,6 +139,29 @@ impl Field {
                 _ => Err(Constraint::PictureName),
             },
         }
+    }
+
+    /// `value` as text within the field's rules, or the first it breaks: not a string, too few or too many characters
+    /// (counting characters, not bytes), too few different ones.
+    fn text(&self, value: &Value) -> Result<Value, Constraint> {
+        let text = value.as_str().ok_or(Constraint::Text)?;
+        let length = text.chars().count();
+        if let Some(least) = self.min_length
+            && length < least
+        {
+            return Err(Constraint::TooShort(least));
+        }
+        if let Some(most) = self.max_length
+            && length > most
+        {
+            return Err(Constraint::TooLong(most));
+        }
+        if let Some(least) = self.min_distinct
+            && text.chars().collect::<std::collections::BTreeSet<_>>().len() < least
+        {
+            return Err(Constraint::TooFewDistinct(least));
+        }
+        Ok(value.clone())
     }
 
     /// `value` as a list of colours, each in normal form, or the first rule it breaks: not a list, too few or too many

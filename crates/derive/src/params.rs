@@ -12,6 +12,7 @@ use syn::{
 use crate::snake_case;
 
 mod colors;
+mod text;
 
 /// The turn a cyclic field spans, in degrees.
 const TURN: f64 = 360.0;
@@ -131,6 +132,7 @@ struct Settings {
     max: Option<Expr>,
     min_length: Option<Expr>,
     max_length: Option<Expr>,
+    min_distinct: Option<Expr>,
     at_most: Option<Ident>,
     drivable: bool,
     advanced: bool,
@@ -184,7 +186,7 @@ enum Written {
 }
 
 /// How the derive reads a field's type: it recognises `f32`, `i32`, `u32`, `bool`, `Color`, `Option<Color>`, `Vec<Color>`,
-/// `FieldName`, `LutName` and `PictureName` by their written names (a type alias is not recognised) and takes any other type for a
+/// `String`, `FieldName`, `LutName` and `PictureName` by their written names (a type alias is not recognised) and takes any other type for a
 /// choice enum, whose names come from its `Choice` impl.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Shape {
@@ -195,6 +197,7 @@ enum Shape {
     Colour,
     OptionalColour,
     Colours,
+    Text,
     Field,
     Lut,
     Picture,
@@ -212,6 +215,7 @@ fn shape(ty: &Type) -> Shape {
         "u32" => Shape::Unsigned,
         "bool" => Shape::Switch,
         "Color" => Shape::Colour,
+        "String" => Shape::Text,
         "LutName" => Shape::Lut,
         "PictureName" => Shape::Picture,
         "FieldName" => Shape::Field,
@@ -260,10 +264,15 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     })?;
     let settings = settings(field, name)?;
     let ty = &field.ty;
-    if shape(ty) != Shape::Colours && (settings.min_length.is_some() || settings.max_length.is_some()) {
+    if !matches!(shape(ty), Shape::Colours | Shape::Text)
+        && (settings.min_length.is_some() || settings.max_length.is_some())
+    {
         return Err(broken(
-            "only a list of colours (Vec<Color>) takes min_length and max_length",
+            "only a list of colours (Vec<Color>) or a text (String) takes min_length and max_length",
         ));
+    }
+    if shape(ty) != Shape::Text && settings.min_distinct.is_some() {
+        return Err(broken("only a text (String) takes min_distinct"));
     }
     let parts = if shape(ty) == Shape::Lut {
         let value = quote!(crate::params::LutName::default());
@@ -289,6 +298,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
         })?;
         match shape(ty) {
             Shape::Float | Shape::Int | Shape::Unsigned => number_parts(&settings, &written, shape(ty), &broken)?,
+            Shape::Text => text::parts(&settings, &written, &broken)?,
             other => other_parts(&settings, &written, other, ty, &broken)?,
         }
     };
@@ -305,6 +315,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
     } = parts;
     let (label, cyclic, drivable, advanced) = (name.to_string(), settings.cyclic, settings.drivable, settings.advanced);
     let nullable = matches!(shape(ty), Shape::OptionalColour | Shape::Picture);
+    let min_distinct = text::distinct(&settings, &broken)?;
     let number = number_of(&settings, ty, &broken)?;
     let at_most = number.as_ref().and_then(|number| number.at_most.as_ref()).map_or_else(
         || quote!(::core::option::Option::None),
@@ -326,6 +337,7 @@ fn declare(field: &Field) -> syn::Result<Declared> {
             choices: #choices,
             min_length: #min_length,
             max_length: #max_length,
+            min_distinct: #min_distinct,
             at_most: #at_most,
             nullable: #nullable,
             drivable: #drivable,
@@ -377,6 +389,7 @@ fn value_as_json(shape: Shape, name: &Ident) -> TokenStream {
         Shape::OptionalColour => quote!(self.#name.map_or(::serde_json::Value::Null, |colour| {
             ::serde_json::Value::Array(colour.0.iter().copied().map(crate::params::decimal).collect())
         })),
+        Shape::Text => quote!(::serde_json::Value::from(self.#name.clone())),
         Shape::Field => quote!(::serde_json::Value::from(self.#name.0.clone())),
         Shape::Lut | Shape::Picture => quote!(self.#name.json()),
         Shape::Choice => quote!(::serde_json::Value::from(crate::params::Choice::name(&self.#name))),
@@ -399,7 +412,7 @@ fn other_parts(
         if shape == Shape::Choice {
             let ty = ty.to_token_stream().to_string().replace(' ', "");
             broken(&format!(
-                "`{ty}` is not f32, i32, u32, bool, Color, Option<Color>, Vec<Color>, FieldName, LutName or PictureName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
+                "`{ty}` is not f32, i32, u32, bool, Color, Option<Color>, Vec<Color>, String, FieldName, LutName or PictureName, so it is taken for a `#[derive(Choice)]` enum, and {problem} \
                  (a number is f32, i32 or u32)"
             ))
         } else {
@@ -607,13 +620,14 @@ fn settings(field: &Field, name: &Ident) -> syn::Result<Settings> {
             "max" => settings.max = Some(meta.value()?.parse()?),
             "min_length" => settings.min_length = Some(meta.value()?.parse()?),
             "max_length" => settings.max_length = Some(meta.value()?.parse()?),
+            "min_distinct" => settings.min_distinct = Some(meta.value()?.parse()?),
             "at_most" => settings.at_most = Some(meta.value()?.parse()?),
             "drivable" => settings.drivable = true,
             "advanced" => settings.advanced = true,
             "cyclic" => settings.cyclic = true,
             _ => {
                 return Err(meta.error(format!(
-                    "parameter `{name}`: `{key}` is not a setting; they are default, unit, min, max, min_length, max_length, at_most, drivable, advanced, cyclic"
+                    "parameter `{name}`: `{key}` is not a setting; they are default, unit, min, max, min_length, max_length, min_distinct, at_most, drivable, advanced, cyclic"
                 )));
             }
         }

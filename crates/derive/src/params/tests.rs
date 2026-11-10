@@ -54,6 +54,9 @@ fn a_complete_declaration_is_accepted_for_every_kind_of_field() {
         // a floor and a ceiling are inclusive: a default may sit on either, a trailing comma is fine
         documented! { #[param(default = ["#000000", "#ffffff",], min_length = 1, max_length = 2)] stops: Vec<Color>, },
         documented! { #[param(default = ["#000000"], min_length = 1, max_length = 1, advanced)] stops: Vec<Color>, },
+        documented! { #[param(default = " .:-")] chars: String, },
+        // the rules are inclusive and a length counts characters, not bytes
+        documented! { #[param(default = "░▒", min_length = 2, max_length = 2, min_distinct = 2, advanced)] chars: String, },
         documented! { #[param()] file: LutName, },
         documented! { #[param(advanced)] file: LutName, },
         documented! { #[param()] image: PictureName, },
@@ -287,6 +290,67 @@ fn a_switch_colour_or_choice_with_a_setting_or_default_of_another_kind_is_refuse
             "a colour whose digits are not all hex",
             documented! { #[param(default = "#+f+f+f")] tint: Color, },
             &["tint", "#rrggbb"],
+        ),
+    ]);
+}
+
+#[test]
+fn a_text_that_breaks_its_rules_is_refused_naming_the_field() {
+    assert_refused(&[
+        (
+            "no default",
+            documented! { #[param(min_length = 1)] chars: String, },
+            &["chars", "default"],
+        ),
+        (
+            "a default that is no text",
+            documented! { #[param(default = 4)] chars: String, },
+            &["chars", "text"],
+        ),
+        (
+            "a min_length that is no whole number",
+            documented! { #[param(default = "ab", min_length = 1.5)] chars: String, },
+            &["chars", "min_length", "whole"],
+        ),
+        (
+            "min_length above max_length",
+            documented! { #[param(default = "ab", min_length = 3, max_length = 2)] chars: String, },
+            &["chars", "min_length", "max_length"],
+        ),
+        (
+            "a default shorter than min_length",
+            documented! { #[param(default = "a", min_length = 2)] chars: String, },
+            &["chars", "default", "min_length"],
+        ),
+        (
+            "a default longer than max_length, counted in characters",
+            documented! { #[param(default = "░▒▓", max_length = 2)] chars: String, },
+            &["chars", "default", "max_length"],
+        ),
+        (
+            "a default with fewer different characters than min_distinct",
+            documented! { #[param(default = "aaa", min_distinct = 2)] chars: String, },
+            &["chars", "default", "min_distinct"],
+        ),
+        (
+            "min_distinct that is no whole number",
+            documented! { #[param(default = "ab", min_distinct = "two")] chars: String, },
+            &["chars", "min_distinct", "whole"],
+        ),
+        (
+            "a unit on a text",
+            documented! { #[param(default = "ab", unit = px)] chars: String, },
+            &["chars", "unit"],
+        ),
+        (
+            "min_distinct on a list of colours",
+            documented! { #[param(default = ["#000000"], min_length = 1, min_distinct = 1)] stops: Vec<Color>, },
+            &["stops", "min_distinct", "text"],
+        ),
+        (
+            "min_distinct on a number",
+            documented! { #[param(default = 4.0, unit = px, min = 0, max = 32, min_distinct = 1)] cell: f32, },
+            &["cell", "min_distinct", "text"],
         ),
     ]);
 }

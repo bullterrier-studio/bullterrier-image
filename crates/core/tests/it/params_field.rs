@@ -20,6 +20,7 @@ fn table() -> Table {
         choices: &[],
         min_length: None,
         max_length: None,
+        min_distinct: None,
         at_most: None,
         nullable: false,
         drivable: false,

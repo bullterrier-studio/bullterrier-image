@@ -22,6 +22,7 @@ fn height(name: &'static str, default: i64, at_most: Option<&'static str>) -> Fi
         choices: &[],
         min_length: None,
         max_length: None,
+        min_distinct: None,
         at_most,
         nullable: false,
         drivable: false,

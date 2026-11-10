@@ -51,6 +51,7 @@ impl Effect for Shower {
                 choices: &[],
                 min_length: None,
                 max_length: None,
+                min_distinct: None,
                 at_most: None,
                 nullable: true,
                 drivable: false,

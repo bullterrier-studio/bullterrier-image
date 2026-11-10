@@ -57,7 +57,7 @@ pub use bullterrier_image_derive::{Choice, Params};
 
 /// The names a choice picks from, in declaration order: what `#[derive(Choice)]` implements for a fieldless enum. The
 /// other kinds need nothing from their type: the derive of `Params` knows `f32`, `i32`, `u32`, `bool`, `Color`, `Option<Color>`,
-/// `Vec<Color>`, `FieldName`, `LutName` and `PictureName` by their written names.
+/// `Vec<Color>`, `String`, `FieldName`, `LutName` and `PictureName` by their written names.
 pub trait Choice {
     /// The names, in `snake_case`.
     const CHOICES: &'static [&'static str];
@@ -124,12 +124,16 @@ pub struct Field {
     pub cyclic: bool,
     /// The names of a choice, in declaration order; none for any other kind.
     pub choices: &'static [&'static str],
-    /// The fewest elements of a list of colours; none for any other kind, and not written then.
+    /// The fewest elements of a list of colours, or characters of a text; none for any other kind, and not written then.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_length: Option<usize>,
-    /// The most elements of a list of colours; none when it has no limit, and not written then.
+    /// The most elements of a list of colours, or characters of a text; none when it has no limit, and not written then.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_length: Option<usize>,
+    /// The fewest different characters of a text (`"aab"` has two); none for no such rule and for any other kind, and not
+    /// written then.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_distinct: Option<usize>,
     /// The name of another number this one may not exceed (`band_min_height` below `band_max_height`); none when it has no
     /// such limit, and not written then. Both are checked together, whichever is given; both are in the same unit.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -166,6 +170,9 @@ pub enum Kind {
     /// A 3D colour lookup table (`LutName`): the name of a table the photo was given, or the path of a `.cube` file;
     /// none is the identity table. The default is always none.
     Lut,
+    /// Free text (`String`), such as the characters of a palette: any string within `min_length` .. `max_length` characters
+    /// and with at least `min_distinct` different ones, when the field has those rules.
+    Text,
     /// A picture laid over the photo (`PictureName`): the name of a picture the photo was given, or the path of an image
     /// file; none leaves the photo as it is. The default is always none.
     Picture,

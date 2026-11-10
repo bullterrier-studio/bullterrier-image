@@ -51,6 +51,7 @@ from typing import Annotated, Any, ClassVar, Literal, NamedTuple, Self, get_args
 import annotated_types
 import numpy as np
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -423,6 +424,7 @@ _PLAIN_KINDS: dict[str, Any] = {
     "lut": Lut,
     "picture": Picture,
     "field": FieldName,
+    "text": str,
 }  # the kinds of `Kind` in crates/core/src/params.rs -> their annotation; a "choice" is a `Literal` of its names
 
 
@@ -458,9 +460,11 @@ def core_field(effect: str, entry: dict[str, Any]) -> tuple[Any, Any]:
     """The annotation and the `param` spec of the field `entry` of the Rust declaration of `effect` (one of the `fields`
     of `_core.params(effect)`), as `class X(EffectParams, core="x")` gives them to the model. A default and a bound are
     the literal the declaration wrote; a list of colours is a tuple, with the `min_length` (and `max_length`) the
-    declaration gives. ValueError if its kind is one the core has and this module has not."""
+    declaration gives, and a text its `min_distinct` too. ValueError if its kind is one the core has and this module
+    has not."""
     annotation = _annotation(effect, entry)
-    lengths = {key: entry[key] for key in ("min_length", "max_length") if key in entry}  # written for a list only
+    # written for a list of colours or a text only
+    lengths = {key: entry[key] for key in ("min_length", "max_length", "min_distinct") if key in entry}
     spec = param(
         _default(entry),
         doc=entry["meaning"],
@@ -684,6 +688,7 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
         constraints = {}  # the validator is the whole check; `strict` has no schema to apply to in a union
     elif annotation is Lut:
         typed = ValidatedLut
+    typed, kwargs = _with_distinct(typed, spec.field_kwargs)
     made = Field(
         spec.default,
         description=spec.doc,
@@ -695,9 +700,29 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
             "at_most": spec.at_most,
         },
         **constraints,
-        **spec.field_kwargs,
+        **kwargs,
     )
     return typed, made
+
+
+def _with_distinct(typed: Any, kwargs: Mapping[str, Any]) -> tuple[Any, dict[str, Any]]:
+    """`typed` and the pydantic constraints `kwargs` without `min_distinct`, which is not one: a text's own rule, made a
+    validator on `typed`."""
+    rest = {key: value for key, value in kwargs.items() if key != "min_distinct"}
+    if kwargs.get("min_distinct") is None:
+        return typed, rest
+    return Annotated[typed, AfterValidator(_at_least_distinct(kwargs["min_distinct"]))], rest
+
+
+def _at_least_distinct(least: int) -> Callable[[str], str]:
+    """A validator that passes a text with at least `least` different characters and refuses any other."""
+
+    def check(text: str) -> str:
+        if len(set(text)) < least:
+            raise ValueError(f"must have at least {least} different characters")
+        return text
+
+    return check
 
 
 def _members(annotation: Any) -> tuple[Any, ...]:

@@ -838,6 +838,7 @@ KIND_SCHEMA = {
     "colors": "array",
     "lut": "string",
     "field": "string",
+    "text": "string",
 }  # the JSON-schema type of each plain kind (a picture is a union with a string, a colour and none: see below)
 
 
@@ -1016,6 +1017,58 @@ def test_the_json_schema_of_a_list_has_its_lengths_and_only_a_ceiling_when_decla
     properties = LISTED.model_json_schema()["properties"]
     assert (properties["stops"]["minItems"], "maxItems" in properties["stops"]) == (1, False)
     assert (properties["palette"]["minItems"], properties["palette"]["maxItems"]) == (2, 4)
+
+
+# --- text declared in Rust -------------------------------------------------------------------------------------------
+# As above, the field is written as `_core.params` writes it (`min_length`, `max_length` and `min_distinct` appear when
+# the field has them); the same rows are checked against `Table::check` in crates/core/tests/it/params_text.rs.
+
+TEXT: dict[str, Any] = {
+    "name": "chars",
+    "kind": "text",
+    "meaning": "The characters.",
+    "default": " .:#",
+    "unit": None,
+    "min": None,
+    "max": None,
+    "cyclic": False,
+    "choices": [],
+    "min_length": 2,
+    "max_length": 4,
+    "min_distinct": 2,
+    "drivable": False,
+    "advanced": False,
+}
+TEXTED = model_of(TEXT)
+
+
+@pytest.mark.parametrize("given", ["ab", "abcd", "aab", " .:#", "░▒▓█"])
+def test_text_inside_every_rule_is_kept_as_it_is(given):
+    assert TEXTED.parse({"chars": given}).model_dump()["chars"] == given
+    assert TEXTED.parse({}).model_dump()["chars"] == " .:#"
+
+
+@pytest.mark.parametrize(
+    ("given", "complaint"),
+    [
+        pytest.param("a", "at least 2 characters", id="shorter than min_length"),
+        pytest.param("abcde", "at most 4 characters", id="longer than max_length"),
+        pytest.param("░▒▓█▀", "at most 4 characters", id="length counts characters, not bytes"),
+        pytest.param("aaaa", "at least 2 different characters", id="fewer different characters than min_distinct"),
+        pytest.param("    ", "at least 2 different characters", id="one character repeated"),
+        pytest.param(3, "must be text", id="a number"),
+        pytest.param(None, "must be text", id="None"),
+        pytest.param(["a", "b"], "must be text", id="a list"),
+    ],
+)
+def test_text_that_breaks_a_rule_is_refused_naming_the_field(given, complaint):
+    with pytest.raises(RecipeError, match=r"`chars`.*" + complaint):
+        TEXTED.parse({"chars": given})
+
+
+def test_the_json_schema_of_text_is_a_string_with_its_lengths():
+    schema = TEXTED.model_json_schema()["properties"]["chars"]
+    assert (schema["type"], schema["minLength"], schema["maxLength"]) == ("string", 2, 4)
 
 
 LUT: dict[str, Any] = {

@@ -792,6 +792,19 @@ fn candidates(field: &Field) -> Vec<Value> {
         Kind::Lut => vec![json!("table")],
         // a name: the test offers its own picture to any effect that is given one (see `render`)
         Kind::Picture => vec![json!("asset")],
+        // the shortest texts the field takes, of the first characters of a ramp from paper to ink (different ones)
+        Kind::Text => {
+            let shortest = field
+                .min_length
+                .unwrap_or(0)
+                .max(field.min_distinct.unwrap_or(0))
+                .max(2);
+            [shortest, shortest + 1]
+                .into_iter()
+                .filter(|length| field.max_length.is_none_or(|most| *length <= most))
+                .map(|length| json!(" .:-=+*#%@".chars().take(length).collect::<String>()))
+                .collect()
+        }
         // the shortest list and one element more (where allowed), of colours that are not the default of any effect
         Kind::Colors => {
             let shortest = field.min_length.unwrap_or(1);
@@ -1011,6 +1024,7 @@ impl Effect for Brighten {
             choices: &[],
             min_length: None,
             max_length: None,
+            min_distinct: None,
             at_most: None,
             nullable: false,
             drivable: false,
@@ -1068,6 +1082,7 @@ impl Effect for Follow {
             choices: &[],
             min_length: None,
             max_length: None,
+            min_distinct: None,
             at_most: None,
             nullable: false,
             drivable: false,
