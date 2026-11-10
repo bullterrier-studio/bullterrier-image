@@ -4,8 +4,8 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
-use crate::ops::noise::{Fractal, field};
+use crate::effect::{Category, Input, Meta};
+use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::random::Rng;
 use crate::ops::{cast, length};
 use crate::params::{Color, Params};
@@ -15,12 +15,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Backgrounds,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `flow_lines` reads around a pixel.
+/// What `flow_lines` reads around a pixel: none of the picture's content; the lines are those of the canvas.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// Replace the picture with streamlines of a noise flow: lines that start at random points and follow the flow.
@@ -81,7 +81,7 @@ pub struct Params {
 
 /// Stamps a soft disc of `radius` px at (`x`, `y`) onto `ink` (`height` x `width`): each pixel keeps the strongest disc over
 /// it, coverage 1 within `radius` - 1/2 of the pixel's centre and falling to 0 at `radius` + 1/2 (a pixel's own width).
-fn stamp(ink: &mut [f32], (height, width): (usize, usize), radius: f64, (x, y): (f64, f64)) {
+fn stamp(ink: &mut [f32], (height, width): (usize, usize), first_row: usize, radius: f64, (x, y): (f64, f64)) {
     let reach = length::whole(radius.ceil()).cast_signed();
     let (corner_column, corner_row) = (
         length::whole(x.floor()).cast_signed(),
@@ -89,7 +89,10 @@ fn stamp(ink: &mut [f32], (height, width): (usize, usize), radius: f64, (x, y): 
     );
     for row in corner_row - reach..=corner_row + reach {
         for column in corner_column - reach..=corner_column + reach {
-            if !(0..height.cast_signed()).contains(&row) || !(0..width.cast_signed()).contains(&column) {
+            // only the rows of the picture, which lie from `first_row` of the canvas on
+            if !(first_row.cast_signed()..(first_row + height).cast_signed()).contains(&row)
+                || !(0..width.cast_signed()).contains(&column)
+            {
                 continue;
             }
             let (centre_x, centre_y) = (
@@ -97,7 +100,7 @@ fn stamp(ink: &mut [f32], (height, width): (usize, usize), radius: f64, (x, y): 
                 length::float(row.cast_unsigned()) + 0.5,
             );
             let covers = (radius - (centre_x - x).hypot(centre_y - y) + 0.5).clamp(0.0, 1.0);
-            let at = &mut ink[row.cast_unsigned() * width + column.cast_unsigned()];
+            let at = &mut ink[(row.cast_unsigned() - first_row) * width + column.cast_unsigned()];
             *at = at.max(cast::single(covers));
         }
     }
@@ -107,14 +110,28 @@ fn stamp(ink: &mut [f32], (height, width): (usize, usize), radius: f64, (x, y): 
 ///
 /// Sequential: every line is drawn one after the other into one picture of ink, and the strongest disc over a pixel wins, which
 /// is the same whatever the order; the work (the stamps) is a share of the lines, not of the pixels.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
+    let place = inputs.place(picture);
+    let canvas = place.canvas_height;
+    // the lines are those of the canvas: their number is the density times its area, at most 50 per 1000 px^2 of a picture
+    // the files limit bounds, and their starts come from one stream of the seed, the same whichever rows are drawn
     // constant: density is counted per 1000 square px
-    let lines = length::whole(f64::from(params.density) * length::float(height * width) / 1000.0);
+    let lines = length::whole(f64::from(params.density) * length::float(canvas * width) / 1000.0);
     let moves = length::whole(f64::from(params.length) / f64::from(params.step));
+    let step = f64::from(params.step);
+    let radius = f64::from(params.thickness) / 2.0;
+    // a line is at most `moves x step` px long, so one that touches the band starts within that of it (and the flow it
+    // follows before then lies within twice that, and the radius of its mark)
+    let (run, mark) = (length::float(moves) * step, radius.ceil() + 1.0);
+    let (first, last) = (place.first_row, place.first_row + height);
+    let near = |y: f64| y >= length::float(first) - run - mark && y < length::float(last) + run + mark;
+    let reach = length::whole((2.0 * run + mark).ceil());
+    let (from, to) = (first.saturating_sub(reach), (last + reach).min(canvas));
     // constant: the flow is the lattice's stream 0 of the seed, independent of the starts' separate generator
-    let flow = field(
-        height,
+    let flow = field_rows(
+        from,
+        to - from,
         width,
         &Fractal {
             spacing: f64::from(params.scale),
@@ -127,22 +144,24 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         0,
     );
     let twist = f64::from(params.twist).to_radians();
-    let step = f64::from(params.step);
-    let radius = f64::from(params.thickness) / 2.0;
     let mut starts = Rng::seeded(params.seed);
     let mut ink = vec![0.0_f32; height * width];
     for _ in 0..lines {
         let mut at = (
             starts.uniform() * length::float(width),
-            starts.uniform() * length::float(height),
+            starts.uniform() * length::float(canvas),
         );
+        if !near(at.1) {
+            continue;
+        }
         for _ in 0..=moves {
             // a line ends where it leaves the picture
-            if !(0.0..length::float(width)).contains(&at.0) || !(0.0..length::float(height)).contains(&at.1) {
+            if !(0.0..length::float(width)).contains(&at.0) || !(0.0..length::float(canvas)).contains(&at.1) {
                 break;
             }
-            stamp(&mut ink, (height, width), radius, at);
-            let heading = twist * f64::from(flow[length::whole(at.1.floor()) * width + length::whole(at.0.floor())]);
+            stamp(&mut ink, (height, width), first, radius, at);
+            let heading =
+                twist * f64::from(flow[(length::whole(at.1.floor()) - from) * width + length::whole(at.0.floor())]);
             at = (at.0 + step * heading.cos(), at.1 + step * heading.sin());
         }
     }

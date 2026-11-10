@@ -103,25 +103,30 @@ fn no_amount_or_no_cloud_and_no_floor_leaves_the_picture_as_it_is() -> Result<()
 }
 
 #[test]
-fn the_cloud_shape_is_smoothstep_of_the_standardised_noise_ranked_by_the_normal_distribution() -> Result<(), Error> {
+fn the_cloud_shape_is_smoothstep_of_the_noise_ranked_by_the_normal_distribution() -> Result<(), Error> {
     // coverage 1, feather 1, no floor, no gradient, amount 1: opacity = smoothstep(u), u = ndtr(standardised noise). Undoing
     // the smoothstep and the normal distribution must give noise of mean 0 and deviation 1
-    let params = Params {
-        amount: 1.0,
-        gradient: 0.0,
-        coverage: 1.0,
-        feather: 1.0,
-        floor: 0.0,
-        scale: 12.0,
-        seed: 4,
-        ..Params::default()
-    };
-    let z: Vec<f64> = opacity(&params, SIDE, SIDE)?
-        .into_iter()
-        .map(|shape| normal_quantile(unsmooth(shape).clamp(1e-7, 1.0 - 1e-7)))
-        .collect();
-    assert!(mean(&z).abs() < 0.01, "mean {}", mean(&z));
-    assert!((deviation(&z) - 1.0).abs() < 0.02, "deviation {}", deviation(&z));
+    // the noise has mean 0 and deviation 1 in how it is made, not in one picture, so it shows both over seeds
+    let mut z: Vec<f64> = Vec::new();
+    for seed in 0..24 {
+        let params = Params {
+            amount: 1.0,
+            gradient: 0.0,
+            coverage: 1.0,
+            feather: 1.0,
+            floor: 0.0,
+            scale: 12.0,
+            seed,
+            ..Params::default()
+        };
+        z.extend(
+            opacity(&params, SIDE, SIDE)?
+                .into_iter()
+                .map(|shape| normal_quantile(unsmooth(shape).clamp(1e-7, 1.0 - 1.0e-7))),
+        );
+    }
+    assert!(mean(&z).abs() < 0.03, "mean {}", mean(&z));
+    assert!((deviation(&z) - 1.0).abs() < 0.05, "deviation {}", deviation(&z));
     Ok(())
 }
 

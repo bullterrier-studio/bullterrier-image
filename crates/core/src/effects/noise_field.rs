@@ -4,11 +4,11 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::gauss::ndtr;
 use crate::ops::nearest::Buckets;
-use crate::ops::noise::{Fractal, field, standardised};
+use crate::ops::noise::{Fractal, field_rows, standardised, window};
 use crate::ops::random::{Rng, mix, unit};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::ops::{cast, length, par, ramp};
@@ -19,12 +19,18 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Backgrounds,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `noise_field` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    // 'value' is the noise of the canvas place and the seed. The others are standardised over the picture they make (a
+    // mean and a deviation of everything), so a part of the picture would be scaled by its own.
+    if params.kind == Kind::Value {
+        Footprint::Pixel
+    } else {
+        Footprint::Whole
+    }
 }
 
 /// The noises `noise_field` can make.
@@ -44,8 +50,8 @@ pub enum Kind {
 /// plasma), coloured through `colors`.
 ///
 /// A generated background: the input is used only for its height and width, its content is ignored. Followed by `shatter`
-/// with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise is standardised to zero mean and
-/// unit deviation over the picture and passed through the normal cumulative distribution, so a pixel's place on the colour
+/// with `fill` 1 it makes flat Voronoi cells (see the `voronoi-cells` recipe). The noise has zero mean and
+/// unit deviation (for 'value', at every pixel as it is made; for the other kinds, standardised over the picture) and is passed through the normal cumulative distribution, so a pixel's place on the colour
 /// ramp is about its rank among all pixels. 'value' is fractal noise; 'perlin' sums octaves of gradient noise (a Gaussian
 /// random slope at each lattice point, blended with Perlin's fade curve); 'worley' sums octaves of F1 (the distance to the
 /// nearest feature point, one point per cell of `scale` / `lacunarity`^i, measured in those cells), weight
@@ -271,47 +277,92 @@ fn sine(height: usize, width: usize, params: &Params) -> Vec<f32> {
     sum
 }
 
-/// The noise of `params.kind` over the picture, standardised: independent stream `stream` of the seed.
+/// The noise of `params.kind` over the whole picture, standardised: independent stream `stream` of the seed. 'value' is made
+/// by `value_noise`.
 fn noise(height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32> {
     match params.kind {
-        Kind::Value => field(
-            height,
-            width,
-            &Fractal {
-                spacing: f64::from(params.scale),
-                octaves: params.octaves.cast_unsigned(),
-                persistence: f64::from(params.persistence),
-                lacunarity: f64::from(params.lacunarity),
-                seed: params.seed,
-                origin: 0.0, // constant: a lattice point on the first pixel
-            },
-            stream,
-        ),
+        Kind::Value => value_noise(0, height, width, params, stream),
         Kind::Perlin => standardised(perlin(height, width, params, stream)),
         Kind::Worley => standardised(worley(height, width, params, stream)),
         Kind::Sine => standardised(sine(height, width, params)),
     }
 }
 
-/// The noise picture, in the picture's size: the picture is used only for its height and width.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+/// The 'value' noise of the `height` rows from canvas row `first_row` on (mean 0 and deviation 1 at every pixel).
+fn value_noise(first_row: usize, height: usize, width: usize, params: &Params, stream: u64) -> Vec<f32> {
+    field_rows(
+        first_row,
+        height,
+        width,
+        &Fractal {
+            spacing: f64::from(params.scale),
+            octaves: params.octaves.cast_unsigned(),
+            persistence: f64::from(params.persistence),
+            lacunarity: f64::from(params.lacunarity),
+            seed: params.seed,
+            origin: 0.0, // constant: a lattice point on the first pixel
+        },
+        stream,
+    )
+}
+
+/// The noise picture, in the picture's size: the picture is used only for its height and width, and its place on the canvas.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
-    let mut place: Vec<f32> = noise(height, width, params, 0)
+    let place = inputs.place(picture);
+    // the other kinds are `Whole`: the picture is the canvas
+    let first_row = if params.kind == Kind::Value { place.first_row } else { 0 };
+    let field = |first: usize, rows: usize, stream: u64| match params.kind {
+        Kind::Value => value_noise(first, rows, width, params, stream),
+        _ => noise(rows, width, params, stream),
+    };
+    let mut place_on_ramp: Vec<f32> = field(first_row, height, 0)
         .into_iter()
         .map(|z| cast::single(ndtr(f64::from(z))))
         .collect();
     if params.kind != Kind::Sine && params.warp > 0.0 {
-        // constant: streams 1 and 2 of the seed are the independent fields that push rows and columns; 0 is the picture
-        let (push_down, push_across) = (noise(height, width, params, 1), noise(height, width, params, 2));
-        let pixels: Vec<[f32; 3]> = place.iter().map(|&level| [level; 3]).collect();
-        let sampler = Sampler::new(&pixels, height, width, Interpolation::Bicubic, Edge::Mirror.extension());
         let warp = f64::from(params.warp);
-        par::rows(&mut place, width, |first_row, band| {
+        // the rows of the unwarped noise that the band reads: a push moves a read by at most `warp x bound` rows
+        let lattice = Fractal {
+            spacing: f64::from(params.scale),
+            octaves: params.octaves.cast_unsigned(),
+            persistence: f64::from(params.persistence),
+            lacunarity: f64::from(params.lacunarity),
+            seed: params.seed,
+            origin: 0.0, // constant: a lattice point on the first pixel
+        };
+        let (from, to) = if params.kind == Kind::Value {
+            window(
+                place.canvas_height,
+                (length::float(first_row), length::float(first_row + height - 1)),
+                warp * lattice.bound(),
+            )
+        } else {
+            (0, height)
+        };
+        // constant: streams 1 and 2 of the seed are the independent fields that push rows and columns; 0 is the picture
+        let (push_down, push_across) = (field(first_row, height, 1), field(first_row, height, 2));
+        let base: Vec<[f32; 3]> = if (from, to) == (first_row, first_row + height) {
+            place_on_ramp.iter().map(|&level| [level; 3]).collect()
+        } else {
+            field(from, to - from, 0)
+                .into_iter()
+                .map(|z| [cast::single(ndtr(f64::from(z))); 3])
+                .collect()
+        };
+        let sampler = Sampler::new(
+            &base,
+            to - from,
+            width,
+            Interpolation::Bicubic,
+            Edge::Mirror.extension(),
+        );
+        par::rows(&mut place_on_ramp, width, |first, band| {
             for (at, level) in band.iter_mut().enumerate() {
-                let index = first_row * width + at;
-                let (row, column) = (first_row + at / width, at % width);
+                let index = first * width + at;
+                let (row, column) = (first_row + first + at / width, at % width);
                 let read = sampler.at(
-                    length::float(row) + warp * f64::from(push_down[index]),
+                    length::float(row) + warp * f64::from(push_down[index]) - length::float(from),
                     length::float(column) + warp * f64::from(push_across[index]),
                 );
                 // the cubic can overshoot beside a sharp fold; a place on the ramp lies in 0..1
@@ -320,5 +371,5 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         });
     }
     let stops: Vec<[f32; 3]> = params.colors.iter().map(|colour| colour.0).collect();
-    picture.map_at(|row, column, _| ramp::at(&stops, place[row * width + column]))
+    picture.map_at(|row, column, _| ramp::at(&stops, place_on_ramp[row * width + column]))
 }

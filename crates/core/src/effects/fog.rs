@@ -4,10 +4,10 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::gauss::ndtr;
-use crate::ops::noise::{Fractal, field, standardised};
+use crate::ops::noise::{Fractal, field_rows, standardised};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::ops::{cast, length, par};
 use crate::params::{Color, Params};
@@ -17,12 +17,25 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Atmosphere,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `fog` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+/// What `fog` reads around a pixel: the clouds are noise of the canvas place and the seed, so none of the picture but the
+/// pixel itself. Read straight off (no `rise`, no `turbulence`) the noise is of deviation 1 at every pixel. Read between
+/// pixels it is smoothed by an amount that depends on where, and the clouds are ranked again over the picture to hold their
+/// `coverage`: that measures the whole picture.
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    if reads_in_place(params) {
+        Footprint::Pixel
+    } else {
+        Footprint::Whole
+    }
+}
+
+/// Whether the clouds are read at the pixel itself.
+#[expect(clippy::float_cmp, reason = "1 and 0 are the parameters' own values, at which a read is exactly in place")]
+fn reads_in_place(params: &Params) -> bool {
+    params.rise == 1.0 && params.turbulence == 0.0
 }
 
 /// Fog or smoke: mix the picture toward `color` by an opacity that is cloudy and heavier toward the bottom. Fog, mist, haze,
@@ -31,7 +44,7 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
 /// The clouds are the high parts of a fractal noise field (`scale`, `octaves`, `persistence`, `lacunarity`), warped when it is
 /// read (`resampling`, `edge`): a pixel the height d above the bottom edge reads the field at d / `rise` (so the clouds are
 /// drawn out `rise` times upward from the bottom edge), pushed `turbulence` px along two more noise fields. The warped field
-/// is standardised and passed through the normal cumulative distribution, giving u spread evenly over 0..1; the cloud shape
+/// is standardised (over the picture, if it is warped) and passed through the normal cumulative distribution, giving u spread evenly over 0..1; the cloud shape
 /// is smoothstep((u - (1 - `coverage`)) / `feather`), so about `coverage` of the picture has cloud and the shape climbs from
 /// 0 to 1 across the `feather` share of pixels above the cut. The opacity at a pixel is `amount` x (1 - `gradient` x (1 - t))
 /// x (`floor` + (1 - `floor`) x shape), where t is how far down the frame the pixel's row centre is (0 at the top edge, 1 at
@@ -110,45 +123,47 @@ pub struct Params {
 }
 
 /// The picture with the fog mixed in.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
-    // constant: one stream per field, numbered from 0 (the seed itself)
-    let noise = |stream| {
-        field(
-            height,
-            width,
-            &Fractal {
-                spacing: f64::from(params.scale),
-                octaves: params.octaves.cast_unsigned(),
-                persistence: f64::from(params.persistence),
-                lacunarity: f64::from(params.lacunarity),
-                seed: params.seed,
-                origin: 0.0, // constant: a lattice point on the first pixel
-            },
-            stream,
-        )
+    let place = inputs.place(picture);
+    let first_row = place.first_row;
+    let lattice = Fractal {
+        spacing: f64::from(params.scale),
+        octaves: params.octaves.cast_unsigned(),
+        persistence: f64::from(params.persistence),
+        lacunarity: f64::from(params.lacunarity),
+        seed: params.seed,
+        origin: 0.0, // constant: a lattice point on the first pixel
     };
-    let (cloud, sway_down, sway_across) = (noise(0), noise(1), noise(2));
-    // the cloud field as a grey picture for the sampler to read between its pixels
-    let cloud_pixels: Vec<[f32; 3]> = cloud.iter().map(|&z| [z; 3]).collect();
-    let sampler = Sampler::new(&cloud_pixels, height, width, params.resampling, params.edge.extension());
-    let (rise, turbulence) = (f64::from(params.rise), f64::from(params.turbulence));
-    let mut warped = vec![0.0_f32; height * width];
-    par::rows(&mut warped, width, |first_row, band| {
-        for (at, out) in band.iter_mut().enumerate() {
-            let index = first_row * width + at;
-            let (row, column) = (index / width, index % width);
-            // a pixel d above the bottom edge reads the field d / rise above it
-            let read_row = (length::float(height) - 1.0) * (1.0 - 1.0 / rise) + length::float(row) / rise;
-            *out = cast::single(
-                sampler.at(
-                    read_row + turbulence * f64::from(sway_down[index]),
-                    length::float(column) + turbulence * f64::from(sway_across[index]),
-                )[0],
-            );
-        }
-    });
-    let ranked = standardised(warped);
+    // constant: one stream per field, numbered from 0 (the seed itself)
+    let cloud = field_rows(first_row, height, width, &lattice, 0);
+    let ranked = if reads_in_place(params) {
+        cloud
+    } else {
+        // `Whole`: the picture is the canvas
+        let sway_down = field_rows(0, height, width, &lattice, 1);
+        let sway_across = field_rows(0, height, width, &lattice, 2);
+        // the cloud field as a grey picture for the sampler to read between its pixels
+        let cloud_pixels: Vec<[f32; 3]> = cloud.iter().map(|&z| [z; 3]).collect();
+        let sampler = Sampler::new(&cloud_pixels, height, width, params.resampling, params.edge.extension());
+        let (rise, turbulence) = (f64::from(params.rise), f64::from(params.turbulence));
+        let mut warped = vec![0.0_f32; height * width];
+        par::rows(&mut warped, width, |first, band| {
+            for (at, out) in band.iter_mut().enumerate() {
+                let index = first * width + at;
+                let (row, column) = (index / width, index % width);
+                // a pixel d above the bottom edge reads the field d / rise above it
+                let read_row = (length::float(height) - 1.0) * (1.0 - 1.0 / rise) + length::float(row) / rise;
+                *out = cast::single(
+                    sampler.at(
+                        read_row + turbulence * f64::from(sway_down[index]),
+                        length::float(column) + turbulence * f64::from(sway_across[index]),
+                    )[0],
+                );
+            }
+        });
+        standardised(warped)
+    };
     let (coverage, feather, floor) = (
         f64::from(params.coverage),
         f64::from(params.feather),
@@ -158,7 +173,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     picture.map_at(|row, column, pixel| {
         let lift = ((ndtr(f64::from(ranked[row * width + column])) - (1.0 - coverage)) / feather).clamp(0.0, 1.0);
         let shape = lift * lift * (3.0 - 2.0 * lift); // constant: 3t^2 - 2t^3 is the standard smoothstep Hermite curve
-        let down = (length::float(row) + 0.5) / length::float(height);
+        let down = (length::float(first_row + row) + 0.5) / length::float(place.canvas_height);
         let opacity = cast::single(
             f64::from(params.amount)
                 * (1.0 - f64::from(params.gradient) * (1.0 - down))

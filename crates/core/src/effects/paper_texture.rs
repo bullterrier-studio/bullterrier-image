@@ -4,8 +4,8 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
-use crate::ops::noise::{Fractal, field, standardised};
+use crate::effect::{Category, Input, Meta};
+use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::random::{mix, unit};
 use crate::ops::{cast, length};
 use crate::params::{Choice, Params};
@@ -15,12 +15,12 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Texture,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `paper_texture` reads around a pixel.
+/// What `paper_texture` reads around a pixel: the texture is a function of the canvas place and the seed.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Whole
+    Footprint::Pixel
 }
 
 /// The surfaces `paper_texture` can lay.
@@ -36,7 +36,8 @@ pub enum Kind {
 
 /// Lay a paper, canvas or linen texture over the picture: each pixel is multiplied by 1 + `amount` x texture.
 ///
-/// The texture has zero mean and unit standard deviation over the picture, so `amount` is its relative strength and the
+/// The texture has zero mean and unit standard deviation at every pixel (known from how it is made, not measured over the
+/// picture, so a crop of a picture has the texture of that part), so `amount` is its relative strength and the
 /// average brightness is kept (before clipping to 0..1). The fibres are fractal noise (`scale`, `octaves`, `persistence`,
 /// `lacunarity`); a weave is a cosine wave of period `spacing` across the columns plus one down the rows, mixed with the
 /// fibres by `fibre`. The same texture multiplies every channel; the same `seed` gives the same texture.
@@ -82,11 +83,11 @@ pub struct Params {
     pub seed: u32,
 }
 
-/// The wave of one axis of the weave: `cos(2 pi p / spacing)` at each of `length` positions `p`, scaled for 'linen' by a
+/// The wave of one axis of the weave: `cos(2 pi p / spacing)` at each of the positions `p` in `positions`, scaled for 'linen' by a
 /// strength drawn for the thread (one pitch wide) the position lies in. `axis` keeps the rows' threads apart from the columns'.
-fn wave(count: usize, axis: u64, params: &Params) -> Vec<f64> {
+fn wave(positions: std::ops::Range<usize>, axis: u64, params: &Params) -> Vec<f64> {
     let spacing = f64::from(params.spacing);
-    (0..count)
+    positions
         .map(|at| {
             let position = length::float(at);
             let wave = (std::f64::consts::TAU * position / spacing).cos();
@@ -104,9 +105,11 @@ fn wave(count: usize, axis: u64, params: &Params) -> Vec<f64> {
 }
 
 /// The picture with the texture laid over it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
-    let mut texture = field(
+    let first_row = inputs.place(picture).first_row;
+    let mut texture = field_rows(
+        first_row,
         height,
         width,
         &Fractal {
@@ -120,20 +123,21 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         0,
     );
     if params.kind != Kind::Paper {
-        let (down, across) = (wave(height, 0, params), wave(width, 1, params));
-        let weave = standardised(
-            (0..height * width)
-                .map(|at| cast::single(down[at / width] + across[at % width]))
-                .collect(),
+        let (down, across) = (
+            wave(first_row..first_row + height, 0, params),
+            wave(0..width, 1, params),
         );
+        // each wave has mean 0 and variance 1/2 (a cosine), times 1/3 more for a linen thread's strength (a uniform 0..1 has
+        // second moment 1/3); the two axes are independent, so the weave has variance 2 x that, and is divided by its root
+        let wave_variance: f64 = if params.kind == Kind::Linen { 1.0 / 6.0 } else { 0.5 }; // constant: see above
         let (weave_share, fibre_share) = (f64::from(1.0 - params.fibre).sqrt(), f64::from(params.fibre).sqrt());
-        texture = standardised(
-            weave
-                .iter()
-                .zip(&texture)
-                .map(|(weave, fibres)| cast::single(weave_share * f64::from(*weave) + fibre_share * f64::from(*fibres)))
-                .collect(),
-        );
+        // weave and fibres are independent with variance 1 each, so their mix with shares whose squares sum to 1 has it too
+        texture = (0..height * width)
+            .map(|at| {
+                let weave = (down[at / width] + across[at % width]) / (2.0 * wave_variance).sqrt();
+                cast::single(weave_share * weave + fibre_share * f64::from(texture[at]))
+            })
+            .collect();
     }
     picture.map_at(|row, column, pixel| {
         let gain = 1.0 + params.amount * texture[row * width + column];

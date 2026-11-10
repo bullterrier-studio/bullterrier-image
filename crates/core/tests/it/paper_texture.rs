@@ -48,23 +48,64 @@ fn amount_zero_leaves_the_picture_as_it_is() -> Result<(), Error> {
 
 #[test]
 fn amount_is_the_relative_deviation_and_the_mean_brightness_is_kept() -> Result<(), Error> {
-    // on a 0.5 grey the texture multiplies by 1 + amount x t, t of zero mean and unit deviation: deviation 0.5 x amount
+    // on a 0.5 grey the texture multiplies by 1 + amount x t, t of zero mean and unit deviation: deviation 0.5 x amount. The
+    // unit deviation is that of how the texture is made, not of one picture, so it is found over many seeds (the weave of
+    // a 'canvas' does not change with the seed, but its 16 periods across 128 px have the deviation of a cosine pair)
     for kind in KINDS {
         for amount in [0.05, 0.1, 0.2] {
-            let added = texture(
-                &Params {
-                    kind,
-                    amount,
-                    seed: 2,
-                    ..Params::default()
-                },
-                128,
-            )?;
+            let mut added = Vec::new();
+            for seed in 0..24 {
+                added.extend(texture(
+                    &Params {
+                        kind,
+                        amount,
+                        scale: 8.0,
+                        spacing: 8.0,
+                        seed,
+                        ..Params::default()
+                    },
+                    128,
+                )?);
+            }
+            let unit = 0.5 * f64::from(amount);
+            assert!((deviation(&added) / unit - 1.0).abs() < 0.08, "{kind:?} at {amount}");
+            assert!(mean(&added).abs() < 0.04 * unit, "{kind:?} at {amount}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_fibres_have_unit_deviation_at_every_pixel_wherever_it_lies_in_a_lattice_cell() -> Result<(), Error> {
+    // lattice points 4 px apart: the 16 pixels of a cell see every phase, and a pixel on a lattice point is its lattice value
+    // (variance 1/3), one between them a blend of four (less); each is divided by its own deviation, so each has variance 1
+    // over the seeds
+    for octaves in [1, 3] {
+        let fields: Vec<Vec<f64>> = (0..400)
+            .map(|seed| {
+                texture(
+                    &Params {
+                        amount: 0.02,
+                        scale: 4.0,
+                        octaves,
+                        seed,
+                        ..Params::default()
+                    },
+                    8,
+                )
+            })
+            .collect::<Result<_, _>>()?;
+        for (row, column) in [(0, 0), (0, 1), (1, 1), (2, 0), (2, 2), (3, 1), (5, 6), (7, 7)] {
+            let seen: Vec<f64> = fields
+                .iter()
+                .map(|field| field[row * 8 + column] / (0.5 * 0.02))
+                .collect();
             assert!(
-                (deviation(&added) / (0.5 * f64::from(amount)) - 1.0).abs() < 1e-3,
-                "{kind:?} at {amount}"
+                (deviation(&seen) - 1.0).abs() < 0.12 && mean(&seen).abs() < 0.12,
+                "{octaves} octaves, pixel ({row}, {column}): deviation {}, mean {}",
+                deviation(&seen),
+                mean(&seen)
             );
-            assert!(mean(&added).abs() < 1e-4, "{kind:?} at {amount}");
         }
     }
     Ok(())

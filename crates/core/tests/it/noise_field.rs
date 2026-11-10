@@ -55,18 +55,38 @@ fn kind(kind: Kind) -> Params {
 fn the_noise_is_standardised_before_it_is_ranked_whatever_the_kind() -> Result<(), Error> {
     for kind in KINDS {
         for (scale, octaves) in [(40.0, 1), (40.0, 4), (9.0, 3)] {
-            let z = noise(&Params {
+            let params = Params {
                 scale,
                 octaves,
                 seed: 5,
                 ..self::kind(kind)
-            })?;
-            assert!(mean(&z).abs() < 0.01, "{kind:?} scale {scale}: mean {}", mean(&z));
-            assert!(
-                (deviation(&z) - 1.0).abs() < 0.02,
-                "{kind:?} scale {scale}: deviation {}",
-                deviation(&z)
-            );
+            };
+            if kind == Kind::Value {
+                // 'value' noise has mean 0 and deviation 1 in how it is made (a pixel needs no picture to be scaled), so it
+                // shows both over seeds, not in one picture of a few lattice cells
+                let mut z = Vec::new();
+                for seed in 0..48 {
+                    z.extend(noise(&Params {
+                        seed,
+                        scale: scale / 5.0,
+                        ..params.clone()
+                    })?);
+                }
+                assert!(mean(&z).abs() < 0.03, "{kind:?} scale {scale}: mean {}", mean(&z));
+                assert!(
+                    (deviation(&z) - 1.0).abs() < 0.05,
+                    "{kind:?} scale {scale}: deviation {}",
+                    deviation(&z)
+                );
+            } else {
+                let z = noise(&params)?;
+                assert!(mean(&z).abs() < 0.01, "{kind:?} scale {scale}: mean {}", mean(&z));
+                assert!(
+                    (deviation(&z) - 1.0).abs() < 0.02,
+                    "{kind:?} scale {scale}: deviation {}",
+                    deviation(&z)
+                );
+            }
         }
     }
     Ok(())

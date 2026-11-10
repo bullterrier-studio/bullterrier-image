@@ -288,7 +288,7 @@ pub(crate) fn graded_blur(
     clippy::cast_sign_loss,
     reason = "scipy's int(): a reach in px, small and positive"
 )]
-fn weights(sigma: f64, truncate: f64) -> Vec<f64> {
+pub(crate) fn weights(sigma: f64, truncate: f64) -> Vec<f64> {
     let reach = (truncate * sigma + 0.5) as usize; // constant: how scipy sizes its kernel
     if reach == 0 {
         return vec![1.0]; // also sigma 0, which would divide by zero below

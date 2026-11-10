@@ -113,9 +113,20 @@ fn the_wobble_moves_rows_with_the_deviation_asked_for_and_slowly_when_its_size_i
             .map(|row| 32.0 - 63.0 * f64::from(out[(row * side + 32) * 3]))
             .collect())
     };
-    // a clumped wander has exactly mean 0 and the deviation asked; independent values (size up to 1) only about
-    for (wobble_size, slack) in [(0.5, 0.6), (4.0, 2e-3), (8.0, 2e-3)] {
-        let drift = drifts(wobble_size)?;
+    // the wander has mean 0 and the deviation asked in how it is made, so over seeds it shows both; one picture's 64 rows
+    // of a slow wander hold only a few independent values
+    for (wobble_size, slack) in [(0.5, 0.15), (4.0, 0.3), (8.0, 0.4)] {
+        let mut drift = Vec::new();
+        for seed in 0..80 {
+            let params = Params {
+                wobble: 2.0,
+                wobble_size,
+                seed,
+                ..untouched()
+            };
+            let out = run_picture(&params, side, side, &ramp)?;
+            drift.extend((0..side).map(|row| 32.0 - 63.0 * f64::from(out[(row * side + 32) * 3])));
+        }
         assert!(mean(&drift).abs() < slack, "size {wobble_size}: mean {}", mean(&drift));
         assert!(
             (deviation(&drift) - 2.0).abs() < slack,
@@ -270,33 +281,46 @@ fn bled_colour_is_the_colour_moved_right_and_blurred_while_brightness_stays() ->
 fn tape_noise_has_the_deviation_asked_clumps_with_its_size_and_leaves_colour_alone() -> Result<(), Error> {
     let side = 40;
     let grey = vec![0.5_f32; side * side * 3];
-    // (the speck's width, whether it is clumped): clumped noise has exactly mean 0 and the deviation asked, single pixels only about
+    // (the speck's width, whether it is clumped): the noise has mean 0 and the deviation asked in how it is made, so it shows
+    // both over seeds (100 pictures of 40 x 40 px hold about 4500 specks of 6 px)
     for (noise_size, clumped) in [(1.0, false), (6.0, true)] {
-        let params = Params {
-            noise: 0.05,
-            noise_size,
-            ..untouched()
-        };
-        let out = channel_of(&run_picture(&params, side, side, &grey)?, 0);
+        let mut out = Vec::new();
+        for seed in 0..100 {
+            let params = Params {
+                noise: 0.05,
+                noise_size,
+                seed,
+                ..untouched()
+            };
+            out.extend(channel_of(&run_picture(&params, side, side, &grey)?, 0));
+        }
         assert!(
-            (mean(&out) - 0.5).abs() < if clumped { 1e-3 } else { 6e-3 },
+            (mean(&out) - 0.5).abs() < 6e-3,
             "size {noise_size}: mean {}",
             mean(&out)
         );
+        assert!(
+            (deviation(&out) - 0.05).abs() < 2e-3,
+            "size {noise_size}: deviation {}",
+            deviation(&out)
+        );
+        let first = channel_of(
+            &run_picture(
+                &Params {
+                    noise: 0.05,
+                    noise_size,
+                    ..untouched()
+                },
+                side,
+                side,
+                &grey,
+            )?,
+            0,
+        );
         if clumped {
-            assert!(
-                (deviation(&out) - 0.05).abs() < 1e-3,
-                "size {noise_size}: deviation {}",
-                deviation(&out)
-            );
-            assert!(neighbour_correlation(&out, side) > 0.8);
+            assert!(neighbour_correlation(&first, side) > 0.8);
         } else {
-            assert!(
-                (deviation(&out) - 0.05).abs() < 5e-3,
-                "size {noise_size}: deviation {}",
-                deviation(&out)
-            );
-            assert!(neighbour_correlation(&out, side).abs() < 0.15);
+            assert!(neighbour_correlation(&first, side).abs() < 0.15);
         }
     }
     let coloured = [0.6_f32, 0.4, 0.3].repeat(side * side);

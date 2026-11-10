@@ -10,7 +10,7 @@ use crate::ops::edge::Edge;
 use crate::ops::noise::{clumped, standard_normal};
 use crate::ops::random::{mix, unit};
 use crate::params::{Choice, Params};
-use crate::{Image, Inputs, Picture};
+use crate::{Image, Inputs, Picture, Place};
 
 /// Where `grain` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -20,14 +20,9 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `grain` reads around a pixel.
-pub(crate) fn footprint(params: &Params) -> Footprint {
-    // Noise that is not clumped is a hash of the pixel's place. Any clumping size above 0 design px can be above 1 working
-    // px (the footprint does not see the size ratio), and clumped noise is blurred and standardised over the picture.
-    if params.size == 0.0 {
-        Footprint::Pixel
-    } else {
-        Footprint::Whole
-    }
+pub(crate) fn footprint(_params: &Params) -> Footprint {
+    // the noise is a function of the canvas place and the seed, whatever the clumping; the picture is read at the pixel
+    Footprint::Pixel
 }
 
 /// Where the noise values come from.
@@ -84,18 +79,20 @@ pub struct Params {
     pub edge: Edge,
 }
 
-/// The noise of channel `stream`, `height` x `width`: mean 0 and deviation 1, clumped into specks about `size` px wide. `first` is the canvas index of the picture's first pixel, which numbers the draws.
-fn noise(height: usize, width: usize, first: usize, params: &Params, stream: u64) -> Vec<f32> {
+/// The noise of channel `stream` for the rows of the picture on `place`: mean 0 and deviation 1, clumped into specks about
+/// `size` px wide. The draws are numbered by the place on the canvas.
+fn noise(place: Place, rows: usize, params: &Params, stream: u64) -> Vec<f32> {
     clumped(
-        (height, width),
+        (place.canvas_height, place.canvas_width),
+        (place.first_row, rows),
         f64::from(params.size),
         f64::from(params.truncate),
         params.edge.extension(),
         |at| match params.distribution {
-            Distribution::Gaussian => standard_normal(params.seed, stream, first + at),
+            Distribution::Gaussian => standard_normal(params.seed, stream, at),
             // uniform on -b..b has deviation b / sqrt(3), so b = sqrt(3) gives 1
             Distribution::Uniform => cast::single(
-                (2.0 * unit(mix(params.seed, &[stream, (first + at) as u64, 0])) - 1.0) * 3.0_f64.sqrt(), // constant: the uniform's deviation
+                (2.0 * unit(mix(params.seed, &[stream, at as u64, 0])) - 1.0) * 3.0_f64.sqrt(), // constant: the uniform's deviation
             ),
         },
     )
@@ -105,11 +102,11 @@ fn noise(height: usize, width: usize, first: usize, params: &Params, stream: u64
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     // a pixel's draw is numbered by its place on the canvas, so a band draws what the whole picture does there
-    let first = inputs.place(picture).first_row * width;
+    let canvas = inputs.place(picture);
     // one noise for all three channels, or one for each
     let channels = if params.color { 3 } else { 1 }; // constant: colour grain is one noise per red, green, blue
     let planes: Vec<Vec<f32>> = (0..channels)
-        .map(|stream| noise(height, width, first, params, stream))
+        .map(|stream| noise(canvas, height, params, stream))
         .collect();
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;

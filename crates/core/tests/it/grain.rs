@@ -215,19 +215,25 @@ fn size_above_one_pixel_clumps_the_grain_and_one_pixel_does_not() -> Result<(), 
 
 #[test]
 fn clumping_keeps_the_standard_deviation() -> Result<(), Error> {
+    // the deviation is that of how the grain is made (a blur scaled by its weights), not of one picture, so it is found over
+    // seeds: 24 pictures of 128 x 128 px hold some 24 x 1000 specks of 4 px
     for distribution in [Distribution::Gaussian, Distribution::Uniform] {
-        for size in [1.0, 4.0] {
-            let params = Params {
-                amount: 0.03,
-                size,
-                distribution,
-                seed: 5,
-                ..Params::default()
-            };
-            let grain = added(&params, &patch([0.5; 3]), 0)?;
+        for size in [1.0, 4.0, 9.0] {
+            let mut grain = Vec::new();
+            for seed in 0..24 {
+                let params = Params {
+                    amount: 0.03,
+                    size,
+                    distribution,
+                    seed,
+                    ..Params::default()
+                };
+                grain.extend(added(&params, &patch([0.5; 3]), 0)?);
+            }
             assert!(
-                (deviation(&grain) / 0.03 - 1.0).abs() < 0.02,
-                "{distribution:?} at {size}"
+                (deviation(&grain) / 0.03 - 1.0).abs() < 0.04,
+                "{distribution:?} at {size}: {}",
+                deviation(&grain) / 0.03
             );
         }
     }
