@@ -226,6 +226,7 @@ On top of the rules in `docs/rules.md`:
 
 - `poe fast` also runs the Rust tests (it is not an extension point of the template). `poe full` adds, through `project-full`:
   `check-scaffold` (`poe new-effect` end to end, the `rebuild` marker), `audit` (needs the network) and `check-min-deps`.
+- **Full-tier Rust tests:** a matrix over sizes or bands has one row in `check` and every row in a test marked `#[ignore = "full: <why>"]`, run by `poe rust-test-full` (in `project-full` and a CI job). Only that reason may ignore a test (`tests/tools/test_rust_full_tier.py`).
 - A gate needs a known-bad row for every kind of source it must see (an effect file pulled in by `include!` is one); image's rows
   are in `tests/tools/test_rust_gates.py`, and the files its own proofs copy or match are `[tool.gate-proofs] project-triggers`.
 - Test and build profile: `[profile.test] opt-level = 1`, `[profile.dev] debug = "line-tables-only"`, `split-debuginfo = "off"`
