@@ -69,8 +69,8 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   imageio.py     adapters  facade over the core's file reading and writing (formats, EXIF, colour profiles); Pillow only for `to_pil`/`from_pil`
   loader.py                load_recipe: reads a recipe file (TOML) and pictures it names, through imageio
   finding/                 subject_matte(rgb) -> alpha, depth_map(rgb) -> depth, inverse_depth(rgb) (before per-photo
-                           scaling). Which model finds them (IS-Net, Depth Anything V2 on ONNX Runtime; or Apple Vision
-                           for subject, when asked) is hidden here
+                           scaling): thin names for the core's finders (IS-Net, Depth Anything V2 on ONNX Runtime, or Apple
+                           Vision for the subject, `crates/finders`), which also pass the onnxruntime library file
   (presets/ and looks/     moved to crates/core/data/ and compiled into the core: data, not code)
   effects/       effects   the effect library, one package per effect (code only), found automatically;
                            _template/ is what `poe new-effect` copies

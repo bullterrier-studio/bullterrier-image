@@ -401,7 +401,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   and `finding.depth.depth_finder()` the depth's. The pipeline's subject, depth and crop caches are keyed by the
   identity. *Reason:* the cache key must tell finders apart, and a bare function or `functools.partial` has no stable
   name (the partial-finder cache collision). *Consequence:* the crop-finder alias in regions is `BoxFinder`; the package
-  is `finding/` (`subject`, `depth`, `download`) and the models' variables are `BT_IMAGE_SUBJECT_MODEL` and
+  is `finding/` (`subject`, `depth`; the work is the core's `finding`) and the models' variables are `BT_IMAGE_SUBJECT_MODEL` and
   `BT_IMAGE_DEPTH_MODEL`.
 
 - **Pixel values are design pixels.** The [parameter format](parameter-format/parameters.md) makes a `px` value a design
