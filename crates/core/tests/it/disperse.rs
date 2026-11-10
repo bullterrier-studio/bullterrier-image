@@ -455,7 +455,7 @@ fn a_cell_draws_its_speed_its_direction_and_its_flight_independently() -> Result
     // (a draw of `flight`); with steady speed (acceleration 0) it has moved t x journey, whose length (a draw of speed)
     // and direction (a draw of angle) are read from its px. Pieces' draws of different kinds must not follow each other.
     let picture = one_cell(4, 10, 1.0);
-    let (mut shares, mut speeds, mut angles) = (vec![], vec![], vec![]);
+    let (mut shares, mut speeds, mut angles, mut lifetimes) = (vec![], vec![], vec![], vec![]);
     for seed in 0..60 {
         let params = Params {
             seed,
@@ -481,9 +481,19 @@ fn a_cell_draws_its_speed_its_direction_and_its_flight_independently() -> Result
             (left as f64) - 10.0 * CELL as f64,
         );
         shares.push(share);
+        lifetimes.push((0.085 - 0.06) / share);
         speeds.push(dy.hypot(dx) / share);
         angles.push(dy.atan2(dx));
     }
+    // a flight lasts `flight` from (1 - variation) x to (1 + variation) x: 0.05 to 0.15 here, and both ends are drawn
+    let (shortest, longest) = lifetimes
+        .iter()
+        .fold((f64::MAX, 0.0_f64), |(low, high), &x| (low.min(x), high.max(x)));
+    assert!(
+        shortest >= 0.049 && shortest < 0.07,
+        "the shortest flight was {shortest}"
+    );
+    assert!(longest <= 0.151 && longest > 0.13, "the longest flight was {longest}");
     for (name, a, b) in [
         ("flight and speed", &shares, &speeds),
         ("flight and angle", &shares, &angles),
@@ -564,5 +574,122 @@ fn the_bottom_border_is_no_edge_while_open_and_the_figure_ends_above_its_thresho
         )?;
         assert_eq!(cell_black(&out, 4, 15), goes, "field_threshold {field_threshold}");
     }
+    Ok(())
+}
+
+/// How far the lit cell that started at (`row`, `column`) has moved, whole px as (down, right), judged by its top left lit
+/// px; its brightness there.
+fn drift(out: &[f32], row: usize, column: usize) -> Option<(isize, isize, f32)> {
+    let lit: Vec<usize> = (0..HEIGHT * WIDTH).filter(|&at| out[at * 3] > 0.0).collect();
+    let top = lit.iter().map(|at| at / WIDTH).min()?;
+    let left = lit.iter().map(|at| at % WIDTH).min()?;
+    let (dy, dx) = (
+        top as isize - (row * CELL_HEIGHT) as isize,
+        left as isize - (column * CELL) as isize,
+    );
+    Some((dy, dx, out[(top * WIDTH + left) * 3]))
+}
+
+#[test]
+fn sway_is_a_sideways_wobble_of_at_most_sway_px_that_grows_with_the_flight() -> Result<(), Error> {
+    // no wind: half way through its flight (t = 0.5) a cell has swayed sway x its draw x t x sin(a phase) = at most 20 px
+    let picture = one_cell(4, 14, 1.0);
+    let mut widest = 0;
+    for seed in 0..60 {
+        let params = Params {
+            seed,
+            wind: 0.0,
+            sway: 40.0,
+            sway_cycles: 0.0,
+            ..plain(0.16)
+        };
+        let (dy, dx, _) = drift(&run(&params, &picture)?, 4, 14).unwrap_or_default();
+        assert_eq!(dy, 0, "seed {seed}: the sway is sideways");
+        assert!(dx.abs() <= 21, "seed {seed}: swayed {dx} px, over 40 x 0.5");
+        widest = widest.max(dx.abs());
+    }
+    assert!(
+        widest >= 12,
+        "the widest sway of 60 seeds was {widest} px, under 0.6 x 20"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_hovering_piece_bobs_up_and_down_by_at_most_bob_px_and_bob_cycles_turns_the_wave() -> Result<(), Error> {
+    // half way through the float (floating 0.5, before it goes at 0.06) the bob is bob x sin(a phase + bob_cycles / 2 turns)
+    let picture = one_cell(4, 14, 1.0);
+    let mut widest = 0;
+    let bobbed = |seed, bob_cycles| -> Result<isize, Error> {
+        let params = Params {
+            seed,
+            wind: 0.0,
+            hover: 0.5,
+            bob: 20.0,
+            bob_cycles,
+            ..plain(0.03)
+        };
+        Ok(drift(&run(&params, &picture)?, 4, 14).unwrap_or_default().0)
+    };
+    for seed in 0..60 {
+        let (level, half_a_turn) = (bobbed(seed, 0.0)?, bobbed(seed, 1.0)?);
+        assert!(level.abs() <= 21, "seed {seed}: bobbed {level} px, over 20");
+        widest = widest.max(level.abs());
+        if level.abs() >= 8 {
+            assert!(
+                (half_a_turn + level).abs() <= 1,
+                "seed {seed}: {level} px, a cycle further {half_a_turn}"
+            );
+        }
+    }
+    assert!(
+        widest >= 12,
+        "the widest bob of 60 seeds was {widest} px, under 0.6 x 20"
+    );
+    Ok(())
+}
+
+#[test]
+fn before_it_goes_a_piece_eases_back_by_pullback_over_the_anticipation_and_floats_on_a_smoothstep() -> Result<(), Error>
+{
+    let picture = one_cell(3, 15, 0.8);
+    // wind-up: at the start of its flight (0.06) it has eased back all of pullback 0.5 x the wind 48 = 24 px; half way
+    // through the 0.06 before it, 1 - (1 - 0.5)^2 = 0.75 of it: 18 px
+    for (progress, back) in [(0.06, 24), (0.03, 18)] {
+        let params = Params {
+            pullback: 0.5,
+            ..plain(progress)
+        };
+        let out = run(&params, &picture)?;
+        assert_eq!(
+            first_bit_difference(&out, &moved(&picture, 0, -back)),
+            None,
+            "progress {progress}"
+        );
+    }
+    // floating: a quarter of the way along the 0.06 it floats (hover 0.5) smoothstep(0.25) = 0.15625 of it, 0.5 x 48 x
+    // 0.15625 = 3.75: 4 px
+    let params = Params {
+        hover: 0.5,
+        bob: 0.0,
+        ..plain(0.015)
+    };
+    let out = run(&params, &picture)?;
+    assert_eq!(first_bit_difference(&out, &moved(&picture, 0, 4)), None);
+    Ok(())
+}
+
+#[test]
+fn finish_is_the_progress_by_which_the_last_piece_has_gone_however_much_flights_vary() -> Result<(), Error> {
+    // the longest flight is 0.2 x 1.9: the last piece to leave goes early enough to be gone at 0.98
+    let params = Params {
+        flight: 0.2,
+        flight_variation: 0.9,
+        ..plain(0.98)
+    };
+    let out = run(&params, &solid(0.8))?;
+    assert!(out.iter().all(|&level| level == 0.0), "a piece is left at the finish");
+    // and the front takes the time before it: at 0.5 the last row, which goes at 0.6 or later, has not
+    assert!(cell_unchanged(&solid(0.8), &run(&plain(0.5), &solid(0.8))?, 7, 10));
     Ok(())
 }
