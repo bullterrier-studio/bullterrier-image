@@ -274,6 +274,7 @@ fn more_pieces_than_pixels_still_work() -> Result<(), Error> {
 
 /// Where each pixel of a picture whose red is its column and green its row (both over 256) is read from: bilinear reading
 /// of a linear picture is exact, so the output says where a piece carried every pixel to, as (column, row).
+#[expect(clippy::cast_precision_loss, reason = "small pixel indices")]
 fn read_from(params: &Params, (height, width): (usize, usize)) -> Result<Vec<[f64; 2]>, Error> {
     let ramps: Vec<f32> = (0..height * width)
         .flat_map(|at| [(at % width) as f32 / 256.0, (at / width) as f32 / 256.0, 0.0])

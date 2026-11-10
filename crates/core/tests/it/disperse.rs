@@ -489,10 +489,7 @@ fn a_cell_draws_its_speed_its_direction_and_its_flight_independently() -> Result
     let (shortest, longest) = lifetimes
         .iter()
         .fold((f64::MAX, 0.0_f64), |(low, high), &x| (low.min(x), high.max(x)));
-    assert!(
-        shortest >= 0.049 && shortest < 0.07,
-        "the shortest flight was {shortest}"
-    );
+    assert!((0.049..0.07).contains(&shortest), "the shortest flight was {shortest}");
     assert!(longest <= 0.151 && longest > 0.13, "the longest flight was {longest}");
     for (name, a, b) in [
         ("flight and speed", &shares, &speeds),
@@ -579,6 +576,7 @@ fn the_bottom_border_is_no_edge_while_open_and_the_figure_ends_above_its_thresho
 
 /// How far the lit cell that started at (`row`, `column`) has moved, whole px as (down, right), judged by its top left lit
 /// px; its brightness there.
+#[expect(clippy::cast_possible_wrap, reason = "small pixel indices")]
 fn drift(out: &[f32], row: usize, column: usize) -> Option<(isize, isize, f32)> {
     let lit: Vec<usize> = (0..HEIGHT * WIDTH).filter(|&at| out[at * 3] > 0.0).collect();
     let top = lit.iter().map(|at| at / WIDTH).min()?;
