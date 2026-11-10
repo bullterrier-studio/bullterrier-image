@@ -24,6 +24,7 @@ mod deep;
 mod dehaze;
 mod displace;
 mod dither;
+mod drop_shadow;
 mod droste;
 mod dust_scratches;
 mod each;

@@ -358,6 +358,29 @@ fn a_torn_edge_at_its_largest_on_a_thin_picture_finishes() {
     assert!(done.is_ok(), "{done:?}");
 }
 
+#[test]
+fn drop_shadow_at_its_most_copies_and_widest_blur_finishes_and_one_copy_more_is_refused() -> Outcome {
+    // every copy is moved and blurred on its own: the most work of any setting is the most copies at the widest blur
+    let (height, width) = (24, 32);
+    let pixels = vec![0.5; height * width * 3];
+    let photo = Photo::new(Picture::new(height, width, &pixels)?)
+        .with_map("subject", Layer::new(height, width, corners_only(height, width))?)?;
+    let shadow = |copies: u32| {
+        Step::new("drop_shadow")
+            .param("copies", copies)
+            .param("blur", 200)
+            .param("truncate", 10)
+            .param("offset", 3)
+    };
+    let most = photo.render(&Recipe::new([shadow(400)]), &Presets::new(), Options::default());
+    assert!(most.is_ok(), "{most:?}");
+    let past = photo
+        .render(&Recipe::new([shadow(401)]), &Presets::new(), Options::default())
+        .map(drop);
+    assert!(refused(&past, &["copies", "401"]), "{past:?}");
+    Ok(())
+}
+
 // ---- the files an svg region reads --------------------------------------------------------------------------------
 
 const NS: &str = r#"xmlns="http://www.w3.org/2000/svg""#;
