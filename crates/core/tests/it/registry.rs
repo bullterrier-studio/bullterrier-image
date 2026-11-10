@@ -17,16 +17,16 @@ fn paint(name: &str) -> Arc<dyn Effect> {
 #[test]
 fn the_core_effects_are_found_by_name_with_what_each_declares() -> Outcome {
     // (name, category, opacity, inputs): what each effect file declares in its META
-    for (name, category) in [
-        ("grade", Category::Colour),
-        ("pattern", Category::Backgrounds),
-        ("pixel_grid", Category::Texture),
+    for (name, category, inputs) in [
+        ("grade", Category::Colour, &[][..]),
+        ("pattern", Category::Backgrounds, &[Input::Place][..]),
+        ("pixel_grid", Category::Texture, &[Input::Place][..]),
     ] {
         let effect = effect(name)?;
         assert_eq!(effect.name(), name);
         assert_eq!(effect.category(), category, "{name}");
         assert!((effect.opacity() - 1.0).abs() < f64::EPSILON, "{name}");
-        assert!(effect.inputs().is_empty(), "{name}");
+        assert_eq!(effect.inputs(), inputs, "{name}");
         assert!(effect.params().is_some_and(|table| !table.fields.is_empty()), "{name}");
     }
     Ok(())
