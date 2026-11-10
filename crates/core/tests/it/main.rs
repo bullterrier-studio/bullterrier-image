@@ -147,6 +147,7 @@ mod shards;
 mod shards_sites;
 mod sharpen;
 mod shatter;
+mod sheet;
 mod shift;
 mod shipped;
 mod slice_shift;

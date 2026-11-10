@@ -82,6 +82,28 @@ impl Face {
     }
 }
 
+/// `text` set in one row of cells `cell` px wide, one character to a cell and no kerning (the font is monospaced): the
+/// ink coverage 0..1 of each pixel, row after row, and the row's width and height in px. A character the font lacks shows
+/// as its missing-glyph box.
+pub(crate) fn text_row(text: &str, cell: usize) -> (Vec<f32>, usize, usize) {
+    let mut atlases: std::collections::HashMap<char, Atlas> = std::collections::HashMap::new();
+    let characters: Vec<char> = text.chars().collect();
+    for &character in &characters {
+        atlases
+            .entry(character)
+            .or_insert_with(|| Atlas::new(&character.to_string(), cell));
+    }
+    let (width, height) = (characters.len() * cell, cell_size(cell).1);
+    let mut coverage = vec![0.0; width * height];
+    for (place, character) in characters.iter().enumerate() {
+        let glyph = atlases[character].glyph(0);
+        for row in 0..height {
+            coverage[row * width + place * cell..][..cell].copy_from_slice(&glyph[row * cell..][..cell]);
+        }
+    }
+    (coverage, width, height)
+}
+
 /// `(width, height)` in px of one character cell when characters are `cell` px wide: the width is `cell`, the height comes
 /// from the font. The grid every glyph of [`Atlas`] lives on, for callers that lay a grid of whole characters over a
 /// picture without drawing them.
