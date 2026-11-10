@@ -102,7 +102,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         edge,
     );
     // x runs right and y down, so a clockwise angle turns from x toward y; a whole turn is the same direction exactly
-    let toward = f64::from(params.angle.rem_euclid(360.0)).to_radians();
+    let toward = f64::from(params.angle.rem_euclid(360.0)).to_radians(); // constant: a full turn in degrees
     #[expect(clippy::cast_possible_truncation, reason = "a direction, 0..1 in each part")]
     let (to_x, to_y) = (toward.cos() as f32, toward.sin() as f32);
     let (band_width, falloff, amount, tint) = (params.width, params.falloff, params.amount, params.color.0);

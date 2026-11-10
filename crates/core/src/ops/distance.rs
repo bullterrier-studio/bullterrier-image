@@ -100,7 +100,7 @@ impl Envelope {
             out.fill(f64::INFINITY);
             return;
         }
-        let mut lowest = 0;
+        let mut lowest = 0; // constant: the walk starts at the leftmost parabola
         for (x, value) in out.iter_mut().enumerate() {
             let at = x as f64;
             while self.parts.get(lowest + 1).is_some_and(|&(_, _, from)| from < at) {

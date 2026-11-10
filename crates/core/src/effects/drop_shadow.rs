@@ -14,7 +14,7 @@ use crate::{Image, Inputs, Picture};
 /// Where `drop_shadow` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
     category: Category::Subject,
-    opacity: 0.6,
+    opacity: 0.6, // constant: the default opacity of a step: a shadow mixed in partway lets the floor show through
     inputs: &[],
 };
 
@@ -97,7 +97,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     // the shape as a grey picture, which moves as a picture does
     let silhouette: Vec<[f32; 3]> = shape.iter().map(|&value| [value; 3]).collect();
     // (down, right) as seen in the picture; a whole turn is the same direction exactly
-    let heading = f64::from(params.angle.rem_euclid(360.0)).to_radians();
+    let heading = f64::from(params.angle.rem_euclid(360.0)).to_radians(); // constant: a full turn in degrees
     let (down, right) = (
         f64::from(params.offset) * heading.sin(),
         f64::from(params.offset) * heading.cos(),

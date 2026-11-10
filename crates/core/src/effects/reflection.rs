@@ -13,7 +13,7 @@ use crate::{Image, Inputs, Picture};
 /// Where `reflection` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
     category: Category::Subject,
-    opacity: 0.6,
+    opacity: 0.6, // constant: the default opacity of a step: a floor mirrors partway, its own surface showing
     inputs: &[],
 };
 
