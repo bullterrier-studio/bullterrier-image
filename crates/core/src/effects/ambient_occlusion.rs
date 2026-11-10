@@ -3,11 +3,11 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur;
 use crate::ops::edge::Edge;
 use crate::params::{FieldName, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `ambient_occlusion` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `ambient_occlusion` reads around a pixel.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 

@@ -11,7 +11,7 @@ use crate::effect::{Category, Input, Meta};
 use crate::ops::blend;
 use crate::ops::place::{self, Anchor, Fit, Placement, Resample};
 use crate::params::{Params, PictureName};
-use crate::{BlendMode, Footprint, Image, Inputs, Picture};
+use crate::{BlendMode, Canvas, Footprint, Image, Inputs, Picture};
 
 /// Where `blend` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -21,7 +21,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `blend` reads around a pixel: the picture is placed by the photo's size, so any pixel can depend on the whole.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

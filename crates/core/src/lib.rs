@@ -57,7 +57,7 @@ mod run;
 pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error, ErrorKind, MapKind};
 pub use files::{read, read_map, write, write_with_quality};
-pub use footprint::Footprint;
+pub use footprint::{Canvas, Footprint};
 pub use inputs::{Inputs, Labels, Layer, Place};
 pub use lut::Lut;
 pub use ops::edge::{Edge, EdgeOrConstant};

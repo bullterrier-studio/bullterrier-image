@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::cast::single;
 use crate::ops::length;
 use crate::ops::ramp;
 use crate::params::{Choice, Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `fractal` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `fractal` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

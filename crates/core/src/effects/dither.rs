@@ -5,7 +5,6 @@ use std::borrow::Cow;
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start, kmeans, mean, nearest};
 use crate::ops::colorspace::rgb_to_oklab;
@@ -15,6 +14,7 @@ use crate::ops::length::whole;
 use crate::ops::par;
 use crate::ops::random::{Rng, mix};
 use crate::params::{Choice, Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `dither` sits in the catalogue.
@@ -26,7 +26,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `dither` reads around a pixel: error diffusion carries errors across the picture, and the colours of the `photo`
 /// palette are searched in all of it.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Whole
 }
 

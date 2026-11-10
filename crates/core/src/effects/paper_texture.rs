@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::random::{mix, unit};
 use crate::ops::{cast, length};
 use crate::params::{Choice, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `paper_texture` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `paper_texture` reads around a pixel: the texture is a function of the canvas place and the seed.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

@@ -2,10 +2,10 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::textart::{Style, text_art};
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `ascii` sits in the catalogue.
@@ -17,7 +17,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `ascii` reads around a pixel: the grid of characters is anchored at the picture's corner, so a row is not the same
 /// in another frame of reference.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Whole
 }
 

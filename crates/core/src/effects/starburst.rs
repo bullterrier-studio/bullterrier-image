@@ -3,7 +3,6 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::convolve::{Kernel, convolve};
 use crate::ops::edge::Extension;
@@ -11,6 +10,7 @@ use crate::ops::length::float;
 use crate::ops::light::{highlights, screen};
 use crate::ops::random::{mix, unit};
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `starburst` sits in the catalogue.
@@ -21,7 +21,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `starburst` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Whole
 }
 

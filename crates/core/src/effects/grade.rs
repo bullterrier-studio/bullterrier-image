@@ -3,11 +3,11 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::colorspace::{linear_to_srgb, srgb_to_linear};
 use crate::params::Params;
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `grade` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `grade` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

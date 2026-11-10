@@ -3,9 +3,9 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::params::Params;
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `pixel_grid` sits in the catalogue.
@@ -16,7 +16,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `pixel_grid` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

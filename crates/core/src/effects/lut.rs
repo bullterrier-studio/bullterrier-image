@@ -2,9 +2,9 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::params::{LutName, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `lut` sits in the catalogue.
@@ -15,7 +15,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `lut` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

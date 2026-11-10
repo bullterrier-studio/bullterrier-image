@@ -8,7 +8,7 @@ use crate::ops::distance::signed;
 use crate::ops::edge::Extension;
 use crate::ops::light::screen;
 use crate::params::{FieldName, Params};
-use crate::{Footprint, Image, Inputs, Picture};
+use crate::{Canvas, Footprint, Image, Inputs, Picture};
 
 /// Where `light_wrap` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -23,7 +23,7 @@ const TRUNCATE: f64 = 4.0; // constant: scipy's default reach for a Gaussian
 /// Radius: the blur's reach (`TRUNCATE * blur` + 0.5 px, and a px more for rounding). A pixel changes only where the
 /// backdrop is within that reach, and then the nearest backdrop pixel, which gives its depth, is within it too, however
 /// large `width` is.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Radius(TRUNCATE * f64::from(params.blur) + 1.0)
 }
 

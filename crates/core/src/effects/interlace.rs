@@ -3,11 +3,11 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::shift::shifted;
 use crate::params::{Choice, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `interlace` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `interlace` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

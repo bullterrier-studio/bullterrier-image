@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::colorspace::rgb_to_hsv;
 use crate::ops::par;
 use crate::params::{Choice, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `pixel_sort` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `pixel_sort` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Whole
 }
 

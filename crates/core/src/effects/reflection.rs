@@ -3,11 +3,11 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter;
 use crate::ops::edge::Edge;
 use crate::params::{FieldName, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `reflection` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// Whole: the floor line is the lowest row of the shape anywhere in the picture.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Whole
 }
 

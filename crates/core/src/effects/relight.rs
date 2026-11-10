@@ -2,12 +2,12 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_plane;
 use crate::ops::edge::Edge;
 use crate::ops::relief::shade_slopes;
 use crate::params::{FieldName, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `relight` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `relight` reads around a pixel: the blur's reach and a pixel on either side for the slope.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     // constant: the kernel reaches int(truncate x blur + 0.5) px and the slope one more
     Footprint::reach(
         f64::from(params.blur * params.truncate) + 1.5,

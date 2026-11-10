@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_plane;
 use crate::ops::edge::EdgeOrConstant;
 use crate::ops::light::{highlights, screen};
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `bloom` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `bloom` reads around a pixel.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::reach(
         f64::from(params.radius * params.truncate),
         params.edge == EdgeOrConstant::Wrap,

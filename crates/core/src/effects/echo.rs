@@ -3,11 +3,11 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::shift::shifted;
 use crate::params::Params;
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `echo` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `echo` reads around a pixel.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::reach(
         f64::from(params.copies.unsigned_abs()) * f64::from(params.dy.abs()),
         params.edge == Edge::Wrap,

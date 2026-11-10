@@ -2,13 +2,13 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::length;
 use crate::ops::light::screen;
 use crate::ops::random::{mix, unit};
 use crate::ops::segments::{Segment, draw};
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `particles` sits in the catalogue: the light is laid over the picture partway, so a step lays it at 0.8.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `particles` reads around a pixel: none but its own; the particles lie at random places over the canvas.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

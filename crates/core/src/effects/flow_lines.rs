@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::random::Rng;
 use crate::ops::{cast, length};
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `flow_lines` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `flow_lines` reads around a pixel: none of the picture's content; the lines are those of the canvas.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 

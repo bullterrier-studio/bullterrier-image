@@ -3,13 +3,13 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_plane;
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
 use crate::ops::relief::shade_slopes;
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `liquid_metal` sits in the catalogue.
@@ -20,7 +20,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `liquid_metal` reads around a pixel: the smoothing's reach and a pixel on either side for the slope.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     // constant: the kernel reaches int(truncate x smoothing + 0.5) px and the slope one more
     Footprint::reach(
         f64::from(params.smoothing * params.truncate) + 1.5,

@@ -1,6 +1,30 @@
 //! What an effect reads around a pixel: the answer a banded renderer needs to render some rows of a picture without the
 //! rest.
 
+/// The canvas a footprint is asked about: its size in working pixels and the working pixels per design pixel.
+///
+/// A reach that is a share of the canvas, or a whole number of working pixels the runner rounds to, is not a fixed
+/// number of design pixels; an effect that has such a reach reads it here and says it in design pixels (see
+/// [`Radius`](Footprint::Radius)).
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct Canvas {
+    /// Rows of the canvas, in working pixels.
+    pub height: usize,
+    /// Columns of the canvas, in working pixels.
+    pub width: usize,
+    /// Working pixels per design pixel (more than 0).
+    pub ratio: f64,
+}
+
+impl Canvas {
+    /// The canvas of `height` rows and `width` columns whose design pixel is `ratio` working pixels.
+    #[must_use]
+    pub fn new(height: usize, width: usize, ratio: f64) -> Self {
+        Self { height, width, ratio }
+    }
+}
+
 /// What an effect reads around a pixel, given its parameters (see [`Effect::footprint`](crate::Effect::footprint)).
 ///
 /// It is about rows, the unit a banded renderer cuts a picture by. The promise of [`Pixel`](Self::Pixel) and

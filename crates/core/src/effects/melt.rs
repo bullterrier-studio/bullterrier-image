@@ -3,7 +3,6 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::color::luminance;
@@ -12,6 +11,7 @@ use crate::ops::gauss::ndtr;
 use crate::ops::noise::{Fractal, field};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::Params;
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `melt` sits in the catalogue.
@@ -22,7 +22,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `melt` reads around a pixel.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
 }
 

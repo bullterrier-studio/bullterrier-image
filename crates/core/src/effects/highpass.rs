@@ -2,11 +2,11 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur;
 use crate::ops::edge::Edge;
 use crate::params::Params;
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `highpass` sits in the catalogue.
@@ -17,7 +17,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `highpass` reads around a pixel.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 

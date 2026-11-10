@@ -2,7 +2,6 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::{gaussian_filter_owned, gaussian_filter_rows};
 use crate::ops::color::luminance;
@@ -11,6 +10,7 @@ use crate::ops::edges::{at, crests, sobel, sobel_of_line};
 use crate::ops::length::whole;
 use crate::ops::par;
 use crate::params::{Choice, Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `edges` sits in the catalogue.
@@ -25,7 +25,7 @@ const DOG_RATIO: f32 = 1.6; // constant: Marr and Hildreth (1980) show this rati
 
 /// What `edges` reads around a pixel: the smoothing and the gradient, and for `canny` lines that may join across the
 /// whole picture.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     let reach = f64::from(params.radius * params.truncate);
     match params.method {
         Method::Sobel => Footprint::reach(reach, params.edge == Edge::Wrap),

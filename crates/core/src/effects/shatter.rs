@@ -3,7 +3,6 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::length;
@@ -15,6 +14,7 @@ use crate::ops::sample::{Interpolation, Sampler};
 use crate::ops::sites::{detail_weights, scatter};
 use crate::ops::triangles::{labels, triangles};
 use crate::params::{Choice, Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `shatter` sits in the catalogue.
@@ -25,7 +25,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `shatter` reads around a pixel: a piece reads the picture where its move and turn carry it, anywhere in it.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Whole
 }
 

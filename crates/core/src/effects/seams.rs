@@ -3,10 +3,10 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::pieces::line_coverage;
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `seams` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `seams` reads around a pixel: the borders as far as half the line reaches, and the row beside each border pixel
 /// that makes it one.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Radius(f64::from(params.width) / 2.0 + 1.0)
 }
 

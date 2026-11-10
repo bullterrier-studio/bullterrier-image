@@ -3,7 +3,6 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::gauss::ndtr;
@@ -11,6 +10,7 @@ use crate::ops::noise::{Fractal, field_rows, standardised};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::ops::{cast, length, par};
 use crate::params::{Color, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `fog` sits in the catalogue.
@@ -24,7 +24,7 @@ pub(crate) const META: Meta = Meta {
 /// pixel itself. Read straight off (no `rise`, no `turbulence`) the noise is of deviation 1 at every pixel. Read between
 /// pixels it is smoothed by an amount that depends on where, and the clouds are ranked again over the picture to hold their
 /// `coverage`: that measures the whole picture.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     if reads_in_place(params) {
         Footprint::Pixel
     } else {

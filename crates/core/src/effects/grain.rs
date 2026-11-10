@@ -2,7 +2,6 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::cast;
 use crate::ops::color::luminance;
@@ -10,6 +9,7 @@ use crate::ops::edge::Edge;
 use crate::ops::noise::{clumped, standard_normal};
 use crate::ops::random::{mix, unit};
 use crate::params::{Choice, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture, Place};
 
 /// Where `grain` sits in the catalogue.
@@ -20,7 +20,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `grain` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     // the noise is a function of the canvas place and the seed, whatever the clumping; the picture is read at the pixel
     Footprint::Pixel
 }

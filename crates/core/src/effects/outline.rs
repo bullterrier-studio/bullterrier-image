@@ -3,10 +3,10 @@
 
 use serde::Deserialize;
 
-use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::distance::signed;
 use crate::params::{Choice, Color, FieldName, Params};
+use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `outline` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 
 /// Radius: a pixel is touched only within the stroke and its halo of the edge (`width + glow`), plus the one-pixel
 /// antialiasing ramp.
-pub(crate) fn footprint(params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Radius(f64::from(params.width + params.glow) + 1.0) // constant: the antialiasing ramp's px
 }
 
