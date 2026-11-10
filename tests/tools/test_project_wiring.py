@@ -316,7 +316,7 @@ RENAMED = {  # a way the core crate can drift from the public names -> its edits
         ),
         (CORE, 'name = "bullterrier-image"\n', 'name = "bullterrier-image-core"\n'),
         (CORE, "[dependencies]", '[lib]\nname = "bullterrier_image"\n\n[dependencies]'),
-        ("crates/python/Cargo.toml", "bullterrier-image.workspace", "bullterrier-image-core.workspace"),
+        ("crates/*/Cargo.toml", "bullterrier-image = { workspace", "bullterrier-image-core = { workspace"),
     ],
     "the library renamed": [(CORE, "[dependencies]", '[lib]\nname = "bti_core"\n\n[dependencies]')],
 }
