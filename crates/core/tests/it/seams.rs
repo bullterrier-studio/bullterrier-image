@@ -93,3 +93,29 @@ fn a_line_thinner_than_a_pixel_covers_the_pixels_beside_the_border_by_its_width_
     }
     Ok(())
 }
+
+#[test]
+fn a_border_between_the_last_two_rows_or_columns_is_drawn_too() -> Result<(), Error> {
+    // width 2 covers the two pixels beside a border, and nothing else
+    let last_row: Vec<i32> = (0..HEIGHT * WIDTH)
+        .map(|at| i32::from(at / WIDTH == HEIGHT - 1))
+        .collect();
+    let last_column: Vec<i32> = (0..HEIGHT * WIDTH)
+        .map(|at| i32::from(at % WIDTH == WIDTH - 1))
+        .collect();
+    for (what, labels, beside) in [
+        (
+            "rows",
+            last_row,
+            (|at: usize| at / WIDTH >= HEIGHT - 2) as fn(usize) -> bool,
+        ),
+        ("columns", last_column, |at: usize| at % WIDTH >= WIDTH - 2),
+    ] {
+        let cover = coverage(2.0, labels, 2)?;
+        for (at, level) in cover.iter().enumerate() {
+            let wanted = if beside(at) { 1.0 } else { 0.0 };
+            assert!((level - wanted).abs() < 1e-6, "{what}, pixel {at}: {level}");
+        }
+    }
+    Ok(())
+}
