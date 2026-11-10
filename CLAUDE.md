@@ -266,7 +266,7 @@ is a name or path, never a colour, and `usize` counts are kind `int`. What follo
   fields.
 - **Drivable:** `drivable=True` on a float lets a `Drive` vary it per pixel. Declare it only where the output changes
   smoothly with the value (a radius, an amount, an exposure), never for a whole number, choice, seed or colour; every
-  drivable field is tested by `tests/effects/test_contract.py`.
+  drivable field is tested by `tests/effects/test_contract.py` (the facade) and `crates/core/tests/effects_contract.rs`.
 - **Field:** a `FieldName` parameter (`field: FieldName = param("depth", doc=...)`) names a selection (`depth`, `light`,
   `subject`, a region), as `mask` and `Drive.by` do; not drivable, not a number. The effect takes the array as a keyword-only
   argument of that name, no default: `def relight(rgb, params, *, field)`; the runner builds only the fields steps name.
@@ -285,7 +285,7 @@ hue, temperature, tint, angle, spacing, opacity, blend, octaves, persistence, la
 
 Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template in `src/bullterrier_image/effects/_template/`
 defines the shape; `grade` (`crates/core/src/effects/grade.rs`) is the worked example. An effect that
-works from a map declares a `FieldName` parameter and reads its `Layer` from `Inputs` (`focus_blur`); one that cannot be described in Rust yet keeps a Python body (`effects/relight/`).
+works from a map declares a `FieldName` parameter and reads its `Layer` from `Inputs` (`focus_blur`).
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the Rust kernel `crates/core/src/effects/<name>.rs` (`META` with the
    category, a public `Params` with one example field, `render`) and
    `examples/effects/<name>.toml`; no Python file and no Python test. The effect exists once the extension is rebuilt with the kernel (`uv run` and `uv sync`
@@ -297,17 +297,15 @@ works from a map declares a `FieldName` parameter and reads its `Layer` from `In
    `size = 480`. `uv run poe gallery --only <name>` renders `docs/gallery/<name>.jpg` and writes nothing else.
 3. **Gate:** `uv run poe check`. Only files named for the effect may appear in `git status`. The integrator runs
    `uv run poe regenerate`; do not commit `fx.pyi` or `docs/effects/`.
-4. **Porting a Python effect to Rust:** the last step is always deleting its Python tests (`tests/effects/<name>/`) that the Rust
-   tests now cover; keep only what Python code can break (preset data, `fx` and recipe plumbing, `size_ratio`). Read, delete,
-   commit: no ledger, no mutant runs unless one specific property is in doubt. A ported effect ships Rust tests and no Python
-   behaviour test (the shared contract is `crates/core/tests/effects_contract.rs`).
+4. **Python tests:** an effect ships Rust tests; `tests/effects/<name>/` holds only what Python code can break (preset data, `fx` and
+   recipe plumbing, `size_ratio`, field plumbing).
 
 ## Fixing defects: image's additions
 
 On top of the rules in `docs/rules.md`:
 - Outside input is a recipe, a parameter, a photo, a file, a model or the network; each is validated once, where it enters.
 - The one clamp that belongs is the effect contract's (output in 0..1), written once.
-- A rule for every effect lives once, in `tests/effects/test_contract.py`.
+- A rule for every effect lives once, in `crates/core/tests/effects_contract.rs` (the facade's: `tests/effects/test_contract.py`).
 - Two similar Python declarations beat an abstraction with generated fields (a field's declaration is written once, in Rust,
   only for an effect the core runs); a three-line repeat beats a helper that hides the case.
 
@@ -350,9 +348,9 @@ When a test reaches inside (`tests/test_suite_rules.py` fails on private imports
 - Own test effects: `throwaway_effects`, or `fresh_registry` for an empty registry (public interface only).
 - "Work was skipped" shows in the files (an untouched sentinel), not in a spy.
 
-Writing a test file: a new file only for a new module, at the mirror path (`tests/ops/test_blur.py` for `ops/blur.py`); shared
+Writing a test file: a new file only for a new module, at the mirror path (`tests/ops/test_maps.py` for `ops/maps.py`); shared
 helpers are fixtures in the nearest `conftest.py`: `tests/conftest.py` (`photo`, `subject`, registry helpers, `echo_model`,
-`tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). One file: `uv run pytest tests/ops/test_blur.py -n 0`.
+`tracked_files`), `tests/tools/conftest.py` (`project_copy`, `uv_run_env`, `git_repo`). One file: `uv run pytest tests/ops/test_maps.py -n 0`.
 **Fast feedback (agents):** the suite is about 14,000 tests and takes minutes. While iterating or doing red-green TDD run only the
 tests covering your change, never the full suite; run the full gate (`uv run poe check`, then `uv run lint-imports`) once when
 the feature work is finished, before you report.

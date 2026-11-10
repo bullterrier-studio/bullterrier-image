@@ -56,6 +56,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `Table::check` and by the Python model (an `AfterValidator`), so `ascii`'s "at least two different characters" is declared once, in
   its `chars` field, not in Python. *Consequence:* the parameter format names `min_distinct` from v3. `ascii`'s `chars` is capped at 128 characters:
   the glyph atlas holds a cell of coverage for each (54 MB at the widest cell), so the maximum has a row in `limits.rs`.
+- **E6 (geometry, subject, glyphs, compositing) ran in Rust; the new pieces are few.** Own code: `ops/distance.rs` (exact
+  Euclidean distance transform, Felzenszwalb-Huttenlocher; outline, rim_light, defringe, light_wrap), `ops/segments.rs`
+  (anti-aliased segments), `ops/place.rs` (blend's fit). Crates: `delaunator` (ISC; shatter's triangles; a hard algorithm, used only
+  in `ops/triangles.rs`) and `read-fonts` (glyphs, below). A whole-number count the derive reads as `usize` (a piece or cell count)
+  is kind `int` in the format. Python keeps only the registration path of a hand-written effect (`throwaway_effects` proves it).
 - **Glyphs are drawn in the core with `read-fonts` and image's own rasteriser.** `ops/glyphs.rs` reads the bundled JetBrains
   Mono Regular (`crates/core/data/fonts/`, with its SIL OFL 1.1 text `OFL.txt`, a copy of the repository's `LICENSE-FONT`, itself
   the font authors' notice) with `read-fonts =0.46.0` (no default features, `libm`: the same pin as bullterrier-vector, which

@@ -12,7 +12,7 @@ Looks that are one effect with a set of values ship as presets of that effect (`
 recipes. A new look first extends an existing effect when every one of its parameters still matters for every look;
 it becomes a new effect only when it is a new idea. The effect set is consolidated: a name that is no longer an effect is a preset, a look or a parameter of the effect that took it over (`bt-image effects NAME` finds it).
 
-**Next:** none scheduled. Effects are added only when a video look needs one. Open: "Still planned", at the end.
+**Next:** none scheduled (E6 done). Effects are added only when a video look needs one. Open: "Still planned", at the end.
 
 ## Colour and tone
 
@@ -209,7 +209,6 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
 | depth contours ✓ (`topographic` with `field`) | Contour lines of any field, such as the depth: a LiDAR or scanner look. | `fx.topographic(field="depth", levels=24)` |
 | `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |
-| `light_wrap` | The surroundings' light and colour wrapped onto the subject's edge. Possible today as a recipe: `blend` of a blurred copy, `soft_light`, masked to the subject. | `fx.light_wrap(radius=60, amount=0.4)` |
 
 ## Subject-aware effects
 
@@ -315,10 +314,7 @@ A look is added to `examples/recipes/` by the batch that builds its last missing
 
 ## Still planned
 
-**Field parameters for the remaining injected inputs.** `relight`, `focus_blur` and `topographic` take a `field` parameter
-(`depth`, `light`, `subject`, a region), resolved like a `Drive`'s `by`. `ambient_occlusion` and `parallax` still take the
-injected `depth`; `disperse`, `drop_shadow`, `outline`, `reflection` and `rim_light` the injected `subject`. Moving them
-onto `field` leaves one mechanism; the owner schedules it.
+E7: scipy users left: `finding/subject.py`, `ops/pieces.py`.
 
 **Feature batch after E5 (E5b) ✓.** Halftone inks with a per-ink offset, line screens, ink separation and dither inks, then
 the risograph recipe. The Rust port of those effects (E5) stayed a parity port; the new capability followed it.
