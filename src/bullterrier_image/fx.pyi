@@ -604,19 +604,7 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
 
 @_effect
 def disperse(*, field: str = 'subject', cell: int = 5, progress: float = 0.0, top: float = 1.0, outline: float = 1.0, sweep: float = 0.0, reach: float = 1.0, wind: float = 96.0, angle: float = 350.0, hover: float = 0.0, outward: float = 0.0, ambient: float = 0.0, seed: int = 0, outline_depth: float = 72.0, jitter: float = 0.2, anticipation: float = 0.06, pullback: float = 0.15, flight: float = 0.2, flight_variation: float = 0.4, finish: float = 0.98, hover_spread: float = 0.45, bob: float = 2.0, bob_cycles: float = 3.0, angle_spread: float = 12.0, distance_minimum: float = 0.35, outward_distance: float = 58.0, acceleration: float = 0.5, sway: float = 6.0, sway_cycles: float = 1.5, falloff: float = 1.5, flare: float = 0.4, flare_span: float = 0.2, ambient_phase: float = 0.0, ambient_wavelength: float = 96.0, open_bottom: bool = True, normal_smoothing: float = 1.0, normal_truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', field_threshold: float = 0.5, background_threshold: float = 0.02, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['evaporate', 'halo', 'windblown', 'disintegrate'] | None = None) -> Step:
-    """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).
-
-`progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills
-of those looks, part-way through. The picture is cut into character-sized pieces. Black is background, so use it
-on a cut-out on black. Each piece
-has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows,
-fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.
-
-When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the
-figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover`
-makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.
-
-`field` is filled in by the recipe from the selection `params.field` names: float32 (h, w), 0..1.
+    """One moment of the picture dissolving into drifting pieces (evaporate, dissolve, disintegrate, wind-blown, halo).  `progress` 0 = untouched, 1 = finished. The presets `evaporate`, `halo`, `windblown` and `disintegrate` are stills of those looks, part-way through. The picture is cut into character-sized pieces. Black is background, so use it on a cut-out on black. Each piece has a fixed, random-ish fate set by `seed`: at a given `progress` it winds up, detaches, drifts, wobbles, glows, fades or is gone, and the same `seed` keeps every piece's fate the same at every `progress`.  When a piece detaches is set by where it is (`top`, `outline`, `sweep`, with `jitter`); `reach` is how much of the figure ever goes. Where it goes: on the wind (`wind`, `angle`), and away from its edge with `outward`. `hover` makes the edges loosen all round first; `ambient` with `ambient_phase` makes the pieces that stay shimmer.  Three layers, as motion design has them. Primary: a wind front crosses the picture and pieces drift away on it. Secondary: the pieces near the outline float up slowly first, each piece pulls back slightly before it goes (anticipation) and glows briefly as it leaves. Ambient: the pieces that stay shimmer in a wave travelling against the wind, set by `ambient_phase`. Every time-like parameter is a share of `progress`, so the look is the same however `progress` is driven.
 
 Parameters
 ----------
