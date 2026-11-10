@@ -3,13 +3,13 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
 use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `flow_warp` sits in the catalogue.
@@ -21,7 +21,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `flow_warp` reads around a pixel: the content that reaches it travelled `amount` px, and each of the `steps`
 /// resamplings reads up to two rows beyond the place it is asked for (the footprint's own margin counts one of them).
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     let taps = 2.0 * f64::from(params.steps - 1); // constant: a bicubic window's extra rows, for each step but the first
     Footprint::reach(f64::from(params.amount) + taps, params.edge == Edge::Wrap)
 }

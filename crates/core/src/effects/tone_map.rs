@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::guided::guided_filter;
 use crate::ops::length::whole;
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `tone_map` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `tone_map` reads around a pixel.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(2.0 * f64::from(params.radius))
 }
 

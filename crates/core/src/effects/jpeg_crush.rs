@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::jpeg::{Coefficients, Plane, decode, encode};
 use crate::ops::length::{float, whole};
@@ -10,7 +11,6 @@ use crate::ops::par;
 use crate::ops::random::Rng;
 use crate::ops::resample::Resize;
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `jpeg_crush` sits in the catalogue.
@@ -21,7 +21,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `jpeg_crush` reads around a pixel.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 

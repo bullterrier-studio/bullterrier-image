@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::chroma::smeared;
 use crate::ops::colorspace::{rgb_to_yiq, yiq_to_rgb};
@@ -12,7 +13,6 @@ use crate::ops::par;
 use crate::ops::random::{Rng, mix, unit};
 use crate::ops::shift::{Band, slide_row};
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture, Place};
 
 /// Where `vhs` sits in the catalogue.
@@ -24,7 +24,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `vhs` reads around a pixel: bands, dropouts and the wobble fall at canvas rows chosen from the seed and the canvas's
 /// height, the snow and the noise are numbered by canvas place, and a row reads only itself.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 

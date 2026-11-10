@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::params::{Declared, Kind, Table};
-use crate::{Canvas, Error, Footprint, Image, Inputs, Picture};
+use crate::{Error, Footprint, Image, Inputs, Picture};
 
 /// The sections of the effect catalogue. Every effect is in exactly one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -172,15 +172,15 @@ pub trait Effect: Send + Sync {
         None
     }
 
-    /// What it reads around a pixel when run with `params` on `canvas`: `Footprint::Whole` unless the effect says it is
+    /// What it reads around a pixel when run with `params`: `Footprint::Whole` unless the effect says it is
     /// less. `params` are exactly the parameters [`apply`](Self::apply) is given, an object completed, checked and
-    /// scaled to the picture (see [`Table::scaled`]), so a distance in them is already in working pixels, floors
+    /// scaled to the picture (see `Table::scaled`), so a distance in them is already in working pixels, floors
     /// included; the footprint scales nothing itself. Whatever an effect says holds for the picture it is run on (see
     /// [`Footprint`]).
     ///
     /// # Errors
     /// [`Error::Params`] if `params` are not the effect's parameters, as for [`apply`](Self::apply).
-    fn footprint(&self, _params: &Value, _canvas: &Canvas) -> Result<Footprint, Error> {
+    fn footprint(&self, _params: &Value) -> Result<Footprint, Error> {
         Ok(Footprint::Whole)
     }
 
@@ -238,7 +238,7 @@ pub(crate) struct Native<P> {
     meta: &'static Meta,
     /// The `FieldName` parameters of `P`, read from its declaration, so a field is declared once.
     fields: Vec<FieldParam>,
-    footprint: fn(&P, &Canvas) -> Footprint,
+    footprint: fn(&P) -> Footprint,
     render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
 }
 
@@ -247,7 +247,7 @@ impl<P: Declared> Native<P> {
     pub(crate) fn new(
         name: &'static str,
         meta: &'static Meta,
-        footprint: fn(&P, &Canvas) -> Footprint,
+        footprint: fn(&P) -> Footprint,
         render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
     ) -> Self {
         let fields = P::table()
@@ -301,8 +301,8 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
         Some(P::table())
     }
 
-    fn footprint(&self, params: &Value, canvas: &Canvas) -> Result<Footprint, Error> {
-        Ok((self.footprint)(&self.read(params.clone())?, canvas))
+    fn footprint(&self, params: &Value) -> Result<Footprint, Error> {
+        Ok((self.footprint)(&self.read(params.clone())?))
     }
 
     fn apply(&self, picture: &Picture<'_>, params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
@@ -318,8 +318,8 @@ mod tests {
     use serde::Deserialize;
 
     use super::{Category, FieldParam, Meta, Native};
+    use crate::Footprint;
     use crate::params::{FieldName, Params};
-    use crate::{Canvas, Footprint};
     use crate::{Effect, Image, Inputs, Picture};
 
     /// The parameters of a probe.
@@ -343,7 +343,7 @@ mod tests {
         inputs: &[],
     };
 
-    fn footprint(_params: &Probe, _canvas: &Canvas) -> Footprint {
+    fn footprint(_params: &Probe) -> Footprint {
         Footprint::Pixel
     }
 

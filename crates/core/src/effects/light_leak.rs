@@ -3,11 +3,11 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::light::screen;
 use crate::ops::random::Rng;
 use crate::params::{Color, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `light_leak` sits in the catalogue.
@@ -18,7 +18,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `light_leak` reads around a pixel: none but its own; the patches lie on the canvas.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 

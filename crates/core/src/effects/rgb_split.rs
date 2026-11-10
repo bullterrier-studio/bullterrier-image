@@ -8,11 +8,11 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::shift::shifted;
 use crate::params::{Choice, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `rgb_split` sits in the catalogue.
@@ -23,7 +23,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `rgb_split` reads around a pixel.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
 }
 

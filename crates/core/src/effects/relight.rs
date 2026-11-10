@@ -2,12 +2,12 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::{gaussian_filter_plane, is_fourier};
 use crate::ops::edge::Edge;
 use crate::ops::relief::shade_slopes;
 use crate::params::{FieldName, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `relight` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `relight` reads around a pixel: the blur's reach and a pixel on either side for the slope. A blur summed by the
 /// Fourier transform follows the length of its lines, and `height` multiplies that difference into a visible one: the whole.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     if is_fourier(f64::from(params.blur), f64::from(params.truncate)) {
         return Footprint::Whole;
     }

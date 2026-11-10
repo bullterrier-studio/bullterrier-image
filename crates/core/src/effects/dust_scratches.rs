@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::length;
 use crate::ops::random::{mix, unit};
 use crate::ops::segments::{Point, Segment, draw};
 use crate::params::{Color, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `dust_scratches` sits in the catalogue: a worn print shows its marks partway, so a step lays them at 0.8.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `dust_scratches` reads around a pixel: none but its own; the marks are those of the canvas.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 

@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cast::single;
 use crate::ops::color::luminance;
@@ -13,7 +14,6 @@ use crate::ops::ramp;
 use crate::ops::reaction::grow;
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::{Color, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `reaction_diffusion` sits in the catalogue.
@@ -24,7 +24,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `reaction_diffusion` reads around a pixel: a pattern grown over many steps depends on the whole picture.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 

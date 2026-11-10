@@ -3,13 +3,13 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_plane;
 use crate::ops::edge::Edge;
 use crate::ops::par;
 use crate::ops::ramp;
 use crate::params::{Choice, Color, FieldName, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `topographic` sits in the catalogue.
@@ -21,7 +21,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `topographic` reads around a pixel: the field is blurred and its slope read, and the picture's border changes the
 /// slope there.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 

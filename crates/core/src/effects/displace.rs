@@ -3,13 +3,13 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
 use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `displace` sits in the catalogue.
@@ -32,7 +32,7 @@ fn lattice(params: &Params, spacing: f64) -> Fractal {
 }
 
 /// What `displace` reads around a pixel: a move is `amount` times a field no larger than the noise's bound.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     // constant: a spacing no octave falls under 1 px from, so the bound holds at any size ratio (a finer lattice has fewer octaves)
     let all_octaves = f64::MAX;
     Footprint::reach(

@@ -3,10 +3,10 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::tone::Remap;
 use crate::params::{Choice, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `auto_levels` sits in the catalogue.
@@ -17,7 +17,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `auto_levels` reads around a pixel.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 

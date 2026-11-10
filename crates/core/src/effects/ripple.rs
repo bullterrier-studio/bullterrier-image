@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `ripple` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `ripple` reads around a pixel.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     // a pixel shows what is at most `amplitude` px away; a wrapped edge reads the far side
     Footprint::reach(f64::from(params.amplitude), params.edge == Edge::Wrap)
 }

@@ -6,7 +6,7 @@
 use std::error::Error;
 
 use bullterrier_image::params::Table;
-use bullterrier_image::{Canvas, Inputs, Picture, Place, apply, effect};
+use bullterrier_image::{Inputs, Picture, Place, apply, effect};
 use serde_json::{Value, json};
 
 use crate::common::compare::{first_bit_difference, first_difference_within};
@@ -204,12 +204,7 @@ fn margin(name: &str, params: &Value) -> Result<Option<usize>, Box<dyn Error>> {
     let table: Table = one.params().ok_or("no parameters")?;
     let given = params.as_object().ok_or("not an object")?;
     let completed = table.check(name, given)?;
-    Ok(one
-        .footprint(
-            &Value::Object(scaled(&*one, &completed, 1.0)),
-            &Canvas::new(HEIGHT, WIDTH),
-        )?
-        .margin())
+    Ok(one.footprint(&Value::Object(scaled(&*one, &completed, 1.0)))?.margin())
 }
 
 /// Rows `from..to` of the whole render of `cases` are what a band told its place renders (with the margin the footprint asks),

@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_owned;
 use crate::ops::distance::signed;
@@ -10,7 +11,6 @@ use crate::ops::edge::Edge;
 use crate::ops::light::screen;
 use crate::ops::relief::shade_slopes;
 use crate::params::{Color, FieldName, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `rim_light` sits in the catalogue.
@@ -21,7 +21,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// Whole: a shape with no edge anywhere in the picture lights nothing.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 

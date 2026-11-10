@@ -1,31 +1,10 @@
 //! What an effect reads around a pixel: the answer a banded renderer needs to render some rows of a picture without the
 //! rest.
 
-/// The canvas a footprint is asked about: its size in working pixels.
-///
-/// A reach that is a share of the canvas (of its shorter side, say) is not a number of the effect's parameters; an
-/// effect that has such a reach reads it here and says it in working pixels (see [`Radius`](Footprint::Radius)).
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[non_exhaustive]
-pub struct Canvas {
-    /// Rows of the canvas, in working pixels.
-    pub height: usize,
-    /// Columns of the canvas, in working pixels.
-    pub width: usize,
-}
-
-impl Canvas {
-    /// The canvas of `height` rows and `width` columns.
-    #[must_use]
-    pub fn new(height: usize, width: usize) -> Self {
-        Self { height, width }
-    }
-}
-
 /// What an effect reads around a pixel, given its parameters (see [`Effect::footprint`](crate::Effect::footprint)).
 ///
 /// The parameters are those the effect is rendered with: scaled to the picture, floors included (see
-/// [`Table::scaled`](crate::params::Table::scaled)), so every distance is in working pixels and the footprint and the
+/// `Table::scaled`), so every distance is in working pixels and the footprint and the
 /// render cannot disagree about the scaling.
 ///
 /// It is about rows, the unit a banded renderer cuts a picture by. The promise of [`Pixel`](Self::Pixel) and

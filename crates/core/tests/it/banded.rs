@@ -18,8 +18,8 @@ use std::sync::Arc;
 use bullterrier_image::frame::{Fit, Resample};
 use bullterrier_image::region::Bands;
 use bullterrier_image::{
-    Canvas, Category, Each, Effect, Entry, Footprint, Frame, Image, Input, Inputs, Layer, Options, Photo, Picture,
-    Presets, Recipe, Step, effect, effects,
+    Category, Each, Effect, Entry, Footprint, Frame, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets,
+    Recipe, Step, effect, effects,
 };
 use serde_json::Value;
 
@@ -153,10 +153,7 @@ fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_b
                 },
                 None => setting.clone(),
             };
-            let footprint = one.footprint(
-                &Value::Object(scaled(&*one, &completed, ratio)),
-                &Canvas::new(HEIGHT, WIDTH),
-            )?;
+            let footprint = one.footprint(&Value::Object(scaled(&*one, &completed, ratio)))?;
             if footprint.margin().is_none() {
                 continue; // Whole: the same code as the whole render
             }
@@ -396,7 +393,7 @@ impl Effect for Double {
         }
     }
 
-    fn footprint(&self, _params: &Value, _canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
+    fn footprint(&self, _params: &Value) -> Result<Footprint, bullterrier_image::Error> {
         // honest: the reach in working px
         Ok(self.says.unwrap_or(Footprint::Radius(f64::from(
             u32::try_from(self.reach).unwrap_or(u32::MAX),

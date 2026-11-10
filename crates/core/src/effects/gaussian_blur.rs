@@ -2,11 +2,11 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur;
 use crate::ops::edge::EdgeOrConstant;
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `gaussian_blur` sits in the catalogue.
@@ -17,7 +17,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `gaussian_blur` reads around a pixel.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(
         f64::from(params.radius * params.truncate),
         params.edge == EdgeOrConstant::Wrap,

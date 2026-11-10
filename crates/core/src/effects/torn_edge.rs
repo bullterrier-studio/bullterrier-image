@@ -3,10 +3,10 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::noise::{Fractal, field_rows};
 use crate::params::{Color, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `torn_edge` sits in the catalogue.
@@ -17,7 +17,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `torn_edge` reads around a pixel.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 

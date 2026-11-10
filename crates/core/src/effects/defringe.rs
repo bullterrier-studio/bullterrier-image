@@ -8,7 +8,7 @@ use crate::ops::blur::weighted_gaussian;
 use crate::ops::distance::signed;
 use crate::ops::edge::Extension;
 use crate::params::{FieldName, Params};
-use crate::{Canvas, Footprint, Image, Inputs, Picture};
+use crate::{Footprint, Image, Inputs, Picture};
 
 /// Where `defringe` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -24,7 +24,7 @@ const SIGMA_PER_WIDTH: f64 = 0.5; // constant: the interior colour is a mean ove
 
 /// Radius: a pixel needs its depth (`width`), then the interior around it (the kernel's reach, 4 sigmas of `width` / 2
 /// plus half a px) with each of those pixels' depth (`width` more), and a px for the kernel's rounding.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(f64::from(params.width) * (1.0 + TRUNCATE * SIGMA_PER_WIDTH) + 1.0)
 }
 

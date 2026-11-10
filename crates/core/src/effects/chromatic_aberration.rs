@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `chromatic_aberration` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `chromatic_aberration` reads around a pixel.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     // a copy is magnified by at most 1 +- shift, which moves a pixel by at most `amount` px (the farthest corner moves by it)
     Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
 }

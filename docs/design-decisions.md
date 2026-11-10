@@ -605,15 +605,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     anywhere on its circle about the canvas centre, so the reach is twice a share of the shorter side, `Radius(2 x
     radius x (side - 1) / ratio)` now statable: at the default 0.5 that is the shorter side, a margin that covers the
     picture whatever the band, and `render` takes its centre from the picture, not the canvas.
-- **Settled: a footprint sees the canvas (banded render, B3a).** `Effect::footprint(&Params, &Canvas)`, `Canvas { height,
-  width }` (B5 dropped `ratio`); a share of a side is read from it. (B3a had `Radius` in design px with `ratio` in the canvas;
-  B5 supersedes that, next entry.) *Reason:* a footprint that could not see the canvas forced four effects
-  (`halftone` blurred, `swirl`, `pinch_bulge`, `ascii`) to `Whole`; only `halftone` is freed by it.
+- **Settled: a footprint sees no canvas (banded render, B3a, B5).** B3a gave `Effect::footprint` a `Canvas { height, width }`
+  so a reach that is a share of a side could be stated (it freed `halftone`). No footprint reads it, so `Canvas` was removed
+  as dead API; it returns with its first consumer, e.g. a share-of-side reach (`swirl`, `pinch_bulge`).
 - **Settled: a footprint is asked about the parameters the render gets (banded render, B5).** `Effect::footprint` receives
   the step's parameters after `Table::scaled`, floors included, and `Radius` is in working px; `Footprint::margin` takes no
   ratio. *Reason:* scaling is known in one place; a footprint in design px re-implemented it per effect and missed the floor
   (a `px` value below its `min` in working px when the picture shrinks), so `ambient_occlusion` radius 1 at ratio 0.2 read 4
-  rows against a margin of 3. The honesty test sweeps every `px` parameter at ratios 0.2 to 2 on `Table::scaled`'s output.
+  rows against a margin of 3. `tests/it/banded.rs` renders every `px` parameter of every effect whole and banded through `Photo::render` at ratios 0.2 to 2.
 - **Settled: the band height trades memory for time (banded render).** Measured on 24 MP (4000 x 6000), `grade`,
   `vignette`, `gaussian_blur` radius 2, `grain`; memory is the peak beyond the photo as a multiple of the 288 MB image
   made, time against the whole render at 1 / 4 threads (median of 3):

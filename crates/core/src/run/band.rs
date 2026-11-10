@@ -2,7 +2,7 @@
 
 use super::Run;
 use super::step::Prepared;
-use crate::{Canvas, Error, Image, Picture};
+use crate::{Error, Image, Picture};
 
 impl Run<'_> {
     /// Runs every step still to run, in bands of `rows` rows (at least 1) wherever the steps allow (see
@@ -15,14 +15,10 @@ impl Run<'_> {
     /// dropped. The rows of every band are copied into one output image. A step without a margin runs whole.
     pub(super) fn advance_banded(&mut self, rows: usize) -> Result<(), Error> {
         let steps: Vec<Prepared> = self.steps.by_ref().collect();
-        let (height, width) = {
-            let picture = self.working.picture();
-            (picture.height(), picture.width())
-        };
-        let canvas = Canvas::new(height, width);
+        let height = self.working.picture().height();
         let margins = steps
             .iter()
-            .map(|step| step.margin(&canvas))
+            .map(super::step::Prepared::margin)
             .collect::<Result<Vec<_>, _>>()?;
         let mut first = 0;
         while first < steps.len() {

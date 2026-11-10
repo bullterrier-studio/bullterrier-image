@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_owned;
 use crate::ops::edge::Edge;
 use crate::ops::shift::shifted;
 use crate::params::{Color, FieldName, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `drop_shadow` sits in the catalogue.
@@ -19,7 +19,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `drop_shadow` reads around a pixel: the shape as far as the farthest copy lies, softened by the blur's reach.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     // constant: the Gaussian reaches int(truncate x blur + 0.5) px, and a copy moved by a fraction reads one row more
     Footprint::reach(
         f64::from(params.copies) * f64::from(params.offset) + f64::from(params.blur * params.truncate) + 1.5,

@@ -16,7 +16,7 @@ use crate::common::pictures::asset;
 use crate::common::sweep::{Setting, scaled, variants};
 use bullterrier_image::params::{Kind, Table, Unit};
 use bullterrier_image::{
-    Canvas, Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect, effects,
+    Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect, effects,
 };
 use serde_json::{Value, json};
 
@@ -122,7 +122,7 @@ fn problems_of(
     };
     // the footprint is asked about what the render is given
     let params = scaled(one, &completed, ratio);
-    let footprint = one.footprint(&Value::Object(params.clone()), &Canvas::new(HEIGHT, WIDTH))?;
+    let footprint = one.footprint(&Value::Object(params.clone()))?;
     let Some(margin) = footprint.margin() else {
         return Ok(Vec::new());
     };
@@ -208,7 +208,7 @@ fn every_effect_that_says_it_reads_less_than_the_whole_picture_gives_the_same_ro
             .map(|table| table.check(&name, &Setting::new()))
             .transpose()?;
         if let Some(defaults) = defaults
-            && one.footprint(&Value::Object(defaults), &Canvas::new(HEIGHT, WIDTH))? != Footprint::Whole
+            && one.footprint(&Value::Object(defaults))? != Footprint::Whole
         {
             not_whole += 1;
         }
@@ -237,7 +237,7 @@ impl Effect for Blur {
         Category::Utilities
     }
 
-    fn footprint(&self, _params: &Value, _canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
+    fn footprint(&self, _params: &Value) -> Result<Footprint, bullterrier_image::Error> {
         Ok(self.says)
     }
 
@@ -278,7 +278,7 @@ impl Effect for Ruler {
         Category::Utilities
     }
 
-    fn footprint(&self, _params: &Value, _canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
+    fn footprint(&self, _params: &Value) -> Result<Footprint, bullterrier_image::Error> {
         Ok(Footprint::Pixel)
     }
 
@@ -308,7 +308,7 @@ impl Effect for PlacedRuler {
         &[Input::Place]
     }
 
-    fn footprint(&self, _params: &Value, _canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
+    fn footprint(&self, _params: &Value) -> Result<Footprint, bullterrier_image::Error> {
         Ok(Footprint::Pixel)
     }
 
@@ -442,7 +442,7 @@ impl Effect for Claim {
         self.inner.params()
     }
 
-    fn footprint(&self, _params: &Value, _canvas: &Canvas) -> Result<Footprint, bullterrier_image::Error> {
+    fn footprint(&self, _params: &Value) -> Result<Footprint, bullterrier_image::Error> {
         Ok(self.says)
     }
 

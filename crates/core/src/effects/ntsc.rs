@@ -3,13 +3,13 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::cast;
 use crate::ops::chroma::smeared;
 use crate::ops::colorspace::{rgb_to_yiq, yiq_to_rgb};
 use crate::ops::edge::Edge;
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `ntsc` sits in the catalogue.
@@ -21,7 +21,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `ntsc` reads around a pixel: the dot crawl follows the parity of the row, so a row is not the same in another frame
 /// of reference.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 

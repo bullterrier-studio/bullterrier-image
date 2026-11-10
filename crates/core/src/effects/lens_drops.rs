@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::blur::gaussian_filter;
 use crate::ops::edge::Edge;
@@ -10,7 +11,6 @@ use crate::ops::random::Rng;
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::ops::{cast, length, par};
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `lens_drops` sits in the catalogue.
@@ -23,7 +23,7 @@ pub(crate) const META: Meta = Meta {
 /// What `lens_drops` reads around a pixel: a pixel at offset d from a drop's middle shows the blurred scene at -`refraction` x d
 /// from it, so at most (1 + `refraction`) x `radius` away, and the blur reads `truncate` x `blur` further. The drops lie on
 /// the canvas. A wrapped edge reads the opposite side.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(
         f64::from((1.0 + params.refraction) * params.radius + params.truncate * params.blur),
         params.edge == Edge::Wrap,

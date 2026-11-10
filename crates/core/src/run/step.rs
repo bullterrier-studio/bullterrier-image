@@ -13,7 +13,7 @@ use crate::ops::{blend, levels};
 use crate::params::Kind;
 use crate::recipe::drive;
 use crate::registry::Registry;
-use crate::{BlendMode, Canvas, Entry, Error, Image, Inputs, Labels, Layer, Lut, Picture, Place, Presets, Step};
+use crate::{BlendMode, Entry, Error, Image, Inputs, Labels, Layer, Lut, Picture, Place, Presets, Step};
 
 /// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
 /// names, for an `each` step its looks the same.
@@ -59,14 +59,14 @@ impl Prepared {
         }
     }
 
-    /// The rows of margin this entry needs above and below the rows it makes on `canvas`, or none if it reads the whole
+    /// The rows of margin this entry needs above and below the rows it makes, or none if it reads the whole
     /// picture: an `each` step, a driven step and an effect that says [`Whole`](crate::Footprint::Whole).
     ///
     /// # Errors
     /// [`Error::Params`] if the effect refuses its own parameters.
-    pub(super) fn margin(&self, canvas: &Canvas) -> Result<Option<usize>, Error> {
+    pub(super) fn margin(&self) -> Result<Option<usize>, Error> {
         match self {
-            Self::Step(step) => step.margin(canvas),
+            Self::Step(step) => step.margin(),
             Self::Each(_) => Ok(None),
         }
     }
@@ -290,15 +290,15 @@ impl StepRun {
         })
     }
 
-    /// The rows of margin this step needs above and below the rows it makes on `canvas` (see
+    /// The rows of margin this step needs above and below the rows it makes (see
     /// [`Footprint::margin`](crate::Footprint::margin)), or none if it reads the whole picture. A driven step is whole:
     /// it mixes runs by a map, and its footprint is the widest of its levels', which is not worked out.
     ///
     /// # Errors
     /// [`Error::Params`] if the effect refuses its own parameters.
-    pub(super) fn margin(&self, canvas: &Canvas) -> Result<Option<usize>, Error> {
+    pub(super) fn margin(&self) -> Result<Option<usize>, Error> {
         match &self.runs {
-            Runs::One { scaled } => Ok(self.effect.footprint(scaled, canvas)?.margin()),
+            Runs::One { scaled } => Ok(self.effect.footprint(scaled)?.margin()),
             Runs::Driven { .. } => Ok(None),
         }
     }

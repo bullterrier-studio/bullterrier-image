@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::blur::gaussian_filter;
 use crate::ops::cast;
@@ -11,7 +12,6 @@ use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, SPOT_SCREEN_STEP, sh
 use crate::ops::length::{float, whole};
 use crate::ops::par;
 use crate::params::{Choice, Color, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `halftone` sits in the catalogue.
@@ -23,7 +23,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `halftone` reads around a pixel: the grid of dots is anchored at the picture's corner, so a row is not the same
 /// in another frame of reference.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     // A pixel shows the tone at the centre of its screen cell, at most half a cell diagonal away, and the tone is the
     // blur of the picture there, which reaches `int(truncate x sigma x cell + 0.5)` pixels. `cell` is whole working px.
     // Half a pixel for rounding the centre to a pixel and half for the blur's `+ 0.5`; the margin adds the

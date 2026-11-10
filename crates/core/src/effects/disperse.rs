@@ -12,7 +12,7 @@ use crate::ops::length::float;
 use crate::ops::outward::{Measure, outward};
 use crate::ops::random::{mix, unit};
 use crate::params::{FieldName, Params};
-use crate::{Canvas, Footprint, Image, Inputs, Picture};
+use crate::{Footprint, Image, Inputs, Picture};
 
 /// Where `disperse` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -23,7 +23,7 @@ pub(crate) const META: Meta = Meta {
 
 /// What `disperse` reads around a pixel: the grid of cells is anchored at the picture's corner, the order pieces leave in
 /// is scaled by the extremes over the whole figure, and the distance from its outline reaches across the picture.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 

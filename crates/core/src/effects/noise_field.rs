@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::gauss::ndtr;
@@ -12,7 +13,6 @@ use crate::ops::random::{Rng, mix, unit};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::ops::{cast, length, par, ramp};
 use crate::params::{Choice, Color, Params};
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// Where `noise_field` sits in the catalogue.
@@ -23,7 +23,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `noise_field` reads around a pixel.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     // 'value' is the noise of the canvas place and the seed. The others are standardised over the picture they make (a
     // mean and a deviation of everything), so a part of the picture would be scaled by its own.
     if params.kind == Kind::Value {

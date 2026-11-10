@@ -3,12 +3,12 @@
 
 use serde::Deserialize;
 
+use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::color::luminance;
 use crate::ops::convolve::{Kernel, convolve};
 use crate::ops::edge::Edge;
 use crate::params::Params;
-use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
 
 /// The channel of a convolved sample that carries the weight, after red, green and blue.
@@ -22,7 +22,7 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `lens_blur` reads around a pixel.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.radius), params.edge == Edge::Wrap)
 }
 
