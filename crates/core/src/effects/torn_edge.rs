@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::effect::{Category, Input, Meta};
-use crate::ops::noise::{Fractal, field};
+use crate::ops::noise::{Fractal, field_rows};
 use crate::params::{Color, Params};
 use crate::{Canvas, Footprint};
 use crate::{Image, Inputs, Picture};
@@ -66,7 +66,8 @@ pub struct Params {
 /// left 2, right 3), each its own tear.
 fn distances(length: usize, side: u64, params: &Params) -> Vec<f32> {
     // a strip one pixel high: the tear is one line of noise along the side
-    let wander = field(
+    let wander = field_rows(
+        0,
         1,
         length,
         &Fractal {

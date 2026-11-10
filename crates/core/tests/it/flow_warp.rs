@@ -144,8 +144,8 @@ fn every_pixel_is_carried_amount_px_in_one_step_whatever_the_flow() -> Result<()
 
 #[test]
 fn the_direction_is_the_angle_turned_by_noise_of_mean_zero_and_deviation_variation() -> Result<(), Error> {
-    // the noise is standardised over the picture, so the directions have mean `angle` and deviation `variation`; read off
-    // the interior of a large picture (the margin is the amount) the statistics are close to it
+    // the noise has deviation 1 at every place, so over a large picture (some 500 independent cells) the directions have about
+    // the mean `angle` and the deviation `variation`
     for (angle, variation) in [(0.0_f32, 30.0_f32), (90.0, 60.0), (200.0, 45.0)] {
         let params = Params {
             amount: 2.0,
@@ -201,7 +201,8 @@ fn the_flow_is_smooth_over_the_scale() -> Result<(), Error> {
     let direction_correlation = |scale: f32| -> Result<f64, Error> {
         let params = Params {
             amount: 2.0,
-            variation: 90.0,
+            // 30 degrees turn a direction by under 130 even at the noise's greatest, so no direction wraps at 180 degrees
+            variation: 30.0,
             scale,
             octaves: 1,
             seed: 8,

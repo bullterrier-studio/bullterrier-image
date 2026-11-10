@@ -1,6 +1,6 @@
 //! `aurora`: a curtain of light over a sky. With a level base (`waviness` 0) and no rays the picture is a function of the row
 //! alone and every value is worked out by hand from the documented brightness `(1 - d)^falloff` at `d` of the way up. The
-//! wobble of the base has the deviation `waviness` and the rays' brightness is the normal distribution of a standardised noise,
+//! wobble of the base has the deviation `waviness` and the rays' brightness is the normal distribution of a noise of unit deviation,
 //! which statistics over a wide picture at a fixed seed show.
 
 use bullterrier_image::Error;
@@ -118,7 +118,7 @@ fn the_base_wanders_with_the_waviness_as_its_deviation_around_the_base_line() ->
 }
 
 #[test]
-fn a_ray_is_as_dim_as_rays_says_and_the_columns_brightness_is_the_normal_distribution_of_a_standardised_noise()
+fn a_ray_is_as_dim_as_rays_says_and_the_columns_brightness_is_the_normal_distribution_of_a_noise_of_unit_deviation()
 -> Result<(), Error> {
     // a level base, a grey curtain, reading one row just above the base where the curtain is at full brightness: a column
     // shows 1 - rays x (1 - rank), the rank being ndtr of a noise of unit deviation
@@ -136,22 +136,28 @@ fn a_ray_is_as_dim_as_rays_says_and_the_columns_brightness_is_the_normal_distrib
         rays,
         ..Params::default()
     };
-    let read = |rays| -> Result<Vec<f64>, Error> {
-        let out = run_sized(&params(rays), 100, width, 0.0)?;
+    let read_seed = |rays, seed| -> Result<Vec<f64>, Error> {
+        let out = run_sized(&Params { seed, ..params(rays) }, 100, width, 0.0)?;
         // 10 px above the base the vertical fade is (1 - 10 / 4000)^0.2
         let fade = (1.0_f64 - 10.0 / 4000.0).powf(0.2);
         Ok((0..width)
             .map(|column| f64::from(out[65 * width + column][0]) / fade)
             .collect())
     };
-    // rays 1: the column brightness is the rank itself, its normal quantile standardised noise
+    let read = |rays| read_seed(rays, 8);
+    // rays 1: the column brightness is the rank itself, its normal quantile noise of deviation 1 at every column. A row is
+    // not standardised, so the statistics hold over many seeds (8 rows of 4000 columns, some 5000 independent cells)
+    let mut z = Vec::new();
+    for seed in 1..=8 {
+        z.extend(
+            read_seed(1.0, seed)?
+                .iter()
+                .map(|rank| normal_quantile(rank.clamp(1e-7, 1.0 - 1e-7))),
+        );
+    }
+    assert!(mean(&z).abs() < 0.05, "mean {}", mean(&z));
+    assert!((deviation(&z) - 1.0).abs() < 0.08, "deviation {}", deviation(&z));
     let full = read(1.0)?;
-    let z: Vec<f64> = full
-        .iter()
-        .map(|rank| normal_quantile(rank.clamp(1e-7, 1.0 - 1e-7)))
-        .collect();
-    assert!(mean(&z).abs() < 0.01, "mean {}", mean(&z));
-    assert!((deviation(&z) - 1.0).abs() < 0.02, "deviation {}", deviation(&z));
     // a weaker ray keeps the same ranking, dimmed to between 1 - rays and 1
     let half = read(0.5)?;
     for (rank, dim) in full.iter().zip(&half) {

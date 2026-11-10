@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::effect::{Category, Input, Meta};
 use crate::ops::gauss::ndtr;
-use crate::ops::noise::{Fractal, field};
+use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::{cast, length, ramp};
 use crate::params::{Color, Params};
 use crate::{Canvas, Footprint};
@@ -94,7 +94,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let (rows, width) = (place.canvas_height, place.canvas_width);
     // constant: a one-row field, so the noise runs along the picture only
     let along = |spacing: f32, stream| {
-        field(
+        field_rows(
+            0,
             1,
             width,
             &Fractal {

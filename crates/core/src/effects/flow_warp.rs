@@ -3,10 +3,10 @@
 
 use serde::Deserialize;
 
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::centre::Centre;
 use crate::ops::edge::Edge;
-use crate::ops::noise::{Fractal, field};
+use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::Params;
 use crate::{Canvas, Footprint};
@@ -16,18 +16,23 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Distortion,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
-/// What `flow_warp` reads around a pixel.
-pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
-    Footprint::Whole
+/// What `flow_warp` reads around a pixel: the content that reaches it travelled `amount` px, and each of the `steps`
+/// resamplings reads up to two rows beyond the place it is asked for (the footprint's own margin counts one of them).
+pub(crate) fn footprint(params: &Params, canvas: &Canvas) -> Footprint {
+    let taps = 2.0 * f64::from(params.steps - 1); // constant: a bicubic window's extra rows, for each step but the first
+    Footprint::reach(
+        f64::from(params.amount) + taps / canvas.ratio,
+        params.edge == Edge::Wrap,
+    )
 }
 
 /// Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise.
 ///
 /// The flow at each pixel points `angle` degrees clockwise from pointing right, turned by a noise field (`scale`,
-/// `octaves`, `persistence`, `lacunarity`, standardised to mean 0 and standard deviation 1, then scaled to `variation`
+/// `octaves`, `persistence`, `lacunarity`, of standard deviation 1 at every place, then scaled to `variation`
 /// degrees of spread). The picture is moved along it in `steps` equal steps of `amount` / `steps` px, each step moving what
 /// is at a pixel one step along the flow there, so a pixel's content follows the bends of the flow and piles up into
 /// streaks where currents meet. The path of any content is `amount` px long. The result never leaves 0..1.
@@ -85,9 +90,12 @@ pub struct Params {
 }
 
 /// The picture carried along the flow.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
-    let noise = field(
+    // the flow is that of the canvas place, so a band of the picture is carried as the same rows of the whole are
+    let place = inputs.place(picture);
+    let noise = field_rows(
+        place.first_row,
         height,
         width,
         &Fractal {

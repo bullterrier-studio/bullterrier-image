@@ -54,6 +54,19 @@ fn cases() -> Vec<(&'static str, Value)> {
             json!({"seed": 3, "base": 0.6, "height": 40.0, "waviness": 8.0}),
         ),
         ("torn_edge", json!({"width": 6.0, "roughness": 0.9, "seed": 4})),
+        // the moves are drawn by canvas place; the reach is `amount` times the noise's bound
+        (
+            "displace",
+            json!({"amount": 1.5, "scale": 9.0, "octaves": 2, "seed": 6, "interpolation": "bicubic"}),
+        ),
+        (
+            "displace",
+            json!({"amount": 2.0, "scale": 1.0, "octaves": 1, "seed": 2, "interpolation": "nearest", "edge": "nearest"}),
+        ),
+        (
+            "flow_warp",
+            json!({"amount": 4.0, "steps": 2, "scale": 8.0, "variation": 120.0, "seed": 5, "interpolation": "bicubic"}),
+        ),
         (
             "blend",
             json!({"image": "asset", "mode": "multiply", "fit": "cover", "at": "center"}),

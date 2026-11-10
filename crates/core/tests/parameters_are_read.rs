@@ -488,6 +488,54 @@ fn conditional() -> Vec<Conditional> {
             field: "seed",
             with: vec![("width", json!(3.0)), ("roughness", json!(0.9)), ("scale", json!(5.0))],
         },
+        // the base of the curtain moves by `waviness` x the ripple, which on a picture narrower than `scale` is one value for
+        // the whole width (a place's noise is not standardised over the picture): at the default the 12 px base may leave
+        // the picture, where no curtain shows
+        Conditional {
+            effect: "aurora",
+            field: "colors",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "base",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "height",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "falloff",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "rays",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "ray_width",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "octaves",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "persistence",
+            with: vec![("waviness", json!(0.0))],
+        },
+        Conditional {
+            effect: "aurora",
+            field: "lacunarity",
+            with: vec![("waviness", json!(0.0))],
+        },
         // the lines of a colour are drawn only where there is a gap
         Conditional {
             effect: "shatter",

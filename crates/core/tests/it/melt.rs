@@ -60,9 +60,10 @@ fn pull_at_last_row(params: &Params, width: usize, channel: usize) -> Result<Vec
 /// last row).
 fn drips(params: &Params, width: usize) -> Result<Vec<f64>, Error> {
     let lengths = pull_at_last_row(params, width, 3)?;
-    // the other tests take these as their oracle: a melt that pulled nothing would make them agree with anything
+    // the other tests take these as their oracle: a melt that pulled nothing would make them agree with anything (a length is
+    // the normal distribution of a noise value, so it is above 0 however the seed falls)
     assert!(
-        mean(&lengths) > 0.2,
+        mean(&lengths) > 0.01,
         "the ramp is pulled: mean length {}",
         mean(&lengths)
     );
@@ -70,39 +71,58 @@ fn drips(params: &Params, width: usize) -> Result<Vec<f64>, Error> {
 }
 
 #[test]
-fn a_picture_one_column_wide_has_the_middle_drip_length_by_hand() -> Result<(), Error> {
-    // one column: the noise has no variation, so it is all zeros; the normal distribution of 0 is 1/2. amount 20 pulls the
-    // white last row 10 px, so it shows the ramp at row 54: 54 / 64
-    let params = Params {
-        amount: 20.0,
-        ..Params::default()
-    };
-    let out = run_picture(&params, RAMP, 1, &ramp(1, 3))?;
-    let shown = out[(RAMP - 1) * 3];
-    assert!((shown - 54.0 / 64.0).abs() < 1e-6, "{shown}");
+fn a_picture_one_column_wide_has_a_drip_length_the_noise_can_give_and_the_middle_one_on_average() -> Result<(), Error> {
+    // one column holds one lattice value, drawn evenly from -1 to 1 and divided by its own deviation sqrt(1/3) (the variance of
+    // a uniform on -1..1): a noise value evenly spread over -sqrt(3)..sqrt(3). Its normal distribution is between ndtr(-1.7320508)
+    // = 0.04163 and ndtr(1.7320508) = 0.95837 and is 1/2 on average (the spread is symmetric). amount 20 pulls the white last
+    // row `20 x length` px, so it shows the ramp at row 64 - pulled: (64 - pulled) / 64.
+    let mut total = 0.0;
+    let seeds: u32 = 400;
+    for seed in 0..seeds {
+        let params = Params {
+            amount: 20.0,
+            seed,
+            ..Params::default()
+        };
+        let out = run_picture(&params, RAMP, 1, &ramp(1, 3))?;
+        let length = (1.0 - f64::from(out[(RAMP - 1) * 3])) * 64.0 / 20.0;
+        assert!((0.0416..=0.9584).contains(&length), "seed {seed}: length {length}");
+        total += length;
+    }
+    // the mean of 400 evenly spread lengths (deviation about 0.27) is within 0.05 of 1/2 by a wide margin
+    assert!(
+        (total / f64::from(seeds) - 0.5).abs() < 0.05,
+        "mean length {}",
+        total / f64::from(seeds)
+    );
     Ok(())
 }
 
 #[test]
 fn the_drip_lengths_are_the_normal_distribution_of_noise_of_mean_zero_and_deviation_one() -> Result<(), Error> {
-    let params = Params {
-        amount: 40.0,
-        scale: 6.0,
-        seed: 3,
-        ..Params::default()
-    };
-    let lengths = drips(&params, 2000)?;
+    // the noise has deviation 1 at every column but is not standardised over a row, so the quantiles of the lengths have mean 0
+    // and deviation 1 over many seeds, not for one row: 8 rows of 2000 columns (some 2700 independent cells)
+    let mut lengths = Vec::new();
+    for seed in 1..=8 {
+        let params = Params {
+            amount: 40.0,
+            scale: 6.0,
+            seed,
+            ..Params::default()
+        };
+        lengths.extend(drips(&params, 2000)?);
+    }
     assert!(lengths.iter().all(|u| (0.0..=1.0).contains(u)), "lengths lie in 0..1");
-    // the noise is standardised over the row, so the quantiles of the lengths are exactly mean 0 and deviation 1
     let z: Vec<f64> = lengths
         .iter()
         .map(|u| normal_quantile(u.clamp(1e-7, 1.0 - 1e-7)))
         .collect();
-    assert!(mean(&z).abs() < 0.01, "mean {}", mean(&z));
-    assert!((deviation(&z) - 1.0).abs() < 0.02, "deviation {}", deviation(&z));
-    // and so the lengths spread evenly
+    assert!(mean(&z).abs() < 0.05, "mean {}", mean(&z));
+    assert!((deviation(&z) - 1.0).abs() < 0.08, "deviation {}", deviation(&z));
+    // and so the lengths spread about evenly
+    let count = lengths.len() as f64;
     for quarter in [0.25, 0.5, 0.75] {
-        let below = lengths.iter().filter(|u| **u < quarter).count() as f64 / 2000.0;
+        let below = lengths.iter().filter(|u| **u < quarter).count() as f64 / count;
         assert!(
             (below - quarter).abs() < 0.06,
             "{below} of the columns are under {quarter}"

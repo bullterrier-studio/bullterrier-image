@@ -8,7 +8,7 @@ use crate::ops::centre::Centre;
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
 use crate::ops::gauss::ndtr;
-use crate::ops::noise::{Fractal, field};
+use crate::ops::noise::{Fractal, field_rows};
 use crate::ops::sample::{Interpolation, Sampler};
 use crate::params::Params;
 use crate::{Canvas, Footprint};
@@ -28,8 +28,8 @@ pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
 
 /// Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column.
 ///
-/// Each column has a drip length between 0 and 1: smooth noise along the row, `scale` px wide and standardised to mean 0 and
-/// standard deviation 1, passed through the normal cumulative distribution so that lengths spread evenly. A pixel is pulled
+/// Each column has a drip length between 0 and 1: smooth noise along the row, `scale` px wide and of mean 0 and
+/// standard deviation 1 at every column, passed through the normal cumulative distribution so that lengths spread evenly. A pixel is pulled
 /// down by `amount` x its column's length x its own brightness (Rec. 709 luminance): it shows the picture that many px higher
 /// up in the same column, read by `interpolation` with `edge` above the top. Nothing moves sideways, black pixels stay in
 /// place, and the same `seed` gives the same drips. The result never leaves 0..1.
@@ -63,7 +63,8 @@ pub struct Params {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     // constant: one octave of noise on a strip one pixel high, so the other two layer settings have no effect
-    let strip = field(
+    let strip = field_rows(
+        0,
         1,
         width,
         &Fractal {

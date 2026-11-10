@@ -1,6 +1,6 @@
 //! `displace`: every pixel moved by two fields of fractal noise. The moves are read back from the picture through a warp
 //! of the `coordinates` picture (each pixel then holds the place it was read from), so the properties are those of the
-//! moves: bounded by `amount`, proportional to it, as smooth as `scale` says, different for another seed, independent
+//! moves: of deviation `amount`, bounded by the noise's greatest value, proportional to it, as smooth as `scale` says, different for another seed, independent
 //! between the two axes.
 
 #![expect(
@@ -36,7 +36,7 @@ fn inside(at: usize, margin: usize) -> bool {
 
 fn smooth() -> Params {
     Params {
-        amount: 10.0,
+        amount: 2.0,
         scale: 40.0,
         octaves: 1,
         ..Params::default()
@@ -98,16 +98,24 @@ fn a_single_pixel_has_nothing_to_move_by_and_thin_pictures_are_displaced() -> Re
 }
 
 #[test]
-fn no_pixel_moves_farther_than_the_amount_whatever_the_edge_and_the_layers() -> Result<(), Error> {
-    // (amount, scale, octaves, persistence, lacunarity): broad waves, fine tearing, rough noise; with the edge rule
-    // 'nearest' a read beyond the picture lands on the border, which is never farther than the unclamped read
+fn no_move_is_larger_than_the_amount_times_the_greatest_value_the_noise_can_take() -> Result<(), Error> {
+    // A noise value is a sum of lattice values (within -1..1) read with Catmull-Rom weights, which sum to at most 5/4 in size
+    // along an axis, so at most (5/4)^2 x (the octave weights) = 1.5625 x W; it is divided by its deviation, at least
+    // sqrt(S / 3) x 41/64 for S the sum of the squared octave weights (a lattice value has variance 1/3, the weights of an axis
+    // sum to at least 41/64 in square). So |value| <= 1.5625 x W / (sqrt(S / 3) x 0.640625), worked out by hand per row:
+    // one octave: W = S = 1, 1.5625 / (0.57735 x 0.640625) = 4.2247;
+    // 4 octaves of weights 1, .9, .81, .729: W = 3.439, S = 2.99754, 5.3734 / (0.99959 x 0.640625) = 8.3910;
+    // lacunarity 4 from 80 px: spacings 80, 20, 5, 1.25 are kept (0.3125 is under a pixel), weights 1: W = S = 4,
+    // 6.25 / (1.1547 x 0.640625) = 8.4490.
+    // (amount, scale, octaves, persistence, lacunarity, greatest value). With the edge rule 'nearest' a read beyond the picture
+    // lands on the border, which is never farther than the unclamped read.
     let rows = [
-        (10.0, 40.0, 1, 0.5, 2.0),
-        (3.0, 5.0, 4, 0.9, 1.0),
-        (25.0, 80.0, 8, 1.0, 4.0),
-        (0.5, 1.0, 1, 0.5, 2.0),
+        (10.0, 40.0, 1, 0.5, 2.0, 4.2247),
+        (3.0, 5.0, 4, 0.9, 1.0, 8.3910),
+        (25.0, 80.0, 8, 1.0, 4.0, 8.4490),
+        (0.5, 1.0, 1, 0.5, 2.0, 4.2247),
     ];
-    for (amount, scale, octaves, persistence, lacunarity) in rows {
+    for (amount, scale, octaves, persistence, lacunarity, greatest) in rows {
         let params = Params {
             amount,
             scale,
@@ -118,45 +126,56 @@ fn no_pixel_moves_farther_than_the_amount_whatever_the_edge_and_the_layers() -> 
             edge: Edge::Nearest,
             ..Params::default()
         };
-        let longest = moves(&params)?
+        let largest = moves(&params)?
             .into_iter()
-            .map(|(down, across)| down.hypot(across))
+            .map(|(down, across)| down.abs().max(across.abs()))
             .fold(0.0, f64::max);
         assert!(
-            longest <= f64::from(amount) + 1e-3,
-            "{params:?}: a pixel moves {longest} px"
+            largest <= f64::from(amount) * greatest + 1e-3,
+            "{params:?}: a pixel moves {largest} px along an axis"
         );
     }
     Ok(())
 }
 
 #[test]
-fn the_longest_move_is_the_amount_and_the_moves_scale_with_it() -> Result<(), Error> {
-    // the longest move over the picture is exactly the amount; the border pixels read beyond the picture and cannot be read
-    // back, so over a few seeds the longest interior move comes within a hair of it
-    let amount = 10.0;
-    let mut best = 0.0_f64;
+fn each_move_has_the_amount_as_its_deviation_and_the_moves_scale_with_it() -> Result<(), Error> {
+    // every place has noise of deviation 1, so over many seeds each move has mean 0 and deviation `amount` (a place by itself
+    // is one draw, so the picture is not standardised): read off the interior, away from the border, over 8 seeds
+    let amount: f32 = 3.0;
+    let (mut down, mut across) = (Vec::new(), Vec::new());
     for seed in 1..=8 {
-        let params = Params { seed, ..smooth() };
-        let interior = moves(&params)?
+        let params = Params {
+            amount,
+            scale: 8.0,
+            octaves: 1,
+            seed,
+            edge: Edge::Nearest,
+            ..Params::default()
+        };
+        for (_, (d, a)) in moves(&params)?
             .into_iter()
             .enumerate()
-            .filter(|(at, _)| inside(*at, 10))
-            .map(|(_, (down, across))| down.hypot(across))
-            .fold(0.0, f64::max);
-        assert!(interior <= amount + 1e-3, "seed {seed}: {interior}");
-        best = best.max(interior);
+            .filter(|(at, _)| inside(*at, 13))
+        {
+            down.push(d);
+            across.push(a);
+        }
     }
-    assert!(best > 0.99 * amount, "the longest interior move is {best}");
+    for (axis, values) in [("down", &down), ("across", &across)] {
+        let count = values.len() as f64;
+        let mean = values.iter().sum::<f64>() / count;
+        let deviation = (values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / count).sqrt();
+        assert!(mean.abs() < 0.4, "{axis}: mean move {mean}");
+        assert!(
+            (deviation - f64::from(amount)).abs() < 0.1 * f64::from(amount),
+            "{axis}: deviation {deviation} for an amount of {amount}"
+        );
+    }
     // twice the amount is twice every move
-    let (once, twice) = (
-        moves(&smooth())?,
-        moves(&Params {
-            amount: 20.0,
-            ..smooth()
-        })?,
-    );
-    for (at, (one, two)) in once.iter().zip(&twice).enumerate().filter(|(at, _)| inside(*at, 20)) {
+    let params = |amount| Params { amount, ..smooth() };
+    let (once, twice) = (moves(&params(2.0))?, moves(&params(4.0))?);
+    for (at, (one, two)) in once.iter().zip(&twice).enumerate().filter(|(at, _)| inside(*at, 18)) {
         assert!(
             (2.0 * one.0 - two.0).abs() < 1e-3 && (2.0 * one.1 - two.1).abs() < 1e-3,
             "pixel {at}: {one:?} and {two:?}"
@@ -166,7 +185,7 @@ fn the_longest_move_is_the_amount_and_the_moves_scale_with_it() -> Result<(), Er
 }
 
 #[test]
-fn the_edge_rule_only_matters_within_the_amount_of_the_border() -> Result<(), Error> {
+fn the_edge_rule_only_matters_within_the_greatest_move_of_the_border() -> Result<(), Error> {
     let picture = varied(SIDE, SIDE);
     let run = |edge| run_picture(&Params { edge, ..smooth() }, SIDE, SIDE, &picture);
     let reflected = run(Edge::Reflect)?;

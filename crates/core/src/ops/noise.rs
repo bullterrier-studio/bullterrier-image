@@ -47,7 +47,7 @@ pub(crate) struct Fractal {
 }
 
 impl Fractal {
-    /// A number no value of [`field`] reaches, from the lattice alone: a pixel's value is a sum of lattice values read
+    /// A number no value of [`field_rows`] reaches, from the lattice alone: a pixel's value is a sum of lattice values read
     /// with Catmull-Rom weights, divided by its own deviation. The weights of an axis sum to at most 5/4 in size, so
     /// the sum of the octaves is at most `(5/4)^2 x (the octave weights)` (lattice values are within -1..1), and the
     /// deviation is at least `sqrt(sum of weight^2 / 3) x 41/64`, because the sum of the squared weights of an axis is
@@ -74,7 +74,7 @@ impl Fractal {
 }
 
 /// The shifts of a `height` x `width` picture's pixels, along x (the first field) and along y (the second), row after row:
-/// each field is smooth noise standardised over the picture to mean 0 and standard deviation 1 (see [`field`]), so the caller
+/// each field is smooth noise of deviation 1 at every pixel (see [`field_rows`]), so the caller
 /// scales it to the shift it wants. Octave `i` has lattice points `spacing / lacunarity^i` apart, with values drawn evenly from -1 to 1
 /// by `mix(seed, [axis, i, row, column])` (counting the points from the one just before the first pixel, 0) and
 /// read at the pixels by cubic interpolation through them (Catmull-Rom), so a pixel on a lattice point has its value; the
@@ -83,7 +83,7 @@ impl Fractal {
 ///
 /// It takes memory for the two fields and a few rows, however many octaves.
 pub(crate) fn fractal(height: usize, width: usize, noise: &Fractal) -> [Vec<f32>; 2] {
-    [0, 1].map(|axis| field(height, width, noise, axis))
+    [0, 1].map(|axis| field_rows(0, height, width, noise, axis))
 }
 
 /// The shifts of a `height` x `width` picture, as [`fractal`] gives them, for the lattice of a [`Tear`], fixed in the frame.
@@ -103,15 +103,11 @@ pub(crate) fn bend(height: usize, width: usize, tear: &Tear) -> [Vec<f32>; 2] {
     )
 }
 
-/// The field of the independent noise number `stream` for the lattice of `noise` ([`fractal`] gives streams 0 and 1):
-/// another stream, another seed's worth of lattice values. A single field costs half of [`fractal`]. It is standardised over
-/// the picture, so what it makes depends on the whole picture it is made for: a crop of a picture has other values and
-/// another scale. [`field_rows`] is the noise of the canvas place, and the one to use for a new effect.
-pub(crate) fn field(height: usize, width: usize, noise: &Fractal, stream: u64) -> Vec<f32> {
-    standardised(lattice_sum(0, height, width, noise, stream).0)
-}
-
-/// [`field`] of the `height` rows from canvas row `first_row` on, of a canvas `width` wide: the value at a place depends on
+/// The `height` rows from canvas row `first_row` on, of a canvas `width` wide, of the field of the independent noise number
+/// `stream` for the lattice of `noise` ([`fractal`] gives streams 0 and 1): another stream, another seed's worth of lattice
+/// values. A single field costs half of [`fractal`].
+///
+/// The value at a place depends on
 /// the place and the seed only, so rows cut from the canvas are the same rows of the whole field, to the bit.
 ///
 /// Every value is divided by its own standard deviation, which is known without looking at any other pixel. A lattice value
@@ -242,7 +238,8 @@ fn axis_variance(half: &[f64], len: usize, edge: Extension, at: usize) -> f64 {
 }
 
 /// `sum` shifted to mean 0 and scaled to standard deviation 1; all zeros if it has no variation. This measures the whole
-/// picture, so what it makes is not the same for a part of the picture: only for the kinds of noise that are not [`field`]s.
+/// picture, so what it makes is not the same for a part of the picture: only for the kinds of noise that are not
+/// [`field_rows`]s.
 pub(crate) fn standardised(mut sum: Vec<f32>) -> Vec<f32> {
     let count = length::float(sum.len());
     let mean = sum.iter().map(|&value| f64::from(value)).sum::<f64>() / count;

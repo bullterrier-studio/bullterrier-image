@@ -52,8 +52,8 @@ fn mean_and_deviation(values: &[f64]) -> (f64, f64) {
 
 #[test]
 fn a_border_strays_by_the_amount_along_either_axis_whatever_the_layers_of_the_noise() -> Result<(), Error> {
-    // 960 x 960 is twice the design size, so an amount of 4.8 design px is 9.6 px. The noise is standardised over the
-    // picture, so the border's wander over the rows (columns) has about that deviation and the mean of the straight
+    // 960 x 960 is twice the design size, so an amount of 4.8 design px is 9.6 px. The noise has deviation 1 at every
+    // place, so over the picture the border's wander over the rows (columns) has about that deviation and the mean of the straight
     // border; the bends are slow enough that some twenty independent ones lie along the border: a wide margin
     for (octaves, persistence, scale) in [(1, 0.0, 24.0), (4, 0.55, 48.0), (3, 0.9, 96.0)] {
         let edge = torn(4.8, scale, octaves, persistence, 7);
