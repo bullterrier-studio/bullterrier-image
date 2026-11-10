@@ -6,23 +6,23 @@ use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
 use crate::params::Params;
-use crate::{Footprint, Image, Inputs, Picture};
+use crate::{Canvas, Footprint, Image, Inputs, Picture};
 
 // What the effect declares besides its parameters: its section of the catalogue, the opacity of a step of it that sets
 // none (below 1 for an effect meant to be mixed in partway) and the inputs it takes (none yet: list `Input::Partition`
-// or `Input::SizeRatio` to receive them in `render`'s `inputs`).
+// `Input::SizeRatio` or `Input::Place` (where the picture lies on the canvas) to receive them in `render`'s `inputs`).
 pub(crate) const META: Meta = Meta {
     category: Category::$Category,
     opacity: 1.0,
     inputs: &[],
 };
 
-// What the effect reads around a pixel, for these parameters: `Footprint::Pixel` (nothing but the pixel itself, as here),
+// What the effect reads around a pixel, for these parameters and the canvas (its size and design-px ratio, for a reach in working px): `Footprint::Pixel` (nothing but the pixel itself, as here),
 // `Footprint::Radius(r)` (rows up to `r` design px away: a blur's radius, a displacement's amount) or `Footprint::Whole`
 // (anything else: an effect that knows where a pixel is in the picture, its height, or a statistic of all of it, or
 // when unsure). `crates/core/tests/it/footprint.rs` renders bands of rows with their margin and fails a claim that is
 // less than the truth.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(_params: &Params, _canvas: &Canvas) -> Footprint {
     Footprint::Pixel
 }
 
