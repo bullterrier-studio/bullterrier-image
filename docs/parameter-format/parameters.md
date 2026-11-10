@@ -1,11 +1,11 @@
 # Parameter description
 
-Version 2, 2026-11-04. Owner: bullterrier-image. The one format that image and vector emit for a parameter. Video, slider
+Version 3, 2026-11-10. Owner: bullterrier-image. The one format that image and vector emit for a parameter. Video, slider
 builders and generated stubs read it without knowing what the parameter belongs to.
 
 It is a data format, not shared code: each package keeps its own types and proves it writes this format.
 
-Version 2 only adds: every valid version 1 parameter is a valid version 2 parameter. Vector keeps writing version 1.
+Version 2 only added: every valid version 1 parameter is a valid version 2 parameter. Version 3 narrows `picture` and adds a text rule (see "What changed in version 3"). Vector keeps writing version 1.
 
 ## Where the two packages differed
 
@@ -30,7 +30,7 @@ Image's Python layer is separate: 72 of 84 effects are Pydantic models whose sch
 
 ## The format
 
-One parameter is a JSON object. Schema: [schemas/parameter-2.schema.json](schemas/parameter-2.schema.json).
+One parameter is a JSON object. Schema: [schemas/parameter-3.schema.json](schemas/parameter-3.schema.json).
 Examples: [fixtures/parameters/](fixtures/parameters/) (`valid.json`, `invalid.json`).
 
 | Key | Required | Meaning |
@@ -38,14 +38,15 @@ Examples: [fixtures/parameters/](fixtures/parameters/) (`valid.json`, `invalid.j
 | `name` | yes | Letters, digits and `_`, starting with a letter: the key under which a value is given |
 | `kind` | yes | `float`, `int`, `bool`, `choice`, `color`, `colors`, `field`, `text`, `picture`, `lut` |
 | `meaning` | yes | What it does, in the field's own terms; may be empty |
-| `default` | yes | By kind: a number, a switch, a choice's name, `"#rrggbb"`, an array of `"#rrggbb"` (`colors`), a name (`field`), a string (`text`), `"#rrggbb"` (`picture`: a flat picture), `null` (`lut`: the identity table); `null` for any kind with `nullable` |
+| `default` | yes | By kind: a number, a switch, a choice's name, `"#rrggbb"`, an array of `"#rrggbb"` (`colors`), a name (`field`), a string (`text`), `null` (`picture`: none; `lut`: the identity table); `null` for any kind with `nullable` |
 | `unit` | yes | One of the closed list below for `float` and `int`; `null` for the other kinds |
 | `min`, `max` | yes | Numbers for `float` and `int`; `null` otherwise |
 | `cyclic` | yes | `true` only for a `float` in `degrees` or `cycles` |
 | `choices` | no | The names of a `choice`, in declaration order; absent means none |
 | `min_length` | `colors`: yes; `text`: no | Fewest elements of a `colors` (at least 1), fewest characters of a `text`; absent on `text` means 0. Absent on every other kind |
 | `max_length` | no | Most elements or characters, or `null`; absent means no limit. Only on `colors` and `text` |
-| `nullable` | no | `true`: the value may be left out, and `default` may be `null` (`lut` is always so and does not write it). Absent means false. Not on `bool` or `choice` |
+| `min_distinct` | no | `text` only: the fewest different characters a value has (at least 1); absent means no rule |
+| `nullable` | no | `true`: the value may be left out, and `default` may be `null` (`lut` is always so and does not write it; `picture` is always `true` and writes it). Absent means false. Not on `bool` or `choice` |
 | `drivable` | no | A pixel-by-pixel drive may vary it; absent means false |
 | `advanced` | no | Tunes the technique rather than chooses the look; absent means false |
 
@@ -60,7 +61,8 @@ owner package's.
 - `field`: the name of a selection (`depth`, `light`, `subject`, or a region the recipe declares). A non-empty string; the
   default is a name.
 - `text`: free text, such as the characters of a ramp.
-- `picture`: a second picture (a texture, a logo), or a colour for a flat one.
+- `picture`: a second picture (a texture, a logo), by the name of one the photo was given or by a path; none by default. It
+  holds no colour: a flat colour is a convenience of a package's own code, not a value of the kind.
 - `lut`: a 3D colour lookup table, from a `.cube` file. `default` is `null`: the identity table, which changes nothing.
 - A `nullable` parameter has no value until one is given, and `default` `null` says so. `lut` is the one kind whose
   default is always `null`, so its `nullable` is not written.
@@ -79,8 +81,8 @@ the parameter, the rule and the value, never clamped.
 | `color` | `"#rrggbb"`, `"#rgb"`, or three numbers `[r, g, b]` in 0..1 |
 | `colors` | An array of colour values, each written as for `color`; the spellings may be mixed |
 | `field` | A name |
-| `text` | A string |
-| `picture` | A colour value (a flat picture), or a path string, resolved relative to the recipe file; a string starting with `#` is a colour. In code, a picture object |
+| `text` | A string of `min_length..=max_length` characters with at least `min_distinct` different ones |
+| `picture` | A name or a path string, the path resolved relative to the recipe file, or `null` for none. In code, a picture object |
 | `lut` | A path string to a `.cube` file, resolved relative to the recipe file. In code, a table object |
 
 A `nullable` parameter also takes `null`, or no value, for none.
@@ -100,9 +102,9 @@ Checked by each package's own declaration (the schema cannot do arithmetic):
 3. A cyclic value at `max` and one at `min` give the same result. Whether `max` reads back as `max` (image) or as `min`
    (vector) is the owner's; a reader must not depend on it.
 4. `px` values are design pixels: rendering at another size multiplies them.
-5. For `colors` and `text`: `min_length <= max_length` when both are given, and `default` has a length within them. Every
+5. For `colors` and `text`: `min_length <= max_length` when both are given, and `default` has a length within them, and a `text` default has at least `min_distinct` different characters. Every
    element of a `colors` default is `"#rrggbb"`. Lengths count elements, and characters for `text`.
-6. A `lut` default is `null`; any other kind's default is `null` only when `nullable`.
+6. A `lut` and a `picture` default is `null`; any other kind's default is `null` only when `nullable`.
 7. Names a package reserves (vector: `into`, `pen_mm`) are its own rule, not the format's.
 
 ## What each package changes
@@ -132,6 +134,16 @@ colours, 4 optional colours, 10 field names, a picture, a lookup table and free 
 - **Nothing removed or renamed.** Image's Rust declaration supports `colors`, `field`, `lut` and a `nullable` `color` so far; the other new kinds arrive with their
   first effect.
 
+## What changed in version 3
+
+Decided 2026-11-10, inside bullterrier-image. Nothing outside image reads `picture` today, so version 3 breaks no consumer.
+
+- **`picture` is nullable and holds no colour.** `default` is `null`, `nullable` is written `true`; a value is a name or a
+  path. A version 2 `picture` with a colour default is refused. *Why:* a Rust user reaches the feature with no file, and
+  one kind has one meaning in every binding.
+- **`text` gains `min_distinct`**, the fewest different characters; `min_length` and `max_length` were already there.
+- **Whole-number counts** may be declared as `usize` in the Rust declaration; the JSON kind stays `int`.
+
 ## Proof
 
 Each package has one conformance test:
@@ -141,7 +153,7 @@ Each package has one conformance test:
    validate each against the schema.
 2. Check the fixtures: every `valid.json` parameter is accepted and every `invalid.json` one is refused.
 
-The schema and fixtures are copied into each repository (not imported), with the version in the name. A change to the format
+The schema and fixtures are copied into each repository (not imported), with the version in the name; a copy holds the current version only. A change to the format
 is a new version here first, then a copy in each package.
 
 ## Where it is written down today

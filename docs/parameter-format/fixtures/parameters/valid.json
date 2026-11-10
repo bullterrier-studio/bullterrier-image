@@ -68,12 +68,16 @@
     "parameter": { "name": "chars", "kind": "text", "meaning": "The characters, darkest first.", "default": " .:-=+*#%@", "unit": null, "min": null, "max": null, "cyclic": false }
   },
   {
+    "label": "free text needing two different characters",
+    "parameter": { "name": "chars", "kind": "text", "meaning": "", "default": " .:", "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 2, "max_length": 128, "min_distinct": 2 }
+  },
+  {
     "label": "free text with lengths",
     "parameter": { "name": "label", "kind": "text", "meaning": "", "default": "ab", "unit": null, "min": null, "max": null, "cyclic": false, "min_length": 1, "max_length": 16 }
   },
   {
-    "label": "a picture, a flat grey by default",
-    "parameter": { "name": "image", "kind": "picture", "meaning": "The picture laid over the photo.", "default": "#808080", "unit": null, "min": null, "max": null, "cyclic": false }
+    "label": "a picture, none by default",
+    "parameter": { "name": "image", "kind": "picture", "meaning": "The picture laid over the photo.", "default": null, "unit": null, "min": null, "max": null, "cyclic": false, "nullable": true }
   },
   {
     "label": "a lookup table, the identity by default",

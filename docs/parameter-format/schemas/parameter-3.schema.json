@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "parameter-2",
-  "title": "Parameter description, version 2",
-  "description": "One parameter of an effect or a drawing. Arithmetic rules (min <= max, default within range, a cyclic range of exactly one turn, min_length <= max_length, a default's length within them) are checked by each package's declaration, not here.",
+  "$id": "parameter-3",
+  "title": "Parameter description, version 3",
+  "description": "One parameter of an effect or a drawing. Arithmetic rules (min <= max, default within range, a cyclic range of exactly one turn, min_length <= max_length, a default's length within them, a text default's distinct characters at least min_distinct) are checked by each package's declaration, not here.",
   "type": "object",
   "required": ["name", "kind", "meaning", "default", "unit", "min", "max", "cyclic"],
   "properties": {
@@ -17,6 +17,7 @@
     "choices": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
     "min_length": { "type": "integer", "minimum": 0 },
     "max_length": { "type": ["integer", "null"], "minimum": 0 },
+    "min_distinct": { "type": "integer", "minimum": 1 },
     "nullable": { "type": "boolean" },
     "drivable": { "type": "boolean" },
     "advanced": { "type": "boolean" }
@@ -72,7 +73,7 @@
     },
     {
       "if": { "properties": { "kind": { "const": "picture" } } },
-      "then": { "properties": { "default": { "type": ["string", "null"], "pattern": "^#[0-9a-f]{6}$" }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null } } }
+      "then": { "required": ["nullable"], "properties": { "default": { "const": null }, "unit": { "const": null }, "min": { "const": null }, "max": { "const": null }, "nullable": { "const": true } } }
     },
     {
       "if": { "properties": { "kind": { "const": "lut" } } },
@@ -85,6 +86,10 @@
     {
       "if": { "properties": { "kind": { "not": { "enum": ["colors", "text"] } } } },
       "then": { "properties": { "min_length": false, "max_length": false } }
+    },
+    {
+      "if": { "properties": { "kind": { "not": { "const": "text" } } } },
+      "then": { "properties": { "min_distinct": false } }
     },
     {
       "if": { "properties": { "kind": { "enum": ["bool", "choice"] } } },

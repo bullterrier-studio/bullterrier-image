@@ -1,4 +1,4 @@
-"""Conformance to the ecosystem's parameter format, version 2 (`docs/parameter-format/parameters.md`).
+"""Conformance to the ecosystem's parameter format, version 3 (`docs/parameter-format/parameters.md`).
 
 The schema and the fixtures are the in-repo copy of that format. The fixtures prove the schema accepts what the format
 allows and refuses what it forbids; the schema then judges every parameter of every effect the Rust core declares. The
@@ -14,7 +14,7 @@ from jsonschema import Draft202012Validator
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: only the core can say what it declares
 
 FORMAT = Path(__file__).parents[2] / "docs" / "parameter-format"
-SCHEMA = Draft202012Validator(json.loads((FORMAT / "schemas" / "parameter-2.schema.json").read_text(encoding="utf-8")))
+SCHEMA = Draft202012Validator(json.loads((FORMAT / "schemas" / "parameter-3.schema.json").read_text(encoding="utf-8")))
 
 
 def fixtures(name: str) -> list[object]:

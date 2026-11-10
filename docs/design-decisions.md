@@ -47,15 +47,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   `files::read` (its pixel limit applies); the effect finds it in `Inputs::image`. The colour literal (`blend`'s old
   default `'#808080'`) is gone: no picture leaves the photo unchanged, and a flat colour is `gradient(preset="fill")` with a
   step `blend_mode`. *Reason:* a Rust user reaches the feature with no file, and one kind has one meaning in every
-  binding. *Consequence:* the parameter format's `picture` (v2) says "a colour for a flat one" with a colour default; image
-  declares it nullable with a null default and takes no colour (its Python `Picture.of_color` helper remains). Naming rule: kind names follow the format (`Kind::Picture`, `PictureName`, Python's `Picture`),
+  binding. *Consequence:* parameter format v3 (2026-11-10) states the same: `picture` is nullable, no colour (Python's
+  `Picture.of_color` helper remains). Naming rule: kind names follow the format (`Kind::Picture`, `PictureName`, Python's `Picture`),
   value accessors follow the Rust type (`with_image`, `Inputs::image`; the core's `Picture<'_>` is the photo itself). `blend` sizes
   and places only the pixels that show (`ops/place`), so a picture sized far past the photo allocates nothing extra.
 - **Text is a parameter kind (`String`, kind `text`) with three rules: `min_length`, `max_length`, `min_distinct`.** Lengths
   count characters, not bytes. `min_distinct` (the fewest different characters) is general, beside the lengths, checked by
   `Table::check` and by the Python model (an `AfterValidator`), so `ascii`'s "at least two different characters" is declared once, in
-  its `chars` field, not in Python. *Consequence:* the parameter format v2 names `text` with the two lengths and has no word for
-  `min_distinct` (an unknown key its schema lets through); it joins the format at v3. `ascii`'s `chars` is capped at 128 characters:
+  its `chars` field, not in Python. *Consequence:* the parameter format names `min_distinct` from v3. `ascii`'s `chars` is capped at 128 characters:
   the glyph atlas holds a cell of coverage for each (54 MB at the widest cell), so the maximum has a row in `limits.rs`.
 - **Glyphs are drawn in the core with `read-fonts` and image's own rasteriser.** `ops/glyphs.rs` reads the bundled JetBrains
   Mono Regular (`crates/core/data/fonts/`, with its SIL OFL 1.1 text `OFL.txt`, a copy of the repository's `LICENSE-FONT`, itself
