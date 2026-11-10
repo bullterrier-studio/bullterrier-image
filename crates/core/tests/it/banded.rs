@@ -1,3 +1,6 @@
+//! The byte-exact footprint honesty test (`footprint.rs`) owns small shortfalls per step; this matrix, at 1e-4, owns
+//! composition (a footprint bug of 3+ rows shows far above the bound); do not tighten it.
+//!
 //! A banded render (`Options::with_band`) gives the pictures of the whole-picture render, byte for byte, whatever the
 //! recipe: the whole render is the oracle, and the recipe is rendered both ways through `Photo::render`.
 //!
