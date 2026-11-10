@@ -53,7 +53,7 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, pi
 /// any size.
 ///
 /// `threads` is how many threads the render may use for the rows of its work (laying a step over its input, framing and
-/// resizing, an effect that works pixel by pixel): 1 (none: the default) starts none, 0 is one for each core, and the picture
+/// resizing, an effect that works pixel by pixel): 1 (the default) starts none, 0 is one for each core, and the picture
 /// is the same bytes at any number. A number above 256 is a `CoreError` of kind `recipe`. The render itself stays on the
 /// calling thread, so a Python effect it runs keeps its context.
 ///
@@ -64,7 +64,7 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, pi
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=None, band=None))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=Count(1), band=None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -78,9 +78,9 @@ pub(crate) fn render<'py>(
     luts: Option<&Bound<'py, PyDict>>,
     pictures: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
-    size: Option<&Bound<'py, PyAny>>,
-    threads: Option<&Bound<'py, PyAny>>,
-    band: Option<&Bound<'py, PyAny>>,
+    size: Option<Count<SIZE>>,
+    threads: Count<THREADS>,
+    band: Option<Count<BAND>>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
@@ -145,7 +145,7 @@ pub(crate) fn known_maps(recipe: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
 /// with its alpha, `(height, width, 4)`. The last stage is exactly what `render` returns. Naming the stages is left to
 /// the caller.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=None))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=Count(1)))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -159,8 +159,8 @@ pub(crate) fn trace<'py>(
     luts: Option<&Bound<'py, PyDict>>,
     pictures: Option<&Bound<'py, PyDict>>,
     presets: Option<&Bound<'py, PyDict>>,
-    size: Option<&Bound<'py, PyAny>>,
-    threads: Option<&Bound<'py, PyAny>>,
+    size: Option<Count<SIZE>>,
+    threads: Count<THREADS>,
 ) -> PyResult<Bound<'py, PyList>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
@@ -178,45 +178,70 @@ pub(crate) fn trace<'py>(
 }
 
 /// The options of a render: the longest side `size`, if asked for, `threads` (0: every core) and the `band` of rows.
-///
-/// The one place a value that is no whole number in the type's range (a bool, a float, text, a negative number, one past
-/// the largest) becomes a `CoreError` of kind `recipe` naming the option and the value; the core refuses the rest (a size
-/// of 0, more threads than allowed, a picture over the pixel limit).
-fn options_of(
-    size: Option<&Bound<'_, PyAny>>,
-    threads: Option<&Bound<'_, PyAny>>,
-    band: Option<&Bound<'_, PyAny>>,
-) -> PyResult<Options> {
-    let mut options = Options::default();
-    if let Some(threads) = threads {
-        options = options.with_threads(whole::<usize>("threads", threads)?);
-    }
+fn options_of(size: Option<Count<SIZE>>, threads: Count<THREADS>, band: Option<Count<BAND>>) -> PyResult<Options> {
+    let mut options = Options::default().with_threads(threads.within()?);
     if let Some(size) = size {
-        options = options.with_size(whole::<u32>("size", size)?);
+        options = options.with_size(size.within()?);
     }
     if let Some(band) = band {
-        let rows = NonZeroUsize::new(whole::<usize>("band", band)?).ok_or_else(|| refused("band", band))?;
+        let rows = NonZeroUsize::new(band.within()?).ok_or_else(|| band.refused())?;
         options = options.with_band(rows);
     }
     Ok(options)
 }
 
-/// `value` as the whole number the option `name` is: not a bool, and within the range of `T`.
-fn whole<T: TryFrom<u64>>(name: &str, value: &Bound<'_, PyAny>) -> PyResult<T> {
-    if value.is_instance_of::<PyBool>() {
-        return Err(refused(name, value));
+pub(crate) const SIZE: u8 = 0;
+pub(crate) const THREADS: u8 = 1;
+pub(crate) const BAND: u8 = 2;
+
+/// The value of the option `OPTION` (`SIZE`, `THREADS` or `BAND`) of a render, which must be a whole number: not a bool, not
+/// negative, not past 2^64 - 1. The one place a value that is none of these becomes a `CoreError` of kind `recipe`
+/// naming the option and the value; the core refuses the rest (a size of 0, more threads than allowed, a picture over
+/// the pixel limit).
+#[derive(Clone, Copy)]
+pub(crate) struct Count<const OPTION: u8>(u64);
+
+impl<const OPTION: u8> Count<OPTION> {
+    const NAME: &'static str = match OPTION {
+        SIZE => "size",
+        THREADS => "threads",
+        _ => "band",
+    };
+
+    /// The number as a `T`, refused if it is past `T`'s largest.
+    fn within<T: TryFrom<u64>>(self) -> PyResult<T> {
+        T::try_from(self.0).map_err(|_| self.refused())
     }
-    let number = value.extract::<u64>().map_err(|_| refused(name, value))?;
-    T::try_from(number).map_err(|_| refused(name, value))
+
+    fn refused(self) -> PyErr {
+        refusal(Self::NAME, self.0)
+    }
+}
+
+impl<'a, 'py, const OPTION: u8> FromPyObject<'a, 'py> for Count<OPTION> {
+    type Error = PyErr;
+
+    fn extract(value: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
+        let number = if value.is_instance_of::<PyBool>() {
+            None
+        } else {
+            value.extract::<u64>().ok()
+        };
+        number.map(Self).ok_or_else(|| {
+            refusal(
+                Self::NAME,
+                value
+                    .repr()
+                    .map_or_else(|_| "an object".to_owned(), |text| text.to_string()),
+            )
+        })
+    }
 }
 
 /// The `CoreError` of kind `recipe` for an option `name` given `value`, which is no whole number in range.
-fn refused(name: &str, value: &Bound<'_, PyAny>) -> PyErr {
-    let shown = value
-        .repr()
-        .map_or_else(|_| "an object".to_owned(), |text| text.to_string());
+fn refusal(name: &str, value: impl std::fmt::Display) -> PyErr {
     core_error(Error::Recipe(format!(
-        "`{name}` must be a whole number in range, got {shown}"
+        "`{name}` must be a whole number in range, got {value}"
     )))
 }
 
