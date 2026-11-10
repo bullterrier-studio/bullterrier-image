@@ -62,6 +62,11 @@ def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProce
 def lint_a_copy_with(tmp_path: Path, module: str, line: str) -> subprocess.CompletedProcess:
     """Lint a copy of the package (and its contracts) in which `module` also has the import `line`."""
     shutil.copytree(PACKAGE, tmp_path / "bullterrier_image", ignore=shutil.ignore_patterns("__pycache__"))
+    for folder in (HOST, OTHER):
+        probe = tmp_path / "bullterrier_image" / "effects" / folder
+        probe.mkdir(exist_ok=True)
+        for name in ("__init__.py", "effect.py"):
+            (probe / name).write_text('"""A probe effect folder of the test."""\n', encoding="utf-8")
     shutil.copy(ROOT / "pyproject.toml", tmp_path)
     target = tmp_path / "bullterrier_image" / module
     target.write_text(target.read_text(encoding="utf-8") + f"\n{line}  # injected by the test\n", encoding="utf-8")
@@ -75,8 +80,9 @@ def test_the_package_keeps_every_import_contract():
         assert re.search(rf"{re.escape(name)} KEPT", result.stdout), f"{name!r} not reported kept:\n{result.stdout}"
 
 
-# Two effects still written in Python (the core's have no folder): a host that imports, and the one it must not import.
-HOST, OTHER = (path.parent.name for path in sorted((PACKAGE / "effects").glob("[!_]*/effect.py"))[:2])
+# Two effect folders, as a package of Python effects has them (the core's effects have none, and fewer than two are left
+# written in Python): a host that imports, and the one it must not import. `lint_a_copy_with` makes them in its copy.
+HOST, OTHER = "probe_host", "probe_other"
 
 # One forbidden import per rule, each in a copy of the package: the linter must fail, naming the module and the rule.
 FORBIDDEN = {
