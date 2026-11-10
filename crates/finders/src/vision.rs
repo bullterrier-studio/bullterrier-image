@@ -30,6 +30,12 @@ mod elsewhere {
     }
 
     impl Vision {
+        /// There is no macOS here, so no version: never reached, since `new` fails.
+        #[must_use]
+        pub fn macos_version() -> String {
+            String::new()
+        }
+
         /// This finder with the edge clean-up set to `shrink` and `feather` px.
         #[must_use]
         pub const fn with_edge(self, _shrink: f64, _feather: f64) -> Self {

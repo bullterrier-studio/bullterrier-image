@@ -37,6 +37,16 @@ pub(crate) fn supported() -> bool {
 }
 
 impl Vision {
+    /// The macOS version, as `14.5.1`: the release brings the model, so it is what the finder's answers depend on.
+    #[must_use]
+    pub fn macos_version() -> String {
+        let version = NSProcessInfo::processInfo().operatingSystemVersion();
+        format!(
+            "{}.{}.{}",
+            version.majorVersion, version.minorVersion, version.patchVersion
+        )
+    }
+
     /// The Vision finder.
     ///
     /// # Errors

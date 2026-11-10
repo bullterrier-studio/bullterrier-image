@@ -137,6 +137,12 @@ impl Options {
         }
     }
 
+    /// The local copy of the model these options name, if any.
+    #[must_use]
+    pub fn model_file(&self) -> Option<&Path> {
+        self.model_file.as_deref()
+    }
+
     /// These options with a local copy of the model, used as it is and never downloaded.
     #[must_use]
     pub fn with_model_file(mut self, file: impl Into<PathBuf>) -> Self {

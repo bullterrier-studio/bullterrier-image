@@ -6,8 +6,8 @@ mod vision;
 use std::ffi::OsStr;
 
 use bullterrier_image::finding::onnx::{self, Options};
-use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET};
-use bullterrier_image::{Error, Finder};
+use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET, Model, Tensor};
+use bullterrier_image::{Error, Finder, Picture};
 
 pub use vision::Vision;
 
@@ -89,6 +89,61 @@ pub fn subject_finder(
         Segmenter::Vision => Ok(Box::new(Vision::new()?.with_edge(shrink, feather))),
         Segmenter::Onnx => Ok(Box::new(onnx::finder(&IS_NET, onnx)?.with_edge(shrink, feather))),
     }
+}
+
+/// The identity of the subject finder [`subject_finder`] would make: what its answers depend on, so a cache of them
+/// is kept exactly as long as they could not change. For the portable model the SHA-256 of the model (the catalogue's
+/// when the standard model is meant, so it is not downloaded to find out; else of the local file the options name, so the
+/// same model at another path is the same finder); for Apple Vision the macOS version, whose release brings the model.
+///
+/// # Errors
+/// As [`subject_finder`] for the choice of the segmenter and for Vision; [`Error::BackendUnavailable`] naming a local
+/// model file that is not a file.
+pub fn subject_identity(segmenter: Option<Segmenter>, onnx: &Options) -> Result<String, Error> {
+    let segmenter = match segmenter {
+        Some(chosen) => chosen,
+        None => Segmenter::from_env()?.unwrap_or_else(Segmenter::default_here),
+    };
+    match segmenter {
+        Segmenter::Vision => {
+            Vision::new()?;
+            Ok(format!("vision:macOS {}", Vision::macos_version()))
+        }
+        Segmenter::Onnx => model_identity(&IS_NET, onnx),
+    }
+}
+
+/// The identity of the depth finder [`depth_finder`] would make: `onnx:sha256 ` and the SHA-256 of the model, as for the
+/// portable subject model.
+///
+/// # Errors
+/// [`Error::BackendUnavailable`] naming a local model file that is not a file.
+pub fn depth_identity(onnx: &Options) -> Result<String, Error> {
+    model_identity(&DEPTH_ANYTHING_V2_SMALL, onnx)
+}
+
+fn model_identity(model: &Model, onnx: &Options) -> Result<String, Error> {
+    let digest = match onnx.model_file() {
+        None => model.sha256.to_owned(),
+        Some(file) if file.is_file() => onnx::sha256_of(file)?,
+        Some(file) => {
+            return Err(Error::BackendUnavailable(format!(
+                "the model file {} is not a file (it was named for the {} model)",
+                file.display(),
+                model.name
+            )));
+        }
+    };
+    Ok(format!("onnx:sha256 {digest}"))
+}
+
+/// The relative inverse depth of `picture` on the depth model's own scale, stretched to the photo's size: larger is
+/// nearer. See [`ModelFinder::inverse_depth`](bullterrier_image::finding::ModelFinder::inverse_depth).
+///
+/// # Errors
+/// As [`depth_finder`].
+pub fn inverse_depth(picture: &Picture<'_>, onnx: &Options) -> Result<Tensor, Error> {
+    onnx::finder(&DEPTH_ANYTHING_V2_SMALL, onnx)?.inverse_depth(picture)
 }
 
 /// The depth finder: Depth Anything V2, found as `onnx` says.
