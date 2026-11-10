@@ -276,7 +276,9 @@ impl<'a> Inputs<'a> {
             match input {
                 Input::SizeRatio => declared.size_ratio = self.size_ratio,
                 Input::Partition => {
-                    let partition = self.partition.ok_or_else(|| missing(effect, "partition"))?;
+                    let partition = self
+                        .partition
+                        .ok_or_else(|| missing(effect, "partition", "set the step's region"))?;
                     if (partition.height, partition.width) != size {
                         return Err(wrong_size(
                             effect,
@@ -290,11 +292,13 @@ impl<'a> Inputs<'a> {
             }
         }
         for field in effect.fields() {
-            let layer = self
-                .fields
-                .get(&field.parameter)
-                .copied()
-                .ok_or_else(|| missing(effect, &field.parameter))?;
+            let layer = self.fields.get(&field.parameter).copied().ok_or_else(|| {
+                missing(
+                    effect,
+                    &field.parameter,
+                    &format!("name a map or region in the step's `{}`", field.parameter),
+                )
+            })?;
             if (layer.height, layer.width) != size {
                 return Err(wrong_size(effect, &field.parameter, (layer.height, layer.width), size));
             }
@@ -307,9 +311,10 @@ impl<'a> Inputs<'a> {
     }
 }
 
-fn missing(effect: &dyn Effect, input: &str) -> Error {
+/// The refusal for an input the effect declares and the offer lacks; `hint` says how to give one, by the input's kind.
+fn missing(effect: &dyn Effect, input: &str, hint: &str) -> Error {
     Error::Inputs(format!(
-        "the effect {:?} needs `{input}`, which was not given",
+        "the effect {:?} needs `{input}`, which was not given: {hint}",
         effect.name()
     ))
 }

@@ -73,21 +73,24 @@ fn the_size_ratio_arrives_only_if_declared_else_the_effect_sees_one() -> Outcome
 }
 
 #[test]
-fn a_declared_input_that_is_not_on_offer_refuses_the_run_and_the_effect_never_runs() -> Outcome {
+fn a_declared_input_that_is_not_on_offer_refuses_the_run_with_a_hint_for_its_kind_and_the_effect_never_runs() -> Outcome
+{
     let values = picture_values();
     let picture = Picture::new(2, 3, &values)?;
     let counting = Registered::new(Counting::new())?;
-    let result = apply(counting.name(), &picture, json!({}), &Inputs::default());
-    assert!(
-        matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains("partition")),
-        "{result:?}"
-    );
     let field = Registered::new(Recorder::new(&[], &["depth"]))?;
-    let result = apply(field.name(), &picture, json!({}), &Inputs::default());
-    assert!(
-        matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains("depth")),
-        "{result:?}"
-    );
+    // (the effect, the input it lacks, the hint of its kind)
+    let rows = [
+        (counting.name(), "partition", "set the step's region"),
+        (field.name(), "depth", "name a map or region in the step's `depth`"),
+    ];
+    for (name, input, hint) in rows {
+        let result = apply(name, &picture, json!({}), &Inputs::default());
+        assert!(
+            matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains(input) && error.to_string().contains(hint)),
+            "{input}: {result:?}"
+        );
+    }
     assert_eq!((counting.calls(), field.received().len()), (0, 0));
     Ok(())
 }
