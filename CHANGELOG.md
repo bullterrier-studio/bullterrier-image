@@ -8,6 +8,21 @@ may change the public API.
 "Releasing" in [CONTRIBUTING.md](CONTRIBUTING.md)); a section already written by hand for that version is kept, and
 its `Unreleased` becomes the release date.
 
+## [Unreleased]
+
+### Changed
+
+- **BREAKING:** `displace` `amount` is the standard deviation of a pixel's move, not the longest move (a few moves reach
+  about 3 times it); the default is 4 (was 12) and the preset and example are rescaled.
+- **BREAKING:** `fog` `coverage` is the expected share the cloud covers; a given seed varies about 0.1 either way.
+- The noise effects (`grain`, `vhs`, `paper_texture`, `flow_lines`, `fog`, `noise_field` value, `displace`, `flow_warp`,
+  `melt`, `aurora`, torn `edge`) draw position-stable noise, so their pictures changed.
+
+### Added
+
+- `Options::with_band(rows)` and Python `band=`: render in bands of rows, the same pixels as the whole render, and
+  memory no longer grows with the picture.
+
 ## [0.1.0] - 2026-10-23
 
 The first release, 0.1.0.
