@@ -8,6 +8,7 @@ mod anamorphic_streaks;
 mod apply;
 mod ascii;
 mod aurora;
+mod banded;
 mod bands_narrowing;
 mod blend;
 mod blend_effect;

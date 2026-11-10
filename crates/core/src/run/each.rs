@@ -102,7 +102,7 @@ impl EachRun {
                 .map(|&label| f32::from(u8::from(given[piece(label)] == index)))
                 .collect();
             blur::gaussian(&mut weights, height, width, self.feather * ratio);
-            let result = look.apply(before, ratio, regions, working)?;
+            let result = look.apply(before, ratio, regions, working, 0)?;
             for (((out, was), now), weight) in out
                 .iter_mut()
                 .zip(before.pixels())
@@ -119,6 +119,6 @@ impl EachRun {
             *pixel = pixel.map(|value| value.clamp(0.0, 1.0));
         }
         self.laid
-            .over(before, Image::from_pixels(height, width, out), regions, working)
+            .over(before, Image::from_pixels(height, width, out), regions, working, 0)
     }
 }

@@ -82,6 +82,15 @@ impl Layer {
     pub fn values(&self) -> &[f32] {
         &self.values
     }
+
+    /// The map of rows `from..to` of this one (`from < to <= height`), which a band of a picture is given.
+    pub(crate) fn rows(&self, from: usize, to: usize) -> Self {
+        Self {
+            height: to - from,
+            width: self.width,
+            values: self.values[from * self.width..to * self.width].to_vec(),
+        }
+    }
 }
 
 /// The pieces a region cuts the picture into: the number of the piece every pixel belongs to, row after row, pieces
@@ -164,6 +173,16 @@ impl Labels {
     #[must_use]
     pub fn values(&self) -> &[i32] {
         &self.values
+    }
+
+    /// The labelling of rows `from..to` of this one (`from < to <= height`), among the same pieces.
+    pub(crate) fn rows(&self, from: usize, to: usize) -> Self {
+        Self {
+            height: to - from,
+            width: self.width,
+            values: self.values[from * self.width..to * self.width].to_vec(),
+            pieces: self.pieces,
+        }
     }
 }
 

@@ -23,12 +23,17 @@ pub(super) fn ratio_of(picture: &Picture<'_>) -> f64 {
 pub struct Options {
     size: Option<u32>,
     threads: usize,
+    band: Option<usize>,
 }
 
 impl Default for Options {
-    /// No size asked for, one thread.
+    /// No size asked for, one thread, the whole picture at once.
     fn default() -> Self {
-        Self { size: None, threads: 1 }
+        Self {
+            size: None,
+            threads: 1,
+            band: None,
+        }
     }
 }
 
@@ -63,6 +68,37 @@ impl Options {
     pub const fn with_threads(mut self, threads: usize) -> Self {
         self.threads = threads;
         self
+    }
+
+    /// These options with `rows`, how many rows of the working picture a render makes at a time: the same picture as the
+    /// whole-picture render (byte for byte, at any number of threads), made in bands so that the memory a run of steps
+    /// needs beyond the picture it makes is about a band's, not several pictures'. Without it the render works on the
+    /// whole picture.
+    ///
+    /// A run of steps in a row that each read a bounded neighbourhood of a pixel (see [`Footprint`](crate::Footprint)) is
+    /// made band by band, each band from the rows of the picture before it and as many more above and below as the
+    /// steps' margins add up to; the larger the margins, the less a small band saves, and a run whose margins reach
+    /// the picture runs whole. A step that may read any pixel (an effect whose footprint is `Whole`, an `each` step or a
+    /// step driven by a map) runs on the whole picture, and the runs of steps between such steps are banded. Where a
+    /// picture is as tall as a band or less, the render is the whole-picture one. [`trace`](crate::Photo::trace) ignores
+    /// it: it keeps a picture for every step.
+    ///
+    /// A recipe's `px` values scale by the working picture as a whole, never by a band: the look is the same.
+    ///
+    /// ```text
+    /// let image = photo.render(&look, &presets, Options::default().with_band(64))?;
+    /// ```
+    ///
+    /// A `rows` of 0 is refused by the render, naming it, before anything runs ([`Error::Recipe`](crate::Error::Recipe)).
+    #[must_use]
+    pub const fn with_band(mut self, rows: usize) -> Self {
+        self.band = Some(rows);
+        self
+    }
+
+    /// The rows a band is, if the render is banded.
+    pub(super) const fn band(self) -> Option<usize> {
+        self.band
     }
 
     /// The number of threads asked for.

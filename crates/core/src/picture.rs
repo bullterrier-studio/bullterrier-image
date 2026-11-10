@@ -88,6 +88,15 @@ impl<'a> Picture<'a> {
         }
     }
 
+    /// Rows `from..to` of the picture (`from < to <= height`), a picture of their own.
+    pub(crate) fn rows(&self, from: usize, to: usize) -> Self {
+        Self {
+            height: to - from,
+            width: self.width,
+            pixels: &self.pixels[from * self.width..to * self.width],
+        }
+    }
+
     /// A new image of this picture's size whose every pixel is `change` of the pixel at its place: the shape of an
     /// effect that works pixel by pixel. `change` is called for pixels in any order, and from the threads the render was
     /// given ([`Options::with_threads`](crate::Options::with_threads)): the pixel it gives must depend only on its arguments.

@@ -13,7 +13,7 @@ use crate::ops::{blend, levels};
 use crate::params::Kind;
 use crate::recipe::drive;
 use crate::registry::Registry;
-use crate::{BlendMode, Entry, Error, Image, Inputs, Layer, Lut, Picture, Presets, Step};
+use crate::{BlendMode, Canvas, Entry, Error, Image, Inputs, Labels, Layer, Lut, Picture, Place, Presets, Step};
 
 /// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
 /// names, for an `each` step its looks the same.
@@ -40,6 +40,8 @@ pub(super) enum Prepared {
 impl Prepared {
     /// This entry run on `before`, with the selections it names made by `regions` for `working`, the picture the render
     /// works on, and the result laid over `before`; `ratio` is the working picture's size over the design size.
+    /// `before` is `working`, or, for a step with a [`margin`](Self::margin), the rows of it from `at` on (an `each`
+    /// step is always run on all of it, at 0): the maps the step names are cut to those rows and it is told its place.
     ///
     /// # Errors
     /// Why a region could not be made, or an effect failed.
@@ -49,18 +51,32 @@ impl Prepared {
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
+        at: usize,
     ) -> Result<Image, Error> {
         match self {
-            Self::Step(step) => step.apply(before, ratio, regions, working),
+            Self::Step(step) => step.apply(before, ratio, regions, working, at),
             Self::Each(each) => each.apply(before, ratio, regions, working),
+        }
+    }
+
+    /// The rows of margin this entry needs above and below the rows it makes on `canvas`, or none if it reads the whole
+    /// picture: an `each` step, a driven step and an effect that says [`Whole`](crate::Footprint::Whole).
+    ///
+    /// # Errors
+    /// [`Error::Params`] if the effect refuses its own parameters.
+    pub(super) fn margin(&self, canvas: &Canvas) -> Result<Option<usize>, Error> {
+        match self {
+            Self::Step(step) => step.margin(canvas),
+            Self::Each(_) => Ok(None),
         }
     }
 }
 
 /// The complete parameters a step's effect is run with.
 enum Runs {
-    /// A plain step: one run.
-    One(Value),
+    /// A plain step: one run, with the values scaled to the picture and as the step writes them (completed, in design
+    /// pixels: what a footprint is asked about).
+    One { scaled: Value, design: Value },
     /// A step with driven parameters: one run for each level, `levels[n]` for level `n` (0 to `top`), mixed by the
     /// selection called `by`.
     Driven { by: String, top: u8, levels: Vec<Value> },
@@ -84,7 +100,7 @@ impl Laid {
         }
     }
 
-    /// `after`, the result for `before`, laid over `before`. A plain step (blend mode normal, opacity 1, no mask) is its
+    /// `after`, the result for `before` (the rows of `working` from `at`), laid over `before`. A plain step (blend mode normal, opacity 1, no mask) is its
     /// result as it is, uncopied.
     pub(super) fn over(
         &self,
@@ -92,11 +108,16 @@ impl Laid {
         after: Image,
         regions: &mut Evaluator,
         working: &Picture<'_>,
+        at: usize,
     ) -> Result<Image, Error> {
         let mask = self
             .mask
             .as_ref()
-            .map(|mask| regions.selection(mask, working))
+            .map(|mask| {
+                regions
+                    .selection(mask, working)
+                    .map(|mask| rows_of(mask, at, before.height()))
+            })
             .transpose()?;
         Ok(
             if self.opacity >= 1.0 && mask.is_none() && self.blend_mode == BlendMode::Normal {
@@ -130,19 +151,25 @@ pub(super) struct StepRun {
     laid: Laid,
 }
 
-/// The parameters `effect` (called `name`) is run with for the values `given`: for an effect that describes them, checked
-/// and scaled to `ratio`, else as given.
+/// The parameters `effect` (called `name`) is run with for the values `given`, and the values as checked, unscaled: for
+/// an effect that describes its parameters, checked and scaled to `ratio`, else as given both times.
 fn complete(
     effect: &dyn Effect,
     name: &str,
     given: Map<String, Value>,
     ratio: f64,
     place: &str,
-) -> Result<Value, Error> {
-    Ok(Value::Object(match effect.params() {
-        Some(table) => table.scaled(table.check(name, &given).map_err(|error| error.at(place))?, ratio),
-        None => given,
-    }))
+) -> Result<(Value, Value), Error> {
+    Ok(match effect.params() {
+        Some(table) => {
+            let design = table.check(name, &given).map_err(|error| error.at(place))?;
+            (
+                Value::Object(table.scaled(design.clone(), ratio)),
+                Value::Object(design),
+            )
+        }
+        None => (Value::Object(given.clone()), Value::Object(given)),
+    })
 }
 
 /// The table each lookup table parameter of `effect` names in `runs` (the parameters are the same at every level of a
@@ -160,7 +187,7 @@ fn tables(
         return Ok(Vec::new());
     };
     let params = match runs {
-        Runs::One(params) => params,
+        Runs::One { scaled: params, .. } => params,
         Runs::Driven { levels, .. } => &levels[0],
     };
     let mut found = Vec::new();
@@ -191,7 +218,7 @@ fn pictures(
         return Ok(Vec::new());
     };
     let params = match runs {
-        Runs::One(params) => params,
+        Runs::One { scaled: params, .. } => params,
         Runs::Driven { levels, .. } => &levels[0],
     };
     let mut found = Vec::new();
@@ -237,7 +264,7 @@ impl StepRun {
                     for (name, drive) in &drives {
                         values.insert(name.clone(), Value::from(drive.value(level)));
                     }
-                    complete(&*effect, &step.effect, values, ratio, place)
+                    complete(&*effect, &step.effect, values, ratio, place).map(|(scaled, _)| scaled)
                 })
                 .collect::<Result<_, _>>()?;
             Runs::Driven {
@@ -246,7 +273,8 @@ impl StepRun {
                 levels,
             }
         } else {
-            Runs::One(complete(&*effect, &step.effect, given, ratio, place)?)
+            let (scaled, design) = complete(&*effect, &step.effect, given, ratio, place)?;
+            Runs::One { scaled, design }
         };
         let luts = tables(&*effect, &runs, assets, place)?;
         let pictures = pictures(&*effect, &runs, assets, place)?;
@@ -265,20 +293,39 @@ impl StepRun {
         })
     }
 
-    /// This step's effect run on `before`, with the selections it names made by `regions` for `working`, and the result
-    /// laid over `before`.
+    /// The rows of margin this step needs above and below the rows it makes on `canvas` (see
+    /// [`Footprint::margin`](crate::Footprint::margin)), or none if it reads the whole picture. A driven step is whole:
+    /// it mixes runs by a map, and its footprint is the widest of its levels', which is not worked out.
+    ///
+    /// # Errors
+    /// [`Error::Params`] if the effect refuses its own parameters.
+    pub(super) fn margin(&self, canvas: &Canvas) -> Result<Option<usize>, Error> {
+        match &self.runs {
+            Runs::One { design, .. } => Ok(self.effect.footprint(design, canvas)?.margin(canvas.ratio)),
+            Runs::Driven { .. } => Ok(None),
+        }
+    }
+
+    /// This step's effect run on `before`, which is the rows of `working` from `at` on (all of it when `at` is 0 and
+    /// `before` is as tall), with the selections it names made by `regions` for `working` and cut to those rows, and the
+    /// result laid over `before`.
     pub(super) fn apply(
         &self,
         before: &Picture<'_>,
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
+        at: usize,
     ) -> Result<Image, Error> {
+        let rows = before.height();
         let mut fields = Vec::with_capacity(self.fields.len());
         for (parameter, region) in &self.fields {
-            fields.push((parameter, regions.selection(region, working)?));
+            fields.push((parameter, rows_of(regions.selection(region, working)?, at, rows)));
         }
-        let mut offered = Inputs::default().with_size_ratio(ratio);
+        let mut offered =
+            Inputs::default()
+                .with_size_ratio(ratio)
+                .with_place(Place::new(working.height(), working.width(), at));
         for (parameter, layer) in &fields {
             offered = offered.with_field(parameter.as_str(), layer);
         }
@@ -291,19 +338,23 @@ impl StepRun {
         let partition = self
             .partition
             .as_ref()
-            .map(|region| regions.pieces(region, working))
+            .map(|region| {
+                regions
+                    .pieces(region, working)
+                    .map(|pieces| pieces_of(pieces, at, rows))
+            })
             .transpose()?;
         if let Some(pieces) = &partition {
             offered = offered.with_partition(pieces);
         }
         let after = match &self.runs {
-            Runs::One(params) => effect::run(&*self.effect, before, params.clone(), &offered)?,
+            Runs::One { scaled, .. } => effect::run(&*self.effect, before, scaled.clone(), &offered)?,
             Runs::Driven { by, top, levels } => {
-                let by = regions.selection(by, working)?;
+                let by = rows_of(regions.selection(by, working)?, at, rows);
                 self.driven(before, &offered, &by, *top, levels)?
             }
         };
-        self.laid.over(before, after, regions, working)
+        self.laid.over(before, after, regions, working, at)
     }
 
     /// The effect run on `before` for each level of the drive that some pixel is on or next to, and each pixel mixes the
@@ -332,5 +383,23 @@ impl StepRun {
             }
         }
         Ok(Image::from_pixels(before.height(), before.width(), mixed))
+    }
+}
+
+/// `layer`, a map of the working picture, cut to the `rows` rows from `at`: the map itself if that is all of it.
+fn rows_of(layer: Arc<Layer>, at: usize, rows: usize) -> Arc<Layer> {
+    if rows == layer.height() {
+        layer
+    } else {
+        Arc::new(layer.rows(at, at + rows))
+    }
+}
+
+/// As [`rows_of`], for the pieces of a partition.
+fn pieces_of(pieces: Arc<Labels>, at: usize, rows: usize) -> Arc<Labels> {
+    if rows == pieces.height() {
+        pieces
+    } else {
+        Arc::new(pieces.rows(at, at + rows))
     }
 }

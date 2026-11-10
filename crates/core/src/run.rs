@@ -12,6 +12,7 @@ use std::fmt;
 use std::sync::Arc;
 
 mod assets;
+mod band;
 mod cut;
 mod each;
 mod frame;
@@ -175,9 +176,15 @@ impl<'a> Photo<'a> {
         presets: &Presets,
         options: Options,
     ) -> Result<Image, Error> {
+        if options.band() == Some(0) {
+            return Err(Error::Recipe("`band` must be >= 1, got 0".to_owned()));
+        }
         par::install(options.threads(), || {
             let mut run = self.start(registry, recipe, presets, options)?;
-            while run.advance()?.is_some() {}
+            match options.band() {
+                Some(rows) => run.advance_banded(rows)?,
+                None => while run.advance()?.is_some() {},
+            }
             run.finish()
         })?
     }
@@ -274,7 +281,7 @@ struct Run<'a> {
 }
 
 impl Run<'_> {
-    /// Runs the next step, and shows the image it made; none once all have run.
+    /// Runs the next step on the whole picture, and shows the image it made; none once all have run.
     fn advance(&mut self) -> Result<Option<&Image>, Error> {
         let Some(step) = self.steps.next() else {
             return Ok(None);
@@ -283,7 +290,7 @@ impl Run<'_> {
             .current
             .as_ref()
             .map_or_else(|| self.working.picture(), Image::as_picture);
-        let after = step.apply(&before, self.ratio, &mut self.regions, &self.working.picture())?;
+        let after = step.apply(&before, self.ratio, &mut self.regions, &self.working.picture(), 0)?;
         self.regions.release(self.ran);
         self.ran += 1;
         self.current = Some(after);
