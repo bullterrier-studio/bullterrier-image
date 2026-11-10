@@ -228,7 +228,7 @@ impl<'a> Inputs<'a> {
 
     /// The offer with `image` for the picture parameter called `parameter`.
     #[must_use]
-    pub fn with_picture(mut self, parameter: impl Into<String>, image: &'a Image) -> Self {
+    pub fn with_image(mut self, parameter: impl Into<String>, image: &'a Image) -> Self {
         self.pictures.insert(parameter.into(), image);
         self
     }
@@ -257,10 +257,10 @@ impl<'a> Inputs<'a> {
         self.luts.get(parameter).copied()
     }
 
-    /// The picture for the picture parameter called `parameter`, if one was offered: none means no picture. Its alpha, if
+    /// The image for the picture parameter called `parameter`, if one was offered: none means no picture. Its alpha, if
     /// it has any, is the cover of whatever the effect lays over the photo.
     #[must_use]
-    pub fn picture(&self, parameter: &str) -> Option<&'a Image> {
+    pub fn image(&self, parameter: &str) -> Option<&'a Image> {
         self.pictures.get(parameter).copied()
     }
 

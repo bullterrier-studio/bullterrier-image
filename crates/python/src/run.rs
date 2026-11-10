@@ -211,7 +211,7 @@ fn photo_with<'a>(
         photo = photo.with_lut(name, table);
     }
     for (name, image) in pictures_of(pictures)? {
-        photo = photo.with_picture(name, Arc::new(image));
+        photo = photo.with_image(name, Arc::new(image));
     }
     Ok(photo)
 }

@@ -47,7 +47,7 @@ impl<'a> Assets<'a> {
     /// # Errors
     /// [`Error::ImageRead`] naming the path if `name` is no picture the photo was given and no readable image file (or
     /// one over the core's pixel limit).
-    pub(super) fn picture(&mut self, name: &str) -> Result<Arc<Image>, Error> {
+    pub(super) fn image(&mut self, name: &str) -> Result<Arc<Image>, Error> {
         if let Some(image) = self.given_pictures.get(name).or_else(|| self.pictures.get(name)) {
             return Ok(Arc::clone(image));
         }

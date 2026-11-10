@@ -122,7 +122,7 @@ fn apply<'py>(
         inputs = inputs.with_lut(parameter.as_str(), table);
     }
     for (parameter, image) in &images {
-        inputs = inputs.with_picture(parameter.as_str(), image);
+        inputs = inputs.with_image(parameter.as_str(), image);
     }
     let image = py
         .detach(|| bullterrier_image::apply(effect, &picture, params, &inputs))

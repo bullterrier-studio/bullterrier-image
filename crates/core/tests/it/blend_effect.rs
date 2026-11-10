@@ -25,7 +25,7 @@ fn asset(rows: usize, columns: usize, pixels: &[[f32; 4]]) -> Result<Arc<Image>,
 /// The photo with the step `blend` given `image` = the asset and the `params`, rendered at opacity 1.
 fn laid(asset: Arc<Image>, params: &[(&str, Value)], threads: usize) -> Result<Vec<f32>, Error> {
     let values = photo_values();
-    let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?).with_picture("asset", asset);
+    let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?).with_image("asset", asset);
     let mut step = Step::new("blend").param("image", "asset");
     for (key, value) in params {
         step = step.param(*key, value.clone());

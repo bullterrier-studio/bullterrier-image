@@ -197,7 +197,7 @@ fn pictures(
     let mut found = Vec::new();
     for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
         if let Some(name) = params[field.name].as_str() {
-            let image = assets.picture(name).map_err(|error| match error {
+            let image = assets.image(name).map_err(|error| match error {
                 Error::ImageRead(why) => {
                     Error::ImageRead(format!("{place}: effect '{}': `{}`: {why}", effect.name(), field.name))
                 }
@@ -286,7 +286,7 @@ impl StepRun {
             offered = offered.with_lut(parameter.as_str(), lut);
         }
         for (parameter, image) in &self.pictures {
-            offered = offered.with_picture(parameter.as_str(), image);
+            offered = offered.with_image(parameter.as_str(), image);
         }
         let partition = self
             .partition

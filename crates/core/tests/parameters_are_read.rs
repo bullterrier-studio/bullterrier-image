@@ -889,7 +889,7 @@ fn render(
     )?;
     for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
         if params[field.name].is_string() {
-            inputs = inputs.with_picture(field.name, &asset);
+            inputs = inputs.with_image(field.name, &asset);
         }
     }
     Ok(effect.apply(picture, Value::Object(params), &inputs)?.into_values())

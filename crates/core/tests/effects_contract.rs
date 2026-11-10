@@ -148,7 +148,7 @@ fn run(
     let asset = asset();
     let mut inputs = Inputs::default();
     for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
-        inputs = inputs.with_picture(field.name, &asset);
+        inputs = inputs.with_image(field.name, &asset);
     }
     for field in table.fields.iter().filter(|field| field.kind == Kind::Field) {
         inputs = inputs.with_field(field.name, &layer);
@@ -558,7 +558,7 @@ fn a_cyclic_angle_gives_the_same_picture_a_turn_further_and_takes_any_real() -> 
 
 fn photo(picture: Picture<'_>, height: usize, width: usize) -> Result<Photo<'_>, Box<dyn Error>> {
     Ok(Photo::new(picture)
-        .with_picture("asset", Arc::new(asset()))
+        .with_image("asset", Arc::new(asset()))
         .with_map("depth", cone(height, width)?)?
         .with_map("subject", cone(height, width)?)?)
 }

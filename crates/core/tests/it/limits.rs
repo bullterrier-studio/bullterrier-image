@@ -417,7 +417,7 @@ fn blend_at_its_largest_scale_and_margin_sizes_only_what_shows_and_one_past_is_r
     let (height, width) = (300, 300);
     let pixels = vec![0.5; height * width * 3];
     let strip = Arc::new(Image::rgba(1, 4000, &[0.2, 0.4, 0.6, 1.0].repeat(4000))?);
-    let photo = Photo::new(Picture::new(height, width, &pixels)?).with_picture("strip", strip);
+    let photo = Photo::new(Picture::new(height, width, &pixels)?).with_image("strip", strip);
     let blend = |scale: f64, margin: f64| {
         Recipe::new([Step::new("blend")
             .param("image", "strip")

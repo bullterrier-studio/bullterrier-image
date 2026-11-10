@@ -60,7 +60,7 @@ impl Effect for Shower {
     }
 
     fn apply(&self, picture: &Picture<'_>, _params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
-        match inputs.picture("image") {
+        match inputs.image("image") {
             Some(shown) => Image::new(picture.height(), picture.width(), shown.as_picture().values()),
             None => Image::new(picture.height(), picture.width(), picture.values()),
         }
@@ -80,7 +80,7 @@ fn render(photo: &Photo<'_>, recipe: &Recipe) -> Result<Vec<f32>, Error> {
 fn a_picture_given_to_the_photo_reaches_the_step_that_names_it() -> Result<(), Error> {
     let shower = Registered::new(Shower::new())?;
     let values = counted();
-    let photo = Photo::new(Picture::new(4, 6, &values)?).with_picture("grey", Arc::new(flat(0.25)?));
+    let photo = Photo::new(Picture::new(4, 6, &values)?).with_image("grey", Arc::new(flat(0.25)?));
     let made = render(&photo, &Recipe::new([Step::new(shower.name()).param("image", "grey")]))?;
     assert_close(&made, &vec![0.25; 72], 1e-6, "the picture");
     Ok(())
@@ -90,7 +90,7 @@ fn a_picture_given_to_the_photo_reaches_the_step_that_names_it() -> Result<(), E
 fn a_step_that_names_no_picture_gets_none() -> Result<(), Error> {
     let shower = Registered::new(Shower::new())?;
     let values = counted();
-    let photo = Photo::new(Picture::new(4, 6, &values)?).with_picture("grey", Arc::new(flat(0.25)?));
+    let photo = Photo::new(Picture::new(4, 6, &values)?).with_image("grey", Arc::new(flat(0.25)?));
     for step in [
         Step::new(shower.name()),
         Step::new(shower.name()).param("image", Value::Null),
@@ -105,8 +105,8 @@ fn each_step_gets_the_picture_of_its_own_name() -> Result<(), Error> {
     let shower = Registered::new(Shower::new())?;
     let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?)
-        .with_picture("dark", Arc::new(flat(0.125)?))
-        .with_picture("light", Arc::new(flat(0.875)?));
+        .with_image("dark", Arc::new(flat(0.125)?))
+        .with_image("light", Arc::new(flat(0.875)?));
     let name = shower.name();
     let recipe = Recipe::new([
         Step::new(name).param("image", "dark"),
@@ -126,8 +126,8 @@ fn the_looks_of_an_each_step_find_their_pictures_too() -> Result<(), Error> {
     let shower = Registered::new(Shower::new())?;
     let values = vec![0.5; 4 * 6 * 3];
     let photo = Photo::new(Picture::new(4, 6, &values)?)
-        .with_picture("low", Arc::new(flat(0.125)?))
-        .with_picture("high", Arc::new(flat(0.875)?));
+        .with_image("low", Arc::new(flat(0.125)?))
+        .with_image("high", Arc::new(flat(0.875)?));
     let mut each = Each::new(
         "cells",
         [
@@ -168,7 +168,7 @@ fn an_image_file_named_by_a_step_is_read_and_a_given_picture_of_that_name_wins()
     let recipe = Recipe::new([Step::new(shower.name()).param("image", named.as_str())]);
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     assert_close(&render(&photo, &recipe)?, &vec![1.0; 72], 1e-6, "read from the file");
-    let given = photo.with_picture(named, Arc::new(flat(0.25)?));
+    let given = photo.with_image(named, Arc::new(flat(0.25)?));
     assert_close(
         &render(&given, &recipe)?,
         &vec![0.25; 72],
@@ -242,7 +242,7 @@ fn a_picture_offered_to_apply_reaches_the_effect_under_its_parameter() -> Result
     let values = counted();
     let picture = Picture::new(4, 6, &values)?;
     let grey = flat(0.5)?;
-    let inputs = Inputs::default().with_picture("image", &grey);
+    let inputs = Inputs::default().with_image("image", &grey);
     let made = apply(shower.name(), &picture, json!({"image": null}), &inputs)?;
     assert_close(&made.into_values(), &vec![0.5; 72], 1e-6, "apply with a picture");
     Ok(())

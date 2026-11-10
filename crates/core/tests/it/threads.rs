@@ -52,7 +52,7 @@ fn render(height: usize, width: usize, seed: usize, recipe: &Recipe, threads: us
     let values = varied_seeded(height, width, seed);
     Photo::new(Picture::new(height, width, &values)?)
         .with_lut("film", Arc::new(film()?))
-        .with_picture("logo", Arc::new(logo()?))
+        .with_image("logo", Arc::new(logo()?))
         .render(recipe, &Presets::new(), Options::default().with_threads(threads))
 }
 

@@ -74,8 +74,8 @@ params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect 
 (`Photo::with_lut(name, Arc<Lut>)`), else the path of a `.cube` file read once per render, else an error naming it; the runner
 finds the table before step 1 and offers it, so the table never travels in the recipe (`crate::Lut`, `lut.rs`, `lut/cube.rs`:
 the `.cube` reader and trilinear lookup are the core's). A `picture` parameter (`PictureName`, nullable, none = no picture) is the same route:
-`Photo::with_picture(name, Arc<Image>)` (straight-alpha RGB/RGBA), else the path of an image file read once per render by `files::read`; the effect
-finds it as `Inputs::picture(parameter)`; Python's `Picture` travels as `$picture:<digest>` and `pictures=` (`run/assets.rs`). Rust effects never refer to each other.
+`Photo::with_image(name, Arc<Image>)` (straight-alpha RGB/RGBA), else the path of an image file read once per render by `files::read`; the effect
+finds it as `Inputs::image(parameter)`; Python's `Picture` travels as `$picture:<digest>` and `pictures=` (`run/assets.rs`). Rust effects never refer to each other.
 The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
 (`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
 look, `Table::check` those of an effect's parameters (`_core.check`, `_core.check_recipe`, `_core.read_recipe`). The Python

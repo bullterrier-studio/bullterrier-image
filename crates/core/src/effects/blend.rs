@@ -72,7 +72,7 @@ pub struct Params {
 
 /// The photo with the picture the step names (`image`) laid over it; the photo itself without one.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    let Some(asset) = inputs.picture("image") else {
+    let Some(asset) = inputs.image("image") else {
         return picture.map(|pixel| pixel);
     };
     let (height, width) = (picture.height(), picture.width());

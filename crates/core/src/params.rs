@@ -249,7 +249,7 @@ impl LutName {
     }
 }
 
-/// The value of a picture parameter: the name of a picture the photo was given (see `Photo::with_picture`), else the path
+/// The value of a picture parameter: the name of a picture the photo was given (see `Photo::with_image`), else the path
 /// of an image file read once per render; none means no picture. A recipe writes it as a string or `null`. The picture
 /// itself never travels in the parameters: a render hands it to the effect in its [`Inputs`](crate::Inputs), as an
 /// [`Image`](crate::Image) with straight alpha. (It is not the [`Picture`](crate::Picture) a step reads: that is the photo.)

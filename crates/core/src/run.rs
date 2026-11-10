@@ -119,7 +119,7 @@ impl<'a> Photo<'a> {
     /// name it, within the core's pixel limit), and a path that cannot be read is a render error naming it, before the
     /// first step runs. (The photo itself is a [`Picture`]; this is a second picture a step lays over it.)
     #[must_use]
-    pub fn with_picture(mut self, name: impl Into<String>, image: Arc<Image>) -> Self {
+    pub fn with_image(mut self, name: impl Into<String>, image: Arc<Image>) -> Self {
         self.pictures.insert(name.into(), image);
         self
     }

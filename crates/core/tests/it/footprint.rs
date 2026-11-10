@@ -190,7 +190,7 @@ fn run(
         .filter(|field| field.kind == Kind::Picture)
     {
         if params[field.name].is_string() {
-            inputs = inputs.with_picture(field.name, &asset);
+            inputs = inputs.with_image(field.name, &asset);
         }
     }
     let picture = Picture::new(to - from, WIDTH, rows(picture, 3, from, to))?;
