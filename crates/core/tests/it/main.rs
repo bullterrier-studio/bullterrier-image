@@ -120,6 +120,7 @@ mod recipe_check;
 mod recipe_drive;
 mod recipe_file;
 mod recipe_frame;
+mod recipe_load;
 mod recipe_model;
 mod recipe_needs;
 mod recipe_references;

@@ -24,6 +24,7 @@ mod check;
 pub(crate) mod drive;
 pub(crate) mod file;
 pub mod frame;
+mod load;
 mod needs;
 mod references;
 pub mod region;
