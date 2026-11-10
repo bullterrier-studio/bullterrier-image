@@ -527,3 +527,40 @@ fn a_count_held_as_usize_is_a_whole_number_in_the_table_and_the_values() {
     };
     assert_eq!(params.values()["pieces"], json!(7));
 }
+
+#[test]
+fn a_usize_count_refuses_what_is_not_a_whole_number_in_its_range() {
+    use bullterrier_image::effects::shatter;
+    // pieces: usize, 4 to 500
+    let table = shatter::Params::table();
+    let check = |value: Value| {
+        let mut given = Map::new();
+        given.insert("pieces".into(), value);
+        table.check("shatter", &given).map(|values| values["pieces"].clone())
+    };
+    for good in [json!(4), json!(24), json!(500)] {
+        assert_eq!(
+            check(good.clone()).ok(),
+            Some(good.clone()),
+            "{good} is a count in range"
+        );
+    }
+    for bad in [
+        json!(-1),
+        json!(3),
+        json!(501),
+        json!(9_223_372_036_854_775_808_u64),
+        json!(u64::MAX),
+        json!(4.5),
+        json!(24.5),
+        json!(1e30),
+        json!(true),
+        json!("24"),
+        json!(null),
+    ] {
+        assert!(
+            matches!(check(bad.clone()), Err(Error::Invalid { .. })),
+            "{bad} must be refused"
+        );
+    }
+}
