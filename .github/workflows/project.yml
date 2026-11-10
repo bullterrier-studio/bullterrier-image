@@ -9,6 +9,30 @@ permissions:
   contents: read
 
 jobs:
+  # The Rust tests `poe check` leaves out (`#[ignore = "full: ..."]`): every row of the matrices, which `check` runs one row of.
+  # Once, on Linux, on every push to main and pull request that changes code (ci.yml); `poe full` runs them before a tag.
+  rust-full-tier:
+    name: The whole Rust test matrices pass
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Install the pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && cargo --version
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Fetch the locked crates (cargo fetch)
+        run: cargo fetch --locked
+      - name: Install the locked dependencies (builds the Rust extension)
+        run: uv sync --locked
+      - name: The whole matrices (poe rust-test-full)
+        run: uv run --locked poe rust-test-full
+
   # `poe new-effect` end to end, with a project environment of its own (out of `poe test`): once, on Linux
   scaffold:
     name: A scaffolded effect passes its tests after a rebuild

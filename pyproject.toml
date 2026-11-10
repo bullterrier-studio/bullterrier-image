@@ -162,13 +162,15 @@ rust-shear = { cmd = "cargo shear", help = "Find Rust dependencies no code uses 
 rust-deny = { cmd = "cargo deny --offline --locked check bans licenses sources", help = "Check the Rust dependencies offline: banned crates, licences, sources (deny.toml)" }
 stubtest = { cmd = "python -m mypy.stubtest --mypy-config-file pyproject.toml bullterrier_image._native._core", help = "Check the stub _core.pyi against the built extension" }
 rust-test = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast", help = "Run the Rust tests under the memory cap, every binary even after one fails" }
+# The Rust tests `#[ignore = "full: ..."]` (tests/tools/test_rust_full_tier.py): every size or band of a matrix `check` runs one row of
+rust-test-full = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast -- --ignored", help = "Run the Rust tests that only the full tier runs (the whole matrices), under the memory cap" }
 # A crate's Rust integration tests are one binary (tests/it/main.rs); tools/check_rust_test_layout.py, the table [tool.rust-tests.own-binaries]
 rust-test-layout = { cmd = "python tools/check_rust_test_layout.py", help = "Check that the Rust integration tests are one binary per crate (tests/it/)" }
 dead-code = { cmd = "vulture src", help = "Find dead code in src (vulture)" }
 # The project's own gates and the steps only `full` runs: the template ships these two lines as no-ops and never changes
 # them again, so a project replaces each with a sequence of its tasks without a conflict at the next update
 project-gates = { cmd = "python -c pass", help = "The project's own gates, run last by check and full (none yet)" }
-project-full = { sequence = [{ ref = "check-scaffold" }, { ref = "audit" }, { ref = "check-min-deps" }], default_item_type = "cmd", help = "The project's own steps that only full runs: the scaffold test, the audit (needs the network) and the suite on the lowest dependencies" }
+project-full = { sequence = [{ ref = "rust-test-full" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "check-min-deps" }], default_item_type = "cmd", help = "The project's own steps that only full runs: the whole Rust matrices, the scaffold test, the audit (needs the network) and the suite on the lowest dependencies" }
 # The steps `check` and `full` share, cheapest first, stopping at the first failure
 gates = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "test" }, { ref = "project-gates" }], default_item_type = "cmd", help = "Every gate except the proofs that each gate can fail (format, lint, workflows, dead code, docs, dependencies, types, tests, the project's own)" }
 fast = { sequence = [{ ref = "rust-fmt" }, "ruff format --check .", { ref = "rust-lint" }, "ruff check .", "mypy", { ref = "rust-test" }], default_item_type = "cmd", help = "The inner loop: format, lint, types and the Rust tests; the Python suite, dead code, dependencies, the build checks and the gate proofs are left to check and full" }

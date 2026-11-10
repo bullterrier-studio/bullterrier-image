@@ -141,7 +141,19 @@ fn step_of(name: &str, setting: &Setting, pieces: bool) -> Step {
 }
 
 #[test]
+fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_banded() -> Outcome {
+    band_matrix(&[BANDS[1]], &[BANDS[1]])
+}
+
+#[test]
+#[ignore = "full: every band size; CI runs it with `cargo test -- --ignored`"]
 fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_banded_at_any_band_size() -> Outcome {
+    band_matrix(&BANDS, &BANDS[1..])
+}
+
+/// Every effect with a margin, with its defaults and each parameter at its limits, banded at each of `bands` (at the
+/// sizes recipes are written for, at each of `sized_bands`) is the whole-picture render.
+fn band_matrix(bands: &[usize], sized_bands: &[usize]) -> Outcome {
     let values = varied(HEIGHT, WIDTH);
     let mut problems = Vec::new();
     let (mut banded_effects, mut cases) = (0, 0);
@@ -172,7 +184,7 @@ fn every_effect_with_its_defaults_and_each_parameter_at_its_limits_is_the_same_b
             };
             for &size in sizes {
                 let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
-                let bands: &[usize] = if size.is_some() { &BANDS[1..] } else { &BANDS };
+                let bands = if size.is_some() { sized_bands } else { bands };
                 cases += bands.len();
                 if let Some(found) = first_problem(&values, &recipe, options, bands, TOLERANCE)? {
                     problems.push(format!("{name} {setting:?} size {size:?}: {found}"));
@@ -235,16 +247,17 @@ const FFT_BLURS: [&str; 16] = [
     "vhs",
 ];
 
-/// The first of the pictures `SIDES` at which one `name` step with `setting` banded is not the whole render, byte for
+/// The first of the pictures of long sides `sides` at which one `name` step with `setting` banded is not the whole render, byte for
 /// byte (to `TOLERANCE` for an effect of `FFT_BLURS`).
 fn first_px_problem(
     name: &str,
     setting: &Setting,
     partitioned: bool,
     within: f32,
+    sides: &[usize],
 ) -> Result<Option<String>, Box<dyn Error>> {
     let recipe = Recipe::new([step_of(name, setting, partitioned)]);
-    for side in SIDES {
+    for &side in sides {
         let values = varied(side, WIDTH);
         if let Some(found) = first_problem(&values, &recipe, Options::default(), &SWEEP_BANDS, within)? {
             return Ok(Some(format!("{name} {setting:?} long side {side}: {found}")));
@@ -254,7 +267,18 @@ fn first_px_problem(
 }
 
 #[test]
+fn every_px_parameter_is_the_same_banded_at_the_smallest_size_of_picture() -> Outcome {
+    px_sweep(&SIDES[..1])
+}
+
+#[test]
+#[ignore = "full: every size of picture; CI runs it with `cargo test -- --ignored`"]
 fn every_px_parameter_is_the_same_banded_at_every_size_of_picture() -> Outcome {
+    px_sweep(&SIDES)
+}
+
+/// Every `px` setting of every effect with a margin, banded, is the whole-picture render at each long side of `sides`.
+fn px_sweep(sides: &[usize]) -> Outcome {
     let mut problems = Vec::new();
     let mut cases = 0;
     for name in effects() {
@@ -274,7 +298,7 @@ fn every_px_parameter_is_the_same_banded_at_every_size_of_picture() -> Outcome {
             } else {
                 0.0
             };
-            problems.extend(first_px_problem(&name, setting, partitioned, within)?);
+            problems.extend(first_px_problem(&name, setting, partitioned, within, sides)?);
         }
     }
     assert!(
@@ -300,7 +324,7 @@ fn a_px_value_that_a_small_picture_raises_to_its_minimum_is_the_same_banded() ->
         let Value::Object(setting) = setting else {
             return Err("a row is an object".into());
         };
-        problems.extend(first_px_problem(name, &setting, false, 0.0)?);
+        problems.extend(first_px_problem(name, &setting, false, 0.0, &SIDES)?);
     }
     assert!(problems.is_empty(), "{problems:#?}");
     Ok(())
