@@ -18,12 +18,12 @@ fn inside(row: usize, column: usize) -> bool {
 }
 
 /// 1 for the outer ring up to 4 at the centre of the 9 x 9 square, 0 outside.
-fn depth(row: usize, column: usize) -> usize {
+fn depth(row: usize, column: usize) -> f32 {
     if !inside(row, column) {
-        return 0;
+        return 0.0;
     }
     let edge = |at: usize| (at - SUBJECT.start).min(SUBJECT.end - 1 - at);
-    edge(row).min(edge(column)) + 1
+    f32::from(u8::try_from(edge(row).min(edge(column)) + 1).unwrap_or(u8::MAX))
 }
 
 fn field() -> Vec<f32> {
@@ -71,13 +71,13 @@ fn the_backdrop_colour_is_screened_over_the_edge_by_depth_and_nothing_else_chang
         for (at, (got, was)) in after.iter().zip(&before).enumerate() {
             let (row, column) = (at / SIZE, at % SIZE);
             let d = depth(row, column);
-            let wanted = if d == 0 || d as f32 >= width {
+            let wanted = if d == 0.0 || d >= width {
                 *was // the backdrop, and the subject as deep as the width or deeper: exactly as it was
             } else {
-                let weight = amount * (1.0 - d as f32 / width);
+                let weight = amount * (1.0 - d / width);
                 [0, 1, 2].map(|c| SUBJECT_COLOUR[c] + weight * BACKDROP[c] * (1.0 - SUBJECT_COLOUR[c]))
             };
-            if d == 0 || d as f32 >= width {
+            if d == 0.0 || d >= width {
                 assert_eq!(got, &wanted, "width {width} amount {amount}, pixel ({row}, {column})");
             } else {
                 assert!(

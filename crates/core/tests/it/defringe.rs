@@ -141,7 +141,7 @@ fn the_field_threshold_decides_which_pixels_are_inside() -> Result<(), Error> {
 #[test]
 fn the_result_stays_in_range_on_any_picture() -> Result<(), Error> {
     let noisy: Vec<[f32; 3]> = (0..SIZE * SIZE)
-        .map(|at| [0, 1, 2].map(|c| ((at * 7 + c * 13) % 11) as f32 / 10.0))
+        .map(|at| [0, 1, 2].map(|c| f32::from(u8::try_from((at * 7 + c * 13) % 11).unwrap_or(0)) / 10.0))
         .collect();
     for width in [1.0, 3.0, 6.0] {
         for pixel in run(&params(width, 1.0), &field(), &noisy)? {
