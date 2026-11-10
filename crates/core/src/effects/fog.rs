@@ -69,9 +69,9 @@ pub struct Params {
     /// no fog at the very top, as for mist lying on the ground.
     #[param(default = 0.7, unit = fraction, min = 0, max = 1)]
     pub gradient: f32,
-    /// About the share of the picture that has any cloud in it: 0 = none, 0.45 = clouds with clear air between them, 1 =
-    /// cloud everywhere, in thicker and thinner places. The clouds are the highest parts of a noise field, so raising it
-    /// widens them and joins them up.
+    /// The expected share of the picture that has any cloud in it; a given seed varies, about ±0.1 at the default. 0 =
+    /// none, 0.45 = clouds with clear air between them, 1 = cloud everywhere, in thicker and thinner places. The clouds
+    /// are the highest parts of a noise field, so raising it widens them and joins them up.
     #[param(default = 0.93, unit = fraction, min = 0, max = 1)]
     pub coverage: f32,
     /// How soft the edge of a cloud is, as the share of the picture over which the fog thickens from its thinnest to full
