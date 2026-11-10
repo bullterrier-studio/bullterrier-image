@@ -1,18 +1,18 @@
-# A heat-haze wobble: noise bends the picture by up to 24 px, in broad waves with a little fine ripple. Then frosted
+# A heat-haze wobble: noise bends the picture by about 6 px, in broad waves with a little fine ripple. Then frosted
 # glass: at scale 1 with 'nearest', every pixel is swapped for a neighbour on its own.
 name = "displace"
 size = 480
 
 [[step]]
 effect = "displace"
-amount = 24
+amount = 6
 scale = 60
 octaves = 3
 seed = 1
 
 [[step]]
 effect = "displace"
-amount = 10
+amount = 4
 scale = 1
 octaves = 1
 interpolation = "nearest"

@@ -2,7 +2,7 @@
 
 [scatter]
 description = "Frosted glass: every pixel jumps on its own a few pixels, so edges break into grain and the picture looks seen through ground glass."
-amount = 14
+amount = 6
 scale = 1
 octaves = 1
 interpolation = "nearest"
