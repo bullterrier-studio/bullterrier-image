@@ -5,6 +5,7 @@ mod files;
 mod finding;
 mod lut;
 mod run;
+mod sheet;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -46,6 +47,9 @@ mod _core {
 
     #[pymodule_export]
     use super::lut::PyLut;
+
+    #[pymodule_export]
+    use super::sheet::contact_sheet;
 
     #[pymodule_export]
     use super::finding::{

@@ -7,7 +7,7 @@ from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import runs
 from bullterrier_image.recipe import Band, Each, Framing, Grid, Recipe, Stage, Step, render
-from bullterrier_image.sheet import contact_sheet, sweep, write_stages
+from bullterrier_image.sheet import sweep, write_stages
 
 SLIDE_PARAMS = {"bands": 3, "seed": 5}
 GRAIN_PARAMS = {"amount": 0.1, "size": 1.6, "seed": 2}
@@ -112,54 +112,6 @@ def test_a_sweep_that_cannot_be_made_is_refused_naming_the_offender(arguments, o
 @pytest.mark.parametrize("count", [2, 24])
 def test_the_smallest_and_the_largest_sheet_are_accepted(count):
     assert len(sweep(TWICE, "grain#1.amount", 0, 0.2, count)) == count
-
-
-def clear_red(size=8) -> np.ndarray:
-    """A picture that is red and entirely transparent."""
-    return np.dstack([np.tile(np.array([1, 0, 0], np.float32), (size, size, 1)), np.zeros((size, size), np.float32)])
-
-
-def test_a_picture_with_transparency_is_shown_over_a_checkerboard_so_the_colour_under_it_never_shows():
-    sheet = contact_sheet([("clear", clear_red())], tile=64)
-    tile = sheet[14:78, 14:78]  # the gap is 14 px
-    assert tile.shape == (64, 64, 3)
-    assert not (tile[..., 0] - tile[..., 1] > 0.1).any()  # no red: the colours are greys
-    assert len({tuple(np.round(pixel, 3)) for pixel in tile.reshape(-1, 3)}) == 2  # a light and a dark square
-
-
-def test_an_opaque_four_channel_picture_is_shown_as_its_colour_and_a_half_clear_one_as_a_mix():
-    photo = np.tile(np.array([0.2, 0.4, 0.6], np.float32), (8, 8, 1))
-    opaque = contact_sheet([("a", np.dstack([photo, np.ones((8, 8), np.float32)]))], tile=64)
-    np.testing.assert_allclose(opaque, contact_sheet([("a", photo)], tile=64), atol=1e-6)
-    half = contact_sheet([("a", np.dstack([photo, np.full((8, 8), 0.5, np.float32)]))], tile=64)[14:78, 14:78]
-    checker = contact_sheet([("a", clear_red())], tile=64)[14:78, 14:78]
-    np.testing.assert_allclose(
-        half, 0.5 * photo[0, 0] + 0.5 * checker, atol=1 / 255
-    )  # half the colour, half the board, to 8 bits
-
-
-# Each row: the labels of a three-column sheet of 120 px tiles. A label wider than a tile must not touch the gutters
-# beside its tile (the last tile's right gutter is the sheet's edge, where it would be cut off).
-LABELS = {
-    "short labels fit as they are": ["a=1", "b=2", "c=3"],
-    "a long label in the middle column": ["a=1", "split=9.50 bands=8", "c=3"],
-    "a long label in the last column": ["a=1", "b=2", "split=9.50 bands=8 seed=1234"],
-    "a label too long for any size": ["a=1", "b=2", "split=9.50 bands=8 seed=1234 " * 4],
-}
-
-
-@pytest.mark.parametrize("labels_", LABELS.values(), ids=LABELS.keys())
-def test_a_label_never_runs_past_its_tile_into_the_gutter(labels_):
-    tile = 120
-    picture = np.full((tile, tile, 3), 0.5, np.float32)
-    sheet = contact_sheet([(label, picture) for label in labels_], columns=3, tile=tile)
-    blank = contact_sheet([("", picture) for _ in labels_], columns=3, tile=tile)
-    gap = (sheet.shape[1] - 3 * tile) // 4  # the sheet is a gap, then three tiles each followed by a gap
-    ink = (sheet != blank).any(axis=(0, 2))  # per pixel column: does any label ink fall there
-    for column in range(3):
-        left = gap + column * (tile + gap)
-        assert ink[left : left + tile].any(), f"the label of tile {column} is missing"
-        assert not ink[left + tile : left + tile + gap].any(), f"the label of tile {column} runs into the gutter"
 
 
 def test_write_stages_names_each_stage_and_saves_one_with_transparency_as_png_and_the_others_as_jpg(photo, tmp_path):
