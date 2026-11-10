@@ -10,7 +10,7 @@ publish.workspace = true
 
 [features]
 # Running models through ONNX Runtime (`finding::onnx`): the library is loaded at run time, none is bundled. The published wheel enables it.
-onnx = ["dep:ort", "dep:sha2", "dep:ureq"]
+onnx = ["dep:ort", "dep:ureq"]
 
 [dependencies]
 bullterrier-image-derive.workspace = true
@@ -27,7 +27,7 @@ rustfft.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_path_to_error.workspace = true
-sha2 = { workspace = true, optional = true }
+sha2.workspace = true
 ureq = { workspace = true, optional = true }
 svgtypes.workspace = true
 tiff.workspace = true
@@ -38,6 +38,10 @@ zune-jpeg.workspace = true
 [dev-dependencies]
 peak_alloc.workspace = true
 proptest.workspace = true
+
+# the identity of the core: a hash of its sources, computed at build time (`build.rs`)
+[build-dependencies]
+sha2.workspace = true
 
 [lints]
 workspace = true

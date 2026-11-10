@@ -6,6 +6,8 @@ use std::fmt::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
+use sha2::{Digest, Sha256};
+
 fn main() -> io::Result<()> {
     let manifest =
         env::var_os("CARGO_MANIFEST_DIR").ok_or_else(|| io::Error::other("cargo sets CARGO_MANIFEST_DIR"))?;
@@ -29,7 +31,57 @@ fn main() -> io::Result<()> {
         }
         writeln!(shipped, "];").map_err(io::Error::other)?;
     }
-    fs::write(PathBuf::from(out).join("shipped.rs"), shipped)
+    fs::write(PathBuf::from(&out).join("shipped.rs"), shipped)?;
+    fs::write(PathBuf::from(out).join("identity.rs"), identity(Path::new(&manifest))?)
+}
+
+/// The Rust source of the core's identity: a SHA-256 of every file that can change what the core makes (its sources, the
+/// data that ships with it, its manifest, and the workspace's lock file where there is one: the code of the crates it
+/// builds with), and the list of those files, by relative path, in order.
+fn identity(manifest: &Path) -> io::Result<String> {
+    let mut files = Vec::new();
+    for folder in ["src", "data"] {
+        println!("cargo::rerun-if-changed={}", manifest.join(folder).display());
+        collect(&manifest.join(folder), manifest, &mut files)?;
+    }
+    files.push((String::from("Cargo.toml"), manifest.join("Cargo.toml")));
+    let lock = manifest.join("..").join("..").join("Cargo.lock");
+    if lock.is_file() {
+        println!("cargo::rerun-if-changed={}", lock.display());
+        files.push((String::from("../../Cargo.lock"), lock));
+    }
+    files.sort();
+    let mut digest = Sha256::new();
+    let mut listed = String::new();
+    for (relative, path) in &files {
+        digest.update(relative.as_bytes());
+        digest.update([0]);
+        digest.update(fs::read(path)?);
+        digest.update([0]);
+        writeln!(listed, "    {relative:?},").map_err(io::Error::other)?;
+    }
+    let mut code = String::new();
+    writeln!(
+        code,
+        "pub(crate) const SOURCE_DIGEST: &str = {:?};",
+        format!("{:x}", digest.finalize())
+    )
+    .map_err(io::Error::other)?;
+    writeln!(code, "pub(crate) const SOURCE_FILES: &[&str] = &[\n{listed}];").map_err(io::Error::other)?;
+    Ok(code)
+}
+
+/// Every file below `folder` as `(path relative to root with `/`, full path)`.
+fn collect(folder: &Path, root: &Path, files: &mut Vec<(String, PathBuf)>) -> io::Result<()> {
+    for entry in fs::read_dir(folder)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            collect(&path, root, files)?;
+        } else if let Ok(relative) = path.strip_prefix(root) {
+            files.push((relative.to_string_lossy().replace('\\', "/"), path.clone()));
+        }
+    }
+    Ok(())
 }
 
 /// The `.toml` files in `folder` as `(name without the extension, path)`, sorted by name.

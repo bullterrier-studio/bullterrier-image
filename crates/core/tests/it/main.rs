@@ -62,6 +62,7 @@ mod halftone;
 mod highpass;
 mod hsv;
 mod hue_range;
+mod identity;
 mod inputs;
 mod interlace;
 mod jpeg_crush;
