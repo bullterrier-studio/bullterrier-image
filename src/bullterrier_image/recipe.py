@@ -106,6 +106,7 @@ def render(
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
     threads: int = 1,
+    band: int | None = None,
 ) -> np.ndarray:
     """Run `recipe` on the photo `rgb` and return the result as a new image.
 
@@ -147,9 +148,17 @@ def render(
     bytes at any number, so ask for more when you render one picture and keep 1 when you render many at once from your
     own threads (each render using every core would only compete with the others). The GIL is released while the
     core works, so renders from several Python threads run side by side.
+
+    band: how many rows of the working picture are made at a time, a whole number of 1 or more (RecipeError for anything
+    else); None, the default, makes the whole picture at once. The result is the same bytes for any band, and a run of
+    steps that each read only a bounded neighbourhood of a pixel (a blur, a grade, a vignette) needs memory for a band,
+    not for several pictures. A step that may read any pixel runs on the whole picture. `trace` keeps every step's
+    picture and takes no band.
     """
     recipe = _one_recipe(recipe)
-    return bridge.render(rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size, threads=threads)
+    return bridge.render(
+        rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size, threads=threads, band=band
+    )
 
 
 def trace(
@@ -187,6 +196,7 @@ def render_all(
     finders: Mapping[str, Finder] | None = None,
     size: int | None = None,
     threads: int = 1,
+    band: int | None = None,
 ) -> list[np.ndarray]:
     """Run several recipes on one photo; each map is found at most once, however many recipes need it.
 
@@ -194,11 +204,12 @@ def render_all(
     maps: the photo's maps by name, used by every recipe that needs them (see `render`), or None. finders: each `find`
     is called once with the photo as given when any recipe needs its map and the map was not handed in (the map's error
     if it is needed and missing); the `subject` finder is also asked about the pieces of a `Subject` with `per` as for
-    `render`. A name that is no map of any recipe is a RecipeError. size, threads: as for `render`, for every recipe.
+    `render`. A name that is no map of any recipe is a RecipeError. size, threads, band: as for `render`, for every
+    recipe.
     """
     recipes = _recipes(recipes)
     return bridge.render_all(
-        rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size, threads=threads
+        rgb, recipes, maps=maps, finders=_finders(recipes, maps, finders), size=size, threads=threads, band=band
     )
 
 

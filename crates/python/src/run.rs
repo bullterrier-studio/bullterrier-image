@@ -57,10 +57,14 @@ use super::{CoreError, core_error, found, from_json, photo_array, picture_of, pi
 /// is the same bytes at any number. A number above 256 is a `CoreError` of kind `recipe`. The render itself stays on the
 /// calling thread, so a Python effect it runs keeps its context.
 ///
+/// `band` is how many rows of the working picture the render makes at a time (a positive whole number; none: the whole
+/// picture): the same picture, in less memory for a run of steps that read a bounded neighbourhood of a pixel. A `band`
+/// of 0 is a `CoreError` of kind `recipe`.
+///
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=1))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=1, band=None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -76,12 +80,13 @@ pub(crate) fn render<'py>(
     presets: Option<&Bound<'py, PyDict>>,
     size: Option<u32>,
     threads: usize,
+    band: Option<usize>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders, luts, pictures)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = options_of(size, threads);
+    let options = options_of(size, threads, band);
     let image = py
         .detach(|| photo.render(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -161,7 +166,7 @@ pub(crate) fn trace<'py>(
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders, luts, pictures)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = options_of(size, threads);
+    let options = options_of(size, threads, None);
     let stages = py
         .detach(|| photo.trace(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -172,10 +177,11 @@ pub(crate) fn trace<'py>(
     PyList::new(py, shown)
 }
 
-/// The options of a render: the longest side `size`, if asked for, and `threads` (0: every core).
-fn options_of(size: Option<u32>, threads: usize) -> Options {
+/// The options of a render: the longest side `size`, if asked for, `threads` (0: every core) and the `band` of rows.
+fn options_of(size: Option<u32>, threads: usize, band: Option<usize>) -> Options {
     let options = Options::default().with_threads(threads);
-    size.map_or(options, |size| options.with_size(size))
+    let options = size.map_or(options, |size| options.with_size(size));
+    band.map_or(options, |rows| options.with_band(rows))
 }
 
 /// `photo` with the maps handed in, the finders given and the lookup tables given.

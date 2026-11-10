@@ -756,3 +756,22 @@ def test_an_effect_that_declares_size_ratio_gets_working_px_per_design_px(photo,
     maps = {"f": np.full(photo.shape[:2], 0.3, np.float32)} if "f" in recipe.regions else None
     out = facade.render(photo, recipe, size=size, maps=maps)
     np.testing.assert_allclose(out, ratio / 10, atol=1e-6)  # every Drive level and every look gets the same ratio
+
+
+BANDED = Recipe(
+    [Step("grade", params={"exposure": 0.4}), Step("gaussian_blur", params={"radius": 6.0}), Step("vignette")],
+    name="banded",
+    size=None,
+)
+
+
+def test_a_banded_render_gives_the_picture_of_the_whole_render(photo):
+    whole = facade.render(photo, BANDED)
+    np.testing.assert_array_equal(facade.render(photo, BANDED, band=16), whole)
+    np.testing.assert_array_equal(facade.render_all(photo, [BANDED], band=16)[0], whole)
+
+
+@pytest.mark.parametrize("band", [0, -3, 2.5, True, "8"], ids=["zero", "negative", "fraction", "bool", "text"])
+def test_a_band_that_is_no_number_of_rows_is_refused_naming_it(photo, band):
+    with pytest.raises(RecipeError, match="band"):
+        facade.render(photo, BANDED, band=band)

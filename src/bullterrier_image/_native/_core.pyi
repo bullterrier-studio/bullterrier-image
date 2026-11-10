@@ -98,6 +98,7 @@ def render(
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
     threads: int = 1,
+    band: int | None = None,
 ) -> np.ndarray: ...
 def trace(
     rgb: np.ndarray,
