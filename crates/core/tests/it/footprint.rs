@@ -37,8 +37,9 @@ const BAND: usize = 8;
 const BANDS: [usize; 3] = [0, (HEIGHT - BAND) / 2, HEIGHT - BAND];
 /// Rendering a band alone must give the whole's pixels to within this: a different order of summing is not a fault.
 const SAME: f32 = 1e-4;
-/// The size ratios the picture is rendered at.
-const RATIOS: [f64; 3] = [0.5, 1.0, 2.0];
+/// The size ratios the picture is rendered at. A parameter in `px` is tried at all of them: the runner floors it at its
+/// minimum below 1, a margin that forgets it is too small. The other parameters are tried at the first only.
+const RATIOS: [f64; 4] = [0.2, 0.5, 1.0, 2.0];
 /// At least this many effects of the core are less than `Whole` with their defaults, so declaring all of them `Whole`
 /// does not pass.
 const NOT_WHOLE: usize = 20;
@@ -210,14 +211,21 @@ fn problems(one: &dyn Effect) -> Result<Vec<String>, Box<dyn Error>> {
         rectangle(36..60)?,
         rectangle(4..HEIGHT - 4)?,
     ];
-    let cases = one
-        .params()
-        .map_or_else(|| vec![Setting::new()], |table| variants(&table));
+    let table = one.params();
+    let cases = table
+        .as_ref()
+        .map_or_else(|| vec![Setting::new()], variants);
     let mut found = Vec::new();
     for map in &maps {
         for case in &cases {
-            // the size ratio matters to every parameter alike: the second one is tried with the defaults alone
-            let ratios = if case.is_empty() { &RATIOS[..] } else { &RATIOS[..1] };
+            // the size ratio matters to the defaults and to a `px` parameter (floored at its minimum when it shrinks)
+            let in_px = table.as_ref().is_some_and(|table| {
+                table
+                    .fields
+                    .iter()
+                    .any(|field| field.unit == Some(Unit::Px) && case.contains_key(field.name))
+            });
+            let ratios = if case.is_empty() || in_px { &RATIOS[..] } else { &RATIOS[1..2] };
             for &ratio in ratios {
                 found.extend(problems_of(one, case, ratio, &picture, map)?);
             }
@@ -492,7 +500,7 @@ impl Effect for Claim {
 }
 
 /// `problems_of` for one setting over the same maps `problems` uses.
-fn problems_with(one: &dyn Effect, setting: &Setting) -> Result<Vec<String>, Box<dyn Error>> {
+fn problems_with(one: &dyn Effect, setting: &Setting, ratio: f64) -> Result<Vec<String>, Box<dyn Error>> {
     let picture = hashed(HEIGHT * WIDTH * 3, 3);
     let rectangle = |rows: std::ops::Range<usize>| {
         Layer::new(
@@ -514,7 +522,7 @@ fn problems_with(one: &dyn Effect, setting: &Setting) -> Result<Vec<String>, Box
     ];
     let mut found = Vec::new();
     for map in &maps {
-        found.extend(problems_of(one, setting, 1.0, &picture, map)?);
+        found.extend(problems_of(one, setting, ratio, &picture, map)?);
     }
     Ok(found)
 }
@@ -525,7 +533,7 @@ fn an_effect_whose_footprint_reads_two_parameters_tells_the_truth_with_both_at_o
         let Value::Object(setting) = setting else {
             return Err("a row is an object".into());
         };
-        let found = problems_with(&*effect(name)?, &setting)?;
+        let found = problems_with(&*effect(name)?, &setting, 1.0)?;
         assert!(found.is_empty(), "{name} {setting:?}: {found:?}");
     }
     Ok(())
@@ -542,8 +550,47 @@ fn every_combination_can_fail_a_claim_that_reads_nothing_around_a_pixel() -> Out
             says: Footprint::Pixel,
         };
         assert!(
-            !problems_with(&liar, &setting)?.is_empty(),
+            !problems_with(&liar, &setting, 1.0)?.is_empty(),
             "{name} {setting:?} passed a claim of Pixel: the row proves nothing"
+        );
+    }
+    Ok(())
+}
+
+/// Settings the runner floors in a small picture: a `px` value below the field's minimum in working px is raised to it,
+/// so the effect reads farther than the value scaled by the ratio.
+fn floored() -> Vec<(&'static str, Value, f64)> {
+    vec![
+        ("ambient_occlusion", json!({"radius": 1, "truncate": 4}), 0.2),
+        ("light_wrap", json!({"blur": 1}), 0.2),
+    ]
+}
+
+#[test]
+fn an_effect_tells_the_truth_when_a_small_picture_raises_a_px_value_to_its_minimum() -> Outcome {
+    for (name, setting, ratio) in floored() {
+        let Value::Object(setting) = setting else {
+            return Err("a row is an object".into());
+        };
+        let found = problems_with(&*effect(name)?, &setting, ratio)?;
+        assert!(found.is_empty(), "{name} {setting:?} at ratio {ratio}: {found:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn every_floored_setting_can_fail_a_claim_that_reads_nothing_around_a_pixel() -> Outcome {
+    for (name, setting, ratio) in floored() {
+        let Value::Object(setting) = setting else {
+            return Err("a row is an object".into());
+        };
+        let liar = Claim {
+            inner: effect(name)?,
+            says: Footprint::Pixel,
+        };
+        assert!(
+            !problems_with(&liar, &setting, ratio)?.is_empty(),
+            "{name} {setting:?} at ratio {ratio} passed a claim of Pixel: the row proves nothing"
         );
     }
     Ok(())
