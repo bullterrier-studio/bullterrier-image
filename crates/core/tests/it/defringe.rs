@@ -185,3 +185,41 @@ fn the_result_stays_in_range_on_any_picture() -> Result<(), Error> {
     }
     Ok(())
 }
+
+#[test]
+#[expect(clippy::cast_precision_loss, reason = "small indices")]
+fn the_interior_colour_is_a_gaussian_mean_of_sigma_half_the_width() -> Result<(), Error> {
+    // A subject of columns 10..120 over every row of a 101 x 140 picture whose red grows along the columns. At width 8
+    // its interior is the columns 18 on (depth over 8), and the edge pixel of row 50, column 10, takes all of the interior
+    // colour: the mean of the red of columns 18 to 26 (the blur reaches 4 sigma = 16 columns, rounded half up, from
+    // column 10) weighted by exp(-d^2 / (2 sigma^2)), d the distance from column 10, sigma = 8 / 2 = 4. The rows weigh
+    // alike, being all interior, and drop out.
+    let (rows, columns, width) = (101_usize, 140_usize, 8.0_f32);
+    let sigma = f64::from(width) / 2.0;
+    let field: Vec<f32> = (0..rows * columns)
+        .map(|at| f32::from(u8::from((10..120).contains(&(at % columns)))))
+        .collect();
+    let picture: Vec<f32> = (0..rows * columns * 3)
+        .map(|at| {
+            if at % 3 == 0 {
+                ((at / 3) % columns) as f32 / 140.0
+            } else {
+                0.5
+            }
+        })
+        .collect();
+    let out = run_with_field(&params(width, 1.0), "field", &field, rows, columns, &picture)?;
+    let (mut sum, mut weights) = (0.0_f64, 0.0_f64);
+    for column in 18..=26_u32 {
+        let weight = (-f64::from((column - 10).pow(2)) / (2.0 * sigma * sigma)).exp();
+        sum += weight * f64::from(column) / 140.0;
+        weights += weight;
+    }
+    let got = f64::from(out[(50 * columns + 10) * 3]);
+    assert!(
+        (got - sum / weights).abs() < 1e-4,
+        "got {got}, wanted {}",
+        sum / weights
+    );
+    Ok(())
+}
