@@ -49,3 +49,4 @@ pub(crate) mod shift;
 pub(crate) mod sites;
 pub(crate) mod svg;
 pub(crate) mod tone;
+pub(crate) mod triangles;
