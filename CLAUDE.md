@@ -59,16 +59,15 @@ errors     BullterrierImageError and its subclasses                            (
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
 ```
 **Architecture rules.** Reference for the Rust core, runner, regions, files, threads and bindings: `docs/architecture.md`; read it before touching them.
-- A ported effect has **no Python folder**
+- A ported effect has **no Python folder**: the registry registers every effect the core declares (`registry._register_core_effects`) with a function that calls `_core.apply("<name>", rgb, params.model_dump())`.
 - Rust effects never refer to each other.
 - The ratio of design px (480 on the longest side) is derived from that working picture, never passed in.
 - Every user number that drives allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of `Region::check` with neither a row nor a reason.
 - Python is a facade over the core and runs no recipe itself.
-- rayon's global pool is never used
-- `Effect::apply` takes no thread parameter
+- The render stays on the calling thread, only row bands run on the pool, and rayon's global pool is never used.
+- Outside a pool a kernel runs inline, and `Effect::apply` takes no thread parameter.
 - Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count).
 - Never add real complexity for the last bit: if a kernel's rounding differs between runs with no visible effect, compare within a small tolerance.
-
 
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
@@ -162,12 +161,12 @@ strength is below full declares its steps' default opacity, `@effect(..., opacit
 
 A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, strict).
 Parameter declarations in Rust, the kinds and the Python seam: `docs/parameters.md`; read it before adding or changing a parameter. Binding sentences:
-- An effect the core runs **declares its fields in Rust**
+- An effect the core runs **declares its fields in Rust**, on its public `Params` struct: each field a type, a `///` doc comment and `#[param(default = .., unit = px, min = .., max = .., at_most = other, drivable, advanced, cyclic)]`.
 - The struct's own doc is the model's docstring, a field's doc its help text in Python: plain text, no rustdoc links, a blank `///` line becomes a double space.
-- The Python class is `class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`)
+- The Python class is `class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust declaration, a default or bound keeping the literal as written (a whole number stays an `int`).
 - Python's model validates a user's values when a step is made; `Table::check` in Rust is the same rules, compared with Python's by parity tests (`tests/_native`); running an effect trusts its parameters.
 - The copy is not edited: a change is a new version in the ecosystem's format first, then a new copy here.
-- `picture` (`PictureName`) is a name or path, never a colour, and `usize` counts are kind `int`.
+- A `picture` parameter (`PictureName`) is a name or path, never a colour, and `usize` counts are kind `int`.
 
 Every field has a default and a description (what it does, unit and range in words, what raising it does).
 - **Numeric** (`int`, `float`): a `unit` from the format's list and inclusive `min`/`max` that hold the default.
