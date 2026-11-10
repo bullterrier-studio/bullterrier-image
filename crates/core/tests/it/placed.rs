@@ -241,6 +241,15 @@ fn noise_made_for_a_window_of_a_tall_canvas_is_the_same_rows_of_the_whole() -> R
             "noise_field",
             json!({"kind": "value", "scale": 20.0, "octaves": 3, "warp": 4.0, "seed": 2}),
         ),
+        // one octave and a long push: a read goes as far as the noise's deviation allows, which the window must cover
+        (
+            "noise_field",
+            json!({"kind": "value", "scale": 3.0, "octaves": 1, "warp": 20.0, "seed": 3}),
+        ),
+        (
+            "noise_field",
+            json!({"kind": "value", "scale": 3.0, "octaves": 1, "warp": 20.0, "seed": 4}),
+        ),
         (
             "grain",
             json!({"size": 3.0, "amount": 0.3, "edge": "reflect", "seed": 6}),
