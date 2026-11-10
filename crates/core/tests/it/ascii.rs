@@ -3,11 +3,7 @@
 //! (a cell 10 px wide is 24 px high, worked from the font's tables in `ops/glyphs.rs`) and comparisons between renders that
 //! must be alike or must differ.
 
-#![expect(
-    clippy::cast_precision_loss,
-    clippy::cast_possible_truncation,
-    reason = "small picture sizes and indices"
-)]
+#![expect(clippy::cast_precision_loss, reason = "small picture sizes and indices")]
 
 use bullterrier_image::effects::ascii::Params;
 use bullterrier_image::params::Color;
@@ -266,8 +262,7 @@ fn the_grid_is_a_cell_wide_and_as_high_as_the_font_makes_it() -> Result<(), Erro
         (0..height - apart).all(|row| out[row * width..][..width] == out[(row + apart) * width..][..width])
     };
     let same_columns = |apart: usize| {
-        (0..height)
-            .all(|row| (0..width - apart).all(|column| out[row * width + column] == out[row * width + column + apart]))
+        (0..height).all(|row| out[row * width..][..width - apart] == out[row * width + apart..][..width - apart])
     };
     assert!(same_rows(24) && same_columns(10));
     assert!((1..24).all(|apart| !same_rows(apart)), "a shorter period in the rows");

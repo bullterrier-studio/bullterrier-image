@@ -12,7 +12,7 @@ use crate::{Image, Picture};
 
 /// How a picture is redrawn.
 pub(crate) struct Style<'a> {
-    /// Character width in px; the height follows from the font (see [`glyphs::cell_size`](super::glyphs::cell_size)).
+    /// Character width in px; the height follows from the font (see [`Atlas::height`]).
     pub(crate) cell: usize,
     /// The palette, in any order; each cell gets the character whose ink matches its tone.
     pub(crate) chars: &'a str,

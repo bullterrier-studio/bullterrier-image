@@ -1,6 +1,6 @@
 //! Glyphs as pixels: the coverage of each character of a palette in a cell of the text grid.
 //!
-//! Every glyph is drawn from the one font bundled in the crate (JetBrains Mono Regular, SIL OFL 1.1, `data/fonts/OFL.txt`),
+//! Every glyph is drawn from the one font bundled in the crate (`JetBrains Mono` Regular, SIL OFL 1.1, `data/fonts/OFL.txt`),
 //! monospaced, never a system font, so a look is the same on every platform. One glyph fills one cell: no shaping, no
 //! ligatures, no kerning. A character the font lacks shows as its missing-glyph box. Outlines are flattened by
 //! [`outlines`](super::outlines) and measured by [`raster`](super::raster).
@@ -21,7 +21,7 @@ const FONT: &[u8] = include_bytes!("../../data/fonts/JetBrainsMono-Regular.ttf")
 /// coverage.
 const SAMPLES: usize = 16; // constant: sixteen scanlines a row, the error of a slanting edge shrinking with them
 
-/// The font's smallest size in px: below it FreeType's legible limit is reached and the size stops following the cell.
+/// The font's smallest size in px: below it `FreeType`'s legible limit is reached and the size stops following the cell.
 const SMALLEST_SIZE: f64 = 4.0; // constant: the smallest size Pillow's font loader and FreeType accept for a legible glyph
 
 /// The font and the numbers every cell is made from.
@@ -62,7 +62,7 @@ struct Layout {
 
 impl Face {
     /// The font set so that an 'M' is `cell` px wide (at least [`SMALLEST_SIZE`]), and the line it makes: the ascent and
-    /// descent are the font's rounded up to whole px, as FreeType sizes a hinted font's line.
+    /// descent are the font's rounded up to whole px, as `FreeType` sizes a hinted font's line.
     fn layout(&self, cell: usize) -> Layout {
         let size = (length::float(cell) * self.units / self.advance)
             .round_ties_even()
@@ -75,16 +75,6 @@ impl Face {
             descent: length::whole((self.descender * size / self.units).ceil()),
         }
     }
-}
-
-/// `(width, height)` in px of a cell of characters `cell` px wide: the width is `cell` and the height is the line the font
-/// makes at the size that gives an 'M' that width (its ascent plus its descent).
-///
-/// # Errors
-/// A message if the bundled font cannot be read, which a test excludes.
-pub(crate) fn cell_size(cell: usize) -> Result<(usize, usize), String> {
-    let layout = face()?.layout(cell);
-    Ok((cell, layout.ascent + layout.descent))
 }
 
 /// The glyphs of a palette as ink coverage, each one cell, ordered from the least ink to the most.
@@ -120,9 +110,9 @@ impl Atlas {
             let glyph = charmap.map_unicode(character).unwrap_or(GlyphId::NOTDEF);
             // the advance in whole px, as a hinted font sets it
             let advance = (f64::from(face.font.glyph_metrics().h_advance(glyph)) * layout.scale).round_ties_even();
-            let left = length::float(width) / 2.0 - ((advance + 1.0) / 2.0).floor();
-            let baseline = length::float(height) / 2.0
-                + ((length::float(layout.ascent) - length::float(layout.descent) + 1.0) / 2.0).floor();
+            let left = length::float(width) / 2.0 - advance.midpoint(1.0).floor();
+            let line = length::float(layout.ascent) - length::float(layout.descent);
+            let baseline = length::float(height) / 2.0 + line.midpoint(1.0).floor();
             let mut path = Vec::new();
             if let Some(outline) = outlines.get(glyph) {
                 outline
@@ -219,7 +209,13 @@ fn polygons(path: &[PathElement], to_px: impl Fn(f32, f32) -> [f64; 2]) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{Atlas, cell_size};
+    use super::{Atlas, length};
+
+    /// `(width, height)` of the cells of an atlas of `cell` px.
+    fn cell_size(cell: usize) -> Result<(usize, usize), String> {
+        let atlas = Atlas::new(" ", cell)?;
+        Ok((atlas.width(), atlas.height()))
+    }
 
     /// Hand computation from the font's tables (`head` 1000 units per em, `hhea` ascender 1020 and descender -300, the
     /// advance of 'M' 600): a cell 10 px wide sets the font at round(10 * 1000 / 600) = 17 px, whose ascent is
@@ -301,7 +297,13 @@ mod tests {
     #[test]
     fn the_line_is_centred_with_a_half_pixel_rounded_up() -> Result<(), String> {
         let atlas = Atlas::new(" \u{2588}", 12)?;
-        let rows: Vec<f32> = atlas.glyph(1).chunks_exact(12).map(|row| row.iter().sum()).collect();
+        let rows: Vec<f32> = atlas
+            .glyph(1)
+            .as_chunks::<12>()
+            .0
+            .iter()
+            .map(|row| row.iter().sum())
+            .collect();
         assert_eq!(rows.len(), 27);
         assert!(rows[0] == 0.0, "{rows:?}");
         assert!((rows[1] - 12.0 * 0.9).abs() < 12.0 / 16.0, "{rows:?}");
@@ -331,12 +333,12 @@ mod tests {
             for column in 0..width {
                 let share = f64::from(glyph[row * width + column]);
                 weight += share;
-                moment += share * (column as f64 + 0.5);
+                moment += share * (length::float(column) + 0.5);
             }
         }
         let middle = moment / weight;
         assert!(
-            (middle - width as f64 / 2.0).abs() < 0.5,
+            (middle - length::float(width) / 2.0).abs() < 0.5,
             "ink centred at {middle}, cell {width} wide"
         );
         Ok(())
