@@ -43,6 +43,7 @@ mod effect;
 pub mod effects;
 mod error;
 mod files;
+pub mod finding;
 mod footprint;
 mod inputs;
 mod lut;

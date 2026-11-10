@@ -41,6 +41,7 @@ mod error;
 mod files_icc;
 mod files_read;
 mod files_write;
+mod finding;
 mod flow_lines;
 mod flow_warp;
 mod focus_blur;
