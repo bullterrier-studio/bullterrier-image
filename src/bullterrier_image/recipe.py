@@ -138,7 +138,9 @@ def render(
     finder's map does not fit its crop or is not within 0..1; SubjectNotFoundError also when the framing crops around a
     subject that is not there.
 
-    size: the longest side of the result in px, 1 to 16384 (the recipe's own size when None; RecipeError for anything
+    size: the longest side of the result in px, 1 or more, within the core's pixel limit (the recipe's own size
+        when None;
+    RecipeError for anything
     else). The recipe's pixel values are written for 480 and multiplied by the result's longest side over 480, so one
     recipe gives the same look at any size; a value stops at its minimum when shrinking.
 

@@ -109,7 +109,6 @@ not know `bridge`.
 """
 
 import difflib
-import tomllib
 from collections.abc import Mapping
 from os import PathLike
 from pathlib import Path
@@ -117,7 +116,7 @@ from pathlib import Path
 from bullterrier_image.errors import BullterrierImageError, ImageReadError, LutError, RecipeError
 
 from . import imageio
-from .core import looks, registry
+from .core import looks, native, registry
 from .core.framing import Framing
 from .core.params import arrays_as_values, lut_fields, picture_fields
 from .core.regions import (
@@ -141,33 +140,6 @@ from .core.values import Picture
 
 __all__ = ["load_recipe", "with_files"]
 
-# The recipe format versions this release reads; a file without `format` is the first. A release that changes the
-# format adds its number here and keeps reading the old ones. Format 2 added regions and the step keys `each`, `looks`
-# and `partition`; a file of format 1 may not use them, so its meaning never changes. Format 3 added the region kinds
-# `given`, `band`, `bands`, `combine`, `linear_gradient` and `radial_gradient`, a parameter driven by a field (a table
-# with `by`) and the step key `name`, and a file of an earlier format may not use them. It also replaced the kinds
-# `depth` and `depth_bands` by `band` and `bands` and took the region name `light`: the one place a file's meaning
-# changed, so a file of any format that uses the old kinds is refused saying what to write, and one that declares a
-# region called `light` is refused as it is for `subject`.
-_FORMATS = (1, 2, 3)
-_NEW_IN_2 = ("each", "looks", "partition")
-_KINDS_NEW_IN_3 = ("given", "band", "bands", "combine", "linear_gradient", "radial_gradient")
-# region kinds format 3 replaced, with what to write instead
-_REPLACED_IN_3 = {
-    "depth": 'write `kind = "band"` with `of = "depth"`, `low` where `far` was and `high` where `near` was',
-    "depth_bands": 'write `kind = "bands"` with `of = "depth"` and the same `count`',
-}
-# the top-level keys of a recipe file, each as it is written (a table or a list of tables in brackets), in the order the
-# error for an unknown one lists them
-_KEYS = {
-    "format": "format",
-    "name": "name",
-    "description": "description",
-    "size": "size",
-    "frame": "[frame]",
-    "region": "[region.NAME]",
-    "step": "[[step]]",
-}
 # the region kinds a `[region.NAME]` table may have, by its `kind`
 _KINDS: dict[str, type[Kind]] = {
     "grid": Grid,
@@ -221,31 +193,12 @@ def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[
     return arrays_as_values(model, resolved)
 
 
-def _read(path: Path, text: str | None = None) -> dict:
-    """The file's top-level table (`text` is what a built-in look's file holds), checked: UTF-8 TOML, a format this
-    release reads, and only the known keys."""
+def _text(path: Path) -> str:
+    """The text of the recipe file `path`: UTF-8, else a RecipeError naming the file."""
     try:
-        if text is None:
-            with path.open("rb") as f:
-                raw = tomllib.load(f)
-        else:
-            raw = tomllib.loads(text)
-    except tomllib.TOMLDecodeError as error:  # its message keeps the line and column
-        raise RecipeError(f"{path.name}: {error}") from None
+        return path.read_text(encoding="utf-8")
     except UnicodeDecodeError as error:
         raise RecipeError(f"{path.name}: not UTF-8 text ({error.reason} at byte {error.start})") from None
-    version = raw.get("format", _FORMATS[0])
-    if type(version) is not int or version not in _FORMATS:  # not `in` alone: true == 1 and 1.0 == 1 in Python
-        raise RecipeError(
-            f"{path.name}: `format` {version!r} is not one this release reads; it reads format "
-            f"{', '.join(map(str, _FORMATS))}"
-        )
-    unknown = sorted(set(raw) - set(_KEYS))
-    if unknown:
-        raise RecipeError(f"{path.name}: `{unknown[0]}` is not a recipe key; the keys are: {', '.join(_KEYS.values())}")
-    if "description" in raw and (type(raw["description"]) is not str or not raw["description"].strip()):
-        raise RecipeError(f"{path.name}: `description` is {raw['description']!r}; write a sentence in quotes")
-    return raw
 
 
 def load_recipe(path: str | Path) -> Recipe:
@@ -267,50 +220,38 @@ def load_recipe(path: str | Path) -> Recipe:
         hint = f"did you mean {near}? " if near else ""
         raise RecipeError(f"no look or file {path!r}: {hint}the looks: {', '.join(shipped)}")
     path = Path(path)
-    raw = _read(path, text)
-    table = raw.get("frame", {})
-    if not isinstance(table, dict):
-        raise RecipeError(
-            f"{path.name}: write the framing as a [frame] table (one: its keys are the fields of Framing)"
-        )
     try:
-        frame = Framing(**table)
+        read = native.read_recipe(_text(path) if text is None else text, "toml")
+    except RecipeError as error:
+        raise _located(error, path.name) from None
+    folder = path.parent
+    regions: dict[str, Kind] = {}
+    for name, table in read.get("regions", {}).items():
+        fields = dict(table)
+        kind = fields.pop("kind")
+        if kind == "svg" and isinstance(fields.get("file"), str):
+            fields["file"] = str(folder / fields["file"])
+        try:
+            regions[name] = _KINDS[kind].parse(fields, f"region {name!r}")
+        except RecipeError as error:
+            raise _located(error, path.name) from None
+    try:
+        frame = Framing(**read.get("frame", {}))
     except RecipeError as error:
         raise _located(error, f"{path.name}: [frame]") from None
-    entries = raw.get("step", [])
-    if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
-        raise RecipeError(f"{path.name}: write each step as a [[step]] table (two brackets: there may be several)")
-    tables = raw.get("region", {})
-    if raw.get("format", _FORMATS[0]) == 1 and (tables or any(key in entry for entry in entries for key in _NEW_IN_2)):
-        raise RecipeError(
-            f"{path.name}: regions, `each`, `looks` and `partition` need `format = 2` at the top of the file"
-        )
-    if raw.get("format", _FORMATS[0]) < 3 and isinstance(tables, dict):
-        for name, table in tables.items():
-            if isinstance(table, dict) and isinstance(table.get("kind"), str) and table["kind"] in _KINDS_NEW_IN_3:
-                raise RecipeError(
-                    f"{path.name}: region {name!r}: `kind` {table['kind']!r} needs `format = 3` at the top of the file"
-                )
-    regions = _regions(tables, path.name, path.parent)
     steps = []
-    for i, entry in enumerate(entries, start=1):
+    for i, entry in enumerate(read.get("steps", []), start=1):
         where = f"{path.name}: step {i}"
-        if raw.get("format", _FORMATS[0]) < 3 and "name" in entry:
-            raise RecipeError(f"{where}: `name` needs `format = 3` at the top of the file")
-        if raw.get("format", _FORMATS[0]) < 3 and (drive := _drive_in(entry)) is not None:
-            raise RecipeError(
-                f"{where}{drive[0]}: `{drive[1]}` is a table with `by`, a drive, which needs `format = 3`"
-            )
         try:
-            steps.append(_step(entry, where, path.parent))
+            steps.append(_step(entry, folder))
         except (RecipeError, ImageReadError, LutError) as error:
             raise _located(error, where) from None
     try:
         return Recipe(
             steps,
-            name=raw.get("name", path.stem),
-            description=raw.get("description"),
-            size=raw.get("size"),
+            name=read.get("name", path.stem),
+            description=read.get("description"),
+            size=read.get("size"),
             frame=frame,
             regions=regions,
         )
@@ -318,74 +259,33 @@ def load_recipe(path: str | Path) -> Recipe:
         raise _located(error, path.name) from None
 
 
-def _drive_in(entry: dict) -> tuple[str, str] | None:
-    """The first parameter of the step table `entry` (or of a look in its `looks`) that is a drive, a table with `by`,
-    as (where in the step, the parameter's name); None when there is none."""
-    for key, value in entry.items():
-        if isinstance(value, dict) and "by" in value:
-            return "", key
-    looks = entry.get("looks")
-    for number, look in enumerate(looks if isinstance(looks, list) else [], start=1):
-        if isinstance(look, dict) and (found := _drive_in(look)) is not None:
-            return f", look {number}", found[1]
-    return None
-
-
-def _regions(tables: object, file: str, folder: Path) -> dict[str, Kind]:
-    """The regions of the `[region.NAME]` tables, each made by its `kind` (an svg's `file` is relative to `folder`, the
-    recipe file's); RecipeError naming the file and region."""
-    if not isinstance(tables, dict) or not all(isinstance(table, dict) for table in tables.values()):
-        raise RecipeError(f"{file}: write each region as a [region.NAME] table (one table for each name)")
-    regions: dict[str, Kind] = {}
-    for name, table in tables.items():
-        fields = dict(table)
-        kind = fields.pop("kind", None)
-        if isinstance(kind, str) and kind in _REPLACED_IN_3:
-            raise RecipeError(f"{file}: region {name!r}: `kind` {kind!r} is gone; {_REPLACED_IN_3[kind]} (format = 3)")
-        if not isinstance(kind, str) or kind not in _KINDS:
-            raise RecipeError(
-                f"{file}: region {name!r}: `kind` is {kind!r}; write one of: {', '.join(_KINDS)}"
-                if "kind" in table
-                else f"{file}: region {name!r}: missing `kind`; write one of: {', '.join(_KINDS)}"
-            )
-        if kind == "svg" and isinstance(fields.get("file"), str):
-            fields["file"] = str(folder / fields["file"])
+def _step(entry: dict, folder: Path) -> Step | Each:
+    """The step the core read from a `[[step]]` table (or, in `looks`, an inline table): an `Each` when it has `each`,
+    otherwise an effect step. RecipeError and ImageReadError as the models and pictures raise them."""
+    if "each" not in entry:
+        return _effect_step(entry, folder)
+    looks_made: list[Step | None] = []
+    for number, look in enumerate(entry["looks"], start=1):
+        if look is None:  # a file's word "none": a piece left as it is
+            looks_made.append(None)
+            continue
         try:
-            regions[name] = _KINDS[kind].parse(fields, f"region {name!r}")
-        except RecipeError as error:
-            raise _located(error, file) from None
-    return regions
+            looks_made.append(_effect_step(look, folder))
+        except (RecipeError, ImageReadError, LutError) as error:
+            raise _located(error, f"look {number}") from None
+    keys = ("each", "assign", "seed", "feather", "mask", "opacity", "blend_mode", "name")
+    return Each(looks=looks_made, **_set(entry, *keys))
 
 
-def _step(entry: dict, where: str, folder: Path) -> Step | Each:
-    """The step a `[[step]]` table (or, in `looks`, an inline table) describes: an `Each` when it has `each` or
-    `looks`, otherwise an effect step. RecipeError and ImageReadError as the models and pictures raise them."""
-    if "each" not in entry and "looks" not in entry:
-        return _effect_step(entry, where, folder)
-    values = dict(entry)
-    looks = values.pop("looks", None)
-    if "each" not in values:
-        raise RecipeError("`looks` needs `each`, the name of the partition whose pieces get them")
-    if not isinstance(looks, list):
-        raise RecipeError('an `each` step needs `looks`, a list of tables (one effect each) or "none"')
-    made: list[Step | None] = []
-    for number, look in enumerate(looks, start=1):
-        if look == "none":  # a file's word for a piece left as it is, None in Python
-            made.append(None)
-        elif isinstance(look, dict):
-            try:
-                made.append(_effect_step(look, f"look {number}", folder))
-            except (RecipeError, ImageReadError, LutError) as error:
-                raise _located(error, f"look {number}") from None
-        else:
-            raise RecipeError(f'look {number} is {look!r}: write a table with an `effect`, or "none"')
-    return Each(looks=made, **values)
+def _set(entry: dict, *keys: str) -> dict:
+    """The `keys` of `entry` the file wrote (the core leaves the others `None`)."""
+    return {key: entry[key] for key in keys if entry.get(key) is not None}
 
 
-def _effect_step(entry: dict, where: str, folder: Path) -> Step:
-    """The `Step` of a table: its step keys, and the rest as the parameters of its effect."""
-    entry = dict(entry)
-    keys = {key: entry.pop(key) for key in registry.STEP_KEYS if key in entry}  # the rest are the parameters
-    if "effect" not in keys:
-        raise RecipeError("missing `effect`")
-    return Step(**keys, params=with_files(keys["effect"], entry, folder))
+def _effect_step(entry: dict, folder: Path) -> Step:
+    """The `Step` of a step the core read, its picture and lookup table paths read."""
+    return Step(
+        entry["effect"],
+        params=with_files(entry["effect"], entry.get("params", {}), folder),
+        **_set(entry, "mask", "opacity", "blend_mode", "preset", "partition", "name"),
+    )

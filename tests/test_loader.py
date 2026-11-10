@@ -79,7 +79,7 @@ def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
         pytest.param("", None, id="absent: left unset, not defaulted to some size"),
         pytest.param("size = 1024\n", 1024, id="given: kept"),
         pytest.param("size = 64\n", 64, id="given small: kept"),
-        pytest.param("size = 16384\n", 16384, id="given at the largest: kept"),
+        pytest.param("size = 16384\n", 16384, id="given large: kept"),
     ],
 )
 def test_a_files_size_is_what_it_says_and_unset_when_it_says_none(tmp_path, written, size):
@@ -88,10 +88,10 @@ def test_a_files_size_is_what_it_says_and_unset_when_it_says_none(tmp_path, writ
 
 @pytest.mark.parametrize(
     ("written", "shown"),
-    [("0", "0"), ("-5", "-5"), ("'64'", "'64'"), ("64.0", "64.0"), ("true", "True"), ("16385", "16385")],
-    ids=["zero", "negative", "text", "fraction", "boolean", "above the largest, 16384"],
+    [("0", "0"), ("-5", "-5"), ("'64'", '"64"'), ("64.0", "64.0"), ("true", "true")],
+    ids=["zero", "negative", "text", "fraction", "boolean"],
 )
-def test_a_size_that_is_not_a_whole_number_from_1_to_16384_is_refused_naming_it(tmp_path, written, shown):
+def test_a_size_that_is_not_a_whole_number_of_1_or_more_is_refused_naming_it(tmp_path, written, shown):
     with pytest.raises(RecipeError, match=rf"^look\.toml: .*size.*{re.escape(shown)}"):
         load_recipe(_write(tmp_path, f"size = {written}\n" + STEP))
 
@@ -121,7 +121,7 @@ def test_a_format_1_file_means_the_same_in_format_2(tmp_path):
 
 
 @pytest.mark.parametrize(
-    ("written", "value"), [("4", "4"), ("0", "0"), ("'1'", "'1'"), ("1.0", "1.0"), ("true", "True"), ("'2'", "'2'")]
+    ("written", "value"), [("4", "4"), ("0", "0"), ("'1'", '"1"'), ("1.0", "1.0"), ("true", "true"), ("'2'", '"2"')]
 )
 def test_any_other_format_is_refused_naming_the_value_and_the_formats_this_release_reads(tmp_path, written, value):
     path = _write(tmp_path, f"format = {written}\n" + STEP, "future.toml")
@@ -139,11 +139,11 @@ BROKEN = {
     "steps for step": ("steps = 2\n" + STEP, "`steps`"),
     "an [animation] table, which no longer exists": ("[animation]\nseconds = 2\n" + STEP, "`animation`"),
     "a single [step] table instead of a list": ("[step]\neffect = 'grade'\n", r"\[\[step\]\]"),
-    "an effect written as a list": ("[[step]]\neffect = ['grade']\n", r"step 1: .*effect.*'grade'"),
+    "an effect written as a list": ("[[step]]\neffect = ['grade']\n", r"step 1: .*effect.*\[\"grade\"\]"),
     "a preset written as a list": ("[[step]]\neffect = 'grade'\npreset = ['sepia']\n", r"step 1: .*preset.*sepia"),
     "a region kind written as a list, in format 2": (
         "format = 2\n[region.g]\nkind = ['grid']\n" + STEP,
-        r"region 'g': `kind` is \['grid'\]",
+        r"region 'g': `kind` must be text, got \[\"grid\"\]",
     ),
     "an animated value, which no longer exists": (STEP + "exposure = { from = 0, to = 1 }\n", "step 1: .*exposure"),
 }
@@ -164,20 +164,22 @@ def test_a_frame_table_is_the_recipes_framing_and_without_one_the_recipe_is_not_
         "transparent = 'circle'\n" + STEP
     )
     framed = load_recipe(_write(tmp_path, text, "framed.toml"))
+    # the core keeps a colour in single precision, so the fill is compared to within it
+    assert framed.frame.fill == pytest.approx((16 / 255, 32 / 255, 48 / 255), abs=1e-7)
     assert framed.frame == Framing(
-        aspect=1.0, anchor="subject", margin=0.1, angle=-5, fill="#102030", transparent="circle"
+        aspect=1.0, anchor="subject", margin=0.1, angle=-5, fill=framed.frame.fill, transparent="circle"
     )
     assert framed.size == 512
     assert load_recipe(_write(tmp_path, STEP, "plain.toml")).frame == Framing()
 
 
 FRAME_MISTAKES = {
-    "a choice that is not offered": ("[frame]\nanchor = 'middle'\n", r"\[frame\]: .*`anchor`.*middle"),
-    "a misspelt key": ("[frame]\nrotate = 10\n", r"\[frame\]: .*`rotate`.*angle"),
+    "a choice that is not offered": ("[frame]\nanchor = 'middle'\n", r"frame\.anchor.*middle"),
+    "a misspelt key": ("[frame]\nrotate = 10\n", r"frame\.rotate.*angle"),
     "frame given as a list of tables": ("[[frame]]\naspect = 1\n", r"\[frame\] table"),
     "frame given as a value": ("frame = 'square'\n", r"\[frame\] table"),
-    "a key called self": ("[frame]\nself = 1\n", r"\[frame\]: .*`self`"),
-    "a key called owner": ("[frame]\nowner = 1\n", r"\[frame\]: .*`owner`"),
+    "a key called self": ("[frame]\nself = 1\n", r"frame\.self"),
+    "a key called owner": ("[frame]\nowner = 1\n", r"frame\.owner"),
 }
 
 
@@ -597,7 +599,7 @@ def test_a_step_and_an_each_take_a_name_in_a_recipe_file_and_it_addresses_their_
 NAME_MISTAKES = {
     "a name that is not a word": ("name = 'my-pulse'", r"step 1: .*`name`.*letters, digits and underscores"),
     "a reserved name": ("name = 'region'", r"step 1: .*`name`.*reserved"),
-    "a name that is no text": ("name = 3", r"step 1: .*`name`"),
+    "a name that is no text": ("name = 3", r"step 1: name.*3"),
 }
 
 
@@ -662,11 +664,11 @@ REGION_MISTAKES = {
     ),
     "a misspelt field": ('[region.g]\nkind = "grid"\ncolums = 2\n', r"region 'g'.*`colums`.*columns.*rows"),
     "a value out of range": ('[region.g]\nkind = "shards"\ncount = 0\n', r"region 'g'.*`count`.*1"),
-    "an edge that is not a table": ('[region.g]\nkind = "grid"\nedge = 3\n', r"region 'g'.*`edge`"),
+    "an edge that is not a table": ('[region.g]\nkind = "grid"\nedge = 3\n', r"region 'g': edge.*3"),
     "a region that is not a table": ("region = 3\n", r"\[region\.NAME\]"),
     "a field called self": ('[region.g]\nkind = "grid"\nself = 1\n', r"region 'g'.*`self`"),
     "a field called owner": ('[region.g]\nkind = "grid"\nowner = 1\n', r"region 'g'.*`owner`"),
-    "a kind written as a list": ('[region.g]\nkind = ["grid"]\n', r"region 'g': `kind` is \['grid'\]"),
+    "a kind written as a list": ('[region.g]\nkind = ["grid"]\n', r"region 'g': `kind` must be text.*grid"),
 }
 
 
@@ -725,7 +727,7 @@ EACH_MISTAKES = {
     "a key called owner": ('[[step]]\neach = "g"\nlooks = ["none"]\nowner = 1\n', r"step 1: .*`owner`"),
     "a look that is a word other than none": (
         '[[step]]\neach = "g"\nlooks = ["grade"]\n',
-        r"step 1: look 1 is 'grade'.*none",
+        r"step 1: look 1 is \"grade\".*none",
     ),
     "a look that is a number": ('[[step]]\neach = "g"\nlooks = [3]\n', r"step 1: .*look 1.*table"),
     "a look without an effect": (
@@ -742,7 +744,7 @@ EACH_MISTAKES = {
     ),
     "an assignment that does not exist": (
         '[[step]]\neach = "g"\nlooks = ["none"]\nassign = "shuffle"\n',
-        r"step 1: .*`assign`.*cycle.*random",
+        r"step 1: assign.*shuffle.*cycle.*random",
     ),
 }
 

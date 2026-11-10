@@ -51,7 +51,8 @@ def render(
     (anything with a `find` method) called with the photo as given, once, when the recipe needs that map and it was
     not handed in; the `subject`
     finder is also called with the crop of the working picture of each piece for a `Subject` region with `per`. size:
-    the longest side of the result in px, 1 to 16384 (the recipe's own size when None). threads: how many threads the
+    the longest side of the result in px, 1 or more, within the core's pixel limit (the recipe's own size when None).
+    threads: how many threads the
     core may use for the rows of its work, a whole number from 0 to 256: 1 starts none, 0 is one for each core (the
     result is the same at any number). band: how many rows of the working picture are made at a time, a whole number of
     1 or more (the whole picture when None): the same picture, made in less memory.

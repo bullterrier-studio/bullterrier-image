@@ -74,7 +74,7 @@ def test_recipe_name_defaults_to_the_file_name(tmp_path):
             '[[step]]\neffect="grain"\n[[step]]\neffect="gradient"\ncolors=["#000000"]\nmask="sideways"\n',
             "step 2.*mask",
         ),
-        ('[[step]]\ncolor="red"\n', "missing `effect`"),
+        ('[[step]]\ncolor="red"\n', "step 1.*missing field `effect`"),
         ("name='empty'\n", "at least one"),
     ],
 )

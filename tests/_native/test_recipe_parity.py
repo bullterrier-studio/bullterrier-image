@@ -350,7 +350,7 @@ STEP = "[[step]]\neffect = 'grade'\n"
 DRIVE = "radius = { by = 'depth', start = 0, end = 9 }\n"
 FORMAT_2_EACH = "format = 2\n[region.g]\nkind = 'grid'\n[[step]]\neach = 'g'\n"
 
-# files Python refuses for their shape or format version: the core must too (the file's own TOML, keys, format,
+# files the core refuses for their shape or format version (the file's own TOML, keys, format,
 # and what a later format added). The rules of a look (an unknown effect, a value out of range) are not read here.
 BAD_FILES = {
     "a TOML syntax error": "name = 'ok'\nsize = 64\ncolor = '#fff\n" + STEP,
@@ -397,11 +397,11 @@ GOOD_FILES = {
 
 
 @pytest.mark.parametrize("text", BAD_FILES.values(), ids=BAD_FILES.keys())
-def test_a_file_python_refuses_for_its_shape_or_format_version_is_refused_by_the_core_too(tmp_path, text):
+def test_a_file_that_breaks_a_rule_of_its_shape_or_format_version_is_refused_by_the_loader_and_the_core(tmp_path, text):
     path = tmp_path / "bad.toml"
     path.write_text(text, encoding="utf-8")
     with pytest.raises(ValueError, match=r"\w"):
-        load_recipe(path)
+        load_recipe(path)  # the loader reads the file with the core, so this is the core's refusal with the file named
     with pytest.raises(ValueError, match=r"\w"):
         _core.read_recipe(text, "toml")
 
