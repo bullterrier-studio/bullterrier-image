@@ -508,6 +508,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
 - **A depth input fits a budget.** The depth model's attention grows with the square of the 14 px patches, so a long strip
   (736 x 3210 would be 518 x 2254) took 2.7 GB and, with IS-Net loaded, passed the 4000 MB cap. The long side is held to 1092 px
   (78 patches; measured peak with both models about 2.5 GB), both sides staying multiples of 14. IS-Net is a fixed 1024 square.
+- **Contact sheets and the project are the core's.** `bullterrier_image::contact_sheet` lays tiles out with the bundled font
+  (`ops/glyphs`, monospaced: a label's width is its length times a cell, so fitting, shrinking and the `…` cut are
+  arithmetic) and `bullterrier_image::pipeline::Project` reads `bt-image.toml` or JSON and holds a project made in code to the
+  same rules, with the error kind `project` (`ProjectError`). Python keeps `Project` as a frozen dataclass because it is public
+  API and holds `Recipe` objects built in Python. *Reason:* one rule, one place; both have the CLI as a first user.
 - **`bt-image cutout` makes a cut-out file; `transparent = "background"` ends a look.** The command writes the photo at
   its own size with the subject's alpha, after an optional edge clean-up (`--shrink`, `--feather`), and needs no
   recipe; a recipe's transparency cuts out the finished look at the recipe's size. *Reason:* a cut-out file is the
