@@ -577,16 +577,20 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     whole px, and no radius in design px bounds that at every size ratio, so a blurred screen stays `Whole` (F) until the
     footprint can see the ratio). Done in B1b: every A row but `grain`/`vignette` (B1a) reads `Place`; `ripple` and
     `chromatic_aberration` are `Radius(amplitude)` and `Radius(amount)`, the rest `Pixel`.
-  - B (B2, counter-based draws): `dead_pixels` (a shuffle picks exactly `count` cells: a per-cell chance would change
-    "exactly" to "on average"; unclear, leader's call); `slice_shift` (`Rng` strips and bands over the height; `Pixel`);
-    `vhs` (`Rng` bands and dropouts, a row drift from 1-D noise; `Whole` while `noise` > 0 with `noise_size` > 1, D);
-    `jpeg_crush` (`Rng` hits and DC differences along a row of blocks: E, stays `Whole`).
-  - C (B2, objects generated once per band, count bounded by `limits.rs`; `Pixel` input-wise): `dust_scratches`,
-    `particles`, `light_leak` (patch list), `lens_drops` (`Radius(radius + blur reach + refraction)`).
-  - D (stay `Whole`): `auto_levels`, `dehaze` (airlight, dark channel), `equalize` (tile histograms), `gradient_map`
-    (quantiles), `displace`, `flow_warp`, `flow_lines` (also B), `fog`, `noise_field`, `paper_texture` (the fractal and
-    clumped fields are `standardised` over the picture: a mean and a deviation of everything); `starburst` (`Radius(spikes)`
-    while `limit` is 1, D for the quantile threshold below it), `radial_blur` (also E).
+  - B (sequential seeded stream): done in B2. `dead_pixels`, `slice_shift`, `vhs` (bands, dropouts, row drift) draw lists over
+    the canvas from the seed (`Rng`, a few hundred at most, bounded by the parameters' maxima), then take what falls in the
+    rows; "exactly `count`" stays exact. A per-pixel draw is a hash of the canvas place (`vhs` snow and noise). All `Pixel`.
+    `jpeg_crush` stays `Whole` (E): it averages the canvas down to design px, and a block row's DC differences run along it.
+  - C (objects over the canvas): `dust_scratches`, `particles`, `light_leak`, `lens_drops` are done: `Pixel`, except
+    `lens_drops`, `Radius((1 + refraction) x radius + truncate x blur)` (`Whole` for wrap). Counts are the density times the
+    canvas's area (the files' pixel limit bounds it) or a parameter maximum; `limits.rs` has the particles row.
+  - D (global statistic): `auto_levels`, `dehaze`, `equalize`, `gradient_map`, `radial_blur`, `starburst` (quantile) and
+    `displace`, `flow_warp` stay `Whole`. Done in B2 (noise made from the canvas place): `grain` (every size), `paper_texture`,
+    `flow_lines` (also B), `noise_field` kind `value` (`Pixel`; `perlin`, `worley` and `sine` keep their own picture-wide
+    standardisation and stay `Whole`), `fog` (`Pixel` while `rise` is 1 and `turbulence` 0; read between pixels the clouds
+    are ranked again over the picture, so `Whole`). `displace` and `flow_warp` (and `melt`, `aurora`, `torn_edge`, the torn
+    regions) still call the standardised `noise::field`; converting them to `field_rows` changes their pictures and the
+    hand-worked oracles of their tests, and waits for the leader.
   - E (stay `Whole`): `droste`, `kaleidoscope`, `lens_distortion`, `perspective`, `polar`, `light_rays`, `pinch_bulge`,
     `swirl` (reach is a share of the canvas, not a design px value), `tile` (cells average the whole picture), `quadtree`,
     `dither` (palette and error diffusion), `disperse` (grid ordered over the figure), `shatter` (also B),
@@ -597,10 +601,15 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     top; stays `Whole`: a pixel reads its whole cell, whose height is the atlas's function of the rounded working cell,
     not a bound in design px). `swirl` and `pinch_bulge` stay `Whole` (E): they read up to twice a share of the canvas's
     shorter side, which a radius in design px cannot say.
-  - Open for the leader: the `standardised` noise fields (D) hold 9 effects `Whole`; an analytic normalisation (the
-    lattice noise has a known deviation) would turn them to A or `Radius` at the price of a visible change; `grain`'s
-    claim depends on the size in *working* px (design size x ratio), which `footprint(&Params)` cannot see, so it is `Pixel`
-    only at size 0.
+- **Settled: noise is scaled by its known deviation, not the picture's (banded render, B2).** A fractal field
+  (`noise::field_rows`) is divided at each pixel by its own deviation, derived from the lattice (a value is uniform on -1..1,
+  variance 1/3; the Catmull-Rom weights of the pixel's place give the rest, octaves independent), and clumped noise
+  (`noise::clumped`) by the root of the sum of squared kernel weights it puts on each draw, counted through the edge rule.
+  *Reason:* a crop, a band or a tile of a larger canvas then has the same pixels as the same rows of the whole, and the
+  deviation is a promise of how the noise is made. *Consequence:* a picture's own deviation is only about the asked one (at
+  480 px, 30 seeds: `paper_texture`, `grain` and `vhs` noise 0.98-1.03; `noise_field` value level 0.229-0.319 against
+  0.289 for a uniform; `fog` at the default coverage 0.93 covers 0.80-1.00 of the picture); the tests read mean and
+  deviation over seeds. Blurs of 16 px a side or more are Fourier transforms, equal to the whole within 1e-5, not to the bit.
 - **Open: alpha through effects that move pixels.** `Picture` is RGB by type and only the cut-out after the last step adds
   alpha. A look applied to an already transparent picture (cut out, then sliced, displaced or torn) moves the colour but not the
   alpha. No decision.
