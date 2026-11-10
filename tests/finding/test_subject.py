@@ -11,9 +11,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bullterrier_image import BackendUnavailableError, SubjectNotFoundError, imageio
-from bullterrier_image.finding.subject import onnx_model_path, refine_edge, subject_finder, subject_matte
-from bullterrier_image.ops.resample import resize
+from bullterrier_image import BackendUnavailableError, SubjectNotFoundError
+from bullterrier_image.finding.subject import refine_edge, subject_finder, subject_matte
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -155,7 +154,7 @@ def test_the_identity_is_chosen_like_the_backend_is(echo_red, monkeypatch):
 def test_a_finder_of_a_segmenter_that_cannot_run_is_refused_saying_why_as_subject_matte_does():
     with pytest.raises(BackendUnavailableError, match="coreml") as caught:
         subject_finder("coreml")
-    assert "onnx, vision" in str(caught.value)  # the choices
+    assert "vision, onnx" in str(caught.value)  # the choices
     with pytest.raises(
         BackendUnavailableError, match="no-such-model"
     ):  # the suite's BT_IMAGE_SUBJECT_MODEL names no file
@@ -223,49 +222,6 @@ def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it
         subject_matte(ramp(), segmenter="onnx")
     assert str(missing) in str(caught.value)
     assert not missing.exists()  # pointing at a local file never downloads
-
-
-def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, monkeypatch):
-    """The user's cache folder lies under a file, so it cannot be made: the advice comes before any download."""
-    blocker = tmp_path / "not-a-home"
-    blocker.write_text("a file where the home folder should be", encoding="utf-8")
-    for variable in ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA"):
-        monkeypatch.setenv(variable, str(blocker))
-    monkeypatch.delenv("BT_IMAGE_SUBJECT_MODEL")
-    with pytest.raises(BackendUnavailableError, match="by hand") as caught:
-        subject_matte(ramp(), segmenter="onnx")
-    assert "BT_IMAGE_SUBJECT_MODEL" in str(caught.value)
-    assert "--map subject=" in str(caught.value)
-
-
-def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatch):
-    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(tmp_path / "mine.onnx"))
-    assert onnx_model_path() == tmp_path / "mine.onnx"
-
-
-def use_the_cached_pinned_model(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Point `BT_IMAGE_SUBJECT_MODEL`, which is never fetched, at the cached portable model, or skip when it is not
-    there or not the pinned file. Never downloads: the finder's identity is the pinned digest for the standard model,
-    the file's digest for a named one."""
-    monkeypatch.delenv("BT_IMAGE_SUBJECT_MODEL")
-    pinned = subject_finder("onnx").identity
-    cached = onnx_model_path()
-    if not cached.is_file():
-        pytest.skip(f"the portable model is not in the cache ({cached}); `bt-image cutout` downloads it")
-    monkeypatch.setenv("BT_IMAGE_SUBJECT_MODEL", str(cached))
-    if subject_finder("onnx").identity != pinned:
-        pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
-
-
-def test_the_real_model_finds_the_dog(monkeypatch):
-    """The pinned model itself, when it has been downloaded before (see `use_the_cached_pinned_model`)."""
-    use_the_cached_pinned_model(monkeypatch)
-    photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
-    alpha = subject_matte(photo, segmenter="onnx")
-    height, width = alpha.shape
-    assert alpha[height // 2, width // 2] > 0.9  # the dog's chest, in the middle of the picture
-    assert alpha[: height // 10, : width // 10].max() < 0.1  # the window, top left
-    np.testing.assert_array_equal(subject_matte(photo, segmenter="onnx"), alpha)
 
 
 # --- refine_edge: its rows are the core's (crates/core/tests/it/matte.rs); here only the facade ---------------------

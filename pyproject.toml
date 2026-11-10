@@ -30,20 +30,19 @@ classifiers = [
 # Lower bounds are the oldest releases the suite passes with on Python 3.12 (`uv run poe check-min-deps` runs it against
 # exactly these). Below them: Pillow 11.0.0 (it draws the fonts and resizes in places, and writes the tests' picture
 # files; the core reads and writes ours) cannot build the geotagged picture of the metadata test, pydantic 2.7.0 fails
-# at import, pyobjc 9.2 cannot read Vision's pixel buffer, scipy 1.16 is the floor the radial effects needed (an `affine_transform`
+# at import, scipy 1.16 is the floor the radial effects needed (an `affine_transform`
 # warning; they run in Rust now, so lower it when the floors are next re-measured, or when scipy goes), and numpy 1.26 and onnxruntime 1.17
 # are the first series with Python 3.12 wheels.
 # No upper bounds: nothing is known to break on a newer release.
 dependencies = [
     "annotated-types>=0.4.0",
     "numpy>=1.26.4",
-    # the portable subject finder. No release has Python 3.15 wheels yet: there bullterrier-image installs without it, and the
-    # portable backend says onnxruntime is missing (Apple Vision and --map subject=FILE still work)
+    # the ONNX Runtime library the core loads for the portable finders (no Python import: `finding/_runtime.py` finds its file). No
+    # release has Python 3.15 wheels yet: there bullterrier-image installs without it, and the portable backend says where to get the
+    # library (Apple Vision and --map subject=FILE still work)
     "onnxruntime>=1.17.0 ; python_version < '3.15'",
     "pillow>=11.1.0",
     "pydantic>=2.7.1",
-    "pyobjc-framework-quartz>=10.0 ; sys_platform == 'darwin'",
-    "pyobjc-framework-vision>=10.0 ; sys_platform == 'darwin'",
     "scipy>=1.16.0",
 ]
 
@@ -386,7 +385,7 @@ show_error_codes = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "Foundation", "Quartz", "Vision", "objc.*", "onnxruntime", "onnxruntime.*"]
+module = ["scipy.*", "onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -454,13 +453,9 @@ ignore_names = [
 [tool.deptry]
 # check_release: tools/release.py imports its sibling script (a script's own folder is first on sys.path)
 known_first_party = ["bullterrier_image", "check_release"]
-# pyobjc is not installed off macOS, so deptry cannot read which module each framework provides: say it
-package_module_name_map = { "pyobjc-framework-quartz" = "Quartz", "pyobjc-framework-vision" = "Vision" }
-
 [tool.deptry.per_rule_ignores]
-# Foundation comes with pyobjc-framework-cocoa, which both declared pyobjc frameworks depend on (macOS only)
-DEP001 = ["Foundation"]
-DEP003 = ["Foundation"]
+# onnxruntime is installed for the library file it carries, which the core loads: Python never imports it
+DEP002 = ["onnxruntime"]
 # packaging (PEP 440 versions) is used by tools/release.py, a developer command that runs in the dev environment
 DEP004 = ["packaging"]
 

@@ -306,8 +306,8 @@ PIECE_BY_PIECE = Recipe(
 LAZY_DEFAULT = {
     "a recipe that needs no subject renders": (PLAIN, False, None),
     "a recipe given the subject it needs renders": (MASKED, True, None),
-    "a recipe that needs the subject names the choices": (MASKED, False, "onnx, vision"),
-    "a recipe finding the subject piece by piece asks even with a subject": (PIECE_BY_PIECE, True, "onnx, vision"),
+    "a recipe that needs the subject names the choices": (MASKED, False, "vision, onnx"),
+    "a recipe finding the subject piece by piece asks even with a subject": (PIECE_BY_PIECE, True, "vision, onnx"),
 }
 CALLS = {
     "render": lambda photo, recipe, **keys: facade.render(photo, recipe, **keys),

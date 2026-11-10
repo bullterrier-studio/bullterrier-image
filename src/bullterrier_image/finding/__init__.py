@@ -1,6 +1,7 @@
-"""Finding a map in a photo: the subject's cut-out and the depth, with portable models and the platform backend.
+"""Finding a map in a photo: the subject's cut-out and the depth, with the platform's segmenter or portable models.
 
 `subject` finds the subject (`subject_matte`, `subject_finder`, `refine_edge`); `depth` finds how near each pixel is
-(`depth_map`, `depth_finder`); `download` fetches and verifies a model file on first use. Models are never part of the
-package and never fetched at import time.
+(`depth_map`, `depth_finder`, `inverse_depth`). The work is the core's (`bullterrier_image.finding` in Rust): these
+modules name it for Python and pass the ONNX Runtime library the `onnxruntime` package carries. Models are never part of
+the package and never fetched at import time.
 """

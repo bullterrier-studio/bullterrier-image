@@ -12,9 +12,8 @@ import onnx
 import pytest
 from onnx import TensorProto, helper
 
-from bullterrier_image import BackendUnavailableError, Band, DepthNotFoundError, Recipe, Step, imageio, render
-from bullterrier_image.finding.depth import depth_finder, depth_map, depth_model_path, inverse_depth
-from bullterrier_image.ops.resample import resize
+from bullterrier_image import BackendUnavailableError, Band, DepthNotFoundError, Recipe, Step, render
+from bullterrier_image.finding.depth import depth_finder, depth_map, inverse_depth
 
 EXAMPLE_PHOTO = Path(__file__).parents[2] / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -134,7 +133,7 @@ def test_a_model_answering_nan_is_refused_by_the_render_not_taken_for_a_flat_ans
         size=None,
         regions={"near": Band(of="depth")},
     )
-    with pytest.raises(DepthNotFoundError, match="not finite"):
+    with pytest.raises(DepthNotFoundError, match="NaN"):
         render(ramp(), near)
 
 
@@ -180,10 +179,12 @@ def size_model(path: Path) -> Path:
 @pytest.mark.parametrize(
     ("photo_size", "model_size"),
     [
-        # short side to 518, the other side by the same scale, then to the nearest multiple of 14 (518 = 37 x 14)
-        pytest.param((300, 1000), (518, 1722), id="1726.7 rounds down to 123 x 14"),
-        pytest.param((300, 1010), (518, 1750), id="1743.9 rounds up to 125 x 14"),
-        pytest.param((1010, 300), (1750, 518), id="upright: the width is the short side"),
+        # short side to 518, the other side by the same scale, then to the nearest multiple of 14 (518 = 37 x 14); a
+        # long strip is held to a long side of 1092 (78 x 14), which scales the short side down with it
+        pytest.param((300, 700), (462, 1092), id="a wide photo within reach of 518 but past 1092: both scale down"),
+        pytest.param((300, 1000), (322, 1092), id="past the budget both sides scale down to a long side of 1092"),
+        pytest.param((1010, 300), (1092, 322), id="upright: the height is the long side"),
+        pytest.param((736, 3210), (252, 1092), id="a banner: 518 x 2254 would need 2.7 GB"),
         pytest.param((60, 80), (518, 686), id="a small photo is enlarged: 690.7 to 49 x 14"),
         pytest.param((1200, 900), (686, 518), id="a large photo is reduced"),
     ],
@@ -255,19 +256,6 @@ def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it
     assert not missing.exists()  # pointing at a local file never downloads
 
 
-def test_an_unwritable_cache_folder_says_how_to_get_the_model_by_hand(tmp_path, monkeypatch):
-    """The user's cache folder lies under a file, so it cannot be made: the advice comes before any download."""
-    blocker = tmp_path / "not-a-home"
-    blocker.write_text("a file where the home folder should be", encoding="utf-8")
-    for variable in ("HOME", "USERPROFILE", "XDG_CACHE_HOME", "LOCALAPPDATA"):
-        monkeypatch.setenv(variable, str(blocker))
-    monkeypatch.delenv("BT_IMAGE_DEPTH_MODEL")
-    with pytest.raises(BackendUnavailableError, match="by hand") as caught:
-        depth_map(ramp())
-    assert "BT_IMAGE_DEPTH_MODEL" in str(caught.value)
-    assert "--map depth=" in str(caught.value)
-
-
 def test_without_onnxruntime_the_depth_model_is_unavailable_saying_what_to_install(depth_echo_model, monkeypatch):
     depth_echo_model(0)  # a new file: no session of it is loaded yet
     monkeypatch.setitem(sys.modules, "onnxruntime", None)  # the library is not installed: importing it fails
@@ -275,32 +263,4 @@ def test_without_onnxruntime_the_depth_model_is_unavailable_saying_what_to_insta
         depth_map(ramp())
 
 
-def test_the_model_path_is_the_local_file_when_one_is_given(tmp_path, monkeypatch):
-    monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(tmp_path / "mine.onnx"))
-    assert depth_model_path() == tmp_path / "mine.onnx"
-
-
 # --- the real model, when it is in the cache --------------------------------------------------------------------------
-
-
-def test_the_real_model_puts_the_dog_nearer_than_the_window(monkeypatch):
-    """The pinned model itself, when it has been downloaded before. The test never downloads: it uses the cached file
-    only if it is the right one (the finder's identity is the pinned digest for the standard model, the file's digest
-    for a named one), and through `BT_IMAGE_DEPTH_MODEL`, which is never fetched."""
-    monkeypatch.delenv("BT_IMAGE_DEPTH_MODEL")
-    pinned = depth_finder().identity
-    cached = depth_model_path()
-    if not cached.is_file():
-        pytest.skip(f"the depth model is not in the cache ({cached}); a render that needs depth downloads it")
-    monkeypatch.setenv("BT_IMAGE_DEPTH_MODEL", str(cached))
-    if depth_finder().identity != pinned:
-        pytest.skip(f"the cached model {cached} is not the pinned file; delete it to download it again")
-    photo = resize(imageio.load(EXAMPLE_PHOTO), 320)
-    depth = depth_map(photo)
-    height, width = depth.shape
-    chest = depth[height // 2 - 10 : height // 2 + 10, width // 2 - 10 : width // 2 + 10].mean()
-    window = depth[: height // 10, : width // 10].mean()  # top left
-    # the sofa's front edge at the bottom is nearest (1); the dog sits behind it, well in front of the window
-    assert chest > 0.3
-    assert window < 0.2
-    np.testing.assert_array_equal(depth_map(photo), depth)
