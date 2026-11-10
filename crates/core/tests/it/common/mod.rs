@@ -18,6 +18,7 @@ pub(crate) mod recipe;
 pub(crate) mod run;
 pub(crate) mod sampling;
 pub(crate) mod stats;
+pub(crate) mod sweep;
 pub(crate) mod yiq;
 
 pub(crate) type Outcome = Result<(), Box<dyn std::error::Error>>;

@@ -20,11 +20,12 @@ use std::error::Error;
 use crate::common::Outcome;
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::asset;
-use bullterrier_image::params::{Field, Kind, Scalar, Table, Unit};
+use crate::common::sweep::{Setting, variants};
+use bullterrier_image::params::{Field, Kind, Table, Unit};
 use bullterrier_image::{
     Canvas, Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect, effects,
 };
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 /// The picture is tall and narrow: only the rows matter to a band.
 const HEIGHT: usize = 96;
@@ -36,15 +37,11 @@ const BAND: usize = 8;
 const BANDS: [usize; 3] = [0, (HEIGHT - BAND) / 2, HEIGHT - BAND];
 /// Rendering a band alone must give the whole's pixels to within this: a different order of summing is not a fault.
 const SAME: f32 = 1e-4;
-/// A distance in design px that is neither nothing nor the picture.
-const TYPICAL_PX: f64 = 12.0;
 /// The size ratios the picture is rendered at.
 const RATIOS: [f64; 3] = [0.5, 1.0, 2.0];
 /// At least this many effects of the core are less than `Whole` with their defaults, so declaring all of them `Whole`
 /// does not pass.
 const NOT_WHOLE: usize = 20;
-
-type Setting = Map<String, Value>;
 
 /// `count` values of 0..1 from a hash of their place and `seed`.
 fn hashed(count: usize, seed: u32) -> Vec<f32> {
@@ -58,62 +55,6 @@ fn hashed(count: usize, seed: u32) -> Vec<f32> {
             f32::from(u16::try_from((hash ^ (hash >> 16)) >> 16).unwrap_or(0)) / 65535.0
         })
         .collect()
-}
-
-fn number(bound: Option<Scalar>) -> Option<f64> {
-    match bound? {
-        Scalar::Int(whole) => i32::try_from(whole).ok().map(f64::from),
-        Scalar::Float(decimal) => Some(decimal),
-        _ => None,
-    }
-}
-
-/// The parameters to try: none given (the defaults), then each parameter alone at each end of its range (a direction
-/// also at the quarter turns, a distance also at 12 px), at each choice and at the other position of a switch. Some may be refused by the table (a pair that crosses): those are
-/// left out when they are checked.
-fn variants(table: &Table) -> Vec<Setting> {
-    let mut cases = vec![Setting::new()];
-    for field in &table.fields {
-        let values: Vec<Value> = match field.kind {
-            Kind::Float | Kind::Int => {
-                let (low, high) = (number(field.min), number(field.max));
-                let mut bounds: Vec<f64> = [low, high].into_iter().flatten().collect();
-                if let (Some(low), Some(high)) = (low, high) {
-                    if field.cyclic {
-                        // a direction is tried at the quarter turns too: at its limits it points along the rows or across them
-                        bounds.extend([0.25, 0.5, 0.75].map(|share| low + (high - low) * share));
-                    }
-                    if field.unit == Some(Unit::Px) {
-                        // a distance is tried at 12 px too, a size an effect works at: its limits are beyond the little picture
-                        bounds.extend(
-                            [-TYPICAL_PX, TYPICAL_PX]
-                                .into_iter()
-                                .filter(|px| (low..=high).contains(px)),
-                        );
-                    }
-                }
-                bounds.into_iter()
-            }
-            .map(|bound| {
-                if field.kind == Kind::Int {
-                    json!(bound as i64)
-                } else {
-                    json!(bound)
-                }
-            })
-            .collect(),
-            Kind::Choice => field.choices.iter().map(|choice| json!(choice)).collect(),
-            Kind::Bool => vec![json!(true), json!(false)],
-            Kind::Picture => vec![json!("asset")],
-            _ => Vec::new(),
-        };
-        cases.extend(
-            values
-                .into_iter()
-                .map(|value| Setting::from_iter([(field.name.to_owned(), value)])),
-        );
-    }
-    cases
 }
 
 /// `params` as the runner hands them to an effect for a picture of `ratio` working px per design px: `px` multiplied
@@ -132,7 +73,7 @@ fn scaled(table: &Table, params: &Setting, ratio: f64) -> Setting {
                         1.0 / (ratio * ratio)
                     };
                     let kept = if field.unit == Some(Unit::Px) && ratio < 1.0 {
-                        (number * by).max(self::number(field.min).unwrap_or(f64::MIN))
+                        (number * by).max(crate::common::sweep::number(field.min).unwrap_or(f64::MIN))
                     } else {
                         number * by
                     };
