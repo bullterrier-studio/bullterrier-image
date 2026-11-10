@@ -112,7 +112,11 @@ const fn narrow(level: f64) -> f32 {
 }
 
 /// The piece number `index` as a label.
-#[expect(clippy::cast_possible_truncation, clippy::cast_possible_wrap, reason = "at most a few thousand pieces")]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "at most a few thousand pieces"
+)]
 const fn label(index: usize) -> i32 {
     index as i32
 }
@@ -174,7 +178,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         let (across, down) = (length::float(column) - moved[0], length::float(row) - moved[1]);
         let (sin, cos) = (turn * share[2]).sin_cos();
         sampler
-            .at(middle[1] - across * sin + down * cos, middle[0] + across * cos + down * sin)
+            .at(
+                middle[1] - across * sin + down * cos,
+                middle[0] + across * cos + down * sin,
+            )
             .map(|level| narrow(level.clamp(0.0, 1.0)))
     });
     let shown = shown.as_picture();
