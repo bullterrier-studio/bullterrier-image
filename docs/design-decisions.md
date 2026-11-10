@@ -573,9 +573,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     are 1-D noise over the canvas width and height); `blend` (the asset placed on the canvas size); `ripple`
     (`Radius(amplitude)`, sine about the canvas centre; `Whole` for wrap); `chromatic_aberration` (`Radius(amount)`, scale
     about the canvas centre; `Whole` for wrap); `halftone` (screen lattice and cell centre from the canvas
-    top; `Radius(cell)` only while `sigma` is 0: the blur's reach is a multiple of the cell, which the runner rounds to
-    whole px, and no radius in design px bounds that at every size ratio, so a blurred screen stays `Whole` (F) until the
-    footprint can see the ratio). Done in B1b: every A row but `grain`/`vignette` (B1a) reads `Place`; `ripple` and
+    top; `Radius((half diagonal + truncate x sigma) x cell + 1)` worked out in the working px the runner rounds the cell to
+    and given back in design px, from the canvas's ratio; `Whole` for a wrapping blur). Done in B1b: every A row but `grain`/`vignette` (B1a) reads `Place`; `ripple` and
     `chromatic_aberration` are `Radius(amplitude)` and `Radius(amount)`, the rest `Pixel`.
   - B (sequential seeded stream): done in B2. `dead_pixels`, `slice_shift`, `vhs` (bands, dropouts, row drift) draw lists over
     the canvas from the seed (`Rng`, a few hundred at most, bounded by the parameters' maxima), then take what falls in the
@@ -599,8 +598,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     columns: E), `stretch` (horizontal: row-local; vertical reads `from[row]` over the canvas: E), `topographic`
     (`Radius(smoothing reach + 1)` on its field), `edges` (`canny` hysteresis: `Whole`), `ascii` (cells anchored at the canvas
     top; stays `Whole`: a pixel reads its whole cell, whose height is the atlas's function of the rounded working cell,
-    not a bound in design px). `swirl` and `pinch_bulge` stay `Whole` (E): they read up to twice a share of the canvas's
-    shorter side, which a radius in design px cannot say.
+    not a bound in design px; `render` has no `Place` either). `swirl` and `pinch_bulge` stay `Whole` (E): a pixel reads
+    anywhere on its circle about the canvas centre, so the reach is twice a share of the shorter side, `Radius(2 x
+    radius x (side - 1) / ratio)` now statable: at the default 0.5 that is the shorter side, a margin that covers the
+    picture whatever the band, and `render` takes its centre from the picture, not the canvas.
+- **Settled: a footprint sees the canvas (banded render, B3a).** `Effect::footprint(&Params, &Canvas)`, `Canvas { height,
+  width, ratio }`; `Radius` stays in design px, and an effect with a reach in rounded working px or a share of a side converts
+  (`ceil(working) / ratio`, `share x side / ratio`). *Reason:* a footprint that could not see the canvas forced four effects
+  (`halftone` blurred, `swirl`, `pinch_bulge`, `ascii`) to `Whole`; only `halftone` is freed by it.
 - **Settled: noise is scaled by its known deviation, not the picture's (banded render, B2).** A fractal field
   (`noise::field_rows`) is divided at each pixel by its own deviation, derived from the lattice (a value is uniform on -1..1,
   variance 1/3; the Catmull-Rom weights of the pixel's place give the rest, octaves independent), and clumped noise
