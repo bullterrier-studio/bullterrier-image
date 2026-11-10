@@ -48,13 +48,13 @@ impl Limits {
 const FLATNESS: f64 = 0.05; // constant: a twentieth of a pixel, far below what a pixel shows
 
 /// The four control points of a cubic Bézier.
-type Cubic = [[f64; 2]; 4]; // constant: a cubic has four control points
+pub(crate) type Cubic = [[f64; 2]; 4]; // constant: a cubic has four control points
 
 /// The corners after the first of the chords that stand for the cubic Bézier through the control points `points`: as many
 /// as keep the curve within [`FLATNESS`] of them. The distance of a curve to its chord is at most 1/8 of the curve's largest
 /// second derivative divided by the number of chords squared, and the second derivative is at most 6 times the larger of the
 /// two second differences of the control points.
-fn chords(points: Cubic, limits: &Limits) -> Result<Vec<[f64; 2]>, String> {
+pub(crate) fn chords(points: Cubic, limits: &Limits) -> Result<Vec<[f64; 2]>, String> {
     let second = |a: usize, b: usize, c: usize| {
         let (x, y) = (
             points[a][0] - 2.0 * points[b][0] + points[c][0],

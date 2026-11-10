@@ -19,6 +19,7 @@ pub(crate) mod edges;
 pub(crate) mod fft;
 pub(crate) mod frame;
 pub(crate) mod gauss;
+pub(crate) mod glyphs;
 pub(crate) mod gradient;
 pub(crate) mod grid;
 pub(crate) mod guided;

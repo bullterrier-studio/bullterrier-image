@@ -26,6 +26,8 @@ numpy = "0.30"
 peak_alloc = "0.3"
 proc-macro2 = "1"
 proptest = "1.12"
+# the bundled font's outlines and metrics (`ops/glyphs.rs`), as bullterrier-vector reads fonts: pinned exactly because a release may move an outline, no default features and `libm` so that the maths is the same on every platform
+read-fonts = { version = "=0.46.0", default-features = false, features = ["libm"] }
 rayon = "1"  # the threads of a render (`Options::with_threads`)
 # abi3-py312: one wheel per platform serves every Python from 3.12 (the oldest the package supports)
 pyo3 = { version = "0.30", features = ["abi3-py312"] }
