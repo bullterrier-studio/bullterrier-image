@@ -42,6 +42,8 @@ mod files_icc;
 mod files_read;
 mod files_write;
 mod finding;
+#[cfg(feature = "onnx")]
+mod finding_download;
 mod flow_lines;
 mod flow_warp;
 mod focus_blur;

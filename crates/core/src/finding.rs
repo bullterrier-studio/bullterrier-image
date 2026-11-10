@@ -3,6 +3,8 @@
 //! [`Infer`]'s: the one part that needs a runtime.
 
 #[cfg(feature = "onnx")]
+pub mod download;
+#[cfg(feature = "onnx")]
 pub mod onnx;
 
 use crate::ops::length::{float, whole};

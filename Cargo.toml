@@ -39,6 +39,8 @@ rustfft = "6.4"  # the Fourier transform: blurs and convolutions with a wide ker
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }  # a recipe file's order is data (regions, first offender)
 serde_path_to_error = "0.1"
+# https downloads of model and runtime files (`finding/download.rs`, feature `onnx`): rustls with the bundled Mozilla CA list, no system TLS, no OpenSSL
+ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = { version = "0.10", default-features = false, features = ["std"] }  # the checksum of a model file (`finding/onnx.rs`, feature `onnx`)
 svgtypes = { version = "0.16", default-features = false, features = ["std"] }  # path data, for the path regions
 syn = "3"
