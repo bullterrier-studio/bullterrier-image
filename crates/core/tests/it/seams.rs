@@ -79,7 +79,8 @@ fn one_piece_has_no_border_and_a_width_of_0_draws_nothing() -> Result<(), Error>
 }
 
 #[test]
-fn a_line_thinner_than_a_pixel_covers_the_pixels_beside_the_border_by_its_width_squared_over_two() -> Result<(), Error> {
+fn a_line_thinner_than_a_pixel_covers_the_pixels_beside_the_border_by_its_width_squared_over_two() -> Result<(), Error>
+{
     // by hand: the line reaches width / 2 into each pixel beside the border, and is fainter by its width, so each of the
     // two pixels is covered by width * width / 2
     for (width, each) in [(0.5, 0.125), (0.8, 0.32), (0.25, 0.031_25)] {
