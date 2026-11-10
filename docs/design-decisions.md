@@ -583,13 +583,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   - C (objects over the canvas): `dust_scratches`, `particles`, `light_leak`, `lens_drops` are done: `Pixel`, except
     `lens_drops`, `Radius((1 + refraction) x radius + truncate x blur)` (`Whole` for wrap). Counts are the density times the
     canvas's area (the files' pixel limit bounds it) or a parameter maximum; `limits.rs` has the particles row.
-  - D (global statistic): `auto_levels`, `dehaze`, `equalize`, `gradient_map`, `radial_blur`, `starburst` (quantile) and
-    `displace`, `flow_warp` stay `Whole`. Done in B2 (noise made from the canvas place): `grain` (every size), `paper_texture`,
+  - D (global statistic): `auto_levels`, `dehaze`, `equalize`, `gradient_map`, `radial_blur`, `starburst` (quantile) stay
+    `Whole`. Done in B2 (noise made from the canvas place): `grain` (every size), `paper_texture`,
     `flow_lines` (also B), `noise_field` kind `value` (`Pixel`; `perlin`, `worley` and `sine` keep their own picture-wide
     standardisation and stay `Whole`), `fog` (`Pixel` while `rise` is 1 and `turbulence` 0; read between pixels the clouds
-    are ranked again over the picture, so `Whole`). `displace` and `flow_warp` (and `melt`, `aurora`, `torn_edge`, the torn
-    regions) still call the standardised `noise::field`; converting them to `field_rows` changes their pictures and the
-    hand-worked oracles of their tests, and waits for the leader.
+    are ranked again over the picture, so `Whole`). Done in B3b: `displace` and `flow_warp` (were D, `standardised` noise) read `field_rows` by canvas place and are
+    `Radius`: `amount` x the noise's bound for `displace`, `amount` + two rows a step for `flow_warp`; `melt` (`Radius(amount)`),
+    `aurora`, `torn_edge` and the torn regions only changed their noise source.
   - E (stay `Whole`): `droste`, `kaleidoscope`, `lens_distortion`, `perspective`, `polar`, `light_rays`, `pinch_bulge`,
     `swirl` (reach is a share of the canvas, not a design px value), `tile` (cells average the whole picture), `quadtree`,
     `dither` (palette and error diffusion), `disperse` (grid ordered over the figure), `shatter` (also B),
@@ -615,6 +615,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   480 px, 30 seeds: `paper_texture`, `grain` and `vhs` noise 0.98-1.03; `noise_field` value level 0.229-0.319 against
   0.289 for a uniform; `fog` at the default coverage 0.93 covers 0.80-1.00 of the picture); the tests read mean and
   deviation over seeds. Blurs of 16 px a side or more are Fourier transforms, equal to the whole within 1e-5, not to the bit.
+  `noise::field` (standardised over the picture) is gone: every fractal field, `displace`, `flow_warp`, `melt`, `aurora`,
+  `torn_edge` and the torn regions included, is `field_rows`, so the one noise decision lives in the noise op. `displace`'s
+  `amount` is the deviation of each move, no longer the longest (that needs the whole picture; default 12 to 4); at 480 px
+  the deviation of a move over a picture is 0.92-1.15 of `amount` over 12 seeds.
 - **Open: alpha through effects that move pixels.** `Picture` is RGB by type and only the cut-out after the last step adds
   alpha. A look applied to an already transparent picture (cut out, then sliced, displaced or torn) moves the colour but not the
   alpha. No decision.
