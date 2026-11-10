@@ -72,6 +72,7 @@ mod motion_blur;
 mod noise;
 mod noise_field;
 mod ntsc;
+mod outline;
 mod paper_texture;
 mod parallax;
 mod params;

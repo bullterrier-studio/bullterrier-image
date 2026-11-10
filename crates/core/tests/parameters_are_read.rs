@@ -535,6 +535,12 @@ fn conditional() -> Vec<Conditional> {
             field: "radius",
             with: vec![("kind", json!("dots"))],
         },
+        // the test's selection has an edge within a pixel or two of every pixel, all covered by the default stroke
+        Conditional {
+            effect: "outline",
+            field: "glow",
+            with: vec![("width", json!(0.0))],
+        },
     ]
 }
 

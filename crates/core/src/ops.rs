@@ -12,6 +12,7 @@ pub(crate) mod colorspace;
 pub(crate) mod convolve;
 pub(crate) mod cutout;
 pub(crate) mod cuts;
+pub(crate) mod distance;
 pub(crate) mod dither;
 pub(crate) mod edge;
 pub(crate) mod edges;
