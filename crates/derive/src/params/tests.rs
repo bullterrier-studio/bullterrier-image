@@ -45,6 +45,8 @@ fn a_complete_declaration_is_accepted_for_every_kind_of_field() {
         documented! { #[param(default = 0, unit = count, min = -2147483648, max = 2147483647)] cells: i32, },
         // an unsigned whole number may span all of u32
         documented! { #[param(default = 0, unit = count, min = 0, max = 4294967295)] seed: u32, },
+        // a count held as a usize
+        documented! { #[param(default = 24, unit = count, min = 4, max = 500)] pieces: usize, },
         // the bounds are inclusive: a default may sit on either
         documented! { #[param(default = 0.0, unit = px, min = 0, max = 32)] low: f32, },
         documented! { #[param(default = 32.0, unit = px, min = 0, max = 32)] high: f32, },
@@ -199,6 +201,11 @@ fn a_number_that_breaks_its_range_is_refused_naming_the_field() {
             "an unsigned whole number whose min is negative",
             documented! { #[param(default = 0, unit = count, min = -1, max = 32)] seed: u32, },
             &["seed", "min", "u32"],
+        ),
+        (
+            "a count held as usize whose min is below 0",
+            documented! { #[param(default = 4, unit = count, min = -1, max = 32)] pieces: usize, },
+            &["pieces", "min", "usize"],
         ),
         (
             "an unsigned whole number whose default is beyond u32",
@@ -558,7 +565,7 @@ fn a_type_the_derive_does_not_know_is_refused_naming_the_field_and_the_type() {
         (
             "an alias of f32 is not recognised by its name",
             documented! { #[param(default = 4.0, unit = px, min = 0, max = 32)] cell: Real, },
-            &["cell", "`Real`", "(a number is f32, i32 or u32)"],
+            &["cell", "`Real`", "(a number is f32, i32, u32 or usize)"],
         ),
         (
             "an unknown type with a number for its default",
