@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
-use crate::ops::distance::to_nearest;
+use crate::ops::pieces::line_coverage;
 use crate::params::{Color, Params};
 use crate::{Image, Inputs, Picture};
 
@@ -48,33 +48,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let Some(partition) = inputs.partition() else {
         return Image::from_pixels(height, width, picture.pixels().to_vec());
     };
-    // the pixels beside a border: a neighbour to the right or below (and so they too) of another piece
-    let labels = partition.values();
-    let mut beside = vec![false; height * width];
-    for at in 0..height * width {
-        let (row, column) = (at / width, at % width);
-        for next in [
-            (column + 1 < width).then_some(at + 1),
-            (row + 1 < height).then_some(at + width),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            if labels[next] != labels[at] {
-                beside[at] = true;
-                beside[next] = true;
-            }
-        }
-    }
-    // the pixels beside a border are half a px from it, the others that and their distance to such a pixel farther (to
-    // about a pixel's accuracy along a slanting border); infinite with no border
-    let distance = to_nearest(&beside, (height, width));
-    let line = params.width;
+    let cover = line_coverage(partition.values(), (height, width), params.width);
     let tint = params.color.0;
     picture.map_at(|row, column, pixel| {
-        // a pixel is one px wide, so the line's edge ramp spans 1 px, half of it each side of the line's edge: the half
-        // px to the border and the half px of the ramp cancel; a line thinner than a pixel covers it by its width
-        let cover = (line / 2.0 - distance[row * width + column]).clamp(0.0, 1.0) * line.min(1.0);
+        let cover = cover[row * width + column];
         [0, 1, 2].map(|channel| pixel[channel] + (tint[channel] - pixel[channel]) * cover)
     })
 }

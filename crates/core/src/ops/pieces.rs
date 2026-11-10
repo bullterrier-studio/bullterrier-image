@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use super::distance::to_nearest;
 use super::length;
 
 /// A rectangle of a picture, in pixels: columns `left..right` of rows `top..bottom`.
@@ -175,4 +176,36 @@ pub(crate) fn crop(pixels: &[[f32; 3]], width: usize, window: Bounds) -> Vec<[f3
         out.extend_from_slice(&pixels[row * width + window.left..row * width + window.right]);
     }
     out
+}
+
+/// How much of each pixel a line `line` px wide along the borders between the pieces of `labels` (a `height` x `width`
+/// partition, row after row) covers, 0..1, row after row: the picture's own edge is no border, a single piece has none.
+/// The line is centred on each border and its edge ramps over one px; a line thinner than a pixel is fainter by its
+/// width. Width 0 covers nothing.
+pub(crate) fn line_coverage(labels: &[i32], (height, width): (usize, usize), line: f32) -> Vec<f32> {
+    // the pixels beside a border: a neighbour to the right or below (and so they too) of another piece
+    let mut beside = vec![false; height * width];
+    for at in 0..height * width {
+        let (row, column) = (at / width, at % width);
+        for next in [
+            (column + 1 < width).then_some(at + 1),
+            (row + 1 < height).then_some(at + width),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            if labels[next] != labels[at] {
+                beside[at] = true;
+                beside[next] = true;
+            }
+        }
+    }
+    // the pixels beside a border are half a px from it, the others that and their distance to such a pixel farther (to
+    // about a pixel's accuracy along a slanting border); infinite with no border
+    // a pixel is one px wide, so the line's edge ramp spans 1 px, half of it each side of the line's edge: the half px to
+    // the border and the half px of the ramp cancel; a line thinner than a pixel covers it by its width
+    to_nearest(&beside, (height, width))
+        .into_iter()
+        .map(|distance| (line / 2.0 - distance).clamp(0.0, 1.0) * line.min(1.0))
+        .collect()
 }
