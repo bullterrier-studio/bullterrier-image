@@ -23,15 +23,19 @@ pub(crate) const META: Meta = Meta {
 
 /// What `halftone` reads around a pixel: the grid of dots is anchored at the picture's corner, so a row is not the same
 /// in another frame of reference.
-pub(crate) fn footprint(params: &Params, _canvas: &Canvas) -> Footprint {
-    // A pixel shows the tone at the centre of its screen cell, at most half a cell diagonal away (and the pixel below it).
-    // The blur adds its own reach, a multiple of the cell that the runner rounds to whole pixels, which the radius in
-    // design px cannot bound at every size ratio: only the unblurred screen is claimed.
-    if params.sigma == 0.0 {
-        Footprint::Radius(f64::from(params.cell))
-    } else {
-        Footprint::Whole
-    }
+pub(crate) fn footprint(params: &Params, canvas: &Canvas) -> Footprint {
+    // A pixel shows the tone at the centre of its screen cell, at most half a cell diagonal away, and the tone is the
+    // blur of the picture there, which reaches `int(truncate x sigma x cell + 0.5)` pixels. The runner rounds `cell` to
+    // whole working px (at least 1), so its working size is at most `max(1, cell x ratio + 0.5)`; the reach is worked
+    // out in working px and given in design px. One pixel for rounding the centre to a pixel, one more for the blur's
+    // `+ 0.5`: the margin adds the interpolation rows.
+    const HALF_DIAGONAL: f64 = std::f64::consts::FRAC_1_SQRT_2; // constant: a cell's corner is this many cells from its centre
+    let cell = (f64::from(params.cell) * canvas.ratio + 0.5).max(1.0);
+    let blur = f64::from(params.truncate) * f64::from(params.sigma);
+    Footprint::reach(
+        ((HALF_DIAGONAL + blur) * cell + 1.5) / canvas.ratio,
+        params.edge == EdgeOrConstant::Wrap && params.sigma > 0.0,
+    )
 }
 
 /// A print-style dot screen: tone becomes dot size.

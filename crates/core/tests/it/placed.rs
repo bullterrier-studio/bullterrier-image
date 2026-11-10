@@ -69,6 +69,15 @@ fn cases() -> Vec<(&'static str, Value)> {
             "halftone",
             json!({"sigma": 0.0, "cell": 5, "angle": 15.0, "separation": "cmyk", "paper": "#ffffff"}),
         ),
+        // a blurred screen: the blur's reach (here 4 px, summed tap by tap) adds to the screen's
+        (
+            "halftone",
+            json!({"sigma": 0.5, "cell": 2, "angle": 30.0, "paper": "#ffffff", "ink": "#000000"}),
+        ),
+        (
+            "halftone",
+            json!({"sigma": 0.6, "cell": 2, "angle": 15.0, "separation": "cmyk", "paper": "#ffffff", "edge": "nearest"}),
+        ),
     ]
 }
 
@@ -280,5 +289,14 @@ fn grain_clumped_beyond_the_reach_of_a_summed_kernel_is_the_same_rows_of_the_who
         "grain",
         json!({"size": 16.0, "amount": 0.3, "edge": "reflect", "seed": 6}),
     )];
+    check(&cases, (400, 10), TALL_BANDS, 1e-5)
+}
+
+/// A screen blurred by a kernel of 24 px each side is blurred by a Fourier transform down the window's columns, whose
+/// rounding depends on the window: the rows agree to the blur's own promise (1e-5), not to the bit.
+#[test]
+fn a_screen_blurred_beyond_the_reach_of_a_summed_kernel_is_the_same_rows_of_the_whole_to_the_blurs_rounding()
+-> Result<(), Box<dyn Error>> {
+    let cases = [("halftone", json!({"sigma": 1.0, "cell": 6, "angle": 30.0}))];
     check(&cases, (400, 10), TALL_BANDS, 1e-5)
 }
