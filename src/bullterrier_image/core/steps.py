@@ -10,7 +10,7 @@ Promises:
 - The regions a step names (`mask`, `by`, `partition`, `each`) are checked when the recipe is made, which alone knows
   the regions it declares: a name that is no region, or is a region of the wrong kind, is a `RecipeError` naming the
   step and listing the valid names.
-- Steps and recipes are immutable values (frozen Pydantic models). A step keeps its parameters as they were written,
+- Steps and recipes are immutable values (frozen dataclasses). A step keeps its parameters as they were written,
   so `describe` shows them that way; with a `preset` they are the preset's parameters under the ones given, which is
   all the runner and the cache see of it.
 - `Step.describe` gives a short readable form.
@@ -26,21 +26,19 @@ both build on this module and do not know each other.
 
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
 from importlib import import_module
 from typing import Any, Literal, cast
 
 import numpy as np
-from pydantic import Field, field_validator, model_validator
 
 from bullterrier_image.errors import RecipeError
 
 from . import native, registry
 from .framing import Framing
 from .parameters import arrays_as_values, picture_fields
-from .pieces import Drive, plain
-from .regions import Kind
-from .validated import ValidatedModel
+from .pieces import Drive, documented, plain
+from .regions import KINDS, Kind, kind_name
 from .values import BlendMode, Lut, Picture
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
@@ -64,55 +62,55 @@ class Parameter:
     cyclic: bool = False
 
 
-class _Layer(ValidatedModel):
+@dataclass(frozen=True, init=False, kw_only=True)
+class _Layer:
     """How a step's result is laid over the picture below it (its input, the backdrop): what `Step` and `Each` share.
 
     The runner combines the input and the step's result (the source) by `blend_mode`, then mixes that over the input by
     `opacity`, only where `mask` says.
     """
 
-    mask: str | None = Field(
-        None,
-        description='Apply only where this selection says: the "subject", "background", "depth" or "light" of the '
-        "photo, or the name of a selection the recipe declares (path, pick, subject, band, combine, a gradient or "
-        'given); None: everywhere. Where the subject map is empty "subject" selects nothing and "background" '
-        "everything.",
+    mask: str | None = field(
+        default=None,
+        metadata={
+            "doc": 'Apply only where this selection says: the "subject", "background", "depth" or "light" of the '
+            "photo, or the name of a selection the recipe declares (path, pick, subject, band, combine, a gradient or "
+            'given); None: everywhere. Where the subject map is empty "subject" selects nothing and "background" '
+            "everything."
+        },
     )
-    opacity: float = Field(
-        ge=0,
-        le=1,
-        strict=True,
-        allow_inf_nan=False,
-        json_schema_extra={"unit": "fraction"},
-        description="How much of the step shows: 0 none, 1 fully; when none is given, the effect's own default "
-        "(`registry.opacity`, 1 for most effects, and for an `each` step).",
+    opacity: float = field(
+        metadata={
+            "doc": "How much of the step shows, 0 to 1: 0 none, 1 fully; when none is given, the effect's own default "
+            "(`registry.opacity`, 1 for most effects, and for an `each` step)."
+        },
     )
-    blend_mode: BlendMode = Field(
-        "normal",
-        description="How the result combines with the step's input, as the W3C blend modes: 'normal' shows the result, "
-        "'multiply' darkens, 'screen' lightens, 'overlay' and 'soft_light' deepen contrast, 'difference' subtracts, "
-        "'color' takes the result's hue and saturation and keeps the input's brightness.",
+    blend_mode: BlendMode = field(
+        default="normal",
+        metadata={
+            "doc": "How the result combines with the step's input, as the W3C blend modes: 'normal' shows the result, "
+            "'multiply' darkens, 'screen' lightens, 'overlay' and 'soft_light' deepen contrast, 'difference' "
+            "subtracts, 'color' takes the result's hue and saturation and keeps the input's brightness."
+        },
+    )
+    name: str | None = field(
+        default=None,
+        metadata={
+            "doc": "A name for the step, so its numbers have addresses that survive reordering: letters, digits and "
+            "underscores, starting with a letter; no two steps of a recipe share one, and it is not `region`, `frame` "
+            "or `each` nor the name of an effect the recipe uses. None: the step is reached by its effect (and its "
+            "number among the steps of that effect)."
+        },
     )
 
-    name: str | None = Field(
-        None,
-        description="A name for the step, so its numbers have addresses that survive reordering: letters, digits and "
-        "underscores, starting with a letter; no two steps of a recipe share one, and it is not `region`, `frame` or "
-        "`each` nor the name of an effect the recipe uses. None: the step is reached by its effect (and its number "
-        "among the steps of that effect).",
-    )
-
-    @field_validator("name")
-    @classmethod
-    def _a_word(cls, name: str | None) -> str | None:
-        """A name is a word that cannot be taken for the rest of an address."""
-        if name is not None and not _NAME.fullmatch(name):
-            raise ValueError(f"must be letters, digits and underscores, starting with a letter, got {name!r}")
-        if name in _ADDRESS_WORDS:
-            raise ValueError(f"{name!r} is reserved: an address starts with `region`, `frame` or `each`")
-        return name
+    def _hold(self, **values: Any) -> None:
+        """Set the fields, in the one place a frozen value is made."""
+        for key, value in values.items():
+            object.__setattr__(self, key, value)
 
 
+@documented
+@dataclass(frozen=True, init=False, kw_only=True)
 class Step(_Layer):
     """One effect with its parameters, laid over the picture below it (the step's input) as a layer is in an image
     editor: optionally limited to a selection, combined by a blend mode and mixed in partway.
@@ -124,17 +122,18 @@ class Step(_Layer):
     is put in checks that it exists.
     """
 
-    effect: str = Field(description="The name of a registered effect.")
-    params: dict[str, Any] = Field(default_factory=dict, description="The effect's parameters as written.")
-    partition: str | None = Field(
-        None,
-        description="For an effect that draws along the borders of a partition (`seams`): the name of the region whose "
-        "pieces it uses. A selection counts as a partition of two pieces, what it chooses and what it does not.",
+    effect: str = field(metadata={"doc": "The name of a registered effect."})
+    params: dict[str, Any] = field(default_factory=dict, metadata={"doc": "The effect's parameters as written."})
+    partition: str | None = field(
+        default=None,
+        metadata={
+            "doc": "For an effect that draws along the borders of a partition (`seams`): the name of the region whose "
+            "pieces it uses. A selection counts as a partition of two pieces, what it chooses and what it does not."
+        },
     )
 
     def __init__(
         self,
-        /,
         effect: str,
         *,
         params: Mapping[str, Any] | None = None,
@@ -144,17 +143,15 @@ class Step(_Layer):
         preset: str | None = None,
         partition: str | None = None,
         name: str | None = None,
-        **unknown: Any,
     ) -> None:
-        """Validate and make the step; RecipeError saying what is wrong and what is valid (`unknown` keywords, which
-        pydantic's own validation may pass, are refused by name).
+        """Make the step; RecipeError saying what is wrong and what is valid.
 
         preset: the name of one of the effect's presets (see `registry.presets`). The step holds the preset's
         parameters with `params` laid over them, so a parameter you give wins; an effect without that preset is a
         RecipeError listing the ones it has. opacity: None takes the effect's default (`registry.opacity`, declared with
         `@effect(opacity=...)`, usually 1); a number replaces it. partition: the region an effect that takes the input
         `partition` draws (required for it, refused for any other effect)."""
-        values = {name: _as_drive(effect, name, value) for name, value in (params or {}).items()}
+        values = {key: _as_drive(effect, key, value) for key, value in (params or {}).items()}
         if preset is not None:
             found = registry.presets(effect)  # an unknown effect: UnknownEffectError listing them
             if not isinstance(preset, str) or preset not in found:  # a recipe file may write any value
@@ -163,8 +160,7 @@ class Step(_Layer):
             values = {**found[preset].params, **values}
         if opacity is None:
             opacity = registry.opacity(effect)  # an unknown effect: UnknownEffectError listing them
-        self._init_checked(
-            "",
+        self._hold(
             effect=effect,
             params=values,
             mask=mask,
@@ -172,14 +168,21 @@ class Step(_Layer):
             blend_mode=blend_mode,
             partition=partition,
             name=name,
-            **unknown,
         )
-
-    @model_validator(mode="after")
-    def _valid_for_the_effect(self) -> "Step":
-        """The step, checked by the core as a recipe of one step (the names of regions are the recipe's to check)."""
         _check_alone(self)
-        return self
+
+    @classmethod
+    def from_dict(cls, written: Mapping[str, Any]) -> "Step":
+        """The step that `to_dict` (or a recipe file read into data) writes: a dict with `effect` and, optionally, the
+        keys of the constructor (`params`, `mask`, `opacity`, `blend_mode`, `partition`, `name`)."""
+        if "effect" not in written:
+            raise RecipeError(f"a step written as a dict needs `effect`, got {list(written)}")
+        return cls(written["effect"], **_known(written, "effect", _STEP_KEYS))
+
+    def to_dict(self) -> dict[str, Any]:
+        """The step as the plain data a recipe file writes (`effect`, `params`, `partition`, `opacity`, `blend_mode`,
+        `mask`, `name`; a key is there when it is set). A `Picture` or `Lut` parameter stays the object."""
+        return cast("dict[str, Any]", _entry(self, _kept))
 
     def apply(
         self,
@@ -233,6 +236,8 @@ class Step(_Layer):
         return self.describe()
 
 
+@documented
+@dataclass(frozen=True, init=False, kw_only=True)
 class Each(_Layer):
     """A look for each piece of a partition: every piece shows one of `looks`, the looks taking turns or drawn at
     random, and the pieces blend into each other a little at their borders.
@@ -243,42 +248,40 @@ class Each(_Layer):
     `blend_mode` (and `mask`), or None: the piece stays as it was.
     """
 
-    each: str = Field(
-        description="The name of the partition whose pieces get a look each (grid, shards, cuts, svg or bands)."
+    each: str = field(
+        metadata={"doc": "The name of the partition whose pieces get a look each (grid, shards, cuts, svg or bands)."}
     )
-    looks: tuple[Step | None, ...] = Field(
-        min_length=1,
-        description="The looks: each a step, or None for a piece left as it is. Piece k gets look k, then they "
-        "start again (assign='cycle'), or each piece draws one at random (assign='random').",
+    looks: tuple[Step | None, ...] = field(
+        metadata={
+            "doc": "The looks: each a step, or None for a piece left as it is. Piece k gets look k, then they "
+            "start again (assign='cycle'), or each piece draws one at random (assign='random'). At least one."
+        }
     )
-    assign: Literal["cycle", "random"] = Field(
-        "cycle",
-        description="How pieces get looks: 'cycle' gives the pieces, piece 0 first, the looks in turn; 'random' "
-        "gives each piece a look drawn at random (the same `seed` always draws the same).",
+    assign: Literal["cycle", "random"] = field(
+        default="cycle",
+        metadata={
+            "doc": "How pieces get looks: 'cycle' gives the pieces, piece 0 first, the looks in turn; 'random' "
+            "gives each piece a look drawn at random (the same `seed` always draws the same)."
+        },
     )
-    seed: int = Field(
-        0,
-        ge=0,
-        le=2**32 - 1,
-        strict=True,
-        json_schema_extra={"unit": "count"},
-        description="Random seed of assign='random': the same seed always gives the same looks to the same pieces.",
+    seed: int = field(
+        default=0,
+        metadata={
+            "doc": "Random seed of assign='random', a count from 0 to 4294967295: the same seed always gives the same "
+            "looks to the same pieces."
+        },
     )
-    feather: float = Field(
-        0.5,
-        ge=0,
-        le=24,
-        strict=True,
-        allow_inf_nan=False,
-        json_schema_extra={"unit": "px"},
-        description="How softly a piece's look fades into its neighbours' across a border, in px (0 to 24): the "
-        "standard deviation of a Gaussian. 0 gives hard borders; about 0.5 only smooths the stair-steps of the "
-        "pixels; raising it blends the looks over a wider band.",
+    feather: float = field(
+        default=0.5,
+        metadata={
+            "doc": "How softly a piece's look fades into its neighbours' across a border, in px (0 to 24): the "
+            "standard deviation of a Gaussian. 0 gives hard borders; about 0.5 only smooths the stair-steps of the "
+            "pixels; raising it blends the looks over a wider band."
+        },
     )
 
     def __init__(
         self,
-        /,
         each: str,
         *,
         looks: Sequence[Step | None],
@@ -289,12 +292,12 @@ class Each(_Layer):
         seed: int = 0,
         feather: float = 0.5,
         name: str | None = None,
-        **unknown: Any,
     ) -> None:
-        """Validate and make the step; RecipeError saying what is wrong and what is valid. opacity: None shows the
-        blended looks fully (1); a number mixes them over the input."""
-        self._init_checked(
-            "each step",
+        """Make the step; RecipeError saying what is wrong and what is valid. opacity: None shows the blended looks
+        fully (1); a number mixes them over the input."""
+        if bad := [look for look in looks if look is not None and not isinstance(look, Step)]:
+            raise RecipeError(f"`looks`: each look is a Step, or None for a piece left as it is, got {bad[0]!r}")
+        self._hold(
             each=each,
             looks=tuple(looks),
             mask=mask,
@@ -304,17 +307,21 @@ class Each(_Layer):
             seed=seed,
             feather=feather,
             name=name,
-            **unknown,
         )
+        _check_alone(self)
 
-    @field_validator("looks")
     @classmethod
-    def _looks_take_no_name(cls, looks: tuple[Step | None, ...]) -> tuple[Step | None, ...]:
-        """A look is reached by its place, `each.looks[0]`, so a name on it would address nothing."""
-        for number, look in enumerate(looks):
-            if isinstance(look, Step) and look.name is not None:
-                raise ValueError(f"a look takes no `name`: its numbers are addressed by place, `each.looks[{number}]`")
-        return looks
+    def from_dict(cls, written: Mapping[str, Any]) -> "Each":
+        """The each step that `to_dict` (or a recipe file read into data) writes: `each` and `looks` (a dict is a
+        `Step`, None a piece left as it is), optionally the other keys of the constructor."""
+        if not {"each", "looks"} <= written.keys():
+            raise RecipeError("an each step written as a dict needs both `each` and `looks`")
+        looks = [look if look is None or isinstance(look, Step) else Step.from_dict(look) for look in written["looks"]]
+        return cls(written["each"], **_known(written, "each", _EACH_KEYS) | {"looks": looks})
+
+    def to_dict(self) -> dict[str, Any]:
+        """The each step as the plain data a recipe file writes; its looks are the dicts of `Step.to_dict`, or None."""
+        return cast("dict[str, Any]", _entry(self, _kept))
 
     def describe(self, width: int = 56) -> str:
         """A short readable form, e.g. `each panes [grade(exposure=0.5), none] on subject x0.5`, cut to `width`."""
@@ -324,6 +331,23 @@ class Each(_Layer):
     def __str__(self) -> str:
         """The short readable form (see `describe`)."""
         return self.describe()
+
+
+_STEP_KEYS = ("params", "mask", "opacity", "blend_mode", "preset", "partition", "name")
+_EACH_KEYS = ("looks", "mask", "opacity", "blend_mode", "assign", "seed", "feather", "name")
+
+
+def _known(written: Mapping[str, Any], first: str, allowed: Sequence[str]) -> dict[str, Any]:
+    """The keys of `written` but `first`, which is the constructor's positional; RecipeError naming one that is not
+    among `allowed`."""
+    if unknown := [key for key in written if key != first and key not in allowed]:
+        raise RecipeError(f"`{unknown[0]}`: a step written as a dict has the keys {first}, {', '.join(allowed)}")
+    return {key: value for key, value in written.items() if key != first}
+
+
+def _kept(obj: object) -> object:
+    """A `Hold` that keeps the object in place: a plain dict may carry a `Picture` or a `Lut`."""
+    return obj
 
 
 # What the recipe's own checks and the bridge ask of steps and recipes, kept out of the public classes.
@@ -397,10 +421,8 @@ def _flat(effect: str, name: str, colour: object) -> Picture:
 
 
 def _region(region: Kind) -> dict[str, Any]:
-    """A region as the core reads it: its fields and its `kind`, the class's name in snake case (`LinearGradient` is
-    `linear_gradient`)."""
-    kind = re.sub(r"(?<!^)(?=[A-Z])", "_", type(region).__name__).lower()
-    return {"kind": kind, **plain(region)}
+    """A region as the core reads it: its fields and its `kind`."""
+    return {"kind": kind_name(region), **plain(region)}
 
 
 def _is_colour(value: object) -> bool:
@@ -427,15 +449,26 @@ def _value(value: object, hold: Hold) -> object:
 
 
 def _step_from_dict(written: Mapping[str, Any]) -> Step | Each:
-    """The `Each` (it has `each` or `looks`) or the `Step` (it has `effect`) that the dict `written` describes, made by
-    their own constructors; ValueError otherwise."""
+    """The `Each` (it has `each` or `looks`) or the `Step` (it has `effect`) that the dict `written` describes;
+    RecipeError otherwise."""
     if "each" in written or "looks" in written:
-        if not {"each", "looks"} <= written.keys():
-            raise ValueError("an each step written as a dict needs both `each` and `looks`")
-        return Each(**written)
+        return Each.from_dict(written)
     if "effect" not in written:
-        raise ValueError(f"a step written as a dict needs `effect` (a step) or `each` and `looks`, got {list(written)}")
-    return Step(**written)
+        raise RecipeError(
+            f"a step written as a dict needs `effect` (a step) or `each` and `looks`, got {list(written)}"
+        )
+    return Step.from_dict(written)
+
+
+def _region_from_dict(name: str, written: Any) -> Kind:
+    """The region that the dict `written` describes: its `kind` names the class, the other keys are its fields."""
+    if not isinstance(written, Mapping):
+        return cast("Kind", written)  # a region already
+    fields_ = dict(written)
+    kind = fields_.pop("kind", None)
+    if kind not in KINDS:
+        raise RecipeError(f"region {name!r}: `kind` is one of {', '.join(KINDS)}, got {kind!r}")
+    return KINDS[kind](**fields_)
 
 
 def _as_drive(effect: str, name: str, value: Any) -> Any:
@@ -449,10 +482,10 @@ def _as_drive(effect: str, name: str, value: Any) -> Any:
         raise RecipeError(f"effect {effect!r}: `{name}`: {error}") from None
 
 
-_ALONE = re.compile(r"^step: ")  # the place the core names a step checked on its own
+_ALONE = re.compile(r"^(?:step|not a step): ")  # the place the core names a step checked on its own
 
 
-def _check_alone(step: "Step") -> None:
+def _check_alone(step: "Step | Each") -> None:
     """RecipeError (UnknownEffectError for an unknown effect) unless the core accepts `step` on its own: its effect,
     parameters, drives, opacity, name and `partition`. The regions it names are the recipe's to check."""
     with registry.holding() as hold:
@@ -482,7 +515,9 @@ def _short(value: object) -> str:
     return text if len(text) <= 18 else text[:15] + "..."
 
 
-class Recipe(ValidatedModel):
+@documented
+@dataclass(frozen=True, init=False, kw_only=True)
+class Recipe:
     """A look: ordered steps, how the photo is framed before them and the size it is scaled to, and optionally a name
     and a description.
 
@@ -505,29 +540,34 @@ class Recipe(ValidatedModel):
         corners, the subject) after the last, so the render has an alpha channel.
     """
 
-    steps: tuple[Step | Each, ...] = Field(description="The steps, run in order, each on the previous one's output.")
-    name: str | None = Field(None, description="What the look is called, free text; None: unnamed.")
-    description: str | None = Field(None, description="What the look looks like, in a sentence; None: undescribed.")
-    regions: dict[str, Kind] = Field(
+    steps: tuple[Step | Each, ...] = field(
+        metadata={"doc": "The steps, run in order, each on the previous one's output. At least one."}
+    )
+    name: str | None = field(default=None, metadata={"doc": "What the look is called, free text; None: unnamed."})
+    description: str | None = field(
+        default=None, metadata={"doc": "What the look looks like, in a sentence; None: undescribed."}
+    )
+    regions: dict[str, Kind] = field(
         default_factory=dict,
-        description="The regions the steps name, by name, besides the built-in 'subject', 'background', 'depth' and "
-        "'light'.",
+        metadata={
+            "doc": "The regions the steps name, by name, besides the built-in 'subject', 'background', 'depth' and "
+            "'light'."
+        },
     )
-    size: int | None = Field(
-        None,
-        ge=1,
-        strict=True,
-        description="The longest side in px the recipe renders at, 1 or more (at most 67,108,864 pixels); None: the "
-        "photo's own. Its px values "
-        "are always written for 480.",
+    size: int | None = field(
+        default=None,
+        metadata={
+            "doc": "The longest side in px the recipe renders at, 1 or more (at most 67,108,864 pixels); None: the "
+            "photo's own. Its px values are always written for 480."
+        },
     )
-    frame: Framing = Field(
-        default_factory=Framing, description="How the photo is framed before the steps and cut out after them."
+    frame: Framing = field(
+        default_factory=Framing,
+        metadata={"doc": "How the photo is framed before the steps and cut out after them."},
     )
 
     def __init__(
         self,
-        /,
         steps: Sequence[Step | Each],
         *,
         name: str | None = None,
@@ -535,66 +575,66 @@ class Recipe(ValidatedModel):
         size: int | None = None,
         frame: Framing | None = None,
         regions: Mapping[str, Kind] | None = None,
-        **unknown: Any,
     ) -> None:
-        """Validate and make the recipe; RecipeError saying what is wrong (unknown keywords are refused by name).
-        `frame` is the recipe's `Framing`; without one the photo is only scaled. `regions` are the declared regions,
-        by name; every region a step names must be among them or built in, and of the kind its key takes."""
+        """Make the recipe; RecipeError saying what is wrong. `frame` is the recipe's `Framing`; without one the photo
+        is only scaled. `regions` are the declared regions, by name; every region a step names must be among them or
+        built in, and of the kind its key takes."""
         if isinstance(steps, str | Mapping | Step | Each):  # iterating one of these would give its fields or letters
             raise RecipeError(
                 f"`steps`: a recipe's steps are a list, Recipe([step, ...]), got {type(steps).__name__}: "
                 "wrap one step in a list"
             )
-        given = {} if frame is None else {"frame": frame}
-        self._init_checked(
-            "",
-            steps=tuple(steps),
-            name=name,
-            description=description,
-            size=size,
-            regions=dict(regions or {}),
-            **given,
-            **unknown,
+        for key, value in {
+            "steps": tuple(steps),
+            "name": name,
+            "description": description,
+            "size": size,
+            "frame": Framing() if frame is None else frame,
+            "regions": dict(regions or {}),
+        }.items():
+            object.__setattr__(self, key, value)
+        if not self.steps:
+            raise RecipeError("a recipe needs at least one step")
+        if bad := [step for step in self.steps if not isinstance(step, Step | Each)]:
+            raise RecipeError(
+                f"`steps`: a recipe's steps are Step or Each, got {type(bad[0]).__name__}: a step written as a dict "
+                "is made by Recipe.from_dict"
+            )
+        with registry.holding() as hold:  # the rules the core runs by, those of a region's path among them
+            native.check_recipe(recipe_dict(self, hold))
+
+    @classmethod
+    def from_dict(cls, written: Mapping[str, Any]) -> "Recipe":
+        """The recipe that `to_dict` (or a recipe file read into data) writes: `steps` (a dict is a `Step`, or an
+        `Each` when it has `each`), and optionally `name`, `description`, `size`, `frame` (a dict of the `Framing`'s
+        fields) and `regions` (a dict by name, each with its `kind`). RecipeError for a key it does not know."""
+        known = {"steps", "name", "description", "size", "frame", "regions"}
+        if unknown := sorted(set(written) - known):
+            raise RecipeError(f"a recipe written as a dict has the keys {', '.join(sorted(known))}, not {unknown}")
+        steps = [_step_from_dict(step) if isinstance(step, Mapping) else step for step in written.get("steps", ())]
+        frame = written.get("frame")
+        return cls(
+            steps,
+            name=written.get("name"),
+            description=written.get("description"),
+            size=written.get("size"),
+            frame=Framing(**frame) if isinstance(frame, Mapping) else frame,
+            regions={name: _region_from_dict(name, region) for name, region in written.get("regions", {}).items()},
         )
+
+    def to_dict(self) -> dict[str, Any]:
+        """The recipe as the plain data a recipe file writes (`from_dict` reads it back): a key is there when it is
+        set, every region has its `kind`. A `Picture` or `Lut` parameter stays the object."""
+        return recipe_dict(self, _kept)
 
     def replace(self, **changes: Any) -> "Recipe":
         """A copy with `changes`: any of the fields `Recipe` takes (`steps`, `name`, `description`, `size`, `frame`,
-        `regions`), each replacing this recipe's. Checked as a new recipe is: RecipeError for a bad or unknown field.
-        To set numbers inside steps, regions or the frame by address, see `with_values`."""
-        held = {field: getattr(self, field) for field in type(self).model_fields}
-        return Recipe(**{**held, **changes})
-
-    @field_validator("steps", mode="before")
-    @classmethod
-    def _steps_from_dicts(cls, steps: object) -> object:
-        """A step written as a dict (what `model_dump` gives, or a file read into data) is a `Step`, or an `Each` when
-        it has `each` or `looks`; ValueError, naming the keys, when it is neither."""
-        if not isinstance(steps, list | tuple):
-            return steps  # pydantic says what is wrong
-        return tuple(_step_from_dict(step) if isinstance(step, Mapping) else step for step in steps)
-
-    @field_validator("regions", mode="before")
-    @classmethod
-    def _regions_from_dicts(cls, regions: object) -> object:
-        """A region written as a dict is read as the kind whose fields it has, which only a dict with fields can name:
-        `Given()` dumps to `{}`, which fits every kind (R3's canonical form names the kind), so an empty one is refused
-        rather than read as another kind."""
-        if isinstance(regions, Mapping):
-            for name, region in regions.items():
-                if isinstance(region, Mapping) and not region:
-                    raise ValueError(
-                        f"region {name!r} is an empty dict, which fits every kind of region: pass the region itself "
-                        "(`Given()`)"
-                    )
-        return regions
-
-    @model_validator(mode="after")
-    def _complete(self) -> "Recipe":
-        if not self.steps:
-            raise RecipeError("a recipe needs at least one step")
-        with registry.holding() as hold:  # the rules the core runs by, those of a region's path among them
-            native.check_recipe(recipe_dict(self, hold))
-        return self
+        `regions`), each replacing this recipe's. Checked as a new recipe is: RecipeError for a bad value, TypeError
+        for a field it does not have. To set numbers inside steps, regions or the frame by address, see
+        `with_values`."""
+        held = {each.name: getattr(self, each.name) for each in fields(self)}
+        merged = {**held, **changes}
+        return Recipe(merged.pop("steps"), **merged)
 
     def parameters(self) -> dict[str, Parameter]:
         """Every number of the recipe that can be set, by address, in the order of the recipe: the numbers of each step

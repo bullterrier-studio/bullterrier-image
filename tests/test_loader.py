@@ -626,7 +626,7 @@ def test_a_look_in_a_recipe_file_takes_no_name_naming_the_look(tmp_path):
         'format = 3\n[region.g]\nkind = "grid"\n[[step]]\neach = "g"\n'
         'looks = ["none", { effect = "grade", name = "warm" }]\n'
     )
-    with pytest.raises(RecipeError, match=r"^bad\.toml: .*a look takes no `name`.*each\.looks\[1\]"):
+    with pytest.raises(RecipeError, match=r"^bad\.toml: .*a look takes no `name`.*looks\[1\]"):
         load_recipe(_write(tmp_path, text, "bad.toml"))
 
 

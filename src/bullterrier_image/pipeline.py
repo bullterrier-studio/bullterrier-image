@@ -33,10 +33,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Literal
-
-from pydantic import ConfigDict, Field
-from pydantic.dataclasses import dataclass as validated_dataclass
+from typing import Literal
 
 from .core import native, registry
 from .core.bridge import core_finder
@@ -49,8 +46,6 @@ _PROJECT_FILE = "bt-image.toml"
 # The project file's tables and the `Project` fields each one holds (top-level keys map to fields of their own name).
 _TABLES = {"export": ("formats", "sizes", "quality", "steps"), "checks": ("subject_share",)}
 _DEFAULT_PHOTOS = ["photos/*.jpg", "photos/*.jpeg", "photos/*.png", "photos/*.webp"]
-
-_Share = Annotated[float, Field(strict=True, ge=0, le=1)]
 
 
 @dataclass(frozen=True)
@@ -110,7 +105,7 @@ class Project:
         return self.output / ".cache"
 
 
-@validated_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
+@dataclass(frozen=True)
 class Item:
     """What happened to one photo x recipe pair.
 
@@ -217,4 +212,4 @@ def run(
             generated=datetime.now().isoformat(timespec="seconds"),  # noqa: DTZ005  (local time, for the person reading)
             log=log,
         )
-    return [Item(**item) for item in items]
+    return [Item(**{**item, "outputs": tuple(item["outputs"]), "warnings": tuple(item["warnings"])}) for item in items]

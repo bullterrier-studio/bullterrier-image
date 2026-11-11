@@ -23,8 +23,8 @@ finds it as `Inputs::image(parameter)`; Python's `Picture` travels as `$picture:
 The recipe is Rust too (`crates/core/src/recipe.rs`): `Recipe`, `Step`, `Each` are plain values, built in code or read
 (`Recipe::from_toml`, `from_json`; the same types are the JSON form); `Step::of(grade::Params {..})` builds a step from an effect's typed parameters. `Recipe::checked(&Presets)` applies the rules of a
 look, `Table::check` those of an effect's parameters (`_core.check`, `_core.check_recipe`, `_core.read_recipe`). The Python
-`Step`, `Recipe`, regions and `Framing` are Pydantic builders over these types: their models validate (and document) first,
-and a `Recipe` is then held to `Recipe::checked`, which alone reads a region's path data.
+`Step`, `Each`, `Recipe`, regions and `Framing` are frozen dataclasses over these types: the core checks each when it is
+made (`check_step`, `region`, `frame`), and a `Recipe` is held to `Recipe::checked`, which alone reads a region's path data.
 **The runner is Rust too** (`crates/core/src/run.rs`): `Photo::new(Picture)` borrows the picture; `with_map(name, Layer)` hands
 a map in, `with_finder(name, Arc<dyn Finder>)` gives a finder (`Finder::find(&Picture)` only; its answer for the whole photo is kept and asked once;
 a `Subject` region found `per` piece also asks the `subject` finder, uncached, about the crop of each piece);

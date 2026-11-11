@@ -6,6 +6,7 @@ import inspect
 import json
 import pickle
 import tomllib
+from dataclasses import FrozenInstanceError
 from pathlib import Path
 from typing import Literal
 
@@ -29,7 +30,6 @@ from bullterrier_image.recipe import (
     Each,
     Edge,
     Framing,
-    Given,
     Grid,
     LinearGradient,
     Pick,
@@ -221,7 +221,7 @@ def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_oth
 
 
 def test_a_look_of_an_each_takes_no_name_because_nothing_could_reach_it_by_it(gain):
-    with pytest.raises(RecipeError, match=r"a look takes no `name`.*each\.looks\[0\]"):
+    with pytest.raises(RecipeError, match=r"a look takes no `name`.*looks\[0\]"):
         Each("g", looks=[Step("gain_probe", name="x"), None])
     assert Each("g", looks=[Step("gain_probe"), None], name="pieces").name == "pieces"
 
@@ -679,7 +679,7 @@ def test_a_recipe_copy_has_the_fields_given_and_keeps_the_rest():
         ),
         pytest.param(lambda: Recipe([fx.grade()]).replace(steps=[]), RecipeError, "at least one step", id="no steps"),
         pytest.param(lambda: Recipe([fx.grade()]).replace(size=0), RecipeError, r"`size`", id="a size below 1"),
-        pytest.param(lambda: Recipe([fx.grade()]).replace(sise=64), RecipeError, r"`sise`", id="a misspelt field"),
+        pytest.param(lambda: Recipe([fx.grade()]).replace(sise=64), TypeError, r"sise", id="a misspelt field"),
     ],
 )
 def test_a_copy_with_a_bad_change_is_refused_as_making_it_so_would_be(make, error, complaint):
@@ -792,28 +792,28 @@ def test_a_recipe_refuses_a_frame_that_is_not_a_framing():
 
 
 def test_the_recipe_objects_are_frozen():
-    with pytest.raises(ValueError, match="frozen"):
+    with pytest.raises(FrozenInstanceError):
         Step("grade").opacity = 0.5  # type: ignore[misc]  # the point of the test
 
 
 def test_the_recipe_objects_refuse_unknown_fields():
-    with pytest.raises(ValueError, match="colour"):
-        Step.model_validate({"effect": "grade", "colour": "red"})
+    with pytest.raises(RecipeError, match="colour"):
+        Step.from_dict({"effect": "grade", "colour": "red"})
+    with pytest.raises(TypeError, match="colour"):
+        Step("grade", colour="red")  # type: ignore[call-arg]  # the point of the test
 
 
 @pytest.mark.parametrize(
     ("make", "complaint"),
     [
-        pytest.param(lambda: fx.bloom().model_copy(update={"params": {"radius": -1}}), r"`radius`", id="a step's copy"),
         pytest.param(
-            lambda: Recipe([fx.grade()]).model_copy(update={"steps": ()}), "at least one step", id="a recipe's copy"
-        ),
-        pytest.param(
-            lambda: Step.model_validate({"effect": "bloom", "params": {"radius": -1}, "opacity": 1.0}),
+            lambda: Step.from_dict({"effect": "bloom", "params": {"radius": -1}, "opacity": 1.0}),
             r"`radius`",
             id="a step from a dict",
         ),
-        pytest.param(lambda: Recipe.model_validate({"steps": ()}), "at least one step", id="a recipe from a dict"),
+        pytest.param(lambda: Recipe.from_dict({"steps": ()}), "at least one step", id="a recipe from a dict"),
+        pytest.param(lambda: fx.bloom().replace(radius=-1), r"`radius`", id="a step's copy"),
+        pytest.param(lambda: Recipe([fx.grade()]).replace(steps=()), "at least one step", id="a recipe's copy"),
     ],
 )
 def test_no_copy_or_dict_skips_the_checks_of_the_constructor(make, complaint):
@@ -821,15 +821,16 @@ def test_no_copy_or_dict_skips_the_checks_of_the_constructor(make, complaint):
         make()
 
 
-def test_a_recipe_takes_steps_written_as_dicts_a_step_by_effect_an_each_step_by_each():
+def test_a_recipe_is_made_from_steps_written_as_dicts_a_step_by_effect_an_each_step_by_each():
     written = [
         {"effect": "grade", "params": {"exposure": 0.3}, "opacity": 0.5},
         {"each": "panes", "looks": [{"effect": "grade"}, None], "seed": 3},
     ]
     expected: list[Step | Each] = [fx.grade(exposure=0.3, opacity=0.5), Each("panes", looks=[fx.grade(), None], seed=3)]
     regions = {"panes": Grid(columns=2)}
-    assert Recipe(written, regions=regions) == Recipe(expected, regions=regions)  # type: ignore[arg-type]
-    assert Recipe.model_validate({"steps": written, "regions": regions}) == Recipe(expected, regions=regions)
+    assert Recipe.from_dict({"steps": written, "regions": {"panes": {"kind": "grid", "columns": 2}}}) == Recipe(
+        expected, regions=regions
+    )
 
 
 @pytest.mark.parametrize(
@@ -845,12 +846,10 @@ def test_a_recipe_takes_steps_written_as_dicts_a_step_by_effect_an_each_step_by_
 )
 def test_a_step_written_as_a_bad_dict_is_a_recipe_error_naming_what_is_wrong(written, complaint):
     with pytest.raises(RecipeError, match=complaint):
-        Recipe([written], regions={"panes": Grid()})
-    with pytest.raises(RecipeError, match=complaint):
-        Recipe.model_validate({"steps": [written], "regions": {"panes": Grid()}})
+        Recipe.from_dict({"steps": [written], "regions": {"panes": {"kind": "grid"}}})
 
 
-def test_a_recipe_dumped_to_a_dict_is_validated_back_into_an_equal_recipe():
+def test_a_recipe_written_to_a_dict_is_read_back_into_an_equal_recipe():
     recipe = Recipe(
         [
             fx.grade(exposure=0.3, name="warm"),
@@ -862,7 +861,7 @@ def test_a_recipe_dumped_to_a_dict_is_validated_back_into_an_equal_recipe():
         size=64,
         frame=Framing(aspect=1.0, transparent="circle"),
     )
-    assert Recipe.model_validate(recipe.model_dump()) == recipe
+    assert Recipe.from_dict(recipe.to_dict()) == recipe
 
 
 REGION_KINDS = {
@@ -881,7 +880,7 @@ REGION_KINDS = {
 @pytest.mark.parametrize("kind", REGION_KINDS.values(), ids=REGION_KINDS.keys())
 def test_a_recipe_with_a_region_dumped_to_a_dict_comes_back_equal_and_of_its_kind(kind):
     recipe = Recipe([fx.grade()], regions={"here": kind})
-    back = Recipe.model_validate(recipe.model_dump())
+    back = Recipe.from_dict(recipe.to_dict())
     assert back == recipe
     assert type(back.regions["here"]) is type(kind)
 
@@ -891,15 +890,7 @@ def test_an_each_step_and_a_pick_dumped_to_a_dict_come_back_equal():
         [Each("panes", looks=[fx.grade(), None], seed=2), fx.grade(mask="first")],
         regions={"panes": Grid(columns=2), "first": Pick(of="panes", pieces=[0])},
     )
-    assert Recipe.model_validate(recipe.model_dump()) == recipe
-
-
-def test_a_region_with_no_fields_cannot_be_read_back_from_a_dict_as_it_fits_every_kind():
-    """Until the canonical form names each region's kind (R3), `Given()` dumps to `{}`: no kind in particular."""
-    recipe = Recipe([fx.grade()], regions={"mine": Given()})
-    with pytest.raises(RecipeError, match=r"region 'mine'.*empty.*Given\(\)"):
-        Recipe.model_validate(recipe.model_dump())
-    assert recipe.regions["mine"] == Given()  # the region itself is accepted, as ever
+    assert Recipe.from_dict(recipe.to_dict()) == recipe
 
 
 COPIED = {
@@ -930,31 +921,13 @@ def test_steps_and_recipes_survive_pickling_and_copying_equal_as_a_process_pool_
 
 
 BAD_STEP = {"effect": "bloom", "params": {"radius": -1}}
-CHECKED_ENTRANCES = {
-    "model_validate": lambda: Step.model_validate(BAD_STEP),
-    "model_validate_json": lambda: Step.model_validate_json(json.dumps(BAD_STEP)),
-    "model_validate_strings": lambda: Step.model_validate_strings({"effect": "bloom", "opacity": "7"}),
-    "model_copy": lambda: fx.bloom().model_copy(update={"params": BAD_STEP["params"]}),
-}
 
 
-@pytest.mark.parametrize("enter", CHECKED_ENTRANCES.values(), ids=CHECKED_ENTRANCES.keys())
-def test_every_pydantic_entrance_refuses_a_bad_step_as_a_recipe_error(enter):
-    with pytest.raises(RecipeError):
-        enter()
-
-
-def test_a_step_from_json_is_the_step_and_a_bad_one_names_the_value():
+def test_a_step_written_to_json_data_is_read_back_and_a_bad_one_names_the_value():
     step = fx.bloom(radius=12, opacity=0.5, name="halo")
-    assert Step.model_validate_json(step.model_dump_json()) == step
+    assert Step.from_dict(json.loads(json.dumps(step.to_dict()))) == step
     with pytest.raises(RecipeError, match=r"`radius`.*>= 0.*-1"):
-        Step.model_validate_json(json.dumps({**BAD_STEP, "opacity": 1.0}))
-
-
-@pytest.mark.parametrize("cls", [Step, Recipe, Each])
-def test_nothing_builds_an_unchecked_value_with_model_construct(cls):
-    with pytest.raises(RecipeError, match="model_construct"):
-        cls.model_construct()
+        Step.from_dict(json.loads(json.dumps({**BAD_STEP, "opacity": 1.0})))
 
 
 # --- presets: an effect's named parameter sets, merged under the parameters a step is given ------------------------
@@ -1032,18 +1005,17 @@ def test_an_each_takes_none_for_a_piece_left_as_it_is():
 
 
 BAD_EACH = {
-    "no looks": (lambda: Each("panes", looks=[]), r"looks"),
+    "no looks": (lambda: Each("panes", looks=[]), r"at least one look"),
     "a look that is a word": (lambda: Each("panes", looks=["none"]), r"looks"),  # type: ignore[list-item]
     "a look that is a number": (lambda: Each("panes", looks=[3]), r"looks"),  # type: ignore[list-item]
     "an assignment that does not exist": (
         lambda: Each("panes", looks=[None], assign="shuffle"),
-        r"`assign`.*cycle.*random",
+        r"assign.*shuffle.*cycle.*random",
     ),
-    "a negative seed": (lambda: Each("panes", looks=[None], seed=-1), r"`seed`.*0"),
+    "a negative seed": (lambda: Each("panes", looks=[None], seed=-1), r"seed.*-1"),
     "a feather below 0": (lambda: Each("panes", looks=[None], feather=-0.005), r"`feather`.*0"),
     "an infinite feather": (lambda: Each("panes", looks=[None], feather=float("inf")), r"`feather`"),
-    "an unknown key": (lambda: Each("panes", looks=[None], effect="grade"), r"`effect`"),
-    "a mask that is not a name": (lambda: Each("panes", looks=[None], mask=3), r"`mask`"),  # type: ignore[arg-type]
+    "a mask that is not a name": (lambda: Each("panes", looks=[None], mask=3), r"mask"),  # type: ignore[arg-type]
 }
 
 
@@ -1086,7 +1058,7 @@ def test_an_each_step_shows_fully_unless_it_gives_an_opacity():
 def test_the_each_step_is_a_frozen_value_and_keeps_its_looks_as_a_tuple():
     step = Each("panes", looks=[Step("grade"), None])
     assert step.looks == (Step("grade"), None)
-    with pytest.raises(ValueError, match="frozen"):
+    with pytest.raises(FrozenInstanceError):
         step.feather = 3.0  # type: ignore[misc]  # the point of the test
 
 

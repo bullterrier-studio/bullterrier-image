@@ -3,7 +3,7 @@
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use bullterrier_image::{Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage};
+use bullterrier_image::{Entry, Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage};
 use numpy::{AllowTypeChange, PyArray1, PyArray2, PyArray3, PyArrayLike2, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -109,15 +109,20 @@ pub(crate) fn check_recipe(recipe: &Bound<'_, PyDict>, presets: Option<&Bound<'_
         .map_err(core_error)
 }
 
-/// Check `step` (a dict, as a step is written in a recipe's `steps`) on its own: its effect, parameters, drives,
+/// Check `step` (a dict, as a step or an each step is written in a recipe's `steps`) on its own: its effect, parameters, drives,
 /// `opacity`, `name` and `partition`, never the regions it names (those are `check_recipe`'s). Returns nothing; a
 /// `CoreError` (a `ValueError`) leading its message with `step`. `presets` as for `render`.
 #[pyfunction]
 #[pyo3(signature = (step, *, presets=None))]
 pub(crate) fn check_step(step: &Bound<'_, PyDict>, presets: Option<&Bound<'_, PyDict>>) -> PyResult<()> {
-    let step: bullterrier_image::Step = serde_json::from_value(to_json(step.as_any())?)
+    let entry: Entry = serde_json::from_value(to_json(step.as_any())?)
         .map_err(|error| core_error(Error::Recipe(format!("not a step: {error}"))))?;
-    step.check(&presets_of(presets)?).map_err(core_error)
+    let presets = presets_of(presets)?;
+    match entry {
+        Entry::Step(step) => step.check(&presets),
+        Entry::Each(each) => each.check(&presets),
+    }
+    .map_err(core_error)
 }
 
 /// What rendering `recipe` (a dict, as for `render`) asks of the photo: `{"maps": [str], "finds_pieces": bool}`. `maps`

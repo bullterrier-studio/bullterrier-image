@@ -13,9 +13,10 @@ wrong kind of region, a cycle, a path that is no path): a `RecipeError` naming t
 Dependency direction: imports `pieces` and `native`; the steps build on it.
 """
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, get_args
 
 from . import native
 from .pieces import _Piece, piece
@@ -635,3 +636,13 @@ Kind = (
     | RadialGradient
     | Given
 )
+
+
+def kind_name(region: object) -> str:
+    """The name the core gives the kind of `region`: the class's name in snake case (`LinearGradient` is
+    `linear_gradient`)."""
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", type(region).__name__).lower()
+
+
+KINDS: dict[str, type[Kind]] = {re.sub(r"(?<!^)(?=[A-Z])", "_", cls.__name__).lower(): cls for cls in get_args(Kind)}
+"""The region classes by the name of their kind, as a recipe file writes `kind`."""

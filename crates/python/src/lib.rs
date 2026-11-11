@@ -763,9 +763,9 @@ fn to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {
 /// `value`, which lies `level` levels down (1 for the outermost), as JSON.
 fn json_at(value: &Bound<'_, PyAny>, level: usize) -> PyResult<Value> {
     if level > MOST_NESTING {
-        return Err(PyValueError::new_err(format!(
+        return Err(core_error(Error::Recipe(format!(
             "a parameter is nested more than {MOST_NESTING} levels deep"
-        )));
+        ))));
     }
     if value.is_none() {
         Ok(Value::Null)
@@ -774,12 +774,12 @@ fn json_at(value: &Bound<'_, PyAny>, level: usize) -> PyResult<Value> {
     } else if let Ok(whole) = value.cast::<PyInt>() {
         let number = whole
             .extract::<i64>()
-            .map_err(|_| PyValueError::new_err(format!("a parameter is out of range for 64 bits: {whole}")))?;
+            .map_err(|_| core_error(Error::Recipe(format!("a parameter is out of range for 64 bits: {whole}"))))?;
         Ok(Value::from(number))
     } else if let Ok(real) = value.cast::<PyFloat>() {
         serde_json::Number::from_f64(real.value())
             .map(Value::Number)
-            .ok_or_else(|| PyValueError::new_err(format!("a parameter is not finite: {}", real.value())))
+            .ok_or_else(|| core_error(Error::Recipe(format!("a parameter is not finite: {}", real.value()))))
     } else if let Ok(text) = value.cast::<PyString>() {
         Ok(Value::String(text.to_str()?.to_owned()))
     } else if let Ok(list) = value.cast::<PyList>() {
@@ -795,14 +795,19 @@ fn json_at(value: &Bound<'_, PyAny>, level: usize) -> PyResult<Value> {
             .map(Value::Array)
     } else if let Ok(dict) = value.cast::<PyDict>() {
         dict.iter()
-            .map(|(key, item)| Ok((key.extract::<String>()?, json_at(&item, level + 1)?)))
+            .map(|(key, item)| {
+                let key = key.extract::<String>()?;
+                let json = json_at(&item, level + 1)
+                    .map_err(|error| core_error(Error::Recipe(format!("`{key}`: {}", error.value(item.py())))))?;
+                Ok((key, json))
+            })
             .collect::<PyResult<_>>()
             .map(Value::Object)
     } else {
-        Err(PyValueError::new_err(format!(
+        Err(core_error(Error::Recipe(format!(
             "a parameter of type {} has no JSON form",
             value.get_type()
-        )))
+        ))))
     }
 }
 

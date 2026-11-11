@@ -118,43 +118,11 @@ from . import imageio
 from .core import native, registry
 from .core.framing import Framing
 from .core.parameters import arrays_as_values, lut_fields, picture_fields
-from .core.regions import (
-    Band,
-    Bands,
-    Combine,
-    Cuts,
-    Given,
-    Grid,
-    Kind,
-    LinearGradient,
-    Pick,
-    RadialGradient,
-    Shards,
-    Subject,
-    Svg,
-)
-from .core.regions import Path as PathRegion  # `Path` is pathlib's here
+from .core.regions import KINDS, Kind
 from .core.steps import Each, Recipe, Step
 from .core.values import Picture
 
 __all__ = ["load_recipe", "with_files"]
-
-# the region kinds a `[region.NAME]` table may have, by its `kind`
-_KINDS: dict[str, type[Kind]] = {
-    "grid": Grid,
-    "shards": Shards,
-    "cuts": Cuts,
-    "path": PathRegion,
-    "svg": Svg,
-    "pick": Pick,
-    "subject": Subject,
-    "band": Band,
-    "bands": Bands,
-    "combine": Combine,
-    "linear_gradient": LinearGradient,
-    "radial_gradient": RadialGradient,
-    "given": Given,
-}
 
 
 def _located[E: BullterrierImageError](error: E, where: str) -> E:
@@ -211,7 +179,7 @@ def load_recipe(path: str | Path) -> Recipe:
         fields = dict(table)
         kind = fields.pop("kind")
         try:
-            regions[name] = _KINDS[kind](**fields)
+            regions[name] = KINDS[kind](**fields)
         except RecipeError as error:  # the core names the kind; the file names the region
             problem = str(error).removeprefix(f"region '{kind}': ")
             raise _located(RecipeError(f"region {name!r}: {problem}"), named) from None

@@ -17,7 +17,7 @@ from typing import Any, ClassVar
 
 from . import native
 
-__all__ = ["Drive", "plain"]
+__all__ = ["Drive", "documented", "plain"]
 
 
 def plain(value: Any) -> Any:
@@ -48,13 +48,24 @@ class _Piece:
     def __post_init__(self) -> None:
         """Ask the core for the normal form of the fields and hold that. Only a field the caller passed is sent: the
         core fills in the rest, and a preset (`Shards(preset=...)`) gives the fields beside it only what was passed."""
-        # A piece made without `__init__` (pydantic revalidating a recipe) holds every field: all are sent.
-        names = getattr(self, "_given", None) or [each.name for each in fields(self)]
-        given = {name: plain(getattr(self, name)) for name in names}
+        given = {name: plain(getattr(self, name)) for name in self._given}  # type: ignore[attr-defined]
         answer = type(self)._normal(given)  # noqa: SLF001  (the class's own)
         for each in fields(self):
             made = self._make.get(each.name)
             object.__setattr__(self, each.name, made(answer[each.name]) if made else _frozen(answer[each.name]))
+
+
+def documented[C](cls: type[C]) -> type[C]:
+    """`cls`, a dataclass, with its docstring ended by the documentation of the fields that have a `doc` in their
+    metadata (what `help(cls)` lists)."""
+    described = [
+        textwrap.fill(f"{each.name} : {each.metadata['doc']}", 100, initial_indent="", subsequent_indent="    ")
+        for each in fields(cls)  # type: ignore[arg-type]
+        if "doc" in each.metadata
+    ]
+    if described:
+        cls.__doc__ = f"{(cls.__doc__ or '').strip()}\n\nAttributes\n----------\n" + "\n".join(described)
+    return cls
 
 
 def piece[P](normal: Callable[[dict[str, Any]], dict[str, Any]] | None = None) -> Callable[[type[P]], type[P]]:
@@ -72,14 +83,7 @@ def piece[P](normal: Callable[[dict[str, Any]], dict[str, Any]] | None = None) -
         made.__init__ = init  # type: ignore[method-assign,assignment]
         if normal is not None:
             made._normal = staticmethod(normal)  # type: ignore[attr-defined]  # noqa: SLF001
-        described = [
-            textwrap.fill(f"{each.name} : {each.metadata['doc']}", 100, initial_indent="", subsequent_indent="    ")
-            for each in fields(made)  # type: ignore[arg-type]
-            if "doc" in each.metadata
-        ]
-        if described:
-            made.__doc__ = f"{(made.__doc__ or '').strip()}\n\nAttributes\n----------\n" + "\n".join(described)
-        return made
+        return documented(made)
 
     return wrap
 

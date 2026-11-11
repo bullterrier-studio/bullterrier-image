@@ -37,6 +37,7 @@ A step that gives each piece of a region its own look is an `Each` (`bullterrier
 (`gallery.stub_text`), once at integration rather than on every branch, so it can lag behind a branch's effects.
 """
 
+import dataclasses
 import inspect
 from collections.abc import Callable
 from functools import cache
@@ -105,6 +106,11 @@ def _builder(name: str, function: Callable) -> _Effect:
                 f"`effect`: fx.{name}() always builds the effect {name!r}, so it takes no `effect` "
                 f"(got {values['effect']!r}); call the fx function of the effect you want"
             )
+        for key in ("each", "looks"):  # the keys of an each step: another kind of step
+            if key in values:
+                raise RecipeError(
+                    f"`{key}`: fx.{name}() builds a step of one effect, which takes no `{key}`; use Each(...)"
+                )
         keys = {key: values.pop(key) for key in registry.STEP_KEYS if key in values}  # the rest are the parameters
         return Step(name, params=with_files(name, values, Path()), **keys)
 
@@ -123,10 +129,10 @@ def _signature(name: str) -> inspect.Signature:
     key that is also an injected input, `partition`, only for an effect that takes it), and `preset` (one of the
     names) if the effect has presets."""
     signature = parameters.signature(registry.parameters(name))
-    step = Step.model_fields
-    defaults = {key: step[key].default for key in step} | {"opacity": registry.opacity(name)}
+    step = {each.name: each for each in dataclasses.fields(Step)}
+    defaults = {key: each.default for key, each in step.items()} | {"opacity": registry.opacity(name)}
     keys = [
-        inspect.Parameter(key, inspect.Parameter.KEYWORD_ONLY, default=defaults[key], annotation=step[key].annotation)
+        inspect.Parameter(key, inspect.Parameter.KEYWORD_ONLY, default=defaults[key], annotation=step[key].type)
         for key in registry.STEP_KEYS
         if key in step and key != "effect" and (key not in registry.INPUTS or key in registry.inputs(name))
     ]

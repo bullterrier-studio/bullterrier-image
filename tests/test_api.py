@@ -191,7 +191,7 @@ def test_a_recipe_built_in_code_is_checked_too():
         ({"each": "panes"}, r"`each`"),
         ({"looks": ["none"]}, r"`looks`"),
         ({"partition": "panes"}, r"gradient_map.*takes no partition"),
-        ({"blend_mode": "lighten"}, r"`blend_mode`.*screen.*'lighten'"),
+        ({"blend_mode": "lighten"}, r"blend_mode.*lighten.*screen"),
         ({"preset": "sepya"}, r"'sepya'.*sepia"),
         ({"effect": "blur"}, r"`effect`.*'gradient_map'.*'blur'"),
     ],
