@@ -70,9 +70,9 @@ pub(crate) fn run_project<'py>(
     luts: Option<&Bound<'py, PyDict>>,
     force: bool,
     dry_run: bool,
-    only: Option<String>,
+    only: Option<&str>,
     generated: &str,
-    log: Option<Py<PyAny>>,
+    log: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyList>> {
     let project = Project::from_json(&to_json(given)?.to_string()).map_err(core_error)?;
     let mut inputs = Given::default();
@@ -94,13 +94,13 @@ pub(crate) fn run_project<'py>(
         .collect::<BTreeMap<_, _>>();
     inputs.luts = tables_of(luts)?.into_iter().collect();
     let presets = Presets::shipped().map_err(core_error)?;
-    let generated = generated.to_owned();
+    let (generated, log) = (generated.to_owned(), log.map(|callback| callback.clone().unbind()));
     let items = py
         .detach(|| {
             let options = RunOptions {
                 force,
                 dry_run,
-                only: only.as_deref(),
+                only,
                 generated: &generated,
             };
             run(&project, &presets, &options, &inputs, &mut |line| {
