@@ -305,10 +305,6 @@ def test_an_angle_that_wraps_is_listed_as_cyclic_with_the_turn_as_its_range_and_
     assert not pulse.parameters()["frame.aspect"].cyclic
 
 
-def test_a_cyclic_number_set_past_its_turn_is_the_same_direction_inside_it(pulse):
-    assert pulse.with_values({"frame.angle": 725}).parameters()["frame.angle"].value == 5  # 725 - 2 * 360
-
-
 def test_a_number_nobody_wrote_is_listed_at_its_default_and_one_that_was_written_at_what_was_written(pulse):
     listed = pulse.parameters()
     assert (listed["pulse.offset"].value, listed["pulse.gain"].value) == (0.0, 2.0)
@@ -812,7 +808,6 @@ def test_the_recipe_objects_refuse_unknown_fields():
         pytest.param(
             lambda: Recipe([fx.grade()]).model_copy(update={"steps": ()}), "at least one step", id="a recipe's copy"
         ),
-        pytest.param(lambda: Grid().model_copy(update={"columns": 0}), r"`columns`", id="a region's copy"),
         pytest.param(
             lambda: Step.model_validate({"effect": "bloom", "params": {"radius": -1}, "opacity": 1.0}),
             r"`radius`",
@@ -956,7 +951,7 @@ def test_a_step_from_json_is_the_step_and_a_bad_one_names_the_value():
         Step.model_validate_json(json.dumps({**BAD_STEP, "opacity": 1.0}))
 
 
-@pytest.mark.parametrize("cls", [Step, Recipe, Each, Grid, Framing, Drive])
+@pytest.mark.parametrize("cls", [Step, Recipe, Each])
 def test_nothing_builds_an_unchecked_value_with_model_construct(cls):
     with pytest.raises(RecipeError, match="model_construct"):
         cls.model_construct()

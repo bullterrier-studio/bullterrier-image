@@ -68,8 +68,8 @@ fn a_recipe_file_reads_into_the_steps_it_writes() {
         "frame": {"flip": "none", "angle": 0.0, "fit": "crop", "resample": "bicubic", "aspect": 1.0,
                   "anchor": "subject", "margin": 0.0, "pad_top": 0.0, "pad_right": 0.0, "pad_bottom": 0.0,
                   "pad_left": 0.0, "fill": [0.0, 0.0, 0.0], "transparent": "none", "corner_radius": 0.2},
-        // a count of shares is written as the list, and every field of the kind is written
-        "regions": {"panes": {"kind": "grid", "edge": {"style": "straight", "amount": 4.8, "scale": 24.0, "seed": 0, "octaves": 6, "persistence": 0.55},
+        // a count of shares is written as the list, and every field of the kind is written, none ones included
+        "regions": {"panes": {"kind": "grid", "fit": null, "edge": {"style": "straight", "amount": 4.8, "scale": 24.0, "seed": 0, "octaves": 6, "persistence": 0.55},
                               "columns": [1.0, 1.0, 1.0], "rows": [1.0, 1.0]}},
         "steps": [
             {"effect": "probe", "params": {"cell": 8, "angle": 90.0, "tint": [0.0, 0.5, 1.0]},

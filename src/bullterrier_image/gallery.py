@@ -178,7 +178,7 @@ def stub_text() -> str:
         "",
         "import numpy",
         "",
-        "from .core.params import Drive",
+        "from .core.pieces import Drive",
         "from .core.values import Lut, Picture",
         "from .recipe import Step",
         "",
@@ -197,7 +197,7 @@ def stub_text() -> str:
         signature = re.sub(r"Optional\[(Literal\[[^\]]*\])\]", r"\1 | None", str(written))
         signature = signature.replace("bullterrier_image.core.values.Picture", "Picture")
         signature = signature.replace("bullterrier_image.core.values.Lut", "Lut")
-        signature = signature.replace("bullterrier_image.core.params.Drive", "Drive")
+        signature = signature.replace("bullterrier_image.core.pieces.Drive", "Drive")
         lines += ["@_effect", f"def {name}{signature} -> Step:"]
         doc = registry.documentation(name).replace("\\", "\\\\").replace('"""', "'''")
         lines += [f'    """{doc}"""', "    ...", ""]

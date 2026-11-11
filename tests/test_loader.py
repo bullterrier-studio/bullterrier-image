@@ -537,7 +537,7 @@ DRIVE_MISTAKES = {
     ),
     "a drive with a key called self": (
         'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, self = 1 }',
-        r"step 1: .*`self`",
+        r"step 1: .*`radius`.*self",
     ),
 }
 

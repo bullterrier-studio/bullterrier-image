@@ -6,7 +6,7 @@ from typing import Any, Literal, Protocol, Union
 
 import numpy
 
-from .core.params import Drive
+from .core.pieces import Drive
 from .core.values import Lut, Picture
 from .recipe import Step
 

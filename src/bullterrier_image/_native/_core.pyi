@@ -18,11 +18,13 @@ __all__ = [
     "check_step",
     "depth_finder_identity",
     "documentation",
+    "drive",
     "effect",
     "effects",
     "find_depth",
     "find_inverse_depth",
     "find_subject",
+    "frame",
     "init_project",
     "kept_onnx_runtime",
     "known_maps",
@@ -41,6 +43,7 @@ __all__ = [
     "read_recipe",
     "read_recipe_source",
     "refine_edge",
+    "region",
     "region_presets",
     "register",
     "render",
@@ -206,6 +209,9 @@ def trace(
 def number_pieces(rgb: np.ndarray, partition: np.ndarray) -> np.ndarray: ...
 def map_problem(layer: np.ndarray) -> str | None: ...
 def check_step(step: dict[str, Any], *, presets: dict[str, str] | None = None) -> None: ...
+def region(kind: str, fields: dict[str, Any]) -> dict[str, Any]: ...
+def frame(fields: dict[str, Any]) -> dict[str, Any]: ...
+def drive(fields: dict[str, Any]) -> dict[str, Any]: ...
 def parse_color(value: object) -> tuple[float, float, float] | None: ...
 def resize(image: np.ndarray, longest_side: int) -> np.ndarray: ...
 def read(path: str | os.PathLike[str]) -> np.ndarray: ...

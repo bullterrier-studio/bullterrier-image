@@ -81,7 +81,7 @@ fn a_recipe_is_written_in_the_form_a_person_would_and_reads_back_equal() {
         "frame": {"flip": "none", "angle": 0.0, "fit": "crop", "resample": "bicubic", "aspect": 1.0,
                   "anchor": "subject", "margin": 0.0, "pad_top": 0.0, "pad_right": 0.0, "pad_bottom": 0.0,
                   "pad_left": 0.25, "fill": [0.0, 0.5, 1.0], "transparent": "none", "corner_radius": 0.2},
-        "regions": {"panes": {"kind": "grid", "edge": {"style": "straight", "amount": 4.8, "scale": 24.0, "seed": 0, "octaves": 6, "persistence": 0.55}, "columns": [1.0, 1.0], "rows": [1.0]}},
+        "regions": {"panes": {"kind": "grid", "fit": null, "edge": {"style": "straight", "amount": 4.8, "scale": 24.0, "seed": 0, "octaves": 6, "persistence": 0.55}, "columns": [1.0, 1.0], "rows": [1.0]}},
     });
     assert_eq!(serde_json::to_value(&recipe).ok(), Some(written.clone()));
     assert_eq!(read(&written).ok(), Some(recipe));

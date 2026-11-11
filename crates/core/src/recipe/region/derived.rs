@@ -92,7 +92,6 @@ impl Default for Pick {
 pub struct Subject {
     /// The name of a partition: the subject is found inside each of its pieces separately and the finds are united,
     /// so small things a whole-picture search misses are found. None: the subject of the whole picture.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub per: Option<String>,
     /// How much of its surroundings the finder sees round a piece, as a share of the piece's own size added on each
     /// side, 0 to 1; the view is clipped to the picture. Only the piece's own pixels count. Only matters with `per`.

@@ -39,7 +39,6 @@ from . import native, registry
 from .framing import Framing
 from .params import (
     Drive,
-    EffectParams,
     ValidatedModel,
     arrays_as_values,
     bounds,
@@ -47,6 +46,7 @@ from .params import (
     picture_fields,
     unit_of,
 )
+from .pieces import plain
 from .regions import Kind
 from .values import BlendMode, Lut, Picture
 
@@ -360,7 +360,7 @@ def recipe_dict(recipe: "Recipe", hold: Hold) -> dict[str, Any]:
         if (value := getattr(recipe, key)) is not None:
             document[key] = value
     if recipe.frame != Framing():
-        document["frame"] = recipe.frame.model_dump()
+        document["frame"] = plain(recipe.frame)
     if recipe.regions:
         document["regions"] = {name: _region(region) for name, region in recipe.regions.items()}
     return document
@@ -407,7 +407,7 @@ def _region(region: Kind) -> dict[str, Any]:
     """A region as the core reads it: its fields and its `kind`, the class's name in snake case (`LinearGradient` is
     `linear_gradient`)."""
     kind = re.sub(r"(?<!^)(?=[A-Z])", "_", type(region).__name__).lower()
-    return {"kind": kind, **region.model_dump()}
+    return {"kind": kind, **plain(region)}
 
 
 def _is_colour(value: object) -> bool:
@@ -421,7 +421,7 @@ def _value(value: object, hold: Hold) -> object:
     if isinstance(value, Picture | Lut):
         return hold(value)
     if isinstance(value, Drive):
-        return value.model_dump()
+        return plain(value)
     if isinstance(value, Mapping):
         return {key: _value(item, hold) for key, item in value.items()}
     if isinstance(value, list | tuple):
@@ -452,7 +452,7 @@ def _as_drive(effect: str, name: str, value: Any) -> Any:
         return value
     try:
         return Drive(**value)
-    except RecipeError as error:
+    except (RecipeError, TypeError) as error:  # a key the drive lacks or one it needs is a TypeError
         raise RecipeError(f"effect {effect!r}: `{name}`: {error}") from None
 
 
@@ -743,13 +743,13 @@ def _set_effect_step(step: Step, put: Mapping[str, Any]) -> Step:
         else:
             params[rest] = value
     for name, parts in ends.items():
-        params[name] = Drive(**{**params[name].model_dump(), **parts})
+        params[name] = Drive(**{**plain(params[name]), **parts})
     return step.replace(**params, opacity=opacity)
 
 
-def _set_numbers[M: EffectParams](model: M, put: Mapping[str, Any]) -> M:
+def _set_numbers[M](model: M, put: Mapping[str, Any]) -> M:
     """`model` (a region kind or the framing) with the numbers `put` set; a new model, checked afresh."""
-    return type(model)(**{**model.model_dump(), **put})
+    return type(model)(**{**plain(model), **put})
 
 
 def _refuses(recipe: Recipe, target: tuple, rest: str, value: Any) -> bool:

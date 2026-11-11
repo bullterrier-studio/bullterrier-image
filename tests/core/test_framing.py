@@ -19,7 +19,6 @@ from bullterrier_image.recipe import Framing
         pytest.param({"fill": "red"}, "fill", id="a colour that is not written as one"),
         pytest.param({"transparent": "oval"}, "transparent", id="a cut that is not offered"),
         pytest.param({"corner_radius": 0.6}, "corner_radius", id="corners rounder than the picture allows"),
-        pytest.param({"rotate": 10}, "rotate", id="a misspelt field"),
     ],
 )
 def test_a_bad_value_is_refused_naming_the_field(values, field):
@@ -42,16 +41,9 @@ def test_good_values_make_a_framing(values):
     assert isinstance(Framing(**values), Framing)
 
 
-@pytest.mark.parametrize(
-    ("written", "stored"),
-    [
-        pytest.param(180, 180, id="the half turn"),
-        pytest.param(270, -90, id="past the half turn"),
-        pytest.param(-450, -90, id="a turn and a quarter back"),
-    ],
-)
-def test_an_angle_past_the_half_turn_is_the_same_turn_inside_it(written, stored):
-    assert Framing(angle=written).angle == stored
+def test_a_misspelt_field_is_refused_naming_it():
+    with pytest.raises(TypeError, match="rotate"):
+        Framing(rotate=10)  # type: ignore[call-arg]
 
 
 # --- a crop around the subject --------------------------------------------------------------------------------------

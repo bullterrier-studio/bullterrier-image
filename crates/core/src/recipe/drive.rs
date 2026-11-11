@@ -65,6 +65,18 @@ impl Drive {
         }
     }
 
+    /// The drive the JSON object `value` writes (`by`, `start`, `end` and optionally `levels`, 2 to 16), or what is wrong
+    /// with it. The rules that need the parameter or the recipe (a range, a field that exists) are the recipe's.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] naming the key and the rule.
+    pub fn from_json(value: &Value) -> Result<Self, Error> {
+        let table = value
+            .as_object()
+            .ok_or_else(|| Error::Recipe("a drive is a table with `by`, `start`, `end` and `levels`".to_owned()))?;
+        Self::read(table).map_err(|problem| Error::Recipe(format!("drive: {problem}")))
+    }
+
     /// The drive a table writes, or what is wrong with it.
     pub(crate) fn read(table: &Map<String, Value>) -> Result<Self, String> {
         if let Some(key) = table

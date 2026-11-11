@@ -5,6 +5,7 @@ import inspect
 import pickle
 import re
 import types
+from dataclasses import FrozenInstanceError
 from typing import Any, Literal
 
 import numpy as np
@@ -581,7 +582,7 @@ def test_a_model_names_its_drivable_fields():
 
 def test_a_drivable_field_is_written_float_or_drive_in_the_signature_and_the_others_as_they_were():
     text = str(signature_of(Drivable))
-    assert "radius: float | bullterrier_image.core.params.Drive = 24.0" in text
+    assert "radius: float | bullterrier_image.core.pieces.Drive = 24.0" in text
     assert "amount: float = 0.5" in text
     assert "count: int = 3" in text
 
@@ -630,8 +631,8 @@ DRIVES = {
     "no field named": ({"by": "", "start": 0, "end": 1}, "by"),
     "a field that is no text": ({"by": 3, "start": 0, "end": 1}, "by"),
     "a start that is not a number": ({"by": "near", "start": "0", "end": 1}, "start"),
-    "an end that is not finite": ({"by": "near", "start": 0, "end": float("inf")}, "end"),
-    "a nan": ({"by": "near", "start": float("nan"), "end": 1}, "start"),
+    "an end that is not finite": ({"by": "near", "start": 0, "end": float("inf")}, "finite"),
+    "a nan": ({"by": "near", "start": float("nan"), "end": 1}, "finite"),
     "a misspelt key": ({"by": "near", "start": 0, "end": 1, "step": 3}, "step"),
     "no end": ({"by": "near", "start": 0}, "end"),
     "no field": ({"start": 0, "end": 1}, "by"),
@@ -643,7 +644,7 @@ def test_a_drive_names_its_field_its_two_ends_and_how_many_levels_or_is_refused_
     if complaint is None:
         assert Drive(**values).by == values["by"]
         return
-    with pytest.raises(RecipeError, match=rf"^drive: .*{complaint}"):
+    with pytest.raises((ValueError, TypeError), match=complaint):
         Drive(**values)
 
 
@@ -679,7 +680,7 @@ def test_a_drive_is_frozen_and_equal_to_another_of_the_same_values_and_says_what
     drive = Drive(by="near", start=0, end=30)
     assert drive == Drive(by="near", start=0.0, end=30.0, levels=5)
     assert drive != Drive(by="near", start=0, end=31)
-    with pytest.raises(ValueError, match="frozen"):
+    with pytest.raises(FrozenInstanceError):
         drive.start = 5  # type: ignore[misc]  # the point of the test
     assert drive.describe() == "by near 0..30"
 

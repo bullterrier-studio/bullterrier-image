@@ -151,7 +151,7 @@ Dropped: `cellular_automata` (noisy specks, little value).
 These are settings of the recipe's `[frame]` table, not effects (see "Size changes frame the photo before the steps" in
 the [design decisions](design-decisions.md)): framing runs before the first step, on the photo and the subject matte
 together, always in the order flip, rotate, crop, pad, size; transparency is cut after the last step. Lengths are shares
-of the picture, so a look does not depend on the resolution. `Framing.documentation()` lists every field.
+of the picture, so a look does not depend on the resolution. `help(Framing)` lists every field.
 
 | Setting | What it does | Example |
 | --- | --- | --- |

@@ -48,25 +48,28 @@ fn read(region: &Value) -> Result<Region, String> {
 #[test]
 fn a_kind_alone_is_read_as_the_defaults_and_written_with_every_field_that_is_set() {
     let rows = [
-        ("grid", json!({"edge": straight(), "columns": [1.0], "rows": [1.0]})),
+        (
+            "grid",
+            json!({"fit": null, "edge": straight(), "columns": [1.0], "rows": [1.0]}),
+        ),
         (
             "shards",
-            json!({"edge": straight(), "count": 12, "jitter": 0.5, "impact": [0.5, 0.5], "focus": 0.0, "seed": 0}),
+            json!({"fit": null, "edge": straight(), "count": 12, "jitter": 0.5, "impact": [0.5, 0.5], "focus": 0.0, "seed": 0, "preset": null}),
         ),
         (
             "cuts",
-            json!({"edge": straight(), "lines": [{"x": 0.5, "y": 0.5, "angle": 0.0}]}),
+            json!({"fit": null, "edge": straight(), "lines": [{"x": 0.5, "y": 0.5, "angle": 0.0}]}),
         ),
         (
             "path",
-            json!({"edge": straight(), "d": "M 0 0 H 1 V 1 H 0 Z", "samples": 4}),
+            json!({"fit": null, "edge": straight(), "d": "M 0 0 H 1 V 1 H 0 Z", "samples": 4}),
         ),
         (
             "svg",
-            json!({"edge": straight(), "file": "", "max_shapes": 1000, "max_kilobytes": 1024}),
+            json!({"fit": null, "edge": straight(), "file": "", "max_shapes": 1000, "max_kilobytes": 1024}),
         ),
         ("pick", json!({"of": "", "pieces": [0]})),
-        ("subject", json!({"context": 0.25, "threshold": 0.9})),
+        ("subject", json!({"per": null, "context": 0.25, "threshold": 0.9})),
         ("band", json!({"of": "", "low": 0.5, "high": 1.0, "feather": 0.1})),
         ("bands", json!({"of": "", "count": 3})),
         ("combine", json!({"op": "multiply", "of": ["", ""]})),

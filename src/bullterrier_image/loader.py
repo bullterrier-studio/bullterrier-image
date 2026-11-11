@@ -92,7 +92,7 @@ A parameter that is a colour lookup table (`file` of `lut`) is written the same 
 relative to the recipe file's folder; it is read once at load, and a file that is missing, 1D or malformed fails there
 with a `LutError` naming the file, its line, the step and the parameter.
 
-The `[frame]` table holds the fields of `Framing` (`Framing.documentation()` lists them with their units and ranges):
+The `[frame]` table holds the fields of `Framing` (`help(Framing)` lists them with their units and ranges):
 `flip`, `angle` (with `fit` and `resample`), `aspect` (with `anchor` and `margin`), `pad_top`, `pad_right`, `pad_bottom`
 and `pad_left` (with `fill`), applied to the photo and the subject map in that order, before the first step and
 before `size`; and `transparent` (with `corner_radius`), applied after the last step. The transparency lives in the
@@ -211,9 +211,10 @@ def load_recipe(path: str | Path) -> Recipe:
         fields = dict(table)
         kind = fields.pop("kind")
         try:
-            regions[name] = _KINDS[kind].parse(fields, f"region {name!r}")
-        except RecipeError as error:
-            raise _located(error, named) from None
+            regions[name] = _KINDS[kind](**fields)
+        except RecipeError as error:  # the core names the kind; the file names the region
+            problem = str(error).removeprefix(f"region '{kind}': ")
+            raise _located(RecipeError(f"region {name!r}: {problem}"), named) from None
     try:
         frame = Framing(**read.get("frame", {}))
     except RecipeError as error:

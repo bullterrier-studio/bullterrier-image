@@ -171,11 +171,21 @@ impl Frame {
         self.anchor == Anchor::Subject || self.transparent == Transparent::Background
     }
 
+    /// The frame the JSON object `value` writes, every number checked, or what is wrong, naming the field.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] naming `frame`, the field and the rule.
+    pub fn from_json(value: Value) -> Result<Self, Error> {
+        let frame: Self = super::read(value).map_err(|message| Error::Recipe(format!("frame: {message}")))?;
+        frame.check()?;
+        Ok(frame)
+    }
+
     /// This frame if every number is within its range, else the first that is not.
     ///
     /// # Errors
     /// [`Error::Recipe`] naming the field (`frame.pad_top`), the value and the rule.
-    pub(super) fn check(&self) -> Result<(), Error> {
+    pub fn check(&self) -> Result<(), Error> {
         finite("angle", self.angle)?;
         if let Some(aspect) = self.aspect {
             within("aspect", aspect, 0.1, 10.0)?;

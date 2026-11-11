@@ -8,6 +8,7 @@ shape or its format version must be refused by the core too.
 """
 
 import json
+from dataclasses import fields
 from pathlib import Path
 from typing import Any, get_args
 
@@ -16,6 +17,7 @@ import pytest
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core is compared with Python's models
 from bullterrier_image.core import regions, registry
 from bullterrier_image.core.framing import Framing
+from bullterrier_image.core.pieces import plain as dumped
 from bullterrier_image.core.registry import CATEGORIES, INPUTS, STEP_KEYS
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.core.values import BlendMode, Lut
@@ -225,7 +227,7 @@ def python_answer(effect: str, given: dict) -> dict | None:
     """The complete parameters Python's model makes of `given`, or None when it refuses them."""
     try:
         values = registry.get(effect).validate(given).model_dump()
-    except ValueError:  # RecipeError, which is one
+    except (ValueError, TypeError):  # RecipeError, which is one; an unknown keyword is a TypeError
         return None
     # the identity table Python's model defaults to is the `null` the core writes
     return {key: None if value == Lut.identity() else value for key, value in values.items()}
@@ -465,7 +467,7 @@ FRAME_ROWS = [
 def python_accepts_frame(frame: dict) -> bool:
     try:
         Framing(**frame)
-    except ValueError:  # RecipeError, which is one
+    except (ValueError, TypeError):  # RecipeError, which is one; an unknown keyword is a TypeError
         return False
     return True
 
@@ -492,7 +494,7 @@ def core_frame(frame: dict) -> dict:
 
 def python_frame(frame: dict) -> dict:
     """The same frame as Python's model dumps it, a colour as a list, like JSON."""
-    return {**Framing(**frame).model_dump(), "fill": list(Framing(**frame).fill)}
+    return plain(dumped(Framing(**frame)))
 
 
 ALL_FIELDS = {
@@ -523,7 +525,7 @@ ALL_FIELDS = {
 )
 def test_the_core_names_the_fields_of_a_frame_and_defaults_them_as_python_does(frame):
     core, python = core_frame(frame), python_frame(frame)
-    assert set(core) == set(Framing.model_fields)
+    assert set(core) == {each.name for each in fields(Framing)}
     assert {name: value for name, value in core.items() if name != "fill"} == {
         name: value for name, value in python.items() if name != "fill"
     }
@@ -672,9 +674,9 @@ def python_accepts_region(kind: str, fields: dict) -> bool:
     """Whether Python makes the region and a recipe that declares it (the recipe's check is the core's, which alone
     reads a path)."""
     try:
-        region = PYTHON_KINDS[kind].parse(fields, "region 'r'")
+        region = PYTHON_KINDS[kind](**fields)
         Recipe([Step("grade")], regions={"p": regions.Grid(), "r": region})
-    except ValueError:  # RecipeError, which is one
+    except (ValueError, TypeError):  # RecipeError, which is one; an unknown keyword is a TypeError
         return False
     return True
 
@@ -733,7 +735,7 @@ def without_none(value: Any) -> Any:
 @pytest.mark.parametrize("kind", PYTHON_KINDS)
 def test_the_core_names_the_fields_of_a_region_and_defaults_them_as_python_does(kind):
     read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": kind}}}), "json")["regions"]["r"]
-    python = without_none(plain(PYTHON_KINDS[kind]().model_dump()))
+    python = plain(dumped(PYTHON_KINDS[kind]()))
     assert read == {"kind": kind, **python}
 
 
@@ -741,7 +743,7 @@ def test_the_core_names_the_fields_of_a_region_and_defaults_them_as_python_does(
 def test_a_shards_preset_expands_when_read_to_the_fields_of_python_s_model_and_a_given_field_wins(preset):
     read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": "shards", "preset": preset}}}), "json")
     expanded = read["regions"]["r"]
-    python = without_none(plain(regions.Shards.parse({"preset": preset}, "region 'r'").model_dump()))
+    python = plain(dumped(regions.Shards(preset=preset)))
     assert {key: value for key, value in expanded.items() if key != "kind"} == python
     given = _core.read_recipe(
         json.dumps({"steps": [], "regions": {"r": {"kind": "shards", "preset": preset, "count": 7}}}), "json"
@@ -751,7 +753,9 @@ def test_a_shards_preset_expands_when_read_to_the_fields_of_python_s_model_and_a
 
 def test_a_count_of_shares_is_the_same_list_in_the_core_and_in_python():
     read = _core.read_recipe(json.dumps({"steps": [], "regions": {"r": {"kind": "grid", "columns": 3}}}), "json")
-    assert read["regions"]["r"]["columns"] == list(regions.Grid(columns=3).columns) == [1.0, 1.0, 1.0]
+    held = regions.Grid(columns=3).columns
+    assert isinstance(held, tuple)
+    assert read["regions"]["r"]["columns"] == list(held) == [1.0, 1.0, 1.0]
 
 
 # --- references: what a name must name, in Python's checks and the core's ---------------------------------------------
@@ -827,7 +831,7 @@ def python_accepts_file(tmp_path, text: str) -> bool:
     path.write_text(text, encoding="utf-8")
     try:
         load_recipe(path)
-    except ValueError:  # RecipeError, which is one
+    except (ValueError, TypeError):  # RecipeError, which is one; an unknown keyword is a TypeError
         return False
     return True
 

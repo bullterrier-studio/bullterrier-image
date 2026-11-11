@@ -65,6 +65,7 @@ from pydantic.json_schema import DEFAULT_REF_TEMPLATE, GenerateJsonSchema, JsonS
 from bullterrier_image.errors import RecipeError
 
 from . import native
+from .pieces import Drive
 from .types import Color as ColorForms
 from .values import Color, FieldName, Lut, LutForms, Picture, PictureForms, ValidatedLut, ValidatedPicture, is_number
 
@@ -216,61 +217,6 @@ class ValidatedModel(BaseModel):
             BaseModel.__init__(self, **values)
         except ValidationError as error:
             raise _invalid(error, owner, type(self).model_fields) from None
-
-
-class Drive(ValidatedModel):
-    """A parameter that varies across the picture: its value at a pixel is `start` where the field `by` is 0 and `end`
-    where it is 1, and in between along `levels` evenly spaced values.
-
-    The effect is rendered once at each of the `levels` values (so a driven step costs `levels` times the effect; a
-    value no pixel needs is not rendered) and each pixel takes the two renders either side of its field value, mixed
-    linearly. A field is a selection of the recipe or a built-in one (`depth`, `light`, `subject`...). Written in a
-    recipe file as the table `radius = { by = "near", start = 0, end = 30 }` and in Python as
-    `Drive(by="near", start=0, end=30)`; only a parameter its effect declares drivable takes one, and `start` and `end`
-    (so every value between) must lie in that parameter's range; a cyclic parameter takes any angle.
-    """
-
-    by: str = Field(
-        min_length=1,
-        description="The name of the field, a selection of the recipe or a built-in one (`depth`, `light`, `subject`, "
-        "`background`): the parameter is `start` where it is 0 and `end` where it is 1.",
-    )
-    start: float = Field(
-        strict=True, allow_inf_nan=False, description="The parameter's value where the field is 0, in its own unit."
-    )
-    end: float = Field(
-        strict=True, allow_inf_nan=False, description="The parameter's value where the field is 1, in its own unit."
-    )
-    levels: int = Field(
-        5,
-        ge=2,
-        le=16,
-        strict=True,
-        json_schema_extra={"unit": "count"},
-        description="How many evenly spaced values between `start` and `end` the effect is rendered at (2 to 16); each "
-        "pixel mixes the two nearest. More is smoother and costs more renders; 2 mixes the effect at `start` and at "
-        "`end`.",
-    )
-
-    def __init__(self, /, **values: Any) -> None:
-        """Validate and make the drive from its keys (`by`, `start`, `end`, optionally `levels`); RecipeError naming
-        each missing or bad key and listing the keys when one is unknown."""
-        self._init_checked("drive", **values)
-
-    def value(self, level: int) -> float:
-        """The parameter's value at level `level` (0 is `start`, `levels - 1` is exactly `end`: a parameter at one of
-        its bounds must not miss it by a float rounding)."""
-        if level == self.levels - 1:
-            return self.end
-        return self.start + (self.end - self.start) * level / (self.levels - 1)
-
-    def values(self) -> tuple[float, ...]:
-        """The parameter's value at every level, `start` first."""
-        return tuple(self.value(level) for level in range(self.levels))
-
-    def describe(self) -> str:
-        """A short readable form, e.g. `by near 0..30`."""
-        return f"by {self.by} {self.start:g}..{self.end:g}"
 
 
 class FieldDoc(NamedTuple):

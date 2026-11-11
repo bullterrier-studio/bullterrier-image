@@ -309,7 +309,7 @@ transparent = "circle"            # "background" (the subject), "circle" or "rou
 
 Order is fixed: `flip`, `angle` (with `fit`, `resample`), crop, `pad_*` borders (with `fill`), then `size`. Crop follows the
 subject, so masked step after it still finds the subject. `Recipe(..., frame=Framing(...))` is the same in Python;
-`Framing.documentation()` lists every field with unit and range. Recipe with `transparent` renders to PNG or WebP (RGBA),
+`help(Framing)` lists every field with unit and range. Recipe with `transparent` renders to PNG or WebP (RGBA),
 never JPEG: project exporting it to `jpg` fails before anything renders.
 
 **`bt-image cutout` or `transparent = "background"`?** Both cut the subject out, for different jobs. `bt-image cutout photo.jpg

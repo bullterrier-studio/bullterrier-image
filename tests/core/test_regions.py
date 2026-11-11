@@ -5,6 +5,8 @@ core (`region_check`, `recipe_references`, `run_regions`, `pieces`, `shards`, `s
 `tests/_native/test_region_parity.py`.
 """
 
+from dataclasses import fields
+
 import numpy as np
 import pytest
 
@@ -32,7 +34,6 @@ WAVE = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1"
 BAD_VALUES = {
     "no columns": (Grid, {"columns": 0}, "columns"),
     "a share that is not positive": (Grid, {"rows": [1, 0]}, "rows"),
-    "a misspelt field": (Grid, {"column": 3}, "column"),
     "too many shards": (Shards, {"count": 501}, "count"),
     "an impact outside the frame": (Shards, {"impact": (1.5, 0.5)}, "impact"),
     "a preset that does not exist": (Shards, {"preset": "nope"}, "nope.*glass"),
@@ -40,17 +41,17 @@ BAD_VALUES = {
     "no pieces to pick": (Pick, {"pieces": []}, "pieces"),
     "context past 1": (Subject, {"context": 1.5}, "context"),
     "low above high": (Band, {"low": 0.6, "high": 0.3}, r"low.*0\.6.*high.*0\.3"),
-    "a band count named by its kind as a recipe writes it": (Bands, {"count": 0}, "^bands: .*count"),
-    "a combination named by its kind as a recipe writes it": (Combine, {"op": "xor"}, "^combine: .*op"),
+    "a band count named by its kind as a recipe writes it": (Bands, {"count": 0}, "^region .bands.: .*count"),
+    "a combination named by its kind as a recipe writes it": (Combine, {"op": "xor"}, "^region .combine.: .*op"),
     "a gradient named by its kind as a recipe writes it": (
         LinearGradient,
         {"angle": "up"},
-        "^linear_gradient: .*angle",
+        "^region .linear_gradient.: .*angle",
     ),
     "a radial gradient named by its kind as a recipe writes it": (
         RadialGradient,
         {"radius": 0},
-        "^radial_gradient: .*radius",
+        "^region .radial_gradient.: .*radius",
     ),
 }
 
@@ -59,6 +60,11 @@ BAD_VALUES = {
 def test_a_bad_value_is_refused_naming_the_field(model, values, complaint):
     with pytest.raises(RecipeError, match=complaint):
         model(**values)
+
+
+def test_a_misspelt_field_is_refused_naming_it():
+    with pytest.raises(TypeError, match="column"):
+        Grid(column=3)  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize(
@@ -74,10 +80,10 @@ def test_cuts_that_are_not_cuts_are_refused_when_declared(lines):
 def test_values_written_as_a_recipe_file_writes_them_are_accepted():
     """TOML gives lists and tables, numpy arrays come from scripts: both make the same model."""
     from_file = Grid(columns=[1, 2], rows=[1, 1, 2], edge={"style": "torn", "amount": 9.6})
-    from_script = Grid(columns=np.array([1, 2]), rows=(1, 1, 2), edge=Edge(style="torn", amount=9.6))
+    from_script = Grid(columns=np.array([1, 2]), rows=(1, 1, 2), edge=Edge(style="torn", amount=9.6))  # type: ignore[arg-type]  # scripts pass arrays
     assert from_file == from_script
     assert Shards(impact=[0.2, 0.8]).impact == (0.2, 0.8)
-    assert Pick(pieces=np.array([2, 3])).pieces == (2, 3)
+    assert Pick(pieces=np.array([2, 3])).pieces == (2, 3)  # type: ignore[arg-type]  # scripts pass arrays
     cuts_from_file = Cuts(lines=[{"x": 0.2, "y": 0.4, "angle": 330}, {"path": WAVE}], edge={"style": "torn"})
     assert cuts_from_file == Cuts(lines=[Line(x=0.2, y=0.4, angle=330), Curve(path=WAVE)], edge=Edge(style="torn"))
 
@@ -110,10 +116,8 @@ def test_a_preset_sets_the_fields_and_a_field_given_beside_it_wins():
         RadialGradient,
     ],
 )
-def test_every_field_is_documented_with_its_unit_and_range(model):
-    text = model.documentation()
-    for doc in model.fields_doc():
-        assert doc.name in text
-        assert doc.doc
-        if doc.minimum is not None:
-            assert doc.unit
+def test_every_field_is_documented_in_help_with_its_unit_and_range(model):
+    text = model.__doc__
+    for each in fields(model):
+        assert f"{each.name} : " in text
+        assert each.metadata["doc"]

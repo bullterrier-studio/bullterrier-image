@@ -24,6 +24,30 @@ impl Region {
     /// # Errors
     /// [`Error::Recipe`] naming the region, the field (`edge.amount`), the value and the rule.
     pub(crate) fn check(&self, name: &str, declared: &Regions) -> Result<(), Error> {
+        self.check_shape(name)?;
+        let Self::Pick(pick) = self else { return Ok(()) };
+        let at = Field { region: name };
+        // only an svg has ids, and a render would find that out at the step that uses the pick
+        let id = pick.pieces.iter().find_map(|piece| match piece {
+            Piece::Id(id) => Some(id),
+            Piece::Number(_) => None,
+        });
+        match (id, declared.get(&pick.of)) {
+            (Some(id), found) if !matches!(found, Some(Self::Svg(_))) => Err(at.refuse(&format!(
+                "`pieces` names the id '{id}', but '{}' is not an svg region",
+                pick.of
+            ))),
+            _ => Ok(()),
+        }
+    }
+
+    /// Whether every number of this region, called `name` in its message, lies within its range (see the field's
+    /// documentation): the rules that need no other region. What it names (`of`, `per`, `fit`) and the ids a `Pick` lists are
+    /// not looked up: those are the recipe's.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] naming the region, the field (`edge.amount`), the value and the rule.
+    pub fn check_shape(&self, name: &str) -> Result<(), Error> {
         let at = Field { region: name };
         match self {
             Self::Grid(grid) => {
@@ -83,21 +107,7 @@ impl Region {
                 at.within("max_shapes", svg.max_shapes, 1, 100_000)?;
                 at.within("max_kilobytes", svg.max_kilobytes, 1, 100_000)
             }
-            Self::Pick(pick) => {
-                at.count("pieces", pick.pieces.len(), 1, MOST_PIECES)?;
-                // only an svg has ids, and a render would find that out at the step that uses the pick
-                let id = pick.pieces.iter().find_map(|piece| match piece {
-                    Piece::Id(id) => Some(id),
-                    Piece::Number(_) => None,
-                });
-                match (id, declared.get(&pick.of)) {
-                    (Some(id), found) if !matches!(found, Some(Self::Svg(_))) => Err(at.refuse(&format!(
-                        "`pieces` names the id '{id}', but '{}' is not an svg region",
-                        pick.of
-                    ))),
-                    _ => Ok(()),
-                }
-            }
+            Self::Pick(pick) => at.count("pieces", pick.pieces.len(), 1, MOST_PIECES),
             Self::Subject(subject) => {
                 at.within("context", subject.context, 0, 1)?;
                 at.within("threshold", subject.threshold, 0, 1)

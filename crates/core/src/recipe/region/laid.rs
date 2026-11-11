@@ -115,7 +115,6 @@ pub struct Grid {
     /// The name of a selection (a built-in one or another region): the grid is laid over that selection's bounding box
     /// instead of the whole picture, so its borders are shares of that box (object first: cut the subject, not the
     /// sky). Beyond the box the outer pieces run to the picture's edge. None: the whole picture.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub fit: Option<String>,
     /// How the borders run.
     pub edge: Edge,
@@ -131,7 +130,6 @@ pub struct Grid {
 #[serde(default, deny_unknown_fields)]
 pub struct Shards {
     /// The name of a selection the seeds are scattered inside; none: the whole picture.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub fit: Option<String>,
     /// How the borders run.
     pub edge: Edge,
@@ -152,7 +150,6 @@ pub struct Shards {
     /// The name of a shipped set of these fields (`glass`, `torn`, `stone` or `mosaic`), used for every field not
     /// given beside it (a given `edge` replaces the preset's whole `edge`). None: the defaults. It is laid under the
     /// fields when a recipe is read, which then holds them all: a region built in code names a preset for the record only.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub preset: Option<String>,
 }
 
@@ -258,7 +255,6 @@ impl<'de> Deserialize<'de> for Cut {
 #[serde(default, deny_unknown_fields)]
 pub struct Cuts {
     /// The name of a selection the frame is that selection's bounding box; none: the whole picture.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub fit: Option<String>,
     /// How the borders run.
     pub edge: Edge,
@@ -282,7 +278,6 @@ impl Default for Cuts {
 #[serde(default, deny_unknown_fields)]
 pub struct Path {
     /// The name of a selection the path's frame is the bounding box of; none: the whole picture.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub fit: Option<String>,
     /// How the borders run.
     pub edge: Edge,
@@ -312,7 +307,6 @@ impl Default for Path {
 #[serde(default, deny_unknown_fields)]
 pub struct Svg {
     /// The name of a selection the file is placed in the bounding box of; none: the whole picture.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub fit: Option<String>,
     /// How the borders run.
     pub edge: Edge,

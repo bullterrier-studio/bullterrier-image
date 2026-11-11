@@ -29,7 +29,7 @@ from bullterrier_image.core.steps import Recipe, Step, drives
 from bullterrier_image.core.values import FieldName, Picture
 from bullterrier_image.errors import RecipeError
 from bullterrier_image.loader import load_recipe
-from bullterrier_image.recipe import Band, Curve, Edge, Framing, Given, Line
+from bullterrier_image.recipe import Band, Given
 
 ALL = sorted(registry.describe())
 # What the Rust core runs is held to the same rules by `crates/core/tests/effects_contract.rs`; the tests below that
@@ -504,12 +504,8 @@ def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, 
 # A field is a direction (cyclic degrees, 0 to 360, clockwise from the right), a rotation amount (cyclic, signed
 # -180 to 180, clockwise when positive), a length (px, in design pixels) or a share of something named; the tables
 # below hold every field that breaks the convention by its name, each with the reason. They hold for the parameters of
-# every effect and for the models of the recipe's regions and its frame, by owner: the effect's name, or the model's
-# class name (`Line`, `Edge`, `Framing`...).
-MODELS: dict[str, type[EffectParams]] = {
-    **{name: registry.parameters(name) for name in ALL},
-    **{cls.__name__: cls for cls in (*typing.get_args(Kind), Line, Curve, Edge, Framing)},
-}
+# every effect, by owner: the effect's name.
+MODELS: dict[str, type[EffectParams]] = {name: registry.parameters(name) for name in ALL}
 
 # Degrees fields that are no direction and no rotation: the reason each is none.
 NOT_A_DIRECTION = {
@@ -527,9 +523,7 @@ NOT_A_DIRECTION = {
     ("swirl", "angle"): "how far the centre is turned, an amount of several turns",
 }
 # Fields named `angle` that are how far something is turned, not a direction: the reason each is a rotation.
-ROTATIONS = {
-    ("Framing", "angle"): "how far the photo is turned before the steps, as perspective.rotate turns the picture",
-}
+ROTATIONS: dict[tuple[str, str], str] = {}
 ROTATION_WORDS = {"turn", "rotate", "rotation"}  # a field named so is how far something is turned, not a direction
 DIRECTION_WORDS = {"angle", "direction"}
 
@@ -663,10 +657,6 @@ LENGTHS_AS_SHARES = {
     ("fog", "feather"): "the range of the noise that makes the clouds",
     ("disperse", "flare_span"): "a piece's flight",
     ("disperse", "reach"): "the figure, in the order its pieces leave",
-    ("RadialGradient", "radius"): "the picture's shorter side",
-    ("Band", "feather"): "the field's range of values",
-    ("Framing", "margin"): "the longer side of the subject's box",
-    ("Framing", "corner_radius"): "the picture's shorter side",
 }
 LENGTH_WORDS = {
     "length", "width", "size", "offset", "height", "spacing", "radius", "span", "gap", "cell", "thickness",
