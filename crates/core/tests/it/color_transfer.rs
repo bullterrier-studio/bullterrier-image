@@ -226,3 +226,25 @@ fn transparent_reference_pixels_do_not_count() -> Result<(), Error> {
     assert_close(&transfer(&photo, Some(nothing), &[])?, &photo, 0.0, "no visible pixel");
     Ok(())
 }
+
+#[test]
+fn a_half_transparent_reference_pixel_counts_half_as_much_as_an_opaque_one() -> Result<(), Error> {
+    // a flat photo takes the reference's weighted mean: weights 1 for the opaque pixel, 0.5 for the half-clear one
+    let (opaque, half) = ([0.8, 0.2, 0.2], [0.2, 0.3, 0.7]);
+    let reference = Image::rgba(
+        1,
+        2,
+        &[opaque[0], opaque[1], opaque[2], 1.0, half[0], half[1], half[2], 0.5],
+    )?;
+    let made = transfer(&[0.5; HEIGHT * WIDTH * 3], Some(reference), &[])?;
+    let (from_opaque, from_half) = (oklab(&opaque), oklab(&half));
+    let got = oklab(&made[..3]);
+    for channel in 0..3 {
+        let want = (from_opaque[channel] + 0.5 * from_half[channel]) / 1.5;
+        assert!(
+            (got[channel] - want).abs() < 2e-4,
+            "channel {channel}: {got:?}, wanted {want}"
+        );
+    }
+    Ok(())
+}
