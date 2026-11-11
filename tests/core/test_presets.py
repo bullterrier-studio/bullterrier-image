@@ -4,11 +4,8 @@ throwaway folder here; the shipped presets are checked in `tests/effects/test_co
 
 import pytest
 
-from bullterrier_image.core import registry
 from bullterrier_image.core.presets import read
 from bullterrier_image.errors import RecipeError
-
-MODEL = registry.parameters("gradient_map")
 
 
 def _folder(tmp_path, text):
@@ -22,7 +19,7 @@ def test_presets_are_read_in_file_order_with_their_description_and_parameters(tm
         '[warm]\ndescription = "Brown."\nstops = ["#000", "#fa0"]\n\n'
         '[cold]\ndescription = "Blue."\nshadow_clip = 0.2\n',
     )
-    found = read("gradient_map", MODEL, folder)
+    found = read("gradient_map", folder)
     assert list(found) == ["warm", "cold"]
     assert found["warm"].description == "Brown."
     assert found["warm"].params == {"stops": ["#000", "#fa0"]}  # the description is not a parameter
@@ -30,7 +27,7 @@ def test_presets_are_read_in_file_order_with_their_description_and_parameters(tm
 
 
 def test_an_effect_without_a_file_has_no_presets(tmp_path):
-    assert read("gradient_map", MODEL, tmp_path) == {}
+    assert read("gradient_map", tmp_path) == {}
 
 
 BAD = {
@@ -46,4 +43,4 @@ BAD = {
 @pytest.mark.parametrize(("text", "complaint"), BAD.values(), ids=BAD.keys())
 def test_a_preset_that_is_not_complete_and_valid_is_refused_naming_it_and_its_owner(tmp_path, text, complaint):
     with pytest.raises(RecipeError, match=rf"preset 'warm' of 'gradient_map'.*{complaint}"):
-        read("gradient_map", MODEL, _folder(tmp_path, text))
+        read("gradient_map", _folder(tmp_path, text))

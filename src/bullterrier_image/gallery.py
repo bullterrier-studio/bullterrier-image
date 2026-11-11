@@ -21,7 +21,7 @@ from typing import NamedTuple
 import numpy as np
 
 from . import fx, imageio
-from .core import registry
+from .core import parameters, registry
 from .core.bridge import maps_needed
 from .errors import ProjectError
 from .finding.depth import depth_map
@@ -355,7 +355,7 @@ def _category_page(category: str, names: list[str]) -> str:
 
 def _row(name: str) -> str:
     # what a recipe sets: the parameters, not the image or `subject`, which the recipe supplies
-    docs = registry.parameters(name).fields_doc()
+    docs = parameters.fields_doc(registry.parameters(name))
     shown = [f"`{doc.name}={doc.default!r}`" for doc in docs if not doc.advanced]
     if hidden := sum(doc.advanced for doc in docs):
         shown.append(f"+{hidden} advanced")
@@ -377,7 +377,7 @@ def _parameter_table(name: str) -> list[str]:
     """The lines of an effect's parameter table (name, type, unit, range, default, description), under a heading of its
     own; the advanced parameters follow in a collapsed block of the same form, then the opacity of its steps if it is
     not 1, then the effect's presets."""
-    docs = registry.parameters(name).fields_doc()
+    docs = parameters.fields_doc(registry.parameters(name))
     head = ["| Parameter | Type | Unit | Range | Default | Description |", "| --- | --- | --- | --- | --- | --- |"]
 
     def rows(advanced: bool) -> list[str]:

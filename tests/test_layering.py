@@ -35,8 +35,8 @@ LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-im
 
 LAYERS = "Layers: app > adapters > plugin > core > ops > errors"
 CORE_ORDER = (
-    "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > values|pieces "
-    "> native > types"
+    "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > parameters "
+    "> values|pieces|validated > native > types"
 )
 CONTRACTS = [LAYERS, CORE_ORDER]
 

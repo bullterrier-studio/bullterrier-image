@@ -4,7 +4,8 @@ rules (limits, choices, seeds, sizes, threads) are `crates/core/tests/effects_co
 
 import re
 import typing
-from typing import Literal
+from collections.abc import Mapping
+from typing import Any, Literal
 
 import numpy as np
 import pytest
@@ -12,17 +13,11 @@ import pytest
 from bullterrier_image import fx
 from bullterrier_image import recipe as facade
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the effects the Rust core implements
-from bullterrier_image.core import registry
-from bullterrier_image.core.params import (
-    UNITS,
-    Drive,
-    EffectParams,
-    drivable_fields,
-    field_name_fields,
-    param,
-    picture_fields,
-)
-from bullterrier_image.core.params import signature as signature_of
+from bullterrier_image.core import native, parameters, registry
+from bullterrier_image.core.parameters import field_name_fields, picture_fields
+from bullterrier_image.core.parameters import signature as signature_of
+from bullterrier_image.core.params import EffectParams, param, table_of
+from bullterrier_image.core.pieces import Drive
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step, drives
@@ -127,7 +122,7 @@ def _naming_problems(name: str) -> list[str]:
 
     return [
         f"effect {name!r}: parameter `{parameter}` should be called `{DISCOURAGED[parameter]}`"
-        for parameter in registry.parameters(name).model_fields
+        for parameter in parameters.names(registry.parameters(name))
         if parameter in DISCOURAGED
     ]
 
@@ -173,7 +168,7 @@ def _edge_naming_problems(name: str) -> list[str]:
     decides what lies beyond the picture's edge) under a name other than `edge`."""
     return [
         f"effect {name!r}: field `{field}` chooses an edge rule and should be called `edge`"
-        for field, spec in registry.parameters(name).model_json_schema()["properties"].items()
+        for field, spec in native.schema(name)["properties"].items()
         if field != "edge" and {"reflect", "mirror"} & set(spec.get("enum", ()))
     ]
 
@@ -305,22 +300,18 @@ def _pictures(name: str) -> dict[str, Picture]:
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_parameter_is_described_and_has_a_unit_entry(name):
-    schema = registry.parameters(name).model_json_schema()
-    for field, prop in schema["properties"].items():
+    for field, prop in native.schema(name)["properties"].items():
         assert prop.get("description", "").strip(), f"{name}.{field} has no description"
         assert "unit" in prop, f"{name}.{field} has no unit entry"
-        if prop.get("type") in ("number", "integer"):
-            assert prop["unit"] in UNITS, f"{name}.{field}: unit {prop['unit']!r}"
 
 
 @pytest.mark.parametrize("name", ALL)
 def test_every_effect_takes_its_model_its_keywords_or_nothing(name, photo):
-    small, model = _small(photo), registry.parameters(name)
+    small, table = _small(photo), registry.parameters(name)
     inputs = _inputs(name, small)
-    defaults = {field: info.default for field, info in model.model_fields.items() if field not in inputs}
-    by_model = registry.get(name)(small, model(), **inputs)
-    np.testing.assert_array_equal(registry.get(name)(small, **inputs), by_model)
-    np.testing.assert_array_equal(registry.get(name)(small, **defaults, **inputs), by_model)
+    defaults = {entry["name"]: parameters.default_of(entry) for entry in table["fields"] if entry["name"] not in inputs}
+    by_default = registry.get(name)(small, **inputs)
+    np.testing.assert_array_equal(registry.get(name)(small, **defaults, **inputs), by_default)
 
 
 def _picture_changes_the_background(name: str) -> bool:
@@ -351,12 +342,14 @@ def test_no_drops_leave_the_picture_unchanged_in_a_new_array(photo):
 # --- every drivable parameter: a field may vary it pixel by pixel, the effect itself unchanged ------------------------
 
 # every effect: none registered from Python is drivable now, and the facade must still build and render a core Drive
-DRIVABLE = sorted((name, field) for name in ALL for field in drivable_fields(registry.parameters(name)))
+DRIVABLE = sorted(
+    (name, entry["name"]) for name in ALL for entry in registry.parameters(name)["fields"] if entry["drivable"]
+)
 
 
 def _range(name: str, field: str) -> tuple[float, float]:
     """The documented (least, greatest) of the number `field` of the effect `name`."""
-    doc = next(doc for doc in registry.parameters(name).fields_doc() if doc.name == field)
+    doc = next(doc for doc in parameters.fields_doc(registry.parameters(name)) if doc.name == field)
     assert doc.minimum is not None
     assert doc.maximum is not None
     return doc.minimum, doc.maximum
@@ -505,7 +498,7 @@ def test_a_field_written_in_a_recipe_file_is_the_field_of_the_step(field_probe, 
 # -180 to 180, clockwise when positive), a length (px, in design pixels) or a share of something named; the tables
 # below hold every field that breaks the convention by its name, each with the reason. They hold for the parameters of
 # every effect, by owner: the effect's name.
-MODELS: dict[str, type[EffectParams]] = {name: registry.parameters(name) for name in ALL}
+MODELS: dict[str, Mapping[str, Any]] = {name: registry.parameters(name) for name in ALL}
 
 # Degrees fields that are no direction and no rotation: the reason each is none.
 NOT_A_DIRECTION = {
@@ -528,11 +521,11 @@ ROTATION_WORDS = {"turn", "rotate", "rotation"}  # a field named so is how far s
 DIRECTION_WORDS = {"angle", "direction"}
 
 
-def _degree_problems(name: str, model: type[EffectParams]) -> list[str]:
+def _degree_problems(name: str, model: Mapping[str, Any]) -> list[str]:
     """What is wrong with each degrees field of `model`, owned by `name`: a direction is cyclic 0..360 and a rotation
     cyclic -180..180, each with a doc that says clockwise; any other field must be on `NOT_A_DIRECTION`."""
     problems = []
-    for doc in model.fields_doc():
+    for doc in parameters.fields_doc(model):
         words = set(doc.name.split("_"))
         if doc.unit != "degrees" or (name, doc.name) in NOT_A_DIRECTION:
             continue
@@ -558,7 +551,12 @@ def test_every_direction_is_cyclic_degrees_clockwise_from_the_right_and_every_ro
 
 
 def test_the_direction_tables_name_only_degrees_fields_that_exist():
-    known = {(name, doc.name) for name, model in MODELS.items() for doc in model.fields_doc() if doc.unit == "degrees"}
+    known = {
+        (name, doc.name)
+        for name, model in MODELS.items()
+        for doc in parameters.fields_doc(model)
+        if doc.unit == "degrees"
+    }
     assert (set(NOT_A_DIRECTION) | set(ROTATIONS)) - known == set()
 
 
@@ -631,7 +629,7 @@ DEGREE_PROBES: dict[str, tuple[type[EffectParams], str | None]] = {
 
 @pytest.mark.parametrize(("params", "wanted"), DEGREE_PROBES.values(), ids=DEGREE_PROBES.keys())
 def test_the_direction_check_flags_what_breaks_the_convention_and_passes_what_keeps_it(params, wanted):
-    problems = _degree_problems("probe", params)
+    problems = _degree_problems("probe", table_of(params))
     assert len(problems) == (wanted is not None)
     assert all(wanted in problem for problem in problems if wanted)
 
@@ -665,12 +663,12 @@ LENGTH_WORDS = {
 POSITIONS = {"x", "y", "at", "base"}  # a position is a fraction of each axis, not a length
 
 
-def _length_shares(name: str, model: type[EffectParams]) -> list[tuple[str, str]]:
+def _length_shares(name: str, model: Mapping[str, Any]) -> list[tuple[str, str]]:
     """(owner, field) for each field of `model`, owned by `name`, that is a share of something and either is named for
     a length (the last word of its name, leaving out a trailing x, y, min or max, is a length word) or says in its doc
     that it is a share of the long side (a distance called `amount`, say)."""
     found = []
-    for doc in model.fields_doc():
+    for doc in parameters.fields_doc(model):
         words = [word for word in doc.name.split("_") if word not in {"x", "y", "min", "max"}] or [doc.name]
         named = words[-1] in LENGTH_WORDS and doc.name not in POSITIONS
         if doc.unit == "fraction" and (named or "long side" in doc.doc):
@@ -678,7 +676,7 @@ def _length_shares(name: str, model: type[EffectParams]) -> list[tuple[str, str]
     return found
 
 
-def _length_problems(name: str, model: type[EffectParams]) -> list[str]:
+def _length_problems(name: str, model: Mapping[str, Any]) -> list[str]:
     return [
         f"{where[0]}.{where[1]} is a length in a share: give it in px, or list it in LENGTHS_AS_SHARES"
         for where in _length_shares(name, model)
@@ -738,7 +736,7 @@ LENGTH_PROBES: dict[str, tuple[type[EffectParams], int]] = {
 
 @pytest.mark.parametrize(("params", "problems"), LENGTH_PROBES.values(), ids=LENGTH_PROBES.keys())
 def test_the_length_check_flags_a_length_in_a_share_and_passes_px_positions_and_strengths(params, problems):
-    assert len(_length_problems("probe", params)) == problems
+    assert len(_length_problems("probe", table_of(params))) == problems
 
 
 # --- a Python effect: the one registration path left, through the public plugin interface ---------------------------

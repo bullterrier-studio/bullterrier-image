@@ -6,31 +6,21 @@ Promises:
 - `Picture` and `Lut` are read-only and compare, hash and print by a content digest, never by their arrays; a wrong
   array is a `RecipeError` (`Picture`) or a `LutError` (`Lut`). A `Lut` is the Rust core's table (checked there once,
   shared by every render), a `Picture` holds its pixels.
-- `ValidatedPicture` and `ValidatedLut` are what a `Picture` or `Lut` field is validated as; `PictureForms`, `LutForms`
-  and `ColorForms` (from `types`) are what a caller may write in `fx`.
+- `PictureForms`, `LutForms` and `ColorForms` (from `types`) are what a caller may write in `fx`.
 """
 
 import hashlib
 import os
-import re
 from collections.abc import Sequence
-from typing import Annotated, Literal, Self
+from typing import Literal, NewType, Self
 
 import numpy as np
-from pydantic import BeforeValidator, PlainValidator, StringConstraints, WithJsonSchema
 
 from bullterrier_image._native import _core
 from bullterrier_image.errors import LutError, RecipeError
 
 from . import native
 from .types import Color as ColorForms
-
-_HEX = re.compile(r"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})")
-
-
-def is_number(value: object) -> bool:
-    """A real number as Python or numpy writes it; a bool is not one here."""
-    return isinstance(value, int | float | np.integer | np.floating) and not isinstance(value, bool | np.bool_)
 
 
 def _to_color(value: object) -> tuple[float, float, float]:
@@ -44,23 +34,7 @@ def _to_color(value: object) -> tuple[float, float, float]:
     raise ValueError(f"a colour is '#rrggbb', '#rgb' or three numbers from 0 to 1, got {value!r}")
 
 
-Color = Annotated[
-    tuple[float, float, float],
-    BeforeValidator(_to_color),
-    WithJsonSchema(
-        {
-            "anyOf": [
-                {"type": "string", "pattern": f"^{_HEX.pattern}$"},
-                {
-                    "type": "array",
-                    "items": {"type": "number", "minimum": 0, "maximum": 1},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
-            ]
-        }
-    ),
-]
+Color = tuple[float, float, float]
 """A colour parameter: written '#rrggbb', '#rgb' or as three numbers 0..1; held as three floats 0..1 (red, green,
 blue): `np.asarray(color, np.float32)` is the colour as an array."""
 
@@ -71,7 +45,7 @@ Compositing and Blending Level 1 modes the core implements. The core's `BlendMod
 its names for the models, and `tests/_native/test_recipe_parity.py` holds the two together."""
 
 
-FieldName = Annotated[str, StringConstraints(min_length=1)]
+FieldName = NewType("FieldName", str)
 """A parameter that names a field: the name of a selection (`depth`, `light`, `subject`, `background` or a region the
 recipe declares). The runner builds the named field; the effect receives it as an array under the parameter's name."""
 
@@ -133,39 +107,6 @@ class Picture:
         """`Picture('tex.png', 480x640)`: label, then width x height; never the pixels."""
         return f"Picture({self.label!r}, {self.width}x{self.height})"
 
-
-def _to_picture(value: object) -> Picture:
-    """A `Picture` as it is (validation runs at every apply: no copy), or a colour as a flat picture."""
-    if isinstance(value, Picture):
-        return value
-    try:
-        return Picture.of_color(value)
-    except ValueError:
-        shown = f"an array of shape {value.shape}" if isinstance(value, np.ndarray) else repr(value)[:40]
-        raise ValueError(
-            f"a picture is a Picture or a colour ('#rrggbb', '#rgb' or three numbers 0..1); a path or an array is "
-            f"turned into a Picture by a recipe file or fx, got {shown}"
-        ) from None
-
-
-ValidatedPicture = Annotated[
-    Picture,
-    PlainValidator(_to_picture),
-    WithJsonSchema(
-        {
-            "anyOf": [
-                {"type": "string", "description": "a path, relative to the recipe file, or a colour '#rrggbb'"},
-                {
-                    "type": "array",
-                    "items": {"type": "number", "minimum": 0, "maximum": 1},
-                    "minItems": 3,
-                    "maxItems": 3,
-                },
-            ]
-        }
-    ),
-]
-"""What a `Picture` field is made of: a `Picture` or a colour is accepted (a path or an array only through `loader`)."""
 
 PictureForms = Picture | os.PathLike[str] | np.ndarray | ColorForms
 """A picture as a caller may write it in `fx`: a Picture, a path, an array, or a colour."""
@@ -273,23 +214,6 @@ def core_table(lut: Lut) -> _core.Lut:
     """The core's table of `lut`, which a render or `apply` is given."""
     return lut._core  # noqa: SLF001  (the core layer hands it on)
 
-
-def _to_lut(value: object) -> Lut:
-    """A `Lut` as it is (validation runs at every apply: no copy)."""
-    if isinstance(value, Lut):
-        return value
-    shown = f"an array of shape {value.shape}" if isinstance(value, np.ndarray) else repr(value)[:40]
-    raise ValueError(
-        f"a lookup table is a Lut; a path or an array is turned into a Lut by a recipe file or fx, got {shown}"
-    )
-
-
-ValidatedLut = Annotated[
-    Lut,
-    PlainValidator(_to_lut),
-    WithJsonSchema({"type": "string", "description": "a path to a .cube file, relative to the recipe file"}),
-]
-"""What a `Lut` field is made of: a `Lut` is accepted (a path or an array only through `loader`)."""
 
 LutForms = Lut | os.PathLike[str] | str | np.ndarray
 """A lookup table as a caller may write it in `fx`: a Lut, a path to a `.cube` file, or an (n, n, n, 3) array."""

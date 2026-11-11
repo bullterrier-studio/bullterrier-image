@@ -37,17 +37,10 @@ from bullterrier_image.errors import RecipeError
 
 from . import native, registry
 from .framing import Framing
-from .params import (
-    Drive,
-    ValidatedModel,
-    arrays_as_values,
-    bounds,
-    cyclic_of,
-    picture_fields,
-    unit_of,
-)
-from .pieces import plain
+from .parameters import arrays_as_values, picture_fields
+from .pieces import Drive, plain
 from .regions import Kind
+from .validated import ValidatedModel
 from .values import BlendMode, Lut, Picture
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
@@ -612,13 +605,12 @@ class Recipe(ValidatedModel):
         forms an address may take are listed in `with_values`. Each is described by a `Parameter`: its value now (at its
         default where the recipe does not write it), unit, range and what it does. The core knows the addresses
         (`Recipe::numbers`)."""
-        document, foreign = self._document(), self._foreign()
-        return {found["address"]: _parameter(found) for found in native.numbers(document, foreign)}
+        return {found["address"]: _parameter(found) for found in native.numbers(self._document(), {})}
 
     def parameter(self, address: str) -> Parameter:
         """The number at `address` (see `parameters`; any form an address may take); RecipeError naming the address
         when there is none, with what is valid."""
-        return _parameter(native.locate(self._document(), address, self._foreign())["number"])
+        return _parameter(native.locate(self._document(), address, {})["number"])
 
     def with_values(self, values: Mapping[str, float]) -> "Recipe":
         """A copy of the recipe with each number at an address of `values` set to its value; the recipe itself is left
@@ -630,11 +622,11 @@ class Recipe(ValidatedModel):
         so is an address the recipe does not have
         (listing the valid ones and the nearest), a driven number set by itself (set its `.start`, `.end` or `.levels`)
         and a `.start` of a number that is not driven."""
-        document, foreign = self._document(), self._foreign()
+        document = self._document()
         changes: dict[tuple, dict[str, Any]] = {}
         where: dict[tuple, dict[str, str]] = {}  # the address that set each number
         for address, value in values.items():
-            located = native.locate(document, address, foreign)
+            located = native.locate(document, address, {})
             target, rest = tuple(located["place"]), located["rest"]
             if isinstance(value, np.generic):
                 value = value.item()  # a number from numpy is the Python number it holds
@@ -660,32 +652,6 @@ class Recipe(ValidatedModel):
                     f"{', '.join(repr(address) for address in blamed or where[target].values())}: {error}"
                 ) from None
         return self.replace(steps=steps, frame=frame, regions=regions)
-
-    def _foreign(self) -> dict[str, list[dict[str, Any]]]:
-        """The numbers of the effects this recipe uses that are written in Python, as the core cannot read them from a
-        table of its own: the declaration of each field that has a range."""
-        steps = [look for step in self.steps for look in (step.looks if isinstance(step, Each) else (step,))]
-        written = {step.effect for step in steps if isinstance(step, Step)}
-        foreign: dict[str, list[dict[str, Any]]] = {}
-        for effect in sorted(written):
-            model = registry.parameters(effect)
-            if model._core_effect is not None:  # noqa: SLF001  (the model says which Rust declaration it is)
-                continue
-            foreign[effect] = [
-                {
-                    "name": name,
-                    "unit": unit_of(info) or "",
-                    "doc": info.description or "",
-                    "min": bounds(info)[0],
-                    "max": bounds(info)[1],
-                    "whole": info.annotation is int,
-                    "cyclic": cyclic_of(info),
-                    "default": info.default,
-                }
-                for name, info in model.model_fields.items()
-                if bounds(info)[0] is not None
-            ]
-        return foreign
 
     def _document(self) -> dict[str, Any]:
         """The recipe as the dict the core reads."""

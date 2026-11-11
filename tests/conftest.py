@@ -10,7 +10,6 @@ import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import onnx
@@ -19,7 +18,7 @@ from onnx import TensorProto, helper
 
 from bullterrier_image import BackendUnavailableError
 from bullterrier_image.core import native, registry
-from bullterrier_image.core.params import EffectParams, core_effect, param
+from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect, unregister
 from bullterrier_image.core.values import FieldName, Picture
 
@@ -90,12 +89,8 @@ def empty_registry() -> Iterator[None]:
     finally:
         for name in registry.all_effects():
             unregister(name)
-        for _, fn, category, opacity in real:
-            # an effect the Rust core runs gets its category and opacity from the core
-            declared: dict[str, Any] = (
-                {} if core_effect(fn.params_model) else {"category": category, "opacity": opacity}
-            )
-            effect(params=fn.params_model, **declared)(fn)
+        for _, fn, _, _ in real:
+            registry.register_again(fn)
 
 
 @pytest.fixture

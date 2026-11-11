@@ -117,7 +117,7 @@ from bullterrier_image.errors import BullterrierImageError, ImageReadError, LutE
 from . import imageio
 from .core import native, registry
 from .core.framing import Framing
-from .core.params import arrays_as_values, lut_fields, picture_fields
+from .core.parameters import arrays_as_values, lut_fields, picture_fields
 from .core.regions import (
     Band,
     Bands,

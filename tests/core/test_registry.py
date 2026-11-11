@@ -46,9 +46,8 @@ def gain(throwaway_effects):
 # --- the wrapper ---------------------------------------------------------------------------------------------------
 
 
-def test_a_modelled_effect_can_be_called_with_keywords_a_model_or_nothing(gain):
+def test_a_modelled_effect_can_be_called_with_keywords_or_nothing(gain):
     np.testing.assert_allclose(gain(GREY, gain=2.0, offset=0.1), 0.6, atol=1e-6)  # 0.25 * 2 + 0.1
-    np.testing.assert_allclose(gain(GREY, GainParams(gain=2.0, offset=0.1)), 0.6, atol=1e-6)
     np.testing.assert_array_equal(gain(GREY), GREY)  # the defaults: gain 1, offset 0
     np.testing.assert_allclose(registry.apply("gain_probe", GREY, gain=3.0), 0.75, atol=1e-6)
 
@@ -67,19 +66,6 @@ def test_the_wrapper_holds_the_result_of_any_effect_within_0_to_1(throwaway_effe
     out = probe(GREY, gain=gain_value, offset=offset)
     np.testing.assert_allclose(out, expected, atol=1e-6)
     assert out.dtype == np.float32
-
-
-def test_giving_both_a_model_and_keywords_is_an_error(gain):
-    with pytest.raises(TypeError, match="gain_probe"):
-        gain(GREY, GainParams(gain=2.0), offset=0.1)
-
-
-def test_a_model_of_another_effect_is_an_error(gain):
-    class OtherParams(EffectParams):
-        """Another model."""
-
-    with pytest.raises(TypeError, match="GainParams"):
-        gain(GREY, OtherParams())
 
 
 @pytest.mark.parametrize(
@@ -262,18 +248,12 @@ def test_params_must_be_an_effect_params_model(model, throwaway_effects):
 
 
 @pytest.mark.parametrize("name", ["size_ratio", "opacity"], ids=["an input", "a step key"])
-def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name, throwaway_effects):
+def test_a_parameter_may_not_be_named_like_an_input_or_a_step_key(name):
     field = param(0.5, unit="fraction", min=0, max=1, doc="Not allowed: the recipe supplies it.")
-    clashing = type(
-        "ClashParams", (EffectParams,), {"__doc__": "Claims a name.", "__annotations__": {name: float}, name: field}
-    )
-
-    def clash_probe(rgb, params):
-        return rgb
-
-    with pytest.raises(ValueError, match=rf"clash_probe.*`{name}`"):
-        effect(category="light", params=clashing)(clash_probe)
-    assert "clash_probe" not in registry.describe()
+    with pytest.raises(ValueError, match=rf"ClashParams.*{name}"):
+        type(
+            "ClashParams", (EffectParams,), {"__doc__": "Claims a name.", "__annotations__": {name: float}, name: field}
+        )
 
 
 @pytest.mark.parametrize("opacity", [1.5, -0.1, float("nan"), True, "0.5"])
@@ -299,32 +279,6 @@ def test_an_unknown_category_is_refused_naming_it_and_listing_the_valid_ones(cat
     with pytest.raises(ValueError, match=rf"gain_probe.*{category!r}.*colour, light, texture, .*, utilities"):
         effect(category=category, params=GainParams)(gain_probe)
     assert "gain_probe" not in registry.describe()
-
-
-class CoreGradeParams(EffectParams, core="grade"):
-    pass
-
-
-def probe_for_the_core(rgb: np.ndarray, params: CoreGradeParams) -> np.ndarray:
-    """Stands in for grade."""
-    return rgb
-
-
-@pytest.mark.parametrize("given", [{"category": "colour"}, {"opacity": 0.5}], ids=["category", "opacity"])
-def test_an_effect_the_core_runs_takes_its_category_and_opacity_from_the_core_and_refuses_its_own(
-    given, throwaway_effects
-):
-    def grade(rgb: np.ndarray, params: CoreGradeParams) -> np.ndarray:
-        return rgb
-
-    with pytest.raises(ValueError, match=r"grade.*core.*declares"):
-        effect(params=CoreGradeParams, **given)(grade)
-
-
-def test_an_effect_the_core_runs_is_named_like_its_core_effect(throwaway_effects):
-    with pytest.raises(ValueError, match=r"probe_for_the_core.*'grade'"):
-        effect(params=CoreGradeParams)(probe_for_the_core)
-    assert "probe_for_the_core" not in registry.describe()
 
 
 def test_an_effect_with_a_python_model_needs_a_category(throwaway_effects):
@@ -407,10 +361,9 @@ def test_an_effect_without_a_model_is_refused(throwaway_effects):
 
 
 def test_parameters_and_schema_describe_the_model(gain):
-    assert registry.parameters("gain_probe") is GainParams
-    properties = registry.parameters("gain_probe").model_json_schema()["properties"]
-    assert properties["gain"]["unit"] == "ratio"
-    assert properties["offset"]["description"] == "Added after the gain."
+    fields = {entry["name"]: entry for entry in registry.parameters("gain_probe")["fields"]}
+    assert fields["gain"]["unit"] == "ratio"
+    assert fields["offset"]["meaning"] == "Added after the gain."
 
 
 def test_validate_returns_the_model_or_explains_what_is_wrong(gain):

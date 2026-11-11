@@ -14,7 +14,8 @@ import pytest
 
 from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
-from bullterrier_image.core.params import Drive, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.pieces import Drive
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Recipe, Step, drives, runs
@@ -559,13 +560,12 @@ def test_a_step_named_describes_itself_with_its_name_and_an_each_too(gain):
 def test_a_step_name_is_a_step_key_so_fx_takes_it_and_no_effect_may_have_a_parameter_called_it(gain, throwaway_effects):
     assert fx.gain_probe(gain=2, name="pulse").name == "pulse"
 
-    class Clash(EffectParams):
-        """A parameter called like a step key."""
+    with pytest.raises(ValueError, match=r"name.*step key"):
 
-        name: str = param("x", doc="A name.")
+        class Clash(EffectParams):
+            """A parameter called like a step key."""
 
-    with pytest.raises(ValueError, match=r"`name` is supplied by the recipe"):
-        effect(category="light", params=Clash)(lambda rgb, params: rgb)
+            name: str = param("x", doc="A name.")
 
 
 def rich(**changed: float) -> Recipe:

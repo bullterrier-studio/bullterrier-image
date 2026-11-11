@@ -34,7 +34,6 @@ import inspect
 import os
 import re
 import threading
-import types
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -50,16 +49,9 @@ from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, Un
 from . import looks as look_files
 from . import native
 from . import presets as preset_files
-from .params import (
-    EffectParams,
-    core_effect,
-    field_name_fields,
-    from_checked,
-    lut_fields,
-    picture_fields,
-    signature,
-    table_of,
-)
+from .parameters import default_of, field_name_fields, lut_fields, picture_fields, signature
+from .parameters import names as field_names
+from .params import EffectParams, from_checked, prepare, restore, table_of
 from .presets import Preset
 from .values import Lut, Picture, core_table
 
@@ -108,20 +100,20 @@ def _for_the_core(array: np.ndarray) -> np.ndarray:
     return np.require(array, dtype=np.float32, requirements=["C", "A"])
 
 
-class ModelledEffect[P: EffectParams]:
-    """An effect registered with its parameter model: what `@effect(category=..., params=Model)` returns.
+class ModelledEffect:
+    """An effect registered with its parameter table: what `@effect(category=..., params=Model)` returns.
 
-    Call it like the function it wraps, with the values given in any of three ways, all validated by the model:
-    `bloom(rgb)` (the defaults), `bloom(rgb, radius=30)`, or `bloom(rgb, BloomParams(radius=30))`. Giving both a model
-    and keyword values, or a model of another effect, is a `TypeError`; an unknown or invalid value is a `RecipeError`
-    naming the effect, the field, the constraint and the value. Injected inputs (`partition`, `size_ratio`) are passed
-    by keyword in every form. So is the array of each field parameter (`FieldName`), required: float (h, w) of the
-    picture's size, 0..1, else a `MapNotFoundError` naming the parameter. The result is held within 0..1.
+    Call it like the function it wraps, with the values by keyword, all checked by the core: `bloom(rgb)` (the
+    defaults) or `bloom(rgb, radius=30)`. An unknown or invalid value is a `RecipeError` naming the effect, the field,
+    the constraint and the value. Injected inputs (`partition`, `size_ratio`) are passed by keyword in every form. So is
+    the array of each field parameter (`FieldName`), required: float (h, w) of the picture's size, 0..1, else a
+    `MapNotFoundError` naming the parameter. The result is held within 0..1.
     """
 
     __name__: str  # the effect's name, copied from the wrapped function like its docstring and module
     __qualname__: str  # copied too: with the module, where the effect was defined
-    params_model: type[P]  # the effect's parameter model
+    table: dict[str, Any]  # its parameters, in the parameter format: the core's own, or the plugin class's
+    params_model: type[EffectParams] | None  # a plugin's class (the function receives an instance), none for the core's
     category: str  # its section of the catalogue, one of `CATEGORIES`
     inputs: tuple[str, ...]  # the injected inputs it declares, from `INPUTS`
     opacity: float  # the opacity of a step of this effect that sets none, 0..1 (see `effect`)
@@ -129,7 +121,8 @@ class ModelledEffect[P: EffectParams]:
     def __init__(
         self,
         function: Callable[..., np.ndarray],
-        params_model: type[P],
+        table: dict[str, Any],
+        params_model: type[EffectParams] | None,
         category: str,
         inputs: tuple[str, ...],
         opacity: float,
@@ -137,34 +130,34 @@ class ModelledEffect[P: EffectParams]:
         """Wrap `function(rgb, params, *, inputs...)`; the registry does this, after checking every rule."""
         functools.update_wrapper(self, function)
         self._function = function
-        self.params_model, self.category, self.inputs, self.opacity = params_model, category, inputs, opacity
-        named = field_name_fields(params_model)
+        self.table, self.params_model, self.category, self.inputs, self.opacity = (
+            table,
+            params_model,
+            category,
+            inputs,
+            opacity,
+        )
+        named = field_name_fields(table)
         fields = [
             p.replace(annotation=np.ndarray, default=inspect.Parameter.empty) if p.name in named else p
-            for p in signature(params_model).parameters.values()
+            for p in signature(table).parameters.values()
         ]
         given = [p for p in inspect.signature(function).parameters.values() if p.name in inputs]
         self.__signature__ = inspect.Signature(
-            [
-                inspect.Parameter("rgb", inspect.Parameter.POSITIONAL_ONLY, annotation=np.ndarray),
-                inspect.Parameter("params", inspect.Parameter.POSITIONAL_ONLY, default=None, annotation=params_model),
-                *fields,
-                *given,
-            ],
+            [inspect.Parameter("rgb", inspect.Parameter.POSITIONAL_ONLY, annotation=np.ndarray), *fields, *given],
             return_annotation=np.ndarray,
         )
 
-    def __call__(self, rgb: np.ndarray, params: P | None = None, /, **values: Any) -> np.ndarray:
-        """Run the effect on `rgb` (float32 (h, w, 3) 0..1) with a model, keyword values, or the defaults."""
+    def __call__(self, rgb: np.ndarray, /, **values: Any) -> np.ndarray:
+        """Run the effect on `rgb` (float32 (h, w, 3) 0..1) with keyword values, or the defaults."""
         given = {name: values.pop(name) for name in self.inputs if name in values}
-        for name in field_name_fields(self.params_model):
+        for name in field_name_fields(self.table):
             given[name] = self._field_array(name, rgb, values.pop(name, None))
-        if params is None:
-            params = self.validate(values)
-        elif values:
-            raise TypeError(f"{self.__name__}(): give a {self.params_model.__name__} or keyword values, not both")
-        elif not isinstance(params, self.params_model):
-            raise TypeError(f"{self.__name__}() takes a {self.params_model.__name__}, not a {type(params).__name__}")
+        return self.run(rgb, self.validate(values), **given)
+
+    def run(self, rgb: np.ndarray, params: Any, **given: Any) -> np.ndarray:
+        """Run the effect on `rgb` with `params` as `validate` makes them (or the core has checked and scaled them) and
+        the inputs and field arrays `given`."""
         # every effect gets the contract's picture, float32, C-contiguous and aligned, which the Rust core reads in
         # place: the values were checked where the photo entered (`ops.image.as_image`); only the layout is made here,
         # for the output of a step before (a view, or float64) or a direct call. `np.require` copies only when one of
@@ -190,12 +183,15 @@ class ModelledEffect[P: EffectParams]:
     def fields_named(self, values: Mapping[str, object]) -> dict[str, str]:
         """The field each field parameter names in `values` (parameter name -> value, already validated), else its
         default: `{"field": "light"}`; empty for an effect with no field parameter."""
-        model = self.params_model
-        return {name: str(values.get(name, model.model_fields[name].default)) for name in field_name_fields(model)}
+        defaults = {entry["name"]: default_of(entry) for entry in self.table["fields"]}
+        return {name: str(values.get(name, defaults[name])) for name in field_name_fields(self.table)}
 
-    def validate(self, values: Mapping[str, object]) -> P:
-        """The model for `values` (parameter name -> value); RecipeError naming the effect and every problem."""
-        return self.params_model.parse(values, f"effect {self.__name__!r}")
+    def validate(self, values: Mapping[str, object]) -> Any:
+        """The parameters for `values` (parameter name -> value) as the effect receives them: its class, or for an
+        effect the core runs a dict. RecipeError naming the effect and the first problem."""
+        sent, held = prepare(self.table, values)
+        made = restore(self.table, native.check(self.__name__, sent), held)
+        return made if self.params_model is None else from_checked(self.params_model, made)
 
 
 _EFFECTS: dict[str, ModelledEffect] = {}
@@ -219,17 +215,15 @@ class _Loading:
 _LOADING = _Loading()
 
 
-def effect[P: EffectParams](
-    *, category: str | None = None, params: type[P], opacity: float | None = None
-) -> Callable[[Callable[..., np.ndarray]], ModelledEffect[P]]:
+def effect(
+    *, category: str | None = None, params: type[EffectParams], opacity: float | None = None
+) -> Callable[[Callable[..., np.ndarray]], ModelledEffect]:
     """Decorator: `@effect(category="light", params=BloomParams)` makes `bloom(rgb, params) -> rgb`
     available under its own name to recipes, `fx` and the command line, and returns it as a `ModelledEffect`.
 
     `params` is an `EffectParams` subclass, whose instance the function receives as its second argument.
     `category` (required, one of `CATEGORIES`) is where the effect sits in the catalogue. Keyword-only parameters after
-    the model are injected inputs, each named in `INPUTS` and defaulted. An effect the Rust core runs (its model is
-    `EffectParams, core="x"`) is named like its core effect and takes category and opacity from the core, where its
-    file declares them: giving either here is a `ValueError`.
+    the model are injected inputs, each named in `INPUTS` and defaulted.
     `opacity` (0..1, default 1) is the opacity a step of this effect has when it sets none, in a recipe file, `Step`
     and `fx` alike: an effect that is meant to be mixed in partway (a shadow, rain) says so here, and a step's own
     `opacity` replaces it. `fx` signatures, `documentation` and the catalogue show it.
@@ -242,12 +236,19 @@ def effect[P: EffectParams](
     return lambda fn: _register(fn, category, params, opacity)
 
 
+def register_again(fn: ModelledEffect) -> ModelledEffect:
+    """Register `fn`, an effect that was registered before and removed (`unregister`), again as it was. For tests that
+    empty the registry and put the real effects back."""
+    params = fn.params_model if fn.params_model is not None else fn.table
+    return _register(fn, fn.category, params, fn.opacity)
+
+
 def unregister(name: str) -> None:
     """Remove the effect called `name` (UnknownEffectError if there is none). For tests that register throwaway
     effects."""
     removed = get(name)
     del _EFFECTS[name]
-    if core_effect(removed.params_model) is None:
+    if removed.params_model is not None:
         native.unregister(name)
 
 
@@ -277,8 +278,8 @@ def _not_an_effect(name: str) -> str:
     if name in looks:
         meanings.append(f'a look (load_recipe("{name}"), `bt-image render PHOTO {name}`): {looks[name].description}')
     owners = sorted(
-        (effect for effect, fn in _EFFECTS.items() if name in fn.params_model.model_fields),
-        key=lambda effect: (len(_EFFECTS[effect].params_model.model_fields), effect),  # the narrowest effect first
+        (effect for effect, fn in _EFFECTS.items() if name in field_names(fn.table)),
+        key=lambda effect: (len(field_names(_EFFECTS[effect].table)), effect),  # the narrowest effect first
     )
     if owners:
         meanings.append(f"a parameter of {_some(owners)}")
@@ -326,14 +327,15 @@ def categories() -> dict[str, list[str]]:
     return {c: [name for name, fn in effects.items() if fn.category == c] for c in CATEGORIES}
 
 
-def parameters(name: str) -> type[EffectParams]:
-    """The parameter model of the effect called `name` (KeyError like `get`)."""
-    return get(name).params_model
+def parameters(name: str) -> dict[str, Any]:
+    """The parameter table of the effect called `name`, in the parameter format (KeyError like `get`)."""
+    return get(name).table
 
 
 def presets(name: str) -> dict[str, Preset]:
     """The presets of the effect called `name` by name (empty if it has none; KeyError like `get`)."""
-    return preset_files.read(name, parameters(name))
+    get(name)  # an unknown name is refused here, not read as an effect without presets
+    return preset_files.read(name)
 
 
 def opacity(name: str) -> float:
@@ -366,29 +368,14 @@ def documentation(name: str, *, advanced: bool = True) -> str:
     `advanced=False`, one line counting them), then a "Step opacity" section if a step of it has an opacity other than
     1 by default, then a "Presets" section if it has any. KeyError like `get`. The core writes it for an effect it
     declares; an effect registered from Python is written here, the same way."""
-    fn = get(name)
-    if fn.params_model._core_effect is not None:  # noqa: SLF001  (the model says which Rust declaration it is)
-        return native.documentation(name, advanced=advanced)
-    text = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation(advanced)}"
-    if fn.opacity != 1:
-        text += (
-            f"\n\nStep opacity\n------------\n{fn.opacity:g}: a step of this effect is mixed in at {fn.opacity:g} "
-            "unless it sets its own `opacity`, which replaces this."
-        )
-    if not (found := presets(name)):
-        return text
-    lines = [f"{preset} : {found[preset].description}" for preset in found]
-    return f"{text}\n\nPresets\n-------\n" + "\n".join(lines)
+    get(name)
+    return native.documentation(name, advanced=advanced)
 
 
 def summary(name: str) -> str:
     """The first sentence of the documentation of the effect called `name`, on one line."""
-    fn = get(name)
-    if fn.params_model._core_effect is not None:  # noqa: SLF001  (as in `documentation`)
-        return native.summary(name)
-    text = " ".join((fn.__doc__ or "").split())
-    end = _SENTENCE_END.search(text)
-    return text[: end.end()] if end else text
+    get(name)
+    return native.summary(name)
 
 
 def _load_effect_packages() -> None:
@@ -431,36 +418,36 @@ def _register_core_effects() -> None:
     for name in native.effects(declared=True):
         if name in _EFFECTS:
             continue
-        model = types.new_class(f"{name.title().replace('_', '')}Params", (EffectParams,), {"core": name})
-        run = _core_runner(name, field_name_fields(model))
-        run.__doc__ = model.__doc__
-        _register(run, None, model, None)
+        table = native.params(name)
+        run = _core_runner(name, table)
+        run.__doc__ = table["doc"]
+        _register(run, None, table, None)
 
 
-def _core_runner(name: str, fields: tuple[str, ...]) -> Callable[..., np.ndarray]:
+def _core_runner(name: str, table: dict[str, Any]) -> Callable[..., np.ndarray]:
     """The function of the core effect `name`: it hands the validated parameters to the core, a `Lut` parameter as
     the core's table, which the effect finds in its inputs under the parameter's name (the value is then none), and the
     array of each field parameter in `fields` (keyword-only, as the registry asks of every effect) the same way. An
     effect that declares `size_ratio` takes it as a keyword, 1 outside a recipe; one that declares `partition` takes the
     piece labels (int32 (h, w)) as a keyword, which the core refuses to run without."""
+    fields, luts_of, pictures_of = field_name_fields(table), lut_fields(table), picture_fields(table)
     declared = native.effect(name)["inputs"]
     sized, partitioned = "size_ratio" in declared, "partition" in declared
 
     def run(
         rgb: np.ndarray,
-        params: Any,
+        values: dict[str, Any],
         *,
         size_ratio: float = 1.0,
         partition: np.ndarray | None = None,
         **arrays: np.ndarray,
     ) -> np.ndarray:
-        values = params.model_dump()
-        luts = {field: core_table(values[field]) for field in lut_fields(type(params))}
-        pictures = {field: values[field].pixels for field in picture_fields(type(params)) if values[field] is not None}
+        luts = {field: core_table(values[field]) for field in luts_of}
+        pictures = {field: values[field].pixels for field in pictures_of if values[field] is not None}
         return _core.apply(
             name,
             rgb,
-            values | dict.fromkeys(luts) | dict.fromkeys(picture_fields(type(params))),
+            values | dict.fromkeys(luts) | dict.fromkeys(pictures_of),
             size_ratio=size_ratio,
             partition=partition,
             luts=luts,
@@ -471,7 +458,7 @@ def _core_runner(name: str, fields: tuple[str, ...]) -> Callable[..., np.ndarray
     run.__signature__ = inspect.Signature(  # type: ignore[attr-defined]  # what `_check_shape` reads, in place of `**arrays`
         [
             inspect.Parameter("rgb", inspect.Parameter.POSITIONAL_OR_KEYWORD),
-            inspect.Parameter("params", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+            inspect.Parameter("values", inspect.Parameter.POSITIONAL_OR_KEYWORD),
             *(inspect.Parameter(field, inspect.Parameter.KEYWORD_ONLY) for field in fields),
             *([inspect.Parameter("size_ratio", inspect.Parameter.KEYWORD_ONLY, default=1.0)] if sized else []),
             *([inspect.Parameter("partition", inspect.Parameter.KEYWORD_ONLY, default=None)] if partitioned else []),
@@ -512,24 +499,24 @@ def _failure(entry_point: metadata.EntryPoint, error: Exception) -> str:
 
 
 def _register(fn: Any, category: str | None, params: Any, opacity: Any) -> ModelledEffect:
+    """Register `fn` under its name. `params` is a plugin's `EffectParams` class, or the table of an effect the Rust
+    core runs (its category and opacity are then the core's)."""
     name = fn.__name__
-    core = core_effect(params) if isinstance(params, type) and issubclass(params, EffectParams) else None
-    if core is not None:
-        if category is not None or opacity is not None:
-            raise ValueError(
-                f"effect {name!r} is run by the Rust core, which declares its category and opacity: "
-                "leave category= and opacity= out"
-            )
-        if name != core:
-            raise ValueError(f"effect {name!r} is run by the Rust core effect {core!r}: name the function {core!r}")
-        declared = native.effect(core)
-        category, opacity = declared["category"], declared["opacity"]
+    core = isinstance(params, dict)
+    if core:
+        category, opacity = native.effect(name)["category"], native.effect(name)["opacity"]
+        table, model = params, None
     elif category is None:
         raise ValueError(
             f"effect {name!r} needs a category: write @effect(category=...) with one of: {', '.join(CATEGORIES)}"
         )
     elif opacity is None:
         opacity = 1.0
+    if not core:
+        if not (isinstance(params, type) and issubclass(params, EffectParams)):
+            raise ValueError(f"effect {name!r}: params must be an EffectParams subclass, got {params!r}")
+        # the function's docstring documents the effect; the class's, its parameters as a group
+        table, model = {**table_of(params), "doc": inspect.cleandoc(fn.__doc__ or "")}, params
     if category not in CATEGORIES:
         raise ValueError(
             f"effect {name!r} has the unknown category {category!r}: write @effect(category=...) with one of: "
@@ -540,27 +527,28 @@ def _register(fn: Any, category: str | None, params: Any, opacity: Any) -> Model
             f"effect {name!r}: opacity, the default opacity of its steps, must be a number from 0 to 1, got {opacity!r}"
         )
     if isinstance(fn, ModelledEffect):  # registered again (a module reloaded, a test restoring the registry)
-        if params is not fn.params_model:
+        if model is not fn.params_model:
             raise ValueError(
-                f"effect {name!r} has the model {fn.params_model.__name__}, not {getattr(params, '__name__', params)}"
+                f"effect {name!r} has the model {getattr(fn.params_model, '__name__', None)}, not "
+                f"{getattr(params, '__name__', params)}"
             )
         fn.category, fn.opacity = category, opacity
         registered = fn
     else:
-        registered = ModelledEffect(fn, params, category, _check_shape(name, fn, params), opacity)
+        registered = ModelledEffect(fn, table, model, category, _check_shape(name, fn, table), opacity)
     existing = _EFFECTS.get(name)
     if existing is not None and _origin(existing) != _origin(registered):
         raise ValueError(
             f"two effects are called {name!r}: one in {existing.__module__}, another in {registered.__module__}; "
             "rename one"
         )
-    if core is None:
-        _mirror(registered)
+    if model is not None:
+        _mirror(registered, model)
     _EFFECTS[name] = registered
     return registered
 
 
-def _mirror(effect: "ModelledEffect") -> None:
+def _mirror(effect: "ModelledEffect", model: type[EffectParams]) -> None:
     """Make `effect` known to the Rust core, so that a recipe the core runs can use it; replaces the core's copy of an
     earlier registration of the name. The core calls `run` with the parameters as a step wrote them (a Python effect
     describes none to the core) and `size_ratio`, always declared: the wrapper validates and scales them, passes the
@@ -569,10 +557,10 @@ def _mirror(effect: "ModelledEffect") -> None:
     name = effect.__name__
 
     def run(rgb: np.ndarray, params: dict[str, Any], *, size_ratio: float, **inputs: Any) -> np.ndarray:
-        values = from_checked(effect.params_model, _resolved(params))  # the core has checked and scaled them
+        values = from_checked(model, _resolved(params))  # the core has checked and scaled them
         if "size_ratio" in effect.inputs:
             inputs["size_ratio"] = size_ratio
-        result = effect(rgb, values, **inputs)
+        result = effect.run(rgb, values, **inputs)
         if result.shape != rgb.shape:
             raise RuntimeError(f"effect {name!r} changed the image shape {rgb.shape} -> {result.shape}")
         return result
@@ -587,7 +575,7 @@ def _mirror(effect: "ModelledEffect") -> None:
         run,
         inputs=declared,
         fields=effect.fields_named({}),
-        table=table_of(effect.params_model),
+        table=effect.table,
     )
 
 
@@ -665,10 +653,8 @@ def _resolved(value: Any) -> Any:
     return value
 
 
-def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
-    """Check a modelled effect's function and model; returns the inputs it declares."""
-    if not (isinstance(params, type) and issubclass(params, EffectParams)):
-        raise ValueError(f"effect {name!r}: params must be an EffectParams subclass, got {params!r}")
+def _check_shape(name: str, fn: Callable, table: dict[str, Any]) -> tuple[str, ...]:
+    """Check a modelled effect's function against its table; returns the inputs it declares."""
     shape = (
         f"write it as {name}(rgb, params, *, size_ratio=1.0): the image, the model, then keyword-only inputs from "
         f"{INPUTS} and fields"
@@ -677,7 +663,7 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
     positional = [p for p in every if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)]
     if len(positional) != 2 or any(p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD) for p in every):
         raise ValueError(f"effect {name!r}: {shape}")
-    fields = field_name_fields(params)
+    fields = field_name_fields(table)
     declared, taken = [], []
     for parameter in (p for p in every if p.kind is p.KEYWORD_ONLY):
         if parameter.name in fields:
@@ -699,7 +685,7 @@ def _check_shape(name: str, fn: Callable, params: Any) -> tuple[str, ...]:
             f"effect {name!r}: the field parameter `{unused[0]}` names a field the effect must receive: add the "
             f"keyword-only argument `{unused[0]}` after `params`"
         )
-    clash = sorted(set(params.model_fields) & {*INPUTS, *STEP_KEYS})
+    clash = sorted(set(field_names(table)) & {*INPUTS, *STEP_KEYS})
     if clash:
         raise ValueError(
             f"effect {name!r}: `{clash[0]}` is supplied by the recipe (an input or a key of the step), so it cannot be "

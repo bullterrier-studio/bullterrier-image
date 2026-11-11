@@ -84,9 +84,9 @@ Those rules apply here. What follows is image's own, or where it needs a rule di
    `edges`, `colorspace`...). An `ops` module arrives with its first consumer (`vulture` fails on unused code). `ops` is
    internal.
 2. **Presets and looks are data**: a preset is a named parameter set of one effect, `crates/core/data/presets/<effect>.toml`; a look is a multi-step recipe with a `description`, `crates/core/data/looks/<name>.toml`, loaded by name (`load_recipe("crt")`).
-3. **Params are declared once**: in Rust for an effect the core runs, else as a Pydantic model; either way the Pydantic
-   model drives validation, defaults, generated docs (`help(fx.<effect>)`, `bt-image effects`, `docs/effects/`,
-   `fx.pyi`), `fx` signatures and the JSON schema. See "Parameters".
+3. **Params are declared once**: in Rust for an effect the core runs, else as an `EffectParams` class (a plugin's); either way
+   the parameter table (the ecosystem's format) drives validation (the core's), defaults, generated docs (`help(fx.<effect>)`,
+   `bt-image effects`, `docs/effects/`, `fx.pyi`), `fx` signatures and the JSON schema. See "Parameters".
 4. **Open/closed:** adding an effect creates files named for it and modifies none (`tests/test_scaffold.py` proves it). Editing
    the registry, `__init__`, README, `fx.pyi` or `docs/effects/` for a new effect means something is wrong.
 5. **No hidden tunables.** Every value that shapes a result, including library options, is a named, documented parameter in the
@@ -157,12 +157,11 @@ strength is below full declares its steps' default opacity, `@effect(..., opacit
 
 ## Parameters
 
-A Pydantic model per effect: a subclass of `EffectParams` (`bullterrier_image.core.params`; frozen, `extra="forbid"`, strict).
+An effect the core runs has no Python class: its table is the core's. A plugin declares a subclass of `EffectParams` (`bullterrier_image.core.params`; plain, frozen); the class makes its table once, when it is declared, and every caller (`fx`, the loader, the gallery, a step) reads that table, so a plugin's effect looks like a core one.
 Parameter declarations in Rust, the kinds and the Python seam: `docs/parameters.md`; read it before adding or changing a parameter. Binding sentences:
 - An effect the core runs **declares its fields in Rust**, on its public `Params` struct: each field a type, a `///` doc comment and `#[param(default = .., unit = px, min = .., max = .., at_most = other, drivable, advanced, cyclic)]`.
 - The struct's own doc is the model's docstring, a field's doc its help text in Python: plain text, no rustdoc links, a blank `///` line becomes a double space.
-- The Python class is `class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust declaration, a default or bound keeping the literal as written (a whole number stays an `int`).
-- Python's model validates a user's values when a step is made; `Table::check` in Rust is the same rules, compared with Python's by parity tests (`tests/_native`); running an effect trusts its parameters.
+- A user's values are checked by the core (`Table::check`) when a step is made, for a core effect and a plugin alike; Python holds no rule of its own; running an effect trusts its parameters.
 - The copy is not edited: a change is a new version in the ecosystem's format first, then a new copy here.
 - A `picture` parameter (`PictureName`) is a name or path, never a colour, and `usize` counts are kind `int`.
 

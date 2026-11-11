@@ -9,7 +9,7 @@ import pytest
 
 from bullterrier_image.core import bridge, registry
 from bullterrier_image.core.framing import Framing
-from bullterrier_image.core.params import Drive
+from bullterrier_image.core.pieces import Drive
 from bullterrier_image.core.regions import (
     Edge,
     Grid,

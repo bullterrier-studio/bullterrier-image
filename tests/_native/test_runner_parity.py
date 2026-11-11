@@ -8,7 +8,8 @@ import pytest
 
 from bullterrier_image._native import _core  # noqa: PLC2701  architecture: the Rust core's runner is compared with the definitions
 from bullterrier_image.core import bridge, native, registry
-from bullterrier_image.core.params import Drive, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.pieces import Drive
 from bullterrier_image.core.regions import Given, Grid
 from bullterrier_image.core.registry import effect, unregister
 from bullterrier_image.core.steps import Recipe, Step

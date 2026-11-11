@@ -43,8 +43,7 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Literal, Protocol, cast
 
-from .core import registry
-from .core.params import signature as parameter_signature
+from .core import parameters, registry
 from .core.steps import Step
 from .errors import RecipeError
 from .loader import with_files
@@ -96,7 +95,7 @@ def _builder(name: str, function: Callable) -> _Effect:
 
     def build(*args: Any, **values: Any) -> Step:
         if args:
-            first = next(iter(registry.parameters(name).model_fields), "value")
+            first = next(iter(parameters.names(registry.parameters(name))), "value")
             raise TypeError(
                 f"fx.{name}() takes its values by keyword, not by position (got {len(args)} positional): write "
                 f"fx.{name}({first}={args[0]!r})"
@@ -123,7 +122,7 @@ def _signature(name: str) -> inspect.Signature:
     declares them (`effect` is the builder's own name; `opacity` defaults to the effect's own, `registry.opacity`; a
     key that is also an injected input, `partition`, only for an effect that takes it), and `preset` (one of the
     names) if the effect has presets."""
-    signature = parameter_signature(registry.parameters(name))
+    signature = parameters.signature(registry.parameters(name))
     step = Step.model_fields
     defaults = {key: step[key].default for key in step} | {"opacity": registry.opacity(name)}
     keys = [

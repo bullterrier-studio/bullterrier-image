@@ -40,7 +40,7 @@ mod _core {
 
     #[pymodule_export]
     use super::{
-        CoreError, apply, check, documentation, effect, effects, main, params, parse_color, read_recipe,
+        CoreError, apply, check, check_table, documentation, effect, effects, main, params, parse_color, read_recipe,
         read_recipe_source, region_presets, register, schema, shipped_looks, shipped_presets, summary, unregister,
         vocabulary,
     };
@@ -291,7 +291,39 @@ fn check<'py>(py: Python<'py>, effect: &str, params: &Bound<'py, PyDict>) -> PyR
         .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
     let given = params
         .iter()
-        .map(|(key, value)| Ok((key.extract::<String>()?, to_json(&value)?)))
+        .map(|(key, value)| {
+            let key = key.extract::<String>()?;
+            let json = to_json(&value)
+                .map_err(|error| core_error(Error::Recipe(format!("`{key}`: {}", error.value(value.py())))))?;
+            Ok((key, json))
+        })
+        .collect::<PyResult<Map<_, _>>>()?;
+    let checked = table.check(effect, &given).map_err(core_error)?;
+    from_json(py, &Value::Object(checked))
+}
+
+/// The complete parameters for the values `params` under the declaration `table` (a dict in the parameter format), as
+/// `check` gives them for a registered effect: for a model that is not an effect yet. `effect` is the name the message
+/// gives.
+///
+/// `ValueError` if `table` is not a valid declaration; `CoreError` naming `effect`, the parameter, the rule and the value
+/// for the first rule `params` break.
+#[pyfunction]
+fn check_table<'py>(
+    py: Python<'py>,
+    table: &Bound<'py, PyDict>,
+    effect: &str,
+    params: &Bound<'py, PyDict>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let table = Table::from_json(&to_json(table.as_any())?).map_err(core_error)?;
+    let given = params
+        .iter()
+        .map(|(key, value)| {
+            let key = key.extract::<String>()?;
+            let json = to_json(&value)
+                .map_err(|error| core_error(Error::Recipe(format!("`{key}`: {}", error.value(value.py())))))?;
+            Ok((key, json))
+        })
         .collect::<PyResult<Map<_, _>>>()?;
     let checked = table.check(effect, &given).map_err(core_error)?;
     from_json(py, &Value::Object(checked))

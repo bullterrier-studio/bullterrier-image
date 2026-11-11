@@ -32,7 +32,7 @@ from bullterrier_image import (
     run,
     trace,
 )
-from bullterrier_image.core import registry
+from bullterrier_image.core import parameters, registry
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.values import Color, Picture
@@ -391,7 +391,7 @@ def _step_keys(function: ast.FunctionDef) -> dict[str, tuple[str, object]]:
     """A stub function's keyword-only arguments after the effect's parameters: name -> (annotation, default); the stub
     writes both for each."""
     pairs = zip(function.args.kwonlyargs, function.args.kw_defaults, strict=True)
-    fields = registry.parameters(function.name).model_fields
+    fields = parameters.names(registry.parameters(function.name))
     return {
         a.arg: (ast.unparse(a.annotation), ast.literal_eval(d))  # type: ignore[arg-type]
         for a, d in pairs

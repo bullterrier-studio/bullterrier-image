@@ -19,7 +19,8 @@ from bullterrier_image import (
 )
 from bullterrier_image import recipe as facade
 from bullterrier_image.core import bridge
-from bullterrier_image.core.params import Drive, EffectParams, param
+from bullterrier_image.core.params import EffectParams, param
+from bullterrier_image.core.pieces import Drive
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
 from bullterrier_image.imageio import resize

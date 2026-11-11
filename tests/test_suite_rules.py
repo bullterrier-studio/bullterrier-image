@@ -22,10 +22,6 @@ ALLOWED: dict[tuple[str, str], str] = {
         "the contract test checks that every effect the Rust core implements is a registered effect; only the core "
         "can say which it implements"
     ),
-    ("core/test_params.py", "bullterrier_image._native"): (
-        "a model declared in Rust is compared with the table the core reports, for every effect the core implements; "
-        "only the core can say which, and what its structs declare"
-    ),
     ("_native/test_recipe_parity.py", "bullterrier_image._native"): (
         "the extension's checks of parameters and recipe files are compared with Python's models and loader, the oracle"
     ),

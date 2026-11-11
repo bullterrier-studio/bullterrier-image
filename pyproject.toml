@@ -390,6 +390,9 @@ ignore_decorators = [
 ignore_names = [
     # public API a caller uses, which no line of ours does: a `Recipe` sets numbers by address, an `Item` says what happened
     "with_values",
+    "register_again",  # `tests/conftest.py` puts the real effects back after emptying the registry
+    "parse",  # `Step.parse`, `Each.parse` and `Recipe.parse` make one from a dict (docs/python-api.md)
+    "count",  # a field of `Bands` and `Shards`, written to the core by `plain`
     "write_stages",  # `examples/python_api.py` saves the stages of a trace with it
     "status",
     "warnings",
@@ -490,7 +493,7 @@ layers = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > values|pieces > native > types"
+name = "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > parameters > values|pieces|validated > native > types"
 type = "layers"
 containers = ["bullterrier_image.core"]
 exhaustive = true  # a new core module must be placed in a layer here
@@ -501,7 +504,7 @@ exhaustive = true  # a new core module must be placed in a layer here
 # too and ask the core (`native`) for their presets. Each edge points down, so each gets a layer of its own (the framing, the registry, the
 # regions and the finder side by side: none knows another); the bridge runs a recipe in the Rust core, with the finders
 # it is given.
-layers = ["bridge", "steps", "framing | registry | regions | finder", "presets | looks", "params | vocabulary", "values | pieces", "native", "types"]
+layers = ["bridge", "steps", "framing | registry | regions | finder", "presets | looks", "params | vocabulary", "parameters", "values | pieces | validated", "native", "types"]
 # `native` (the extension's entry points, raising the package's exceptions) imports no core module; params and registry call it,
 # and `values` makes the core's lookup table through it.
 

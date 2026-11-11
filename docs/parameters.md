@@ -9,11 +9,9 @@ at_most = other, drivable, advanced, cyclic)]` (`at_most = other`: the number ma
 same unit, as `band_min_height` stays below `band_max_height`; `Table::check` and the Python model both apply it); a choice is a fieldless `#[derive(Choice)]` enum (`default = Variant`). The struct's own
 doc is the model's docstring, a field's doc its help text in Python: plain text, no rustdoc links, a blank `///` line
 becomes a double space. The build refuses a broken declaration, naming the field (an unknown unit is rustc's own
-error; that a choice's doc names every variant is checked when Python builds the model). The Python class is
-`class XParams(EffectParams, core="x")` with an empty body (`# noqa: D101`); the model is built from the Rust
-declaration, a default or bound keeping the literal as written (a whole number stays an `int`). Python's model validates a
-user's values when a step is made; `Table::check` in Rust is the same rules, compared with Python's by parity tests
-(`tests/_native`); running an effect trusts its parameters. Rust kinds: `f32`, `i32`, `u32` (a seed: 0..4294967295), `bool`, `Color`, `Vec<Color>`
+error; that a choice's doc names every variant is checked when Python builds the model). It has no Python class: the table is the Rust declaration as data, a default or bound keeping the literal as written (a
+whole number stays an `int`). A user's values are checked by `Table::check` when a step is made; running an effect trusts
+its parameters. Rust kinds: `f32`, `i32`, `u32` (a seed: 0..4294967295), `bool`, `Color`, `Vec<Color>`
 (`#[param(default = ["#12002b", "#ff2bd6"], min_length = 2, max_length = 8)]`: `min_length` of at least 1 required, `max_length`
 optional, the default lowercase `#rrggbb`; Python sees a `tuple[Color, ...]`), `Option<Color>` (`#[param()]`, no default: none until
 a step gives one, and the `///` doc says what none means; written `nullable`; Python sees `Color | None`), `FieldName`

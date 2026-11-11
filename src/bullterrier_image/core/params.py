@@ -1,4 +1,4 @@
-"""How an effect declares its parameters: a frozen Pydantic model whose every field is described, ranged and defaulted.
+"""How a plugin declares the parameters of an effect: a plain class with every field described, ranged and defaulted.
 
     class BloomParams(EffectParams):
         \"\"\"Bloom around the bright parts of the picture.\"\"\"
@@ -7,90 +7,53 @@
         tint: Color = param("#ffffff", doc="Colour of the halo.")
 
 Promises:
-- A model is checked when its class is made (that is, when the effect module is imported): every field is declared with
-  `param` and has a non-empty description; a number has a unit from `UNITS` and a range (min and max) that holds its
-  default; any other field takes no unit or range. A broken
-  declaration raises `ValueError` naming the model and the field, so it never reaches a recipe.
-- Values are checked when a model is made, strictly, for every kind of field: unknown fields, values of the wrong kind
-  (a bool or a numeric-looking string for a number, a string for a switch, a number for a choice) and values out of
-  range are rejected; a whole number is fine for a decimal field, a list (or numpy array) for a list field. Models are
-  frozen.
-- `ValidatedModel.parse` is the one way callers validate: a mapping in, the model out, or one `RecipeError` (a
-  `ValueError`) naming the owner, each field, the constraint and the value (`describe_error` is its wording). A more
-  specific `RecipeError` raised by a validator (an `UnknownEffectError`) keeps its class when it is the only problem.
-- `EffectParams.signature`, `fields_doc` and `documentation` describe a model for `fx`, `help()`, the catalogue and the
-  command line, in a caller's types (a `Color` is shown as the forms one may write).
+- A class is declared when it is made (when the effect module is imported): its fields become the parameter table of
+  the ecosystem's format (`table_of`), which the core reads and holds to the format's rules (a number has a unit and a
+  range that holds its default, a default must pass its own check...). A broken declaration raises `ValueError` naming
+  the class and the field, so it never reaches a recipe. Every field is declared with `param` and has a non-empty
+  description. The table is the one description every caller reads: `fx`, the catalogue, the command line and the
+  loader see a plugin's effect as they see one the core runs.
+- Values are checked by the core when an instance is made: the rules are the format's, for every kind of field (unknown
+  names, values of the wrong kind, values out of range are refused, a whole number is fine for a decimal field, a
+  list or numpy array for a list field). Instances are frozen, compare and hash by their values.
 - A `Picture` field (a second picture an effect uses: a texture, a logo; named `image` when an effect has one) holds a
   `Picture`, read-only RGBA pixels with a content digest, or none (`Picture | None`, default none: the step leaves the
-  photo as it is); it is given a `Picture` or a colour (a flat picture).
-  Recipe files and `fx` turn a path or an array into a `Picture` before validation (see `loader`).
+  photo as it is); it is given a `Picture` or a colour (a flat picture). Recipe files and `fx` turn a path or an array
+  into a `Picture` before validation (see `loader`).
 - A `FieldName` field (a selection an effect works from: `depth`, `light`, a band of the recipe) holds the name of a
   selection, as a step's `mask` and a `Drive`'s `by` do; the recipe checks the name, the runner builds the field and the
   effect receives its array (see `registry`). It is not a number: it has no address and cannot be driven.
 - A `Lut` field (a 3D colour lookup table, from a `.cube` file) holds a `Lut`, a read-only table with a content digest;
   it must have a default such as `Lut.identity()`. Recipe files and `fx` turn a path or an array into a `Lut` before
   validation (see `loader`).
-- `class XParams(EffectParams, core="x")`, with an empty body, is the model of an effect the Rust core runs: its fields,
-  descriptions, defaults and ranges are the ones its Rust `Params` struct declares (`_core.params("x")`), literals as
-  written (a whole number stays an `int`), and every promise above holds for it. `ValueError` if the core has no such
-  effect. Python validates; the core trusts.
-- `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated,
-  defaulted, in the signature and in the JSON schema (`"advanced"`) like any other.
+- `param(..., advanced=True)` changes only how a field is listed (after the basic ones, or as a count); it is validated
+  and defaulted like any other.
 """
 
-import difflib
 import inspect
-import math
-import textwrap
 import types
 import typing
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Annotated, Any, ClassVar, Literal, NamedTuple, Self, get_args, get_origin
+from collections.abc import Mapping
+from dataclasses import FrozenInstanceError, dataclass
+from typing import Any, ClassVar, Literal, Self, get_args, get_origin
 
-import annotated_types
 import numpy as np
-from pydantic import (
-    AfterValidator,
-    BaseModel,
-    BeforeValidator,
-    ConfigDict,
-    Field,
-    ValidationError,
-    model_validator,
-)
-from pydantic.fields import FieldInfo
-from pydantic.json_schema import DEFAULT_REF_TEMPLATE, GenerateJsonSchema, JsonSchemaMode
 
 from bullterrier_image.errors import RecipeError
 
 from . import native
-from .pieces import Drive
-from .types import Color as ColorForms
-from .values import Color, FieldName, Lut, LutForms, Picture, PictureForms, ValidatedLut, ValidatedPicture, is_number
+from .parameters import default_of
+from .values import FieldName, Lut, Picture
 
-UNITS = (
-    "px",
-    "fraction",
-    "degrees",
-    "stops",
-    "count",
-    "ratio",
-    "cycles",
-    "density",
-)  # also `Unit` in crates/core/src/params.rs
+__all__ = ["EffectParams", "from_checked", "param", "prepare", "restore", "table_of"]
 
-
-def _as_tuple(value: object) -> object:
-    """A list or a 1-d numpy array as the tuple a list field holds (TOML writes lists); anything else unchanged."""
-    if isinstance(value, np.ndarray) and value.ndim == 1:
-        return tuple(value.tolist())
-    return tuple(value) if isinstance(value, list) else value
+_COLOUR = tuple[float, float, float]  # a `Color` without its validation: what a hint says of a colour
+_MISSING = object()
 
 
 @dataclass(frozen=True)
 class _Spec:
-    """What `param` was told, until the model class turns it into a pydantic field (see `EffectParams`)."""
+    """What `param` was told, until the class turns it into a table."""
 
     default: Any
     doc: str
@@ -101,7 +64,9 @@ class _Spec:
     drivable: bool = False
     cyclic: bool = False
     at_most: str | None = None
-    field_kwargs: dict[str, Any] = field(default_factory=dict)
+    min_length: int | None = None
+    max_length: int | None = None
+    min_distinct: int | None = None
 
 
 def param(
@@ -115,632 +80,31 @@ def param(
     drivable: bool = False,
     cyclic: bool = False,
     at_most: str | None = None,
-    **field_kwargs: Any,
+    min_length: int | None = None,
+    max_length: int | None = None,
+    min_distinct: int | None = None,
 ) -> Any:
-    """Declare one field of an `EffectParams` model.
+    """Declare one field of an `EffectParams` class.
 
     default: the value an effect uses when none is given; it must lie in the range. doc: what the field does, its unit
     and range in words, and what raising it does (shown in `help()`, the catalogue and the command line). unit: one of
-    `UNITS`, required for a number, not allowed otherwise. min, max: the documented range, both required and inclusive
-    for a number; not allowed for anything else. advanced: the user would change it to tune the technique rather
-    than to choose the look; it is listed after the basic fields (and left out of short listings) but is settable,
-    validated and in the schema like any other. drivable: a field (see `Drive`) may vary this decimal number pixel by
-    pixel; declare it only where the effect's output changes smoothly with the value. Only a float can be.
+    the format's units, required for a number, not allowed otherwise. min, max: the documented range, both required and
+    inclusive for a number; not allowed for anything else. advanced: the user would change it to tune the technique
+    rather than to choose the look; it is listed after the basic fields (and left out of short listings) but is
+    settable, validated and in the schema like any other. drivable: a field (see `Drive`) may vary this decimal number
+    pixel by pixel; declare it only where the effect's output changes smoothly with the value. Only a float can be.
     cyclic: an angle in degrees whose value and the value a turn (360) further mean the same picture; `min` to `max`
     must be exactly one turn, and a value outside it is stored as the same direction inside it (a value inside, the
-    bounds included, is kept). at_most: the name of another number field of the model, in the same unit, that this
-    one may not exceed (a lowest height below the highest); checked when a model is made, whichever of the two is
-    given. field_kwargs: further pydantic `Field` constraints, e.g. `min_length=2` for a list.
+    bounds included, is kept). at_most: the name of another number field of the class, in the same unit, that this
+    one may not exceed (a lowest height below the highest); checked when a value is made, whichever of the two is
+    given. min_length, max_length: the length of a list of colours or a text; min_distinct: the different characters a
+    text needs.
 
-    The rules are checked when the model class is made; a violation raises `ValueError` naming the model and the field.
+    The rules are checked when the class is made; a violation raises `ValueError` naming the class and the field.
     """
-    return _Spec(default, doc, unit, min, max, advanced, drivable, cyclic, at_most, field_kwargs)
-
-
-def describe_error(error: ValidationError, owner: str, valid: Iterable[str]) -> str:
-    """One sentence for a failed validation: `owner` (e.g. "effect 'bloom'"; "" for none), then each problem with its
-    field, the constraint and the value given. `valid` names the fields, listed when an unknown one was given."""
-    problems = "; ".join(_problem(detail, sorted(valid)) for detail in error.errors())
-    return f"{owner}: {problems}" if owner else problems
-
-
-def _invalid(error: ValidationError, owner: str, valid: Iterable[str]) -> RecipeError:
-    """The `RecipeError` for a failed validation, in the wording of `describe_error`. Pydantic wraps a `ValueError`
-    raised inside a validator; when that is the only problem and it is a more specific `RecipeError` (an unknown effect
-    is also a `KeyError`), the caller gets that class back, so `except UnknownEffectError` works on a `Step` too."""
-    problems = [detail.get("ctx", {}).get("error") for detail in error.errors()]
-    single = problems[0] if len(problems) == 1 else None
-    kind = type(single) if isinstance(single, RecipeError) else RecipeError
-    return kind(describe_error(error, owner, valid))
-
-
-class ValidatedModel(BaseModel):
-    """Base of bullterrier-image's validated values (effect parameters, recipe steps, recipes): frozen, unknown fields
-    refused,
-    and every validation failure reported as one `RecipeError` in the wording of `describe_error`."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    @classmethod
-    def parse(cls, values: Mapping[str, object], owner: str = "") -> Self:
-        """The model for `values` (field name -> value); RecipeError naming `owner` (e.g. "effect 'bloom'"), each bad
-        field, the constraint and the value, and listing the fields when an unknown one was given."""
-        try:
-            return super().model_validate(dict(values))
-        except ValidationError as error:
-            raise _invalid(error, owner, cls.model_fields) from None
-
-    @classmethod
-    def model_validate(cls, obj: Any, **options: Any) -> Self:
-        """pydantic's `model_validate`, its failure a RecipeError as `parse` reports it."""
-        try:
-            return super().model_validate(obj, **options)
-        except ValidationError as error:
-            raise _invalid(error, "", cls.model_fields) from None
-
-    @classmethod
-    def model_validate_json(cls, json_data: str | bytes | bytearray, **options: Any) -> Self:
-        """pydantic's `model_validate_json`, its failure a RecipeError as `parse` reports it."""
-        try:
-            return super().model_validate_json(json_data, **options)
-        except ValidationError as error:
-            raise _invalid(error, "", cls.model_fields) from None
-
-    @classmethod
-    def model_validate_strings(cls, obj: Any, **options: Any) -> Self:
-        """pydantic's `model_validate_strings`, its failure a RecipeError as `parse` reports it."""
-        try:
-            return super().model_validate_strings(obj, **options)
-        except ValidationError as error:
-            raise _invalid(error, "", cls.model_fields) from None
-
-    @classmethod
-    def model_construct(cls, _fields_set: set[str] | None = None, **values: Any) -> Self:  # type: ignore[override]  # mypy reads pydantic's underscore name as private
-        """Refused: pydantic's `model_construct` builds a value without checking it, which nothing may. Make one with
-        its constructor or `model_validate`."""
-        raise RecipeError(
-            f"{cls.__name__}.model_construct() builds a value without checking it: use {cls.__name__}(...) or "
-            f"{cls.__name__}.model_validate(...)"
-        )
-
-    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
-        """A copy with `update` laid over the values, checked as a new value is (pydantic's own copy checks nothing):
-        a bad value is a RecipeError. Without `update` the copy is equal (with `deep`, of copied fields)."""
-        if not update:
-            return super().model_copy(deep=deep)
-        return type(self).model_validate({**dict(self), **update})
-
-    def _init_checked(self, owner: str, /, **values: Any) -> None:
-        """For a subclass's own (positional) constructor: validate `values` into this instance; RecipeError like
-        `parse`."""
-        try:
-            BaseModel.__init__(self, **values)
-        except ValidationError as error:
-            raise _invalid(error, owner, type(self).model_fields) from None
-
-
-class FieldDoc(NamedTuple):
-    """The documentation of one parameter, in parts (see `EffectParams.fields_doc`)."""
-
-    name: str
-    type: str  # in words: "number", "whole number", "colour", "one of 'a', 'b'", "list of colours"...
-    unit: str | None
-    minimum: float | None
-    maximum: float | None
-    default: Any
-    doc: str
-    advanced: bool
-    cyclic: bool  # an angle that wraps: `minimum` to `maximum` is one turn and any real value is accepted
-
-    @property
-    def range(self) -> str:
-        """The documented range in words, e.g. "0 to 500"; empty for a field that is not a number."""
-        if self.minimum is None or self.maximum is None:
-            return ""
-        return f"{_number(self.minimum)} to {_number(self.maximum)}"
-
-
-class _EffectSchema(GenerateJsonSchema):
-    """The JSON schema generator of effect parameters: a field whose default has no JSON form (a `Lut`) shows none."""
-
-    ignored_warning_kinds = {"non-serializable-default"}  # noqa: RUF012  (pydantic reads it, never changes it)
-
-
-class EffectParams(ValidatedModel):
-    """Base class of every effect's parameter model: subclass it and declare each field with `param`.
-
-    A text parameter is taken exactly as given, spaces included (a space can be data, as in a text-art palette).
-    """
-
-    model_config = ConfigDict(validate_default=True)
-
-    _core_effect: ClassVar[str | None] = None  # the Rust core effect this model is declared by (`core="x"`), if any
-
-    @classmethod
-    def model_json_schema(
-        cls,
-        by_alias: bool = True,
-        ref_template: str = DEFAULT_REF_TEMPLATE,
-        schema_generator: type[GenerateJsonSchema] = _EffectSchema,
-        mode: JsonSchemaMode = "validation",
-        **kwargs: Any,
-    ) -> dict[str, Any]:
-        """The JSON schema of the parameters (pydantic's), without a default for a field that cannot show one."""
-        return super().model_json_schema(by_alias, ref_template, schema_generator, mode, **kwargs)
-
-    def __init_subclass__(cls, core: str | None = None, **kwargs: Any) -> None:
-        """Check every field's declaration and turn it into a strict pydantic field.
-
-        This runs before pydantic reads the fields, which is why the field (and, for a list, the type of its items) can
-        depend on the annotation here. `core="grade"` declares the model from the Rust `Params` struct of the effect
-        called so (see `_declare_from_core`) instead of from fields written in the class body.
-        """
-        super().__init_subclass__(**kwargs)
-        if core is not None:
-            _declare_from_core(cls, core)
-            cls._core_effect = core
-        annotations = cls.__annotations__  # this class's own, in definition order
-        for name, annotation in inspect.get_annotations(cls, eval_str=True).items():
-            if name.startswith("_"):  # private attributes are not parameters
-                continue
-            typed, made = _field(cls.__name__, name, annotation, cls.__dict__.get(name, _MISSING))
-            annotations[name] = typed
-            setattr(cls, name, made)
-
-    @classmethod
-    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
-        """Prove that the defaults themselves validate (a default colour of the wrong form, say), and that every
-        `at_most` names another field of the model."""
-        super().__pydantic_init_subclass__(**kwargs)
-        for name, info in cls.model_fields.items():
-            other = _extra(info).get("at_most")
-            if other is not None and (other == name or other not in cls.model_fields):
-                raise ValueError(
-                    f"parameter model {cls.__name__!r}, field `{name}`: at_most names `{other}`, "
-                    "which is not another field"
-                )
-        cls.parse({}, f"the defaults of {cls.__name__!r}")
-
-    @model_validator(mode="after")
-    def _numbers_within_their_limits(self) -> Self:
-        """A number declared `at_most=other` may not exceed `other`: the rule `Table::check` applies to a Rust
-        declaration, refused naming both and their values."""
-        for name, info in type(self).model_fields.items():
-            other = _extra(info).get("at_most")
-            if other is not None and getattr(self, name) > getattr(self, other):
-                raise ValueError(f"`{name}` ({getattr(self, name)}) must not exceed `{other}` ({getattr(self, other)})")
-        return self
-
-    @classmethod
-    def fields_doc(cls) -> tuple[FieldDoc, ...]:
-        """Every field's documentation, in declaration order."""
-        hints = typing.get_type_hints(cls, include_extras=True)
-        docs = []
-        for name, info in cls.model_fields.items():
-            extra = _extra(info)
-            minimum, maximum = bounds(info)
-            text = _type_text(hints[name]) + (" (drivable)" if extra.get("drivable") else "")
-            text += " (cyclic)" if cyclic_of(info) else ""
-            docs.append(
-                FieldDoc(
-                    name,
-                    text,
-                    unit_of(info),
-                    minimum,
-                    maximum,
-                    info.default,
-                    info.description or "",
-                    bool(extra["advanced"]),
-                    cyclic_of(info),
-                )
-            )
-        return tuple(docs)
-
-    @classmethod
-    def documentation(cls, advanced: bool = True) -> str:
-        # Still Python: effects registered from Python, the framing and the regions have no table in the core to format;
-        # an effect the core declares is documented by `documentation::effect` (`registry.documentation`).
-        """A "Parameters" section (numpydoc style) with each basic field's type, unit, range, default and description,
-        then an "Advanced parameters" section of the same form if there are advanced fields. With `advanced=False` those
-        are left out and one line says how many."""
-        sections: dict[bool, list[str]] = {False: [], True: []}
-        for doc in cls.fields_doc():
-            parts = [doc.type]
-            if doc.unit:
-                parts.append(doc.unit)
-            if doc.range:
-                parts.append(doc.range)
-            parts.append(f"default {doc.default!r}")
-            words = " ".join(doc.doc.split())
-            description = textwrap.fill(words, 88, initial_indent="    ", subsequent_indent="    ")
-            sections[doc.advanced].append(f"{doc.name} : {', '.join(parts)}\n{description}")
-        text = "Parameters\n----------\n" + "\n".join(sections[False])
-        if not sections[True]:
-            return text
-        if advanced:
-            return text + "\n\nAdvanced parameters\n-------------------\n" + "\n".join(sections[True])
-        return text + f"\n\n(+{len(sections[True])} advanced)"
-
-
-_MISSING = object()
-_PLAIN_KINDS: dict[str, Any] = {
-    "float": float,
-    "int": int,
-    "bool": bool,
-    "color": Color,
-    "colors": tuple[Color, ...],
-    "lut": Lut,
-    "picture": Picture,
-    "field": FieldName,
-    "text": str,
-}  # the kinds of `Kind` in crates/core/src/params.rs -> their annotation; a "choice" is a `Literal` of its names
-
-
-def _annotation(effect: str, entry: dict[str, Any]) -> Any:
-    """The annotation of the field `entry` of the Rust declaration of `effect`; ValueError if its kind is one the core
-    has and this module has not (a kind added to `Kind` without a line in `_PLAIN_KINDS`). A `nullable` field may also
-    be none."""
-    kind = entry["kind"]
-    if kind == "choice":
-        return Literal[tuple(entry["choices"])]
-    if kind not in _PLAIN_KINDS:
-        raise ValueError(
-            f"the Rust core declares {effect}.{entry['name']} of the kind {kind!r}, which EffectParams cannot build a "
-            f"field from (it knows {', '.join([*_PLAIN_KINDS, 'choice'])})"
-        )
-    annotation = _PLAIN_KINDS[kind]
-    return annotation | None if entry.get("nullable") else annotation
-
-
-def _default(entry: dict[str, Any]) -> Any:
-    """The default of the field `entry`: a list of colours as a tuple, a lookup table (declared as none) as the identity
-    table, else the literal the declaration wrote."""
-    match entry["kind"]:
-        case "colors":
-            return tuple(entry["default"])
-        case "lut":
-            return Lut.identity()
-        case _:
-            return entry["default"]
-
-
-def core_field(effect: str, entry: dict[str, Any]) -> tuple[Any, Any]:
-    """The annotation and the `param` spec of the field `entry` of the Rust declaration of `effect` (one of the `fields`
-    of `_core.params(effect)`), as `class X(EffectParams, core="x")` gives them to the model. A default and a bound are
-    the literal the declaration wrote; a list of colours is a tuple, with the `min_length` (and `max_length`) the
-    declaration gives, and a text its `min_distinct` too. ValueError if its kind is one the core has and this module
-    has not."""
-    annotation = _annotation(effect, entry)
-    # written for a list of colours or a text only
-    lengths = {key: entry[key] for key in ("min_length", "max_length", "min_distinct") if key in entry}
-    spec = param(
-        _default(entry),
-        doc=entry["meaning"],
-        unit=entry["unit"],
-        min=entry["min"],
-        max=entry["max"],
-        advanced=entry["advanced"],
-        drivable=entry["drivable"],
-        cyclic=entry["cyclic"],
-        at_most=entry.get("at_most"),  # written for a limited number only
-        **lengths,
+    return _Spec(
+        default, doc, unit, min, max, advanced, drivable, cyclic, at_most, min_length, max_length, min_distinct
     )
-    return annotation, spec
-
-
-def _declare_from_core(cls: type[EffectParams], effect: str) -> None:
-    """Give `cls` the docstring and the fields (annotations and `param` specs) that the Rust core's `Params` struct of
-    `effect` declares, before pydantic reads them; the checks of `_field` then run on them like on any model. Every
-    default and bound is the literal the declaration wrote, so a whole number stays an `int` and a decimal a `float`.
-    ValueError if the class has fields of its own, or if the core implements no such effect (most often an extension
-    built before the effect's kernel was written: the error says to rebuild)."""
-    own = [name for name in inspect.get_annotations(cls) if not name.startswith("_")]
-    own += [name for name, value in cls.__dict__.items() if isinstance(value, _Spec) and name not in own]
-    if own:
-        raise ValueError(
-            f"parameter model {cls.__name__!r} is declared with core={effect!r} and also has fields of its own "
-            f"({', '.join(own)}): the Rust declaration is the only one"
-        )
-    if effect not in native.effects(declared=True):
-        raise ValueError(
-            f"the Rust core has no effect called {effect!r}: if its kernel is new, rebuild the extension (`uv sync`)"
-        )
-    declared = native.params(effect)
-    cls.__doc__ = declared["doc"]
-    fields = {entry["name"]: core_field(effect, entry) for entry in declared["fields"]}
-    cls.__annotations__ = {name: annotation for name, (annotation, _) in fields.items()}
-    for name, (_, spec) in fields.items():
-        setattr(cls, name, spec)
-
-
-_TURN = 360  # constant: a full turn, in degrees
-
-
-def _into_turn(low: float) -> Callable[[Any], Any]:
-    """A validator that moves a real number outside `low` to `low + 360` into that turn by whole turns and passes
-    anything else (a bool, text, nan, infinity) on for the field's own strict check to refuse."""
-
-    def wrap(value: Any) -> Any:
-        if not is_number(value) or not math.isfinite(value):
-            return value
-        if low <= value <= low + _TURN:
-            return value
-        return low + (value - low) % _TURN
-
-    return wrap
-
-
-def _extra(info: Any) -> dict[str, Any]:
-    """What `param` put in a field's JSON-schema extras (unit, advanced, drivable, cyclic)."""
-    return info.json_schema_extra if isinstance(info.json_schema_extra, dict) else {}
-
-
-def core_effect(model: type[EffectParams]) -> str | None:
-    """The Rust core effect the model is declared by (`core="x"`), if any."""
-    return model._core_effect  # noqa: SLF001  (the model's own, read here beside its definition)
-
-
-def unit_of(info: FieldInfo) -> str | None:
-    """The unit the field `info` (a pydantic `FieldInfo`) was declared with, by `param` or by a `json_schema_extra` of
-    `{"unit": ...}`; None when it has none."""
-    unit = _extra(info).get("unit")
-    return unit if isinstance(unit, str) else None
-
-
-def cyclic_of(info: FieldInfo) -> bool:
-    """Whether the field `info` (a pydantic `FieldInfo`) was declared `cyclic=True` by `param`."""
-    return bool(_extra(info).get("cyclic"))
-
-
-def picture_fields(model: type[EffectParams]) -> frozenset[str]:
-    """The fields of `model` that hold a `Picture` (or none): a recipe file writes a path for one, `fx` takes a path or
-    an array."""
-    hints = typing.get_type_hints(model)
-    return frozenset(name for name in model.model_fields if Picture in _scalar(hints[name]))
-
-
-def field_name_fields(model: type[EffectParams]) -> tuple[str, ...]:
-    """The fields of `model` that name a field (`FieldName`), in declaration order: the effect receives the array of
-    each."""
-    hints = typing.get_type_hints(model, include_extras=True)
-    return tuple(name for name in model.model_fields if hints[name] == FieldName)
-
-
-def lut_fields(model: type[EffectParams]) -> frozenset[str]:
-    """The fields of `model` that hold a `Lut`: a recipe file writes a path to a `.cube` file, `fx` a path or an
-    array."""
-    hints = typing.get_type_hints(model)
-    return frozenset(name for name in model.model_fields if hints[name] is Lut)
-
-
-def arrays_as_values(model: type[EffectParams], values: Mapping[str, Any]) -> dict[str, Any]:
-    """`values` (parameters of `model`) with each array given for a picture parameter (3-d) or a lookup table parameter
-    turned into the `Picture` or `Lut` it holds; everything else passes unchanged (a path stays a path: reading files
-    is the loader's, `fx`'s job). The one place an array becomes a value, for `fx` and `Step.replace` alike."""
-    made = dict(values)
-    for key in picture_fields(model) & values.keys():
-        if isinstance(values[key], np.ndarray) and values[key].ndim == 3:  # anything else is `Picture`'s to refuse
-            made[key] = Picture(values[key])
-    for key in lut_fields(model) & values.keys():
-        if isinstance(values[key], np.ndarray):
-            made[key] = Lut(values[key])
-    return made
-
-
-def drivable_fields(model: type[EffectParams]) -> frozenset[str]:
-    """The fields of `model` a `Drive` may vary across the picture (declared with `param(..., drivable=True)`)."""
-    return frozenset(name for name, info in model.model_fields.items() if _extra(info).get("drivable"))
-
-
-def signature(model: type[EffectParams]) -> inspect.Signature:
-    """The fields of `model` as a call signature, in declaration order: each a keyword-only parameter with its default
-    and the type a caller writes (a `Color` as `str | list[float] | tuple[float, float, float]`; a drivable field as
-    `float | Drive`)."""
-    hints = typing.get_type_hints(model, include_extras=True)
-    drivable = drivable_fields(model)
-    return inspect.Signature(
-        [
-            inspect.Parameter(
-                name,
-                inspect.Parameter.KEYWORD_ONLY,
-                default=info.default,
-                annotation=_public(hints[name]) | Drive if name in drivable else _public(hints[name]),
-            )
-            for name, info in model.model_fields.items()
-        ]
-    )
-
-
-_COLOUR = tuple[float, float, float]  # a `Color` without its validation: what a hint says of a colour
-
-
-def _hex(colour: Any) -> str:
-    """A colour default (`'#rrggbb'`, `'#rgb'` or three numbers) as the `'#rrggbb'` text the parameter format writes."""
-    channels = native.parse_color(colour if isinstance(colour, str) else list(colour))
-    if channels is None:
-        raise ValueError(f"{colour!r} is not a colour")
-    return "#" + "".join(f"{round(channel * 255):02x}" for channel in channels)  # constant: 8-bit levels
-
-
-def table_of(model: type[EffectParams]) -> dict[str, Any]:
-    """The parameters of `model` in the ecosystem's parameter format (the dict `_core.register(.., table=)` takes):
-    `{"doc": ..., "fields": [...]}`, each field with its kind, meaning, default, unit, bounds and flags. ValueError
-    naming the field when its type is not one of the format's kinds."""
-    hints, named = typing.get_type_hints(model), typing.get_type_hints(model, include_extras=True)
-    fields = []
-    for name, info in model.model_fields.items():
-        extra, annotation = _extra(info), hints[name]
-        members = _scalar(annotation)
-        low, high = bounds(info)
-        lengths = {
-            "min_length": next((m.min_length for m in info.metadata if isinstance(m, annotated_types.MinLen)), None),
-            "max_length": next((m.max_length for m in info.metadata if isinstance(m, annotated_types.MaxLen)), None),
-        }
-        nullable = type(None) in _members(annotation)
-        default, written = info.default, dict[str, Any]()
-        if _choices(annotation):
-            kind, written["choices"] = "choice", [str(choice) for choice in _choices(annotation)]
-        elif members == {bool}:
-            kind = "bool"
-        elif members == {int}:
-            kind = "int"
-        elif members == {float}:
-            kind = "float"
-        elif members == {_COLOUR}:
-            kind, default = "color", None if default is None else _hex(default)
-        elif get_origin(annotation) is tuple and get_args(annotation) == (_COLOUR, Ellipsis):
-            kind, default = "colors", [_hex(item) for item in default]
-            written |= {key: value for key, value in lengths.items() if value is not None}
-        elif named[name] == FieldName:
-            kind = "field"
-        elif Lut in members:
-            kind, default = "lut", None
-        elif Picture in members:
-            kind, default, nullable = "picture", None, True
-        elif members == {str}:
-            kind = "text"
-            written |= {key: value for key, value in lengths.items() if value is not None}
-            if extra.get("min_distinct") is not None:
-                written["min_distinct"] = extra["min_distinct"]
-        else:
-            raise ValueError(
-                f"parameter model {model.__name__!r}, field `{name}`: its type is not one the parameter format has "
-                "(a number, a switch, a choice, a colour, a list of colours, a field name, a text, a picture or a "
-                "lookup table)"
-            )
-        if (nullable and kind in {"color"}) or kind == "picture":
-            written["nullable"] = True
-        numeric = kind in {"float", "int"}
-        entry = {
-            "name": name,
-            "kind": kind,
-            "meaning": info.description or "",
-            "default": default,
-            "unit": unit_of(info) if numeric else None,
-            "min": low if numeric else None,
-            "max": high if numeric else None,
-            "cyclic": cyclic_of(info),
-            "drivable": bool(extra.get("drivable")),
-            "advanced": bool(extra.get("advanced")),
-            **written,
-        }
-        if extra.get("at_most") is not None:
-            entry["at_most"] = extra["at_most"]
-        fields.append(entry)
-    return {"doc": inspect.cleandoc(model.__doc__ or ""), "fields": fields}
-
-
-def from_checked[P: EffectParams](model: type[P], values: Mapping[str, Any]) -> P:
-    """The model for `values`, which the core has checked and scaled (every field, a colour as a list, a lookup table
-    and a picture as the objects they stand for): built as they are, with no validation, because a pixel value scaled to
-    a bigger picture may lie beyond its design range."""
-    made = {}
-    for name, value in values.items():
-        hint = model.model_fields[name].annotation
-        if hint is Lut and value is None:
-            value = Lut.identity()  # a table left out is the identity table
-        elif _COLOUR in _scalar(hint) and value is not None:
-            value = tuple(value)
-        elif get_origin(hint) is tuple and value is not None:
-            value = tuple(tuple(item) for item in value)
-        made[name] = value
-    return BaseModel.model_construct.__func__(model, **made)  # type: ignore[attr-defined]  # pydantic's, past the guard
-
-
-def _range_problem(spec: _Spec) -> str | None:
-    """What is wrong with the unit, range, default and cyclic flag of a number's declaration, or None if nothing."""
-    if spec.unit not in UNITS:
-        return f"a number needs a unit from {UNITS}, got {spec.unit!r}"
-    if spec.min is None or spec.max is None:
-        return "a number needs both min and max (its documented range)"
-    if spec.min > spec.max:
-        return f"min {spec.min} is above max {spec.max}"
-    if spec.default is not None and not (is_number(spec.default) and spec.min <= spec.default <= spec.max):
-        return f"the default {spec.default!r} is outside min {spec.min} .. max {spec.max}"
-    if spec.cyclic and (spec.unit != "degrees" or spec.max - spec.min != _TURN):
-        return f"a cyclic field is in degrees, min to max one turn ({_TURN}), not {spec.min} to {spec.max}"
-    return None
-
-
-def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]:
-    """The annotation and pydantic field for a `param` declaration, after checking it; ValueError naming the model and
-    the field if it is broken. Every field is strict; a list field also takes a list or an array."""
-
-    def broken(problem: str) -> ValueError:
-        return ValueError(f"parameter model {model!r}, field `{name}`: {problem}")
-
-    if spec is _MISSING:
-        raise broken("has no default: declare it with param(default, doc=..., ...)")
-    if not isinstance(spec, _Spec):
-        raise broken("declare it with param(default, doc=..., unit=..., min=..., max=...), not a plain default")
-    if not spec.doc.strip():
-        raise broken("needs a doc: what it does, its unit and range, and what raising it does")
-    for choice in _choices(annotation):
-        if str(choice) not in spec.doc:
-            raise broken(f"the doc must explain every choice; it does not mention {choice!r}")
-    numeric = _scalar(annotation) <= {int, float} and bool(_scalar(annotation))
-    # strict for every kind of value; a choice (Literal) is matched exactly anyway, and pydantic refuses `strict` on it
-    constraints: dict[str, Any] = {} if _choices(annotation) else {"strict": True}
-    if numeric:
-        if problem := _range_problem(spec):
-            raise broken(problem)
-    elif spec.cyclic:
-        raise broken("only a number in degrees can be cyclic")
-    elif spec.unit is not None or spec.min is not None or spec.max is not None:
-        raise broken("only a number takes a unit, min and max")
-    if spec.drivable and _scalar(annotation) != {float}:
-        what = "a whole number" if _scalar(annotation) == {int} else "not a number"
-        raise broken(f"only a decimal number can be drivable, and this is {what}")
-    typed: Any = annotation
-    if numeric:
-        constraints |= {"ge": spec.min, "le": spec.max}
-        if float in _scalar(annotation):
-            constraints["allow_inf_nan"] = False  # so a nan is reported as such, not as out of range
-        if spec.cyclic:
-            typed = Annotated[annotation, BeforeValidator(_into_turn(constraints["ge"]))]
-    elif get_origin(annotation) is tuple:
-        typed = Annotated[annotation, BeforeValidator(_as_tuple)]
-    elif Picture in _scalar(annotation):
-        typed = ValidatedPicture | None if type(None) in _members(annotation) else ValidatedPicture
-        constraints = {}  # the validator is the whole check; `strict` has no schema to apply to in a union
-    elif annotation is Lut:
-        typed = ValidatedLut
-    typed, kwargs = _with_distinct(typed, spec.field_kwargs)
-    made = Field(
-        spec.default,
-        description=spec.doc,
-        json_schema_extra={
-            "unit": spec.unit,
-            "advanced": spec.advanced,
-            "drivable": spec.drivable,
-            "cyclic": spec.cyclic,
-            "at_most": spec.at_most,
-            "min_distinct": spec.field_kwargs.get("min_distinct"),
-        },
-        **constraints,
-        **kwargs,
-    )
-    return typed, made
-
-
-def _with_distinct(typed: Any, kwargs: Mapping[str, Any]) -> tuple[Any, dict[str, Any]]:
-    """`typed` and the pydantic constraints `kwargs` without `min_distinct`, which is not one: a text's own rule, made a
-    validator on `typed`."""
-    rest = {key: value for key, value in kwargs.items() if key != "min_distinct"}
-    if kwargs.get("min_distinct") is None:
-        return typed, rest
-    return Annotated[typed, AfterValidator(_at_least_distinct(kwargs["min_distinct"]))], rest
-
-
-def _at_least_distinct(least: int) -> Callable[[str], str]:
-    """A validator that passes a text with at least `least` different characters and refuses any other."""
-
-    def check(text: str) -> str:
-        if len(set(text)) < least:
-            raise ValueError(f"must have at least {least} different characters")
-        return text
-
-    return check
 
 
 def _members(annotation: Any) -> tuple[Any, ...]:
@@ -755,101 +119,239 @@ def _scalar(annotation: Any) -> set[Any]:
     return {m for m in _members(annotation) if m is not type(None)}
 
 
-def bounds(info: FieldInfo) -> tuple[float | None, float | None]:
-    """The (min, max) the constraints of the field `info` (a pydantic `FieldInfo`) give, None for a side it has not."""
-    low = next((m.ge for m in info.metadata if isinstance(m, annotated_types.Ge)), None)
-    high = next((m.le for m in info.metadata if isinstance(m, annotated_types.Le)), None)
-    return low, high  # type: ignore[return-value]  # bounds given to `param` as numbers
-
-
 def _choices(annotation: Any) -> tuple[Any, ...]:
     """The choices of a `Literal[...]` field (also inside `X | None`), else nothing."""
     return tuple(c for m in _members(annotation) if get_origin(m) is Literal for c in get_args(m))
 
 
-def _public(annotation: Any) -> Any:
-    """The type a caller writes for a field: `Color` becomes the colour forms; other metadata is dropped."""
-    if annotation == Color:
-        return ColorForms
-    if annotation is Picture:
-        return PictureForms
-    if annotation is Lut:
-        return LutForms
-    origin, args = get_origin(annotation), get_args(annotation)
-    if origin is Annotated:
-        return _public(args[0])
-    if origin is tuple and Ellipsis in args:  # a list field: callers may pass any sequence (TOML gives lists)
-        return Sequence[_public(args[0])]  # type: ignore[misc]  # built at run time
-    if origin is tuple:
-        return tuple[tuple(_public(arg) for arg in args)]  # type: ignore[misc]  # built at run time
-    if origin in (typing.Union, types.UnionType):
-        public = [_public(arg) for arg in args]
-        union = public[0]
-        for member in public[1:]:
-            union = union | member
-        return union
-    return annotation
+def _hex(colour: Any) -> str:
+    """A colour default (`'#rrggbb'`, `'#rgb'` or three numbers) as the `'#rrggbb'` text the parameter format writes."""
+    channels = native.parse_color(colour if isinstance(colour, str) else list(colour))
+    if channels is None:
+        raise ValueError(f"{colour!r} is not a colour")
+    return "#" + "".join(f"{round(channel * 255):02x}" for channel in channels)  # constant: 8-bit levels
 
 
-def _type_text(annotation: Any) -> str:
-    """A field's type in words, for the documentation."""
-    if annotation == Color:
-        return "colour"
-    if annotation is Picture:
-        return "picture"
+def _kind(annotation: Any, default: Any) -> tuple[str, Any, dict[str, Any]]:
+    """The kind of the format that `annotation` is, the default as the format writes it and what else the kind needs."""
+    members = _scalar(annotation)
+    nullable = type(None) in _members(annotation)
+    if _choices(annotation):
+        return "choice", default, {"choices": [str(choice) for choice in _choices(annotation)]}
+    if members in ({bool}, {int}, {float}):
+        return {bool: "bool", int: "int", float: "float"}[next(iter(members))], default, {}
+    if members == {_COLOUR}:
+        return "color", None if default is None else _hex(default), {"nullable": True} if nullable else {}
+    if get_origin(annotation) is tuple and get_args(annotation) == (_COLOUR, Ellipsis):
+        return "colors", [_hex(item) for item in default], {}
     if annotation == FieldName:
-        return "field name"
-    if annotation is Lut:
-        return "lookup table"
-    origin, args = get_origin(annotation), get_args(annotation)
-    if origin is Annotated:
-        return _type_text(args[0])
-    if origin is Literal:
-        return "one of " + ", ".join(repr(arg) for arg in args)
-    if origin is tuple:
-        count = "list of" if Ellipsis in args else f"{len(args)}"
-        return f"{count} {_type_text(args[0])}s"
-    if origin in (typing.Union, types.UnionType):
-        return " or ".join("none" if arg is type(None) else _type_text(arg) for arg in args)
-    words = {float: "number", int: "whole number", str: "text", bool: "true or false"}
-    return words.get(annotation, inspect.formatannotation(annotation))
+        return "field", default, {}
+    if Lut in members:
+        return "lut", None, {}
+    if Picture in members:
+        return "picture", None, {"nullable": True}
+    if members == {str}:
+        return "text", default, {}
+    raise ValueError(
+        "its type is not one the parameter format has (a number, a switch, a choice, a colour, a list of colours, "
+        "a field name, a text, a picture or a lookup table)"
+    )
 
 
-def _number(value: float) -> str:
-    """A bound as a person writes it: 0, 500, 0.5, 4294967295."""
-    return str(int(value)) if float(value).is_integer() and abs(value) < 1e15 else repr(value)
+def _entry(model: str, name: str, annotation: Any, spec: Any) -> dict[str, Any]:
+    """The table entry of the field `name` of class `model`; ValueError naming both if its declaration is broken."""
 
+    def broken(problem: str) -> ValueError:
+        return ValueError(f"parameter model {model!r}, field `{name}`: {problem}")
 
-def _nearest(given: object, valid: list[str]) -> str:
-    """ " (did you mean `x`?)" for the name `x` in `valid` nearest the misspelt `given`; "" when none is near."""
-    near = difflib.get_close_matches(str(given), valid, n=1)
-    return f" (did you mean `{near[0]}`?)" if near else ""
-
-
-def _problem(detail: Any, valid: list[str]) -> str:
-    location = detail["loc"]
-    if not location:  # a rule about the whole model, not one field
-        return str(detail.get("ctx", {}).get("error") or detail["msg"])
-    name = "`" + "".join(f"[{part}]" if isinstance(part, int) else f".{part}" for part in location).lstrip(".") + "`"
-    kind, ctx, given = detail["type"], detail.get("ctx", {}), detail.get("input")
-    got = f", got {given!r}"
-    wording = {
-        "extra_forbidden": f"{name} is not a parameter{_nearest(location[-1], valid)}; the parameters are: "
-        f"{', '.join(valid)}",
-        "missing": f"{name} is required",
-        "greater_than_equal": f"{name} must be >= {_number(ctx.get('ge', 0))}{got}",
-        "less_than_equal": f"{name} must be <= {_number(ctx.get('le', 0))}{got}",
-        "greater_than": f"{name} must be > {_number(ctx.get('gt', 0))}{got}",
-        "less_than": f"{name} must be < {_number(ctx.get('lt', 0))}{got}",
-        "float_type": f"{name} must be a number{got}",
-        "int_type": f"{name} must be a whole number{got}",
-        "bool_type": f"{name} must be true or false{got}",
-        "string_type": f"{name} must be text{got}",
-        "tuple_type": f"{name} must be a list{got}",
-        "finite_number": f"{name} must be a finite number{got}",
-        "literal_error": f"{name} must be one of {ctx.get('expected')}{got}",
-        "too_short": f"{name} needs at least {ctx.get('min_length')} items{got}",
-        "string_pattern_mismatch": f"{name} must match the pattern {ctx.get('pattern')}{got}",
-        "value_error": f"{name}: {ctx.get('error')}",
+    if spec is _MISSING:
+        raise broken("has no default: declare it with param(default, doc=..., ...)")
+    if not isinstance(spec, _Spec):
+        raise broken("declare it with param(default, doc=..., unit=..., min=..., max=...), not a plain default")
+    if not spec.doc.strip():
+        raise broken("needs a doc: what it does, its unit and range, and what raising it does")
+    for choice in _choices(annotation):
+        if str(choice) not in spec.doc:
+            raise broken(f"the doc must explain every choice; it does not mention {choice!r}")
+    try:
+        kind, default, written = _kind(annotation, spec.default)
+    except ValueError as problem:
+        raise broken(str(problem)) from None
+    if kind in {"colors", "text"}:
+        written |= {key: getattr(spec, key) for key in ("min_length", "max_length") if getattr(spec, key) is not None}
+    if kind == "text" and spec.min_distinct is not None:
+        written["min_distinct"] = spec.min_distinct
+    numeric = kind in {"float", "int"}
+    if not numeric and (spec.unit is not None or spec.min is not None or spec.max is not None):
+        raise broken("only a number takes a unit, min and max")
+    entry = {
+        "name": name,
+        "kind": kind,
+        "meaning": spec.doc,
+        "default": default,
+        "unit": spec.unit if numeric else None,
+        "min": spec.min if numeric else None,
+        "max": spec.max if numeric else None,
+        "cyclic": spec.cyclic,
+        "drivable": spec.drivable,
+        "advanced": spec.advanced,
+        **written,
     }
-    return wording.get(kind, f"{name}: {detail['msg']}{got}")
+    if spec.at_most is not None:
+        entry["at_most"] = spec.at_most
+    return entry
+
+
+def table_of(model: type["EffectParams"]) -> dict[str, Any]:
+    """The parameters of `model` in the ecosystem's parameter format (the dict `_core.register(.., table=)` takes):
+    `{"doc": ..., "fields": [...]}`, each field with its kind, meaning, default, unit, bounds and flags."""
+    return model._table  # noqa: SLF001  (the class's own, made when it was declared)
+
+
+def _declare(cls: type["EffectParams"]) -> dict[str, Any]:
+    """The table of `cls`: from its annotated fields, each with its `param`; the core proves the declaration."""
+    fields = [
+        _entry(cls.__name__, name, annotation, cls.__dict__.get(name, _MISSING))
+        for name, annotation in inspect.get_annotations(cls, eval_str=True).items()
+        if not name.startswith("_")
+    ]
+    table = {"doc": inspect.cleandoc(cls.__doc__ or ""), "fields": fields}
+    try:
+        native.check_table(table, cls.__name__, {})  # reads the declaration, and checks that every default passes
+    except ValueError as error:
+        raise ValueError(f"parameter model {cls.__name__!r}: {error}") from None
+    return table
+
+
+def prepare(table: Mapping[str, Any], values: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """`values` as data the core reads, and the objects held back: a `Lut` or a `Picture` goes as a placeholder name
+    (a colour given for a picture becomes a flat `Picture`), an array or numpy number as the list or number it holds."""
+    kinds = {entry["name"]: entry["kind"] for entry in table["fields"]}
+    sent: dict[str, Any] = {}
+    held: dict[str, Any] = {}
+    for name, value in values.items():
+        kind = kinds.get(name)
+        if kind == "lut" and value is not None:
+            if not isinstance(value, Lut):
+                shown = f"an array of shape {value.shape}" if isinstance(value, np.ndarray) else repr(value)[:40]
+                raise RecipeError(
+                    f"`{name}`: a lookup table is a Lut; a path or an array is turned into a Lut by a recipe file or "
+                    f"fx, got {shown}"
+                )
+            held[name], value = value, name
+        elif kind == "picture" and value is not None:
+            held[name] = value if isinstance(value, Picture) else _flat(name, value)
+            value = name
+        elif isinstance(value, np.ndarray):
+            value = value.tolist()
+        elif isinstance(value, np.generic):
+            value = value.item()
+        elif isinstance(value, list | tuple):
+            value = [item.item() if isinstance(item, np.generic) else item for item in value]
+        sent[name] = value
+    return sent, held
+
+
+def _flat(name: str, value: object) -> Picture:
+    try:
+        return Picture.of_color(value)
+    except ValueError:
+        shown = f"an array of shape {value.shape}" if isinstance(value, np.ndarray) else repr(value)[:40]
+        raise RecipeError(
+            f"`{name}`: a picture is a Picture or a colour ('#rrggbb', '#rgb' or three numbers 0..1); a path or an "
+            f"array is turned into a Picture by a recipe file or fx, got {shown}"
+        ) from None
+
+
+def restore(table: Mapping[str, Any], checked: Mapping[str, Any], held: Mapping[str, Any]) -> dict[str, Any]:
+    """What the core answered for the values (every parameter, normal form) as the values an effect receives: a colour
+    as a tuple, a list of colours as a tuple of them, the `Lut` or `Picture` given back and a table left out the
+    identity table."""
+    made = {}
+    for entry in table["fields"]:
+        name, value = entry["name"], checked[entry["name"]]
+        match entry["kind"]:
+            case "lut":
+                value = held.get(name) or Lut.identity()
+            case "picture":
+                value = held.get(name)
+            case "color" if value is not None:
+                value = tuple(value)
+            case "colors":
+                value = tuple(tuple(item) for item in value)
+        made[name] = value
+    return made
+
+
+def from_checked[P: EffectParams](model: type[P], values: Mapping[str, Any]) -> P:
+    """The instance of `model` for `values`, which the core has checked and scaled (every field, a colour as a list, a
+    lookup table and a picture as the objects they stand for): built as they are, with no check, because a pixel value
+    scaled to a bigger picture may lie beyond its design range."""
+    made = object.__new__(model)
+    for entry in model._table["fields"]:  # noqa: SLF001  (the class's own)
+        name, value = entry["name"], values[entry["name"]]
+        if entry["kind"] == "lut" and value is None:
+            value = Lut.identity()  # a table left out is the identity table
+        elif entry["kind"] == "color" and value is not None:
+            value = tuple(value)
+        elif entry["kind"] == "colors":
+            value = tuple(tuple(item) for item in value)
+        object.__setattr__(made, name, value)
+    return made
+
+
+class EffectParams:
+    """Base class of a plugin's parameters: subclass it and declare each field with `param`.
+
+    A text parameter is taken exactly as given, spaces included (a space can be data, as in a text-art palette).
+    Make one with keywords (`BloomParams(radius=30)`): the core checks them and a bad value is a `RecipeError` naming
+    the class, the field, the rule and the value. An instance has an attribute per field and is frozen.
+    """
+
+    _table: ClassVar[dict[str, Any]]
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Declare the class: its table is made once, here, and the core proves it."""
+        super().__init_subclass__(**kwargs)
+        cls._table = _declare(cls)
+
+    def __init__(self, **values: Any) -> None:
+        """The parameters for `values`, every other field at its default; the core checks them."""
+        for name, entry in self.fields().items():
+            if name not in values:
+                values[name] = default_of(entry)
+        sent, held = prepare(self._table, values)
+        checked = native.check_table(self._table, type(self).__name__, sent)
+        for name, value in restore(self._table, checked, held).items():
+            object.__setattr__(self, name, value)
+
+    @classmethod
+    def fields(cls) -> dict[str, Mapping[str, Any]]:
+        """The entries of the table by field name, in declaration order."""
+        return {entry["name"]: entry for entry in cls._table["fields"]}
+
+    def to_dict(self) -> dict[str, Any]:
+        """The values by field name: a colour as a tuple, a `Lut` or `Picture` as the object."""
+        return {name: getattr(self, name) for name in self.fields()}
+
+    def __setattr__(self, name: str, value: object) -> None:
+        raise FrozenInstanceError(f"cannot assign to field {name!r}")
+
+    def __delattr__(self, name: str) -> None:
+        raise FrozenInstanceError(f"cannot delete field {name!r}")
+
+    def __eq__(self, other: object) -> bool:
+        """Equal when of one class and every field is."""
+        return isinstance(other, EffectParams) and type(other) is type(self) and self.to_dict() == other.to_dict()
+
+    def __hash__(self) -> int:
+        """By the values, as `==`."""
+        return hash((type(self), *self.to_dict().values()))
+
+    def __repr__(self) -> str:
+        """`BloomParams(radius=24.0, tint=(1.0, 1.0, 1.0))`."""
+        return f"{type(self).__name__}({', '.join(f'{k}={v!r}' for k, v in self.to_dict().items())})"
+
+    def replace(self, **changes: Any) -> Self:
+        """A copy with `changes` laid over the values, checked as a new value is."""
+        return type(self)(**{**self.to_dict(), **changes})
