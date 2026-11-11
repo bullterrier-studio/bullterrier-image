@@ -175,7 +175,7 @@ def test_palette_gives_hex_strings_largest_share_first_that_gradient_map_accepts
     fx.gradient_map(stops=stops)  # a step is made: the core accepts what palette gives
     assert bullterrier_image.palette is imageio.palette
     with pytest.raises(TypeError, match="positional"):
-        imageio.palette(picture, 3)  # type: ignore[misc]  # colors is by keyword: the refusal is the point
+        imageio.palette(picture, 3)  # type: ignore[call-arg]  # colors is by keyword: the refusal is the point
 
 
 @pytest.mark.parametrize("colors", [0, -2, 257])
