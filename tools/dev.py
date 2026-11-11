@@ -39,6 +39,12 @@ def main(argv: list[str] | None = None) -> int:
         epilog="example: uv run poe regenerate",
     )
 
+    commands.add_parser(
+        "check-generated",
+        help="fail if fx.pyi or a page of docs/effects/ is not what `regenerate` would write; writes nothing",
+        epilog="example: uv run poe check-generated",
+    )
+
     p = commands.add_parser(
         "new-effect",
         help="create a new effect's files from the template: its code, its tests and its example recipe",
@@ -53,6 +59,13 @@ def main(argv: list[str] | None = None) -> int:
             written = gallery.write_docs(args.only, args.force)
         elif args.command == "regenerate":
             written = gallery.regenerate()
+        elif args.command == "check-generated":
+            old = gallery.stale()
+            for path in old:
+                print(f"stale: {path}", file=sys.stderr)
+            if old:
+                print("error: run `uv run poe regenerate` and commit what it writes", file=sys.stderr)
+            return 1 if old else 0
         else:
             written = gallery.new_effect(args.name, args.category)
     except (

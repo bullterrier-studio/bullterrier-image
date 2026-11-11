@@ -573,3 +573,26 @@ def test_the_gallery_command_reports_an_unknown_effect_and_writes_nothing(docs):
     assert done.returncode == 1
     assert "'nope'" in done.stderr
     assert not (docs / "docs" / "effects").exists()
+
+
+# --- the generated files are fresh ---------------------------------------------------------------------------------
+
+
+def test_the_generated_files_of_this_checkout_are_up_to_date():
+    assert gallery.stale() == []
+
+
+def test_a_checkout_without_its_generated_files_lists_them_and_a_regenerated_one_lists_none(checkout):
+    layout = gallery.stale(checkout=checkout)
+    assert checkout / "src" / "bullterrier_image" / "fx.pyi" in layout
+    assert any(path.parent == checkout / "docs" / "effects" for path in layout)
+    real = Path(__file__).parent.parent  # this checkout's own generated files are the up-to-date ones
+    shutil.copy(real / "src" / "bullterrier_image" / "fx.pyi", checkout / "src" / "bullterrier_image" / "fx.pyi")
+    shutil.copytree(real / "docs" / "effects", checkout / "docs" / "effects", dirs_exist_ok=True)
+    assert gallery.stale(checkout=checkout) == []
+    (checkout / "docs" / "effects" / "light.md").write_text("changed by hand\n", encoding="utf-8")
+    (checkout / "docs" / "effects" / "gone.md").write_text("a page of a category that is gone\n", encoding="utf-8")
+    assert gallery.stale(checkout=checkout) == [
+        checkout / "docs" / "effects" / "light.md",
+        checkout / "docs" / "effects" / "gone.md",
+    ]

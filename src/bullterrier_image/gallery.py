@@ -143,6 +143,23 @@ def _write_pages(checkout: Path) -> list[Path]:
     return [folder / filename for filename in pages]
 
 
+def stale(*, checkout: Path = CHECKOUT) -> list[Path]:
+    """The generated files of `checkout` that `regenerate` would change: `src/bullterrier_image/fx.pyi` and the pages of
+    `docs/effects/` that are missing, differ from what the catalogue gives, or the catalogue no longer has. Nothing is
+    written. Empty when every one is up to date: the freshness gate (`poe check`)."""
+    layout = _layout(checkout)
+    old = []
+    if not layout.stub.is_file() or layout.stub.read_text(encoding="utf-8") != stub_text():
+        old.append(layout.stub)
+    pages = render_effects_pages()
+    for filename, text in pages.items():
+        page = layout.pages / filename
+        if not page.is_file() or page.read_text(encoding="utf-8") != text:
+            old.append(page)
+    old += [page for page in sorted(layout.pages.glob("*.md")) if page.name not in pages]
+    return old
+
+
 def regenerate(*, checkout: Path = CHECKOUT) -> list[Path]:
     """The one integration step after effects were added or changed: write `src/bullterrier_image/fx.pyi` (for editors)
     in `checkout`, then `write_docs`. Returns the files written. Every effect's example recipe is checked first, so a
