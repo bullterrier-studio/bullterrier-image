@@ -9,6 +9,37 @@ use crate::Error;
 use crate::params::Kind;
 
 impl Recipe {
+    /// The look called `name` that ships with the crate: a recipe with a `description`, named `name`.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] saying `no look "name"`, which looks are closest (if any are) and all the looks, for any other
+    /// name.
+    pub fn look(name: &str) -> Result<Self, Error> {
+        let looks = crate::shipped::looks();
+        let Some((_, text)) = looks.iter().find(|(known, _)| *known == name) else {
+            return Err(Error::Recipe(format!("no look {name:?}: {}", unknown_look(name))));
+        };
+        let mut recipe = Self::from_toml(text)?;
+        recipe.name = Some(name.to_owned());
+        Ok(recipe)
+    }
+
+    /// The recipe `spec` names: a look that ships with the crate if `spec` is exactly its name, else the recipe file at
+    /// that path ([`from_file`](Self::from_file)).
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] saying `no look or file "spec"`, the closest looks and all the looks if `spec` is neither;
+    /// what `from_file` refuses.
+    pub fn resolve(spec: &str) -> Result<Self, Error> {
+        if crate::shipped::looks().iter().any(|(known, _)| *known == spec) {
+            Self::look(spec)
+        } else if Path::new(spec).exists() {
+            Self::from_file(Path::new(spec))
+        } else {
+            Err(Error::Recipe(format!("no look or file {spec:?}: {}", unknown_look(spec))))
+        }
+    }
+
     /// The recipe the file `path` holds ([`from_toml`](Self::from_toml)), with the name of the file (without `.toml`) when
     /// it names none, and each file it names found relative to the recipe file: the `file` of an svg region, and a
     /// parameter that is a picture or a lookup table given as a path. An absolute path, the name of a picture or table the
@@ -89,4 +120,40 @@ fn beside(value: Option<&mut Value>, folder: &Path) {
         return;
     }
     *value = Value::String(folder.join(text).to_string_lossy().into_owned());
+}
+
+/// What helps a person who typed `name` for a look that is not one: the closest looks (a few edits away), then all of them.
+fn unknown_look(name: &str) -> String {
+    let looks = crate::shipped::looks();
+    let reach = (name.chars().count() / 3).max(2); // constant: about one edit in three letters, at least two
+    let mut near: Vec<(usize, &str)> = looks
+        .iter()
+        .map(|(known, _)| (edits(name, known), *known))
+        .filter(|(distance, _)| *distance <= reach)
+        .collect();
+    near.sort_unstable();
+    let hint = if near.is_empty() {
+        String::new()
+    } else {
+        let names: Vec<String> = near.iter().take(3).map(|(_, known)| format!("{known:?}")).collect();
+        format!("did you mean {}? ", names.join(" or "))
+    };
+    let all: Vec<&str> = looks.iter().map(|(known, _)| *known).collect();
+    format!("{hint}the looks: {}", all.join(", "))
+}
+
+/// The number of single-letter edits (insert, delete, change) between `one` and `other`: Levenshtein's distance.
+fn edits(one: &str, other: &str) -> usize {
+    let other: Vec<char> = other.chars().collect();
+    let mut row: Vec<usize> = (0..=other.len()).collect();
+    for (i, a) in one.chars().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, b) in other.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = (diagonal + usize::from(a != *b)).min(above + 1).min(row[j] + 1);
+            diagonal = above;
+        }
+    }
+    row[other.len()]
 }

@@ -81,3 +81,37 @@ fn a_file_that_is_missing_or_not_a_recipe_is_refused_naming_it() -> Outcome {
     );
     Ok(())
 }
+
+#[test]
+fn a_look_is_a_recipe_of_the_name_it_ships_under_with_its_description() -> Outcome {
+    let crt = Recipe::look("crt")?;
+    assert_eq!(crt.name.as_deref(), Some("crt"));
+    assert!(crt.description.as_deref().is_some_and(|text| !text.trim().is_empty()));
+    assert!(!crt.steps.is_empty());
+    Ok(())
+}
+
+#[test]
+fn an_unknown_look_names_the_closest_looks_and_lists_them_all() {
+    let refused = Recipe::look("crtt").err().map(|error| error.to_string()).unwrap_or_default();
+    assert!(refused.contains("no look \"crtt\""), "{refused}");
+    assert!(refused.contains("did you mean \"crt\"?"), "{refused}");
+    assert!(refused.contains("the looks: ") && refused.contains("glitch"), "{refused}");
+    let short = Recipe::look("ct").err().map(|error| error.to_string()).unwrap_or_default();
+    assert!(short.contains("\"crt\""), "a missing letter: {short}");
+    let far = Recipe::look("zzzzzzzz").err().map(|error| error.to_string()).unwrap_or_default();
+    assert!(!far.contains("did you mean"), "{far}");
+    let same_length = Recipe::look("abc").err().map(|error| error.to_string()).unwrap_or_default();
+    assert!(!same_length.contains("did you mean"), "three edits from crt: {same_length}");
+}
+
+#[test]
+fn a_name_is_a_look_and_anything_else_is_a_file_or_an_error_saying_both_were_tried() -> Outcome {
+    assert_eq!(Recipe::resolve("crt")?.description, Recipe::look("crt")?.description);
+    let path = file("resolve", "[[step]]\neffect = \"grade\"\n")?;
+    assert_eq!(Recipe::resolve(&path.to_string_lossy())?.name.as_deref(), Some("my look"));
+    let nothing = Recipe::resolve("no/such/recipe.toml").err().map(|error| error.to_string()).unwrap_or_default();
+    assert!(nothing.contains("no look or file \"no/such/recipe.toml\""), "{nothing}");
+    assert!(nothing.contains("the looks: "), "{nothing}");
+    Ok(())
+}
