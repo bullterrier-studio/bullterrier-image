@@ -94,13 +94,16 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         return picture.map(|pixel| pixel);
     };
     #[expect(clippy::cast_possible_truncation, reason = "Oklab levels of an f32 picture")]
-    let (target_mean, own_mean, gain) = (
+    let (target_mean, own_mean) = (
         target.mean.map(|level| level as f32),
         own.mean.map(|level| level as f32),
-        std::array::from_fn::<f32, 3, _>(|channel| {
-            (target.deviation[channel] / own.deviation[channel].max(MIN_SPREAD)) as f32
-        }),
     );
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a ratio of Oklab spreads, for an f32 picture"
+    )]
+    let gain: [f32; 3] =
+        std::array::from_fn(|channel| (target.deviation[channel] / own.deviation[channel].max(MIN_SPREAD)) as f32);
     picture.map(|pixel| {
         let lab = rgb_to_oklab(pixel);
         let moved: [f32; 3] = std::array::from_fn(|channel| {
