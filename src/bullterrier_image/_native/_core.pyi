@@ -35,6 +35,7 @@ __all__ = [
     "needs",
     "number_pieces",
     "numbers",
+    "palette",
     "params",
     "parse_color",
     "project_maps",
