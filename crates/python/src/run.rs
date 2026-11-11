@@ -3,7 +3,9 @@
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use bullterrier_image::{Entry, Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage};
+use bullterrier_image::{
+    Entry, Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage,
+};
 use numpy::{AllowTypeChange, PyArray1, PyArray2, PyArray3, PyArrayLike2, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
