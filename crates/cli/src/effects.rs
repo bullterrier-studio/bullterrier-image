@@ -105,6 +105,13 @@ pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Err
         return Ok(0);
     }
     if let Some(name) = &args.name {
+        if effect(name).is_ok_and(|found| found.params().is_none()) {
+            // written in Python: the core has no parameter table to document
+            console.result(&format!(
+                "{name}\n    registered from Python: help(fx.{name}) documents it"
+            ))?;
+            return Ok(0);
+        }
         let text = documentation(name, &presets, true).map_err(|error| dress(error, name, &presets))?;
         console.result(&format!("{name}\n{}", indented(&text, "    ")))?;
         return Ok(0);

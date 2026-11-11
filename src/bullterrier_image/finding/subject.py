@@ -30,8 +30,6 @@ from bullterrier_image.core.finder import Finder
 
 from ._runtime import onnxruntime_library
 
-SEGMENTERS = ("onnx", "vision")
-
 
 def subject_matte(
     rgb: np.ndarray, *, shrink: float = 1.5, feather: float = 1.0, segmenter: str | None = None

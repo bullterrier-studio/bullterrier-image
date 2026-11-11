@@ -201,6 +201,11 @@ fn steps_writes_a_picture_per_stage_and_the_sheet_and_prints_the_sheet() -> Outc
     ]);
     assert_eq!(ran.code, 0, "{}", ran.err);
     assert_eq!(ran.out.trim(), at(&root, "st/_sheet.jpg"));
+    assert!(
+        ran.err.starts_with("  input\n  1. grade(exposure=0.1)\n"),
+        "each stage is named as it is written: {}",
+        ran.err
+    );
     assert!(root.join("st/00-input.jpg").is_file() && root.join("st/01-grade.jpg").is_file());
     Ok(())
 }

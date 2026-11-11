@@ -16,6 +16,7 @@ publish = false
 
 [workspace.dependencies]
 bullterrier-image = { path = "crates/core" }
+bullterrier-image-cli = { path = "crates/cli" }
 bullterrier-image-finders = { path = "crates/finders" }
 bullterrier-image-derive = { path = "crates/derive" }
 # the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring

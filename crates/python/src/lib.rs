@@ -39,7 +39,7 @@ mod _core {
 
     #[pymodule_export]
     use super::{
-        CoreError, apply, check, documentation, effect, effects, params, read_recipe, region_presets, register,
+        CoreError, apply, check, documentation, effect, effects, main, params, read_recipe, region_presets, register,
         shipped_looks, shipped_presets, summary, unregister, vocabulary,
     };
 
@@ -175,6 +175,18 @@ fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
         .params()
         .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
     from_json(py, &serde_json::to_value(table).map_err(value_error)?)
+}
+
+/// Runs the command line `bt-image` with `argv` (the arguments after the program's name) and returns its exit code. Results go
+/// to stdout, progress and errors to stderr, as the process's own; `version` is what `--version` prints. Effects registered
+/// with `register` are known to it. Ctrl-C is not seen while it runs: the caller restores the default signal handler first.
+#[pyfunction]
+#[expect(clippy::needless_pass_by_value, reason = "PyO3 extracts a list by value")]
+fn main(py: Python<'_>, argv: Vec<String>, version: &str) -> i32 {
+    py.detach(|| {
+        let (mut out, mut err) = (std::io::stdout(), std::io::stderr());
+        bullterrier_image_cli::main(&argv, version, &mut out, &mut err)
+    })
 }
 
 /// The documentation of the effect called `effect` the core implements: see `bullterrier_image.documentation.effect`.

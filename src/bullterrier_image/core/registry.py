@@ -392,16 +392,28 @@ def _load_effect_packages() -> None:
         _LOADING.running = True
         try:
             for entry_point in _effect_packages():
-                try:
-                    entry_point.load()
-                # A package's import can fail in any way (a missing module, a broken effect, a duplicate name); each is
-                # reported the same way, naming the package, with the original error chained.
-                except Exception as error:
-                    raise BullterrierImageError(_failure(entry_point, error)) from error
+                _load(entry_point)
             _register_core_effects()
             _LOADING.done = True
         finally:
             _LOADING.running = False
+
+
+def _load(entry_point: metadata.EntryPoint) -> None:
+    """Import the effect package of `entry_point`. A package's import can fail in any way (a missing module, a broken
+    effect, a duplicate name); each is reported the same way, naming the package, with the original error chained."""
+    try:
+        entry_point.load()
+    except Exception as error:
+        raise BullterrierImageError(_failure(entry_point, error)) from error
+
+
+def load_plugins() -> None:
+    """Import every effect package, ours included, so that the effects written in Python are known to the core: the
+    command line runs in Rust and parses its recipes before any query here would have loaded them. The effects the
+    core declares need no import."""
+    for entry_point in _effect_packages():
+        _load(entry_point)
 
 
 def _register_core_effects() -> None:

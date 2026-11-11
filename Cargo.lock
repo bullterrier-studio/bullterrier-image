@@ -163,6 +163,7 @@ name = "bullterrier-image-python"
 version = "0.0.0"
 dependencies = [
  "bullterrier-image",
+ "bullterrier-image-cli",
  "bullterrier-image-finders",
  "numpy",
  "pyo3",

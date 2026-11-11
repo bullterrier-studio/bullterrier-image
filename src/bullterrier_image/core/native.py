@@ -88,6 +88,7 @@ refine_edge = entry(_core.refine_edge)
 contact_sheet = entry(_core.contact_sheet)
 read_project = entry(_core.read_project)
 init_project = entry(_core.init_project)
+main = _core.main  # never raises: it returns the exit code
 documentation = entry(_core.documentation)
 summary = entry(_core.summary)
 check_project = entry(_core.check_project)

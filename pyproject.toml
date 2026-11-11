@@ -405,6 +405,10 @@ ignore_decorators = [
     "@field_validator",
 ]
 ignore_names = [
+    # public API a caller uses, which no line of ours does: a `Recipe` sets numbers by address, an `Item` says what happened
+    "with_values",
+    "status",
+    "warnings",
     # fields of the `Framing` and region models: `steps.recipe_dict` writes them to the core with `model_dump`, which reads
     # every field by name, so no line of Python does
     "flip",

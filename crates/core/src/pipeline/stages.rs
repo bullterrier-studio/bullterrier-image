@@ -257,7 +257,7 @@ fn presented(recipe: &Recipe, input: &Image, stage: Stage) -> Result<(String, Im
 
 /// Saves every stage of a render of `recipe` as `NN-name.jpg` in `folder` (`.png` for a stage with transparency, which a JPEG
 /// cannot hold), plus `_sheet.jpg` showing them all in order, a stage with transparency over a checkerboard. Every file must
-/// lie inside `output`. Returns the sheet, the one picture to look at to see what each step did.
+/// lie inside `output`. Returns the sheet, the one picture to look at to see what each step did, and the label of every stage in order.
 ///
 /// # Errors
 /// [`Error::Project`] for a file outside `output`; the errors of writing a picture.
@@ -267,7 +267,7 @@ pub fn write_stages(
     folder: &Path,
     output: &Path,
     quality: u8,
-) -> Result<PathBuf, Error> {
+) -> Result<(PathBuf, Vec<String>), Error> {
     let input = match stages.first() {
         Some(Stage::Input(image)) => image.clone(),
         _ => return Err(Error::Inputs("a trace starts with the photo".to_owned())),
@@ -291,5 +291,5 @@ pub fn write_stages(
     let sheet = contact_sheet(&tiles, COLUMNS.min(tiles.len()), TILE)?;
     let target = inside(output, &folder.join("_sheet.jpg"))?;
     save_image(&target, &sheet, quality)?;
-    Ok(target)
+    Ok((target, shown_stages.into_iter().map(|(label, _)| label).collect()))
 }

@@ -33,7 +33,6 @@ from bullterrier_image import (
     run,
     trace,
 )
-from bullterrier_image.cli import main
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
@@ -562,22 +561,6 @@ def test_turning_steps_on_redoes_finished_work_so_the_pictures_exist(tmp_path, p
     look = Recipe(name="look", size=64, steps=[fx.grain(seed=1)])
     assert [i.status for i in run(make_project(tmp_path, photo, [look]))] == ["done"]
     assert [i.status for i in run(make_project(tmp_path, photo, [look], steps=True))] == ["done"]
-
-
-def test_the_steps_command_writes_one_picture_per_step_and_a_sheet(tmp_path, photo, capsys):
-    imageio.save(photo, tmp_path / "p.png")
-    (tmp_path / "r.toml").write_text(
-        'name = "r"\nsize = 64\n[[step]]\neffect = "grade"\nexposure = 0.2\n[[step]]\neffect = "grain"\n',
-        encoding="utf-8",
-    )
-    assert main(["steps", str(tmp_path / "p.png"), str(tmp_path / "r.toml"), "-o", str(tmp_path / "s")]) == 0
-    assert sorted(p.name for p in (tmp_path / "s").iterdir()) == [
-        "00-input.jpg",
-        "01-grade.jpg",
-        "02-grain.jpg",
-        "_sheet.jpg",
-    ]
-    assert "1. grade(exposure=0.2)" in capsys.readouterr().err
 
 
 # --- a picture parameter in fx: a path, an array, a Picture or a colour ---------------------------------------------

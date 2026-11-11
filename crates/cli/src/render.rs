@@ -137,8 +137,10 @@ pub(crate) fn steps(args: &StepsArgs, console: &mut Console<'_>) -> Result<i32, 
     let stages = traced
         .pop()
         .ok_or_else(|| Error::Recipe("no recipe to trace".to_owned()))?;
-    console.progress(&format!("{} stages", stages.len()))?;
-    let sheet = write_stages(&recipes[0], stages, &folder, &folder, QUALITY)?;
+    let (sheet, labels) = write_stages(&recipes[0], stages, &folder, &folder, QUALITY)?;
+    for label in labels {
+        console.progress(&format!("  {label}"))?;
+    }
     console.result(&sheet.display().to_string())?;
     Ok(0)
 }

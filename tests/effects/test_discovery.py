@@ -42,15 +42,12 @@ def _effect_module(name: str, category: str = "utilities") -> str:
 TRIGGER = "from . import effect  # registers the effect\n"
 
 _REPORT = """
-    import contextlib, io, json, sys
+    import json, subprocess, sys
     from bullterrier_image import effects, fx
     from bullterrier_image.core import registry
-    from bullterrier_image.cli import main
     from bullterrier_image.recipe import Step
 
-    listing = io.StringIO()
-    with contextlib.redirect_stdout(listing):
-        main(["effects"])
+    listing = subprocess.run([sys.executable, "-m", "bullterrier_image", "effects"], capture_output=True, text=True)
     json.dump({
         "package": effects.__file__,
         "registered": sorted(registry.describe()),
@@ -58,7 +55,7 @@ _REPORT = """
         "category": registry.category("zz_folder"),
         "fx": fx.zz_folder(amount=0.2).effect,
         "recipe_step": Step("zz_folder", params={"amount": 0.2}).effect,
-        "cli_lists_it": "zz_folder" in listing.getvalue(),
+        "cli_lists_it": "zz_folder" in listing.stdout,
     }, sys.stdout)
 """
 

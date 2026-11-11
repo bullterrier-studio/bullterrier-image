@@ -697,7 +697,7 @@ fn process(
     let sheet = match stages {
         Some(stages) => {
             let target = folder.join("steps").join(&one.name);
-            let sheet = write_stages(&one.recipe, stages, &target, &project.output, project.settings.quality)?;
+            let (sheet, _) = write_stages(&one.recipe, stages, &target, &project.output, project.settings.quality)?;
             outputs.push(sheet.clone());
             Some(sheet)
         }

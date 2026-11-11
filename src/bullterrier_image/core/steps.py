@@ -561,42 +561,6 @@ def _short(value: object) -> str:
     return text if len(text) <= 18 else text[:15] + "..."
 
 
-# The file name a recipe's name gives holds nothing that could leave the output folder or hide a file (CWE-22), on any
-# operating system.
-_NAME_CHARACTERS = "A-Za-z0-9._-"
-_NAME_LENGTH = 64
-# Windows keeps these names for devices, in any case and whatever the extension: such a file cannot be made there.
-_WINDOWS_DEVICES = frozenset(
-    {"CON", "PRN", "AUX", "NUL", *(f"COM{digit}" for digit in range(1, 10)), *(f"LPT{digit}" for digit in range(1, 10))}
-)
-
-
-def safe_name(text: str) -> str:
-    """`text` (a recipe's name, a file name without its extension) made into a safe file name, or "" when none is left.
-
-    Every run of characters other than letters, digits, `.`, `_` and `-` becomes one `-`, repeated `-` collapse into
-    one, anything before the first letter or digit is dropped, the result is cut to 64 characters and a trailing `-` or
-    `.` is trimmed: "my look" gives "my-look". "" when nothing remains or the result is a name Windows reserves for a
-    device ("con")."""
-    name = re.sub(r"-{2,}", "-", re.sub(rf"[^{_NAME_CHARACTERS}]+", "-", text))
-    name = re.sub(r"^[^A-Za-z0-9]+", "", name)[:_NAME_LENGTH].rstrip("-.")
-    return "" if not name or name.split(".", 1)[0].upper() in _WINDOWS_DEVICES else name
-
-
-def file_name(recipe: "Recipe") -> str:
-    """The name the files of `recipe` are given: its `name` made safe (`safe_name`). RecipeError naming the fix when
-    the recipe has no name or its name leaves no safe file name."""
-    if recipe.name is None:
-        raise RecipeError('a recipe needs a name to name its files: give one, Recipe(steps, name="my-look")')
-    stem = safe_name(recipe.name)
-    if not stem:
-        raise RecipeError(
-            f"recipe {recipe.name!r}: its name leaves no file name (letters, digits, . _ - and not a device name "
-            'Windows keeps, such as "con"): give another, name="my-look"'
-        )
-    return stem
-
-
 class Recipe(ValidatedModel):
     """A look: ordered steps, how the photo is framed before them and the size it is scaled to, and optionally a name
     and a description.

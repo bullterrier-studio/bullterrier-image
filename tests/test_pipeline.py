@@ -10,7 +10,6 @@ import pytest
 from PIL import Image
 
 from bullterrier_image import Each, Finder, Grid, Picture, Project, Recipe, fx, imageio
-from bullterrier_image.cli import main
 from bullterrier_image.errors import BackendUnavailableError, ProjectError, RecipeError, SubjectNotFoundError
 from bullterrier_image.finding.subject import subject_finder
 from bullterrier_image.pipeline import init_project, load_project, run
@@ -220,7 +219,6 @@ def test_one_bad_photo_does_not_stop_the_batch(folder, capsys):
     # it says which file could not be read
     assert len(failed) == 2
     assert all("broken.png" in str(i.error) for i in failed)
-    assert main(["run", str(folder / "bt-image.toml")]) == 1  # a failure is reported in the exit code
     assert "failed" in (folder / "out" / "index.html").read_text(encoding="utf-8")
 
 
@@ -579,7 +577,6 @@ def test_a_broken_result_is_flagged_by_the_automatic_checks(folder):
     flagged = [i for i in run(load_project(folder / "bt-image.toml")) if i.recipe == "black"]
     assert all(i.warnings and "blank" in i.warnings[0] for i in flagged)
     assert "blank" in (folder / "out" / "index.html").read_text(encoding="utf-8")
-    assert main(["run", str(folder / "bt-image.toml"), "--strict"]) == 1  # strict: warnings fail the run
 
 
 def test_dry_run_writes_nothing_and_says_what_would_happen(folder):
@@ -756,15 +753,6 @@ def test_init_writes_a_working_starter_project(tmp_path, photo):
     assert len(finder.seen) == 1
     with pytest.raises(ProjectError, match="already exists"):
         init_project(tmp_path / "new")
-
-
-def test_the_run_command_reports_and_the_init_command_creates(folder, tmp_path, capsys):
-    assert main(["run", str(folder / "bt-image.toml")]) == 0
-    assert "index.html" in capsys.readouterr().out
-    assert main(["init", str(tmp_path / "fresh")]) == 0
-    assert (tmp_path / "fresh" / "bt-image.toml").is_file()
-    assert main(["run", str(tmp_path / "fresh" / "bt-image.toml")]) == 1  # no photos yet: explained, not a traceback
-    assert "no photos match" in capsys.readouterr().err
 
 
 def circle_project(folder, **settings) -> Project:
