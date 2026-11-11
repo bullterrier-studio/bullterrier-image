@@ -432,6 +432,27 @@ color_balance : A starting point for colour balancing: cool shadows, untouched m
     ...
 
 @_effect
+def color_transfer(*, reference: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, amount: float = 1.0, preserve_luminance: bool = False, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Give the photo the colour mood of a reference picture, so the two look alike.  Reinhard's statistics transfer, in Oklab: each of Oklab's three channels (lightness L, green-red a, blue-yellow b) is shifted and scaled so that its mean and standard deviation over the photo become the reference's, then the result is mixed with the original by `amount` (as sRGB levels). A channel of the photo flatter than 0.002 is scaled as if it had that spread, so a flat photo or reference never divides by zero: a flat photo takes the reference's mean, a flat reference flattens the channel to its mean. Where the reference has transparency its pixels count in proportion to their alpha, so a fully transparent pixel is ignored; a reference with no visible pixel leaves the photo as it is, as no reference does. Colours the transfer pushes outside the sRGB gamut are clipped to it.  The mean and spread are taken over the whole photo and the whole reference, so the transfer is one global grade; to grade only part of the photo, give the step a `mask`.
+
+Parameters
+----------
+reference : picture or none, default None
+    The picture whose colours the photo takes on: the path of an image file in a recipe
+    file (relative to the file) or in `fx`, or, in Python, a Picture or an array; in
+    Rust, the name of a picture the photo was given or the path of an image file. Pixels
+    it makes transparent are ignored. None leaves the photo as it is.
+amount : number, fraction, 0 to 1, default 1.0
+    How far the photo moves toward the reference's colour mood, 0..1: 0 keeps the photo,
+    1 matches the reference's mean and spread in every channel, in between mixes the
+    two. Raising it makes the photo look more like the reference.
+preserve_luminance : true or false, default False
+    True: only the colours change; every pixel keeps its own brightness, so light and
+    shadow stay as shot. False: brightness and contrast are matched to the reference
+    too, so a dark photo with a bright reference gets brighter."""
+    ...
+
+@_effect
 def curves(*, black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize'] | None = None) -> Step:
     """Bend tones along smooth curves through control points: a master curve, then one per colour channel (cross process, solarize).  The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`, `white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed black and white. A curve passes exactly through its points and is a monotone cubic (PCHIP): it never overshoots its neighbouring points, so rising points never darken a brighter tone. The defaults are the straight line.
 

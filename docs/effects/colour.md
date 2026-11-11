@@ -9,6 +9,7 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/auto_levels.jpg" width="160" alt="auto_levels"> | `auto_levels` | Stretch the tones so the darkest values become black and the brightest white, ignoring `clip` at each end. | `clip=0.005` `mode='per_channel'` | [auto_levels.toml](../../examples/effects/auto_levels.toml) |
 | <img src="../gallery/channel_mixer.jpg" width="160" alt="channel_mixer"> | `channel_mixer` | Build each output channel as a weighted sum of the input red, green and blue, set by a 3x3 matrix of weights: black and white, infrared, colour swaps. | `red_from_red=1.0` `red_from_green=0.0` `red_from_blue=0.0` `green_from_red=0.0` `green_from_green=1.0` `green_from_blue=0.0` `blue_from_red=0.0` `blue_from_green=0.0` `blue_from_blue=1.0` | [channel_mixer.toml](../../examples/effects/channel_mixer.toml) |
 | <img src="../gallery/color_balance.jpg" width="160" alt="color_balance"> | `color_balance` | Push the shadows, midtones and highlights each toward a colour: split toning, duotone, teal and orange grading. | `shadows='#3a1bff'` `midtones='#808080'` `highlights='#ff2bd6'` `amount=0.3` `balance=0.5` `softness=1.0` +1 advanced | [color_balance.toml](../../examples/effects/color_balance.toml) |
+| <img src="../gallery/color_transfer.jpg" width="160" alt="color_transfer"> | `color_transfer` | Give the photo the colour mood of a reference picture, so the two look alike. | `reference=None` `amount=1.0` `preserve_luminance=False` | [color_transfer.toml](../../examples/effects/color_transfer.toml) |
 | <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel (cross process, solarize). | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first. | `temperature=0.0` `tint=0.0` `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
@@ -71,6 +72,14 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `teal_orange` | The blockbuster colour grade: teal in the shadows, orange in the highlights, olive between. |
 | `split_tone` | Split toning, duotone style: violet shadows and pink highlights, the two blended through the midtones. |
 | `color_balance` | A starting point for colour balancing: cool shadows, untouched midtones, warm highlights. |
+
+### `color_transfer`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `reference` | picture or none |  |  | `None` | The picture whose colours the photo takes on: the path of an image file in a recipe file (relative to the file) or in `fx`, or, in Python, a Picture or an array; in Rust, the name of a picture the photo was given or the path of an image file. Pixels it makes transparent are ignored. None leaves the photo as it is. |
+| `amount` | number | fraction | 0 to 1 | `1.0` | How far the photo moves toward the reference's colour mood, 0..1: 0 keeps the photo, 1 matches the reference's mean and spread in every channel, in between mixes the two. Raising it makes the photo look more like the reference. |
+| `preserve_luminance` | true or false |  |  | `False` | True: only the colours change; every pixel keeps its own brightness, so light and shadow stay as shot. False: brightness and contrast are matched to the reference too, so a dark photo with a bright reference gets brighter. |
 
 ### `curves`
 
