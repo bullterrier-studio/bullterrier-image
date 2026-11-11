@@ -56,6 +56,113 @@ pub fn effect(name: &str, presets: &Presets, advanced: bool) -> Result<String, E
     Ok(text)
 }
 
+/// Why `name` is no effect, in words that help whoever typed it: everything it is, listed together (a preset of some effects, a
+/// look that ships with the crate with its description, a parameter of some effects, a phrase in the summary of some effects),
+/// or else the closest effects, looks and presets and all the effects.
+#[must_use]
+pub fn unknown_effect(name: &str, presets: &Presets) -> String {
+    let effects: Vec<String> = crate::registry::effects();
+    let described: Vec<(String, Table)> = effects
+        .iter()
+        .filter_map(|effect| Some((effect.clone(), crate::registry::effect(effect).ok()?.params()?)))
+        .collect();
+    let mut meanings: Vec<String> = Vec::new();
+    for effect in &effects {
+        if presets.names(effect).contains(&name) {
+            meanings.push(format!("a preset (fx.{effect}(preset=\"{name}\"))"));
+        }
+    }
+    let looks = crate::shipped::looks();
+    if looks.iter().any(|(known, _)| *known == name) {
+        let description = crate::Recipe::look(name)
+            .ok()
+            .and_then(|look| look.description)
+            .unwrap_or_default();
+        meanings.push(format!(
+            "a look (load_recipe(\"{name}\"), `bt-image render PHOTO {name}`): {description}"
+        ));
+    }
+    let mut owners: Vec<(usize, &str)> = described
+        .iter()
+        .filter(|(_, table)| table.fields.iter().any(|field| field.name == name))
+        .map(|(effect, table)| (table.fields.len(), effect.as_str()))
+        .collect();
+    owners.sort_unstable(); // the narrowest effect first
+    if !owners.is_empty() {
+        let first: Vec<&str> = owners.iter().take(LISTED).map(|(_, effect)| *effect).collect();
+        let more = if owners.len() > LISTED {
+            format!(" and {} more", owners.len() - LISTED)
+        } else {
+            String::new()
+        };
+        meanings.push(format!("a parameter of {}{more}", first.join(", ")));
+    }
+    let words: Vec<String> = words_of(name);
+    let mentions: Vec<(&str, String)> = effects
+        .iter()
+        .filter_map(|effect| Some((effect.as_str(), summary(effect).ok()?)))
+        .filter(|(_, text)| {
+            let found = words_of(text);
+            !words.is_empty() && found.windows(words.len()).any(|window| window == words.as_slice())
+        })
+        .collect();
+    meanings.extend(
+        mentions
+            .iter()
+            .take(LISTED)
+            .map(|(effect, text)| format!("named in the summary of {effect}: {text}")),
+    );
+    if mentions.len() > LISTED {
+        meanings.push(format!("named in the summary of {} more", mentions.len() - LISTED));
+    }
+    if !meanings.is_empty() {
+        return format!("{} is {}", quoted(name), meanings.join("; and "));
+    }
+    let mut kinds: Vec<(String, String)> = effects
+        .iter()
+        .map(|effect| (effect.clone(), "effect".to_owned()))
+        .collect();
+    kinds.extend(looks.iter().map(|(known, _)| ((*known).to_owned(), "look".to_owned())));
+    for effect in &effects {
+        kinds.extend(
+            presets
+                .names(effect)
+                .into_iter()
+                .map(|preset| (preset.to_owned(), format!("preset of {effect}"))),
+        );
+    }
+    let near: Vec<String> = crate::recipe::near::closest(name, kinds.iter().map(|(known, _)| known.as_str()))
+        .into_iter()
+        .filter_map(|close| {
+            kinds
+                .iter()
+                .find(|(known, _)| known == close)
+                .map(|(known, kind)| format!("{known} ({kind})"))
+        })
+        .collect();
+    let hint = if near.is_empty() {
+        String::new()
+    } else {
+        format!("; did you mean: {}", near.join(", "))
+    };
+    format!(
+        "unknown effect {}{hint}; available: {}",
+        quoted(name),
+        effects.join(", ")
+    )
+}
+
+/// How many effects a message names at most, for each thing a name can be.
+const LISTED: usize = 5; // constant: enough to recognise the family, few enough to read
+
+/// The runs of letters and digits of `text`, lowercase.
+fn words_of(text: &str) -> Vec<String> {
+    text.split(|character: char| !character.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_ascii_lowercase)
+        .collect()
+}
+
 /// The first sentence of the description of the effect called `name`, on one line.
 ///
 /// # Errors
@@ -91,7 +198,12 @@ fn parameters(table: &Table, advanced: bool) -> String {
         }
         parts.push(format!("default {}", default(field)));
         let words = field.meaning.split_whitespace().collect::<Vec<_>>().join(" ");
-        let entry = format!("{} : {}\n{}", field.name, parts.join(", "), fill(&words, WIDTH, INDENT));
+        let entry = format!(
+            "{} : {}\n{}",
+            field.name,
+            parts.join(", "),
+            fill(&words, WIDTH, INDENT, INDENT)
+        );
         if field.advanced { &mut extra } else { &mut basic }.push(entry);
     }
     let text = format!("Parameters\n----------\n{}", basic.join("\n"));
@@ -285,14 +397,17 @@ fn chunks(text: &str) -> Vec<String> {
     found
 }
 
-/// `text` wrapped to lines of at most `width` characters, each starting with `indent`: as Python's `textwrap.fill` does
-/// (words are broken after a hyphen between letters, and a word longer than a line is cut).
-fn fill(text: &str, width: usize, indent: &str) -> String {
-    let room = width.saturating_sub(indent.chars().count());
+/// `text` wrapped to lines of at most `width` characters, the first starting with `initial` and the others with
+/// `subsequent`: as Python's `textwrap.fill` does (words are broken after a hyphen between letters, and a word longer than
+/// a line is cut). White space in `text` is kept as it is: normalise it first.
+#[must_use]
+pub fn fill(text: &str, width: usize, initial: &str, subsequent: &str) -> String {
     let mut pending: Vec<String> = chunks(text);
     pending.reverse();
     let mut lines: Vec<String> = Vec::new();
     while !pending.is_empty() {
+        let indent = if lines.is_empty() { initial } else { subsequent };
+        let room = width.saturating_sub(indent.chars().count());
         let mut line: Vec<String> = Vec::new();
         let mut length = 0;
         if !lines.is_empty() && pending.last().is_some_and(|chunk| chunk.trim().is_empty()) {
@@ -365,19 +480,27 @@ mod tests {
         let words = "one two three four five six seven eight nine ten";
         // 20 wide with a 2 px indent leaves 18: "one two three four" is 18 exactly
         assert_eq!(
-            fill(words, 20, "  "),
+            fill(words, 20, "  ", "  "),
             "  one two three four\n  five six seven\n  eight nine ten"
         );
-        assert_eq!(fill("", 20, "  "), "");
+        assert_eq!(fill("", 20, "  ", "  "), "");
+        // a first line and the lines after it may be indented differently, and each fits its own room
+        assert_eq!(
+            fill("one two three four", 10, "- ", "    "),
+            "- one two\n    three\n    four"
+        );
     }
 
     #[test]
     fn a_word_breaks_after_a_hyphen_between_letters_and_a_long_word_is_cut() {
         // "well-known" may break after "well-": the second line starts with "known"
-        assert_eq!(fill("aaaa bbbb well-known", 14, "  "), "  aaaa bbbb\n  well-known");
-        assert_eq!(fill("aaaa well-known", 12, "  "), "  aaaa well-\n  known");
-        assert_eq!(fill("x-5 y-ab", 6, ""), "x-5\ny-ab");
+        assert_eq!(
+            fill("aaaa bbbb well-known", 14, "  ", "  "),
+            "  aaaa bbbb\n  well-known"
+        );
+        assert_eq!(fill("aaaa well-known", 12, "  ", "  "), "  aaaa well-\n  known");
+        assert_eq!(fill("x-5 y-ab", 6, "", ""), "x-5\ny-ab");
         // a word longer than the room is cut to it
-        assert_eq!(fill("abcdefghij", 6, "  "), "  abcd\n  efgh\n  ij");
+        assert_eq!(fill("abcdefghij", 6, "  ", "  "), "  abcd\n  efgh\n  ij");
     }
 }

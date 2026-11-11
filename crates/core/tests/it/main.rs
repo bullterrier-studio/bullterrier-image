@@ -29,6 +29,7 @@ mod dehaze;
 mod disperse;
 mod displace;
 mod dither;
+mod documentation;
 mod drop_shadow;
 mod droste;
 mod dust_scratches;

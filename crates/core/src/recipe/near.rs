@@ -17,7 +17,7 @@ fn edits(one: &str, other: &str) -> usize {
 }
 
 /// Up to three of `known` a few edits from `name` (about one in three letters, at least two), the nearest first.
-pub(super) fn closest<'a>(name: &str, known: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
+pub(crate) fn closest<'a>(name: &str, known: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
     let reach = (name.chars().count() / 3).max(2); // constant: about one edit in three letters, at least two
     let mut near: Vec<(usize, &str)> = known
         .into_iter()

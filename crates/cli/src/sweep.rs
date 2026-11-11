@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use bullterrier_image::documentation::general;
 use bullterrier_image::{Error, Options, Presets, Recipe, Tile, contact_sheet, write};
 use clap::Args as ClapArgs;
 
@@ -55,37 +56,6 @@ fn span(text: &str) -> Result<(f64, f64), String> {
         part.parse::<f64>().map_err(|_| wrong())
     };
     Ok((number(&text[..at])?, number(&text[at + 2..])?))
-}
-
-/// `value` as `%g` writes it: up to six significant digits, no trailing zeros, an exponent beyond 1e-4 .. 1e6.
-fn general(value: f64) -> String {
-    if value == 0.0 {
-        return "0".to_owned();
-    }
-    let exponent = value.abs().log10().floor();
-    if !(-4.0..6.0).contains(&exponent) {
-        let text = format!("{value:.5e}");
-        let (mantissa, power) = text.split_once('e').unwrap_or((&text, "0"));
-        let mantissa = if mantissa.contains('.') {
-            mantissa.trim_end_matches('0').trim_end_matches('.')
-        } else {
-            mantissa
-        };
-        let power: i32 = power.parse().unwrap_or(0);
-        return format!("{mantissa}e{}{:02}", if power < 0 { '-' } else { '+' }, power.abs());
-    }
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "the exponent of a value in -4..6 leaves 0 to 9 decimals"
-    )]
-    let decimals = (5.0 - exponent).max(0.0) as usize;
-    let text = format!("{value:.decimals$}");
-    if text.contains('.') {
-        text.trim_end_matches('0').trim_end_matches('.').to_owned()
-    } else {
-        text
-    }
 }
 
 /// `count` values evenly spaced from `start` to `end`, the last exactly `end`.
@@ -166,27 +136,7 @@ pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Err
 
 #[cfg(test)]
 mod tests {
-    use super::{general, linspace, span};
-
-    // values worked out by hand, as `%g` writes them
-    #[test]
-    fn numbers_are_written_as_g_does() {
-        for (value, text) in [
-            (0.0, "0"),
-            (5.0, "5"),
-            (-2.0, "-2"),
-            (2.5, "2.5"),
-            (0.1 + 0.2, "0.3"),
-            (1.0 / 3.0, "0.333333"),
-            (12.5, "12.5"),
-            (123_456.0, "123456"),
-            (12_345_678.0, "1.23457e+07"),
-            (0.00001, "1e-05"),
-            (0.0001, "0.0001"),
-        ] {
-            assert_eq!(general(value), text);
-        }
-    }
+    use super::{linspace, span};
 
     #[test]
     fn values_are_evenly_spaced_and_end_exactly_on_the_end() {

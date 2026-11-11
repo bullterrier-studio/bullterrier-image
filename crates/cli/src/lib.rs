@@ -4,6 +4,7 @@
 //! Python console script) runs it in-process and sees the exit code and the output.
 
 mod cutout;
+mod effects;
 mod finders;
 mod init;
 mod photo;
@@ -72,6 +73,9 @@ enum Command {
     /// Save just the subject on a transparent background.
     #[command(after_help = "example: bt-image cutout examples/photos/bullterrier.jpeg -o out/cutout.png --feather 2")]
     Cutout(cutout::Args),
+    /// List the built-in looks and the effects, one line each.
+    #[command(after_help = "example: bt-image effects --category light")]
+    Effects(effects::Args),
     /// Process every photo of a project with every recipe: cached, checked, with a report.
     #[command(after_help = "example: bt-image run examples/bt-image.toml --dry-run")]
     Run(run::Args),
@@ -147,6 +151,7 @@ pub fn main(argv: &[String], version: &str, out: &mut dyn Write, err: &mut dyn W
         Command::Steps(given) => render::steps(&given, &mut console),
         Command::Sweep(given) => sweep::command(&given, &mut console),
         Command::Cutout(given) => cutout::command(&given, &mut console),
+        Command::Effects(given) => effects::command(&given, &mut console),
         Command::Run(given) => run::command(&given, &mut console),
     };
     match outcome {

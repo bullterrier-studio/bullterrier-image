@@ -3,6 +3,7 @@
 
 mod common;
 
+mod effects;
 mod init;
 mod render;
 mod run;

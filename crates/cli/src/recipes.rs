@@ -2,8 +2,9 @@
 
 use std::path::{Path, PathBuf};
 
+use bullterrier_image::documentation::unknown_effect;
 use bullterrier_image::pipeline::file_name;
-use bullterrier_image::{Error, Presets, Recipe, shipped};
+use bullterrier_image::{Entry, Error, Presets, Recipe, shipped};
 
 /// The recipes of `specs`, each a look's name, a recipe file, or a folder (its `.toml` files, by name), in order. Each is
 /// checked to be a valid recipe and to have a name its files can be called by, so nothing slow starts for a recipe that cannot
@@ -36,9 +37,21 @@ pub(crate) fn load(specs: &[String]) -> Result<Vec<Recipe>, Error> {
         .iter()
         .map(|source| {
             let located = |error: Error| Error::Recipe(format!("{source}: {error}"));
-            let recipe = Recipe::resolve(source)?.checked(&presets).map_err(located)?;
-            file_name(&recipe).map_err(located)?;
-            Ok(recipe)
+            let recipe = Recipe::resolve(source)?;
+            let checked = recipe.clone().checked(&presets).map_err(|error| match error {
+                // say which step, and what the name the recipe wrote is instead
+                Error::UnknownEffect(name) => {
+                    let step = recipe
+                        .steps
+                        .iter()
+                        .position(|entry| matches!(entry, Entry::Step(step) if step.effect == name))
+                        .map_or_else(String::new, |at| format!("step {}: ", at + 1));
+                    Error::Recipe(format!("{source}: {step}{}", unknown_effect(&name, &presets)))
+                }
+                other => located(other),
+            })?;
+            file_name(&checked).map_err(located)?;
+            Ok(checked)
         })
         .collect()
 }

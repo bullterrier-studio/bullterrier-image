@@ -25,7 +25,7 @@ pub(crate) mod drive;
 pub(crate) mod file;
 pub mod frame;
 mod load;
-mod near;
+pub(crate) mod near;
 mod needs;
 mod numbers;
 mod references;

@@ -534,3 +534,21 @@ fn a_sweep_that_cannot_be_made_is_refused_before_any_work_naming_the_fix() -> Ou
     assert!(usage.err.contains("0-1"), "{}", usage.err);
     Ok(())
 }
+
+#[test]
+fn a_recipe_with_a_misspelt_effect_says_which_step_and_what_the_name_is_near() -> Outcome {
+    let root = scene("misspelt")?;
+    text(
+        &root.join("typo.toml"),
+        "name = \"typo\"\n[[step]]\neffect = \"grade\"\n[[step]]\neffect = \"slice_shif\"\n",
+    )?;
+    let ran = bt(&["render", &at(&root, "me.png"), &at(&root, "typo.toml")]);
+    assert_eq!(ran.code, 1);
+    assert!(
+        ran.err
+            .contains("typo.toml: step 2: unknown effect 'slice_shif'; did you mean: slice_shift (effect)"),
+        "{}",
+        ran.err
+    );
+    Ok(())
+}
