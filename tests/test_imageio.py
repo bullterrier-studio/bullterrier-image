@@ -169,17 +169,19 @@ def test_palette_gives_hex_strings_largest_share_first_that_gradient_map_accepts
     picture[:6] = (1.0, 0.0, 0.0)  # 6 rows red, 3 green, 1 blue
     picture[6:9] = (0.0, 1.0, 0.0)
     picture[9:] = (0.0, 0.0, 1.0)
-    stops = imageio.palette(picture, 3)
+    stops = imageio.palette(picture, colors=3)
     assert stops == ["#ff0000", "#00ff00", "#0000ff"]
-    assert imageio.palette(picture, 3) == stops  # the same seed, the same list
+    assert imageio.palette(picture, colors=3) == stops  # the same seed, the same list
     fx.gradient_map(stops=stops)  # a step is made: the core accepts what palette gives
     assert bullterrier_image.palette is imageio.palette
+    with pytest.raises(TypeError, match="positional"):
+        imageio.palette(picture, 3)  # type: ignore[misc]  # colors is by keyword: the refusal is the point
 
 
 @pytest.mark.parametrize("colors", [0, -2, 257])
 def test_palette_refuses_a_number_of_colours_outside_1_to_256_naming_the_value(colors):
     with pytest.raises(RecipeError, match=rf"colors.*{colors}"):
-        imageio.palette(np.zeros((2, 2, 3), np.float32), colors)
+        imageio.palette(np.zeros((2, 2, 3), np.float32), colors=colors)
 
 
 def test_palette_refuses_what_is_no_picture():
@@ -190,9 +192,9 @@ def test_palette_refuses_what_is_no_picture():
 @pytest.mark.parametrize(("seed", "shown"), [(-1, "-1"), (2**32, "4294967296"), (2**70, "1.18059")])
 def test_palette_refuses_a_seed_outside_0_to_4294967295_naming_the_value(seed, shown):
     with pytest.raises(RecipeError, match=rf"seed.*{shown}"):
-        imageio.palette(np.zeros((2, 2, 3), np.float32), 1, seed=seed)
+        imageio.palette(np.zeros((2, 2, 3), np.float32), colors=1, seed=seed)
 
 
 @pytest.mark.parametrize("seed", [0, 2**32 - 1])
 def test_palette_takes_the_smallest_and_largest_seed(seed):
-    assert imageio.palette(np.zeros((2, 2, 3), np.float32), 1, seed=seed) == ["#000000"]
+    assert imageio.palette(np.zeros((2, 2, 3), np.float32), colors=1, seed=seed) == ["#000000"]
