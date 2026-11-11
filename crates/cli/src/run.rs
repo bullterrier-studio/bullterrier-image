@@ -33,13 +33,8 @@ pub(crate) struct Args {
     /// What finds the subject: vision (Apple Vision, macOS only) or onnx (a portable model, downloaded on first use);
     /// default: `BT_IMAGE_SEGMENTER`, else vision on macOS and onnx elsewhere. A segmenter named here is checked at once,
     /// even for a look that needs no subject.
-    #[arg(long, value_parser = segmenter)]
+    #[arg(long, value_parser = finders::segmenter)]
     segmenter: Option<Segmenter>,
-}
-
-/// A clap value parser: `vision` or `onnx`.
-pub(crate) fn segmenter(name: &str) -> Result<Segmenter, String> {
-    Segmenter::named(name).map_err(|error| error.to_string())
 }
 
 pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Error> {

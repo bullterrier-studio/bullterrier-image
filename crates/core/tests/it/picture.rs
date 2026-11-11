@@ -158,3 +158,15 @@ fn an_rgba_image_is_refused_for_a_wrong_size_a_non_number_or_an_alpha_outside_0_
         assert!(error.is_some_and(|error| error.to_string().contains(says)), "{id}");
     }
 }
+
+#[test]
+fn over_white_lays_a_transparent_image_on_white_so_a_hidden_colour_never_shows() -> Result<(), Error> {
+    // pixels: opaque red, clear green (hidden), half blue
+    let image = Image::rgba(1, 3, &[1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.5])?;
+    let flat = image.over_white();
+    assert_eq!((flat.channels(), flat.height(), flat.width()), (3, 1, 3));
+    assert_eq!(flat.into_values(), [1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.5, 0.5, 1.0]);
+    let opaque = Image::new(1, 1, &[0.2, 0.4, 0.6])?;
+    assert_eq!(opaque.over_white().into_values(), [0.2, 0.4, 0.6], "no alpha: as it is");
+    Ok(())
+}

@@ -4,5 +4,6 @@
 mod common;
 
 mod init;
+mod render;
 mod run;
 mod usage;

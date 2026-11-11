@@ -5,6 +5,9 @@
 
 mod finders;
 mod init;
+mod photo;
+mod recipes;
+mod render;
 mod run;
 mod stamp;
 
@@ -48,6 +51,19 @@ enum Command {
     /// Create a starter bt-image.toml, a photos/ folder and two recipes.
     #[command(after_help = "example: bt-image init my-project")]
     Init(init::Args),
+    /// Render a photo through one or more recipes, one file each.
+    #[command(after_help = "example: bt-image render examples/photos/bullterrier.jpeg examples/recipes -o out")]
+    Render(render::RenderArgs),
+    /// Render recipes and put them side by side in one comparison image.
+    #[command(
+        after_help = "example: bt-image sheet examples/photos/bullterrier.jpeg examples/recipes -o out/sheet.png"
+    )]
+    Sheet(render::SheetArgs),
+    /// Show what every step of a recipe does to a photo: one picture per step.
+    #[command(
+        after_help = "example: bt-image steps examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml"
+    )]
+    Steps(render::StepsArgs),
     /// Process every photo of a project with every recipe: cached, checked, with a report.
     #[command(after_help = "example: bt-image run examples/bt-image.toml --dry-run")]
     Run(run::Args),
@@ -118,6 +134,9 @@ pub fn main(argv: &[String], version: &str, out: &mut dyn Write, err: &mut dyn W
     };
     let outcome = match cli.command {
         Command::Init(given) => init::command(&given, &mut console),
+        Command::Render(given) => render::render(&given, &mut console),
+        Command::Sheet(given) => render::sheet(&given, &mut console),
+        Command::Steps(given) => render::steps(&given, &mut console),
         Command::Run(given) => run::command(&given, &mut console),
     };
     match outcome {

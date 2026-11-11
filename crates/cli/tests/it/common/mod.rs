@@ -68,3 +68,31 @@ pub(crate) fn project(root: &Path, flat: bool) -> Result<PathBuf, Box<dyn std::e
     )?;
     Ok(file)
 }
+
+/// The file `path` (made with its folders) holding `text`.
+pub(crate) fn text(path: &Path, text: &str) -> Result<(), std::io::Error> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(path, text)
+}
+
+/// A map picture of `path`: the left half `left`, the right half `right`, in grey levels 0 or 255.
+pub(crate) fn halves(path: &Path, (height, width): (usize, usize), (left, right): (f32, f32)) -> Outcome {
+    let values: Vec<f32> = (0..height * width)
+        .flat_map(|i| {
+            let level = if i % width < width / 2 { left } else { right };
+            [level; 3]
+        })
+        .collect();
+    write(path, &Image::new(height, width, &values)?)?;
+    Ok(())
+}
+
+/// The pixel `(row, column)` of the picture file `path`, its channels in 0..1.
+pub(crate) fn pixel(path: &Path, row: usize, column: usize) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
+    let image = bullterrier_image::read(path)?;
+    let (channels, width) = (image.channels(), image.width());
+    let values = image.into_values();
+    Ok(values[(row * width + column) * channels..][..channels].to_vec())
+}

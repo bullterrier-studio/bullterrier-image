@@ -235,19 +235,7 @@ impl PhotoState<'_> {
     /// The photo, read upright and in sRGB; a transparent one is laid over white, so a colour hidden under it never shows.
     fn image(&mut self) -> Result<&Image, Error> {
         if self.image.is_none() {
-            let read = crate::read(self.path)?;
-            let image = match read.alpha() {
-                None => read,
-                Some(alpha) => {
-                    let colour = read.as_picture().values().as_chunks::<3>().0;
-                    let over = colour
-                        .iter()
-                        .zip(alpha)
-                        .map(|(pixel, &opacity)| pixel.map(|c| c * opacity + (1.0 - opacity)))
-                        .collect();
-                    Image::from_pixels(read.height(), read.width(), over)
-                }
-            };
+            let image = crate::read(self.path)?.over_white();
             self.image = Some(image);
         }
         self.image

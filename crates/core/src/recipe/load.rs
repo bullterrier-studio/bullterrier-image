@@ -36,7 +36,10 @@ impl Recipe {
         } else if Path::new(spec).exists() {
             Self::from_file(Path::new(spec))
         } else {
-            Err(Error::Recipe(format!("no look or file {spec:?}: {}", unknown_look(spec))))
+            Err(Error::Recipe(format!(
+                "no look or file {spec:?}: {}",
+                unknown_look(spec)
+            )))
         }
     }
 

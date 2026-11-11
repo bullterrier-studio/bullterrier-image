@@ -250,6 +250,20 @@ impl Image {
         }
     }
 
+    /// This image with its transparency laid over white: three channels, and a colour hidden under a clear pixel never
+    /// shows. An image without alpha is returned as it is.
+    #[must_use]
+    pub fn over_white(self) -> Self {
+        let Some(alpha) = self.alpha else { return self };
+        let pixels = self
+            .pixels
+            .into_iter()
+            .zip(alpha)
+            .map(|(pixel, opacity)| pixel.map(|channel| channel * opacity + (1.0 - opacity)))
+            .collect();
+        Self::from_pixels(self.height, self.width, pixels)
+    }
+
     /// This image read as a picture, without copying it: the input of the next effect.
     #[must_use]
     pub fn as_picture(&self) -> Picture<'_> {

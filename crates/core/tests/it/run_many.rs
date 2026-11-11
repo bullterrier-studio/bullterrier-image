@@ -37,7 +37,10 @@ fn plain() -> Recipe {
 const PIXELS: [f32; 8 * 8 * 3] = [0.5; 8 * 8 * 3];
 
 fn finders(asked: &Arc<AtomicUsize>) -> BTreeMap<String, Arc<dyn Finder>> {
-    BTreeMap::from([("subject".to_owned(), Arc::new(Halves(Arc::clone(asked))) as Arc<dyn Finder>)])
+    BTreeMap::from([(
+        "subject".to_owned(),
+        Arc::new(Halves(Arc::clone(asked))) as Arc<dyn Finder>,
+    )])
 }
 
 #[test]
@@ -67,7 +70,13 @@ fn a_finder_nobody_needs_is_not_asked_and_a_map_handed_in_is_not_found() -> Outc
 #[test]
 fn a_map_nobody_can_give_is_the_maps_error_and_a_name_no_recipe_knows_lists_the_names() -> Outcome {
     let picture = Picture::new(8, 8, &PIXELS)?;
-    let missing = Photo::for_recipes(picture, &[masked(0.2)], &Presets::new(), BTreeMap::new(), &BTreeMap::new());
+    let missing = Photo::for_recipes(
+        picture,
+        &[masked(0.2)],
+        &Presets::new(),
+        BTreeMap::new(),
+        &BTreeMap::new(),
+    );
     assert!(
         matches!(&missing, Err(error) if error.kind() == ErrorKind::SubjectNotFound),
         "{missing:?}"

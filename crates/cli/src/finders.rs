@@ -32,3 +32,8 @@ pub(crate) fn found(name: &str, segmenter: Option<Segmenter>) -> Result<Option<F
         _ => Ok(None),
     }
 }
+
+/// A clap value parser: `vision` or `onnx`.
+pub(crate) fn segmenter(name: &str) -> Result<Segmenter, String> {
+    Segmenter::named(name).map_err(|error| error.to_string())
+}

@@ -24,7 +24,10 @@ impl<'a> Photo<'a> {
         finders: &BTreeMap<String, Arc<dyn Finder>>,
     ) -> Result<Vec<Self>, Error> {
         let known: BTreeSet<&str> = recipes.iter().flat_map(Recipe::known_maps).collect();
-        for (what, names) in [("maps", maps.keys().collect::<Vec<_>>()), ("finders", finders.keys().collect())] {
+        for (what, names) in [
+            ("maps", maps.keys().collect::<Vec<_>>()),
+            ("finders", finders.keys().collect()),
+        ] {
             if let Some(unknown) = names.into_iter().find(|name| !known.contains(name.as_str())) {
                 return Err(Error::Recipe(format!(
                     "`{what}` names {unknown:?}, which is no map of the recipes; their maps: {} (`subject` and \
@@ -57,7 +60,10 @@ impl<'a> Photo<'a> {
             .map(|(recipe, need)| {
                 let mut photo = Self::new(picture);
                 for name in recipe.known_maps() {
-                    if let Some(map) = found.get(name).filter(|_| need.maps.contains(name) || handed.contains(name)) {
+                    if let Some(map) = found
+                        .get(name)
+                        .filter(|_| need.maps.contains(name) || handed.contains(name))
+                    {
                         photo = photo.with_map(name, map.clone())?;
                     }
                 }
