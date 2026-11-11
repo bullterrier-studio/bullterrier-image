@@ -5,7 +5,8 @@
 //! The strings of a table read here live as long as the process (a [`Table`] holds `&'static str`, as the derive writes
 //! them): one effect declared at run time costs the text of its table, once.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::{Mutex, OnceLock, PoisonError};
 
 use serde_json::{Map, Value, json};
 
@@ -56,12 +57,27 @@ impl Kind {
 impl Table {
     /// The table `description` writes: `{"doc": text, "fields": [parameter, ..]}`, each parameter as the format describes it
     /// (the form a table serialises to). For an effect declared at run time, whose strings the table keeps for the life of
-    /// the process.
+    /// the process: the same description again gives the table made the first time (a clone sharing its strings), so
+    /// registering one effect over and over does not grow the process.
     ///
     /// # Errors
     /// [`Error::Declaration`] naming the parameter and the rule it breaks: a parameter that [`Field::from_json`] refuses,
     /// a name written twice, an `at_most` that names no other number of the same unit.
     pub fn from_json(description: &Value) -> Result<Self, Error> {
+        static MADE: OnceLock<Mutex<HashMap<String, Table>>> = OnceLock::new();
+        let made = MADE.get_or_init(Mutex::default);
+        let key = description.to_string();
+        if let Some(table) = made.lock().unwrap_or_else(PoisonError::into_inner).get(&key) {
+            return Ok(table.clone());
+        }
+        let table = Self::read_table(description)?;
+        made.lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(key, table.clone());
+        Ok(table)
+    }
+
+    fn read_table(description: &Value) -> Result<Self, Error> {
         let table = description
             .as_object()
             .ok_or_else(|| Error::Declaration("a table is a JSON object with `doc` and `fields`".to_owned()))?;

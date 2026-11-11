@@ -200,3 +200,18 @@ fn the_json_schema_of_a_table_is_worked_out_from_its_parameters() -> Result<(), 
     assert_eq!(schema["required"], json!([]), "every parameter has a default");
     Ok(())
 }
+
+#[test]
+fn the_same_description_again_shares_the_strings_of_the_first_reading() -> Result<(), Error> {
+    let description = json!({"doc": "Shared once.", "fields": [number("reuse_probe", 1.0, 0.0, 9.0)]});
+    let (first, again) = (Table::from_json(&description)?, Table::from_json(&description)?);
+    assert_eq!(first, again);
+    assert!(std::ptr::eq(first.doc, again.doc), "the doc was leaked twice");
+    assert!(
+        std::ptr::eq(first.fields[0].name, again.fields[0].name),
+        "a name was leaked twice"
+    );
+    let other = Table::from_json(&json!({"doc": "Shared once.", "fields": [number("reuse_probe", 2.0, 0.0, 9.0)]}))?;
+    assert_ne!(first, other, "a different table is a different table");
+    Ok(())
+}
