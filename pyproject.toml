@@ -28,11 +28,10 @@ classifiers = [
     "Typing :: Typed",
 ]
 # Lower bounds are the oldest releases the suite passes with on Python 3.12 (`uv run poe check-min-deps` runs it against
-# exactly these). Below them: pydantic 2.7.0 fails at import, and numpy 1.26 is the first series with Python 3.12 wheels.
+# exactly these). Below it: numpy 1.26 is the first series with Python 3.12 wheels.
 # No upper bounds: nothing is known to break on a newer release.
 dependencies = [
     "numpy>=1.26.4",
-    "pydantic>=2.7.1",
 ]
 
 [project.urls]
@@ -367,8 +366,6 @@ warn_redundant_casts = true
 show_error_codes = true
 # NOT enabled: warn_return_any (parts of numpy return Any: pure noise here), disallow_any_generics (bare
 # np.ndarray everywhere), full --strict.
-# The pydantic plugin types each model's constructor from its fields, so a misspelt parameter name is a type error.
-plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = ["tests.*"]
@@ -383,8 +380,6 @@ paths = ["src"]
 min_confidence = 60
 ignore_decorators = [
     "@effect",  # the registry finds an effect function through its decorator; recipes and `fx` call it by name
-    "@model_validator",  # pydantic runs validators when a model is built
-    "@field_validator",
 ]
 ignore_names = [
     # public API a caller uses, which no line of ours does: a `Recipe` sets numbers by address, an `Item` says what happened
@@ -435,9 +430,6 @@ ignore_names = [
     "outputs",  # the fields of `pipeline.Item`, which `run` returns and callers and the record read by name
     "fingerprint",
     "amount",  # `Edge.amount`; the last ascii text-art code that read a name `amount` is gone
-    "model_config",  # pydantic reads each model's settings from this class attribute
-    "model_construct",  # `ValidatedModel.model_construct` overrides pydantic's to raise: a guard, called by no one
-    "ignored_warning_kinds",  # pydantic reads it from a JSON schema generator class
     "__signature__",  # `inspect.signature` reads it (the documented way to give a callable a signature)
     "__call__",  # Python calls it when a registered effect object is called
     "__getattr__",  # module-level hooks (PEP 562): `fx.<effect>` and `dir(fx)`

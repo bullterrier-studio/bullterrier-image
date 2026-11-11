@@ -118,8 +118,8 @@ its parameters.
 
 ## Image's standards
 
-- **Override of the default "Runtime dependencies: none":** numpy is the interface's picture type; pydantic
-  and the finders' runtimes stay until E7 batch 6 (reasons in `docs/design-decisions.md`).
+- **Override of the default "Runtime dependencies: none":** numpy is the interface's picture type, and the finders'
+  runtimes stay (reasons in `docs/design-decisions.md`). pydantic is gone.
 - `src/` holds only code and the data it runs on (presets, looks). Tests, examples and gallery pictures live outside it.
 - **File size:** a source file stays within 1000 lines, a test file within 1500 (`tools/check_file_size.py`, run by the tests;
   `[tool.file-size]`). Split by concept before you reach it. A file already over is listed in `[tool.file-size.exempt]` at its
