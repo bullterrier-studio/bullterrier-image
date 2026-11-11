@@ -28,7 +28,7 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import numpy as np
 from pydantic import Field, field_validator, model_validator
@@ -44,12 +44,11 @@ from .params import (
     arrays_as_values,
     bounds,
     cyclic_of,
-    drivable_fields,
+    field_name_fields,
     picture_fields,
     unit_of,
-    whole_number_fields,
 )
-from .regions import Kind, check, needs
+from .regions import Kind
 from .values import BlendMode, Lut, Picture
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
@@ -71,10 +70,6 @@ class Parameter:
     doc: str
     whole: bool = False
     cyclic: bool = False
-
-
-# One reference a step makes to a region: the key it is written in, the name, and the kind of region that key takes.
-Reference = tuple[str, str, Literal["partition", "selection"] | None]
 
 
 class _Layer(ValidatedModel):
@@ -190,23 +185,8 @@ class Step(_Layer):
 
     @model_validator(mode="after")
     def _valid_for_the_effect(self) -> "Step":
-        """The parameters, checked by the effect itself."""
-        for name in registry.INPUTS:
-            if name in self.params:
-                raise RecipeError(f"`{name}` is supplied by the recipe itself and cannot be set")
-        for name in registry.STEP_KEYS:
-            if name in self.params:
-                raise RecipeError(
-                    f"`{name}` is a key of the step, not a parameter of {self.effect!r}: give it as {name}="
-                )
-        _check_drives(self.effect, self.params)  # an unknown effect: UnknownEffectError listing them
-        takes = "partition" in registry.inputs(self.effect)
-        if takes and self.partition is None:
-            raise RecipeError(
-                f"effect {self.effect!r} draws along the borders of a partition: give `partition`, a region"
-            )
-        if self.partition is not None and not takes:
-            raise RecipeError(f"effect {self.effect!r} takes no partition: remove `partition`")
+        """The step, checked by the core as a recipe of one step (the names of regions are the recipe's to check)."""
+        _check_alone(self)
         return self
 
     def apply(
@@ -367,33 +347,6 @@ def drives(step: Step) -> dict[str, Drive]:
     return {name: value for name, value in step.params.items() if isinstance(value, Drive)}
 
 
-def fixed(step: Step) -> dict[str, Any]:
-    """The parameters of `step` that are plain values, as written (the rest are `drives`)."""
-    return {name: value for name, value in step.params.items() if not isinstance(value, Drive)}
-
-
-def named_fields(step: Step) -> dict[str, str]:
-    """The fields the effect of `step` works from, by the name of the parameter that names each, as written or by
-    default (`{"field": "light"}`); empty for an effect with no field parameter."""
-    return registry.get(step.effect).fields_named(step.params)
-
-
-def references(step: Step | Each) -> list[Reference]:
-    """The regions `step` names, as `(key, name, kind)`, which the recipe checks against its regions: its mask; for a
-    `Step` the field that drives it (`by`, a selection), the fields its effect works from (`<effect>.<parameter>`,
-    selections) and the partition it draws; for an `Each` its partition and its looks' regions."""
-    masked: list[Reference] = [] if step.mask is None else [("mask", step.mask, "selection")]
-    if isinstance(step, Each):
-        looks = [reference for look in runs(step) for reference in references(look)]
-        return [*masked, ("each", step.each, "partition"), *looks]
-    driving: list[Reference] = [("by", by, "selection") for by in dict.fromkeys(d.by for d in drives(step).values())]
-    working: list[Reference] = [
-        (f"{step.effect}.{parameter}", field, "selection") for parameter, field in named_fields(step).items()
-    ]
-    drawn: list[Reference] = [] if step.partition is None else [("partition", step.partition, None)]
-    return [*masked, *driving, *working, *drawn]
-
-
 Hold = Callable[
     [object], object
 ]  # `registry.holding`'s: keeps an object, returns the reference or name to put in its place
@@ -431,7 +384,7 @@ def _entry(step: "Step | Each | None", hold: Hold) -> dict[str, Any] | None:
             pictures = picture_fields(registry.parameters(step.effect))
             entry["params"] = {
                 # a colour written for a picture is a flat one, in Python only: the core takes names and paths
-                name: _value(Picture.of_color(value) if name in pictures and _is_colour(value) else value, hold)
+                name: _value(_flat(step.effect, name, value) if name in pictures and _is_colour(value) else value, hold)
                 for name, value in step.params.items()
             }
         if step.partition is not None:
@@ -441,6 +394,14 @@ def _entry(step: "Step | Each | None", hold: Hold) -> dict[str, Any] | None:
         if (value := getattr(step, key)) is not None:
             entry[key] = value
     return entry
+
+
+def _flat(effect: str, name: str, colour: object) -> Picture:
+    """The flat picture of the colour written for the picture parameter `name`; RecipeError naming the effect and it."""
+    try:
+        return Picture.of_color(colour)
+    except ValueError as error:
+        raise RecipeError(f"effect {effect!r}: `{name}`: {error}") from None
 
 
 def _region(region: Kind) -> dict[str, Any]:
@@ -496,48 +457,36 @@ def _as_drive(effect: str, name: str, value: Any) -> Any:
         raise RecipeError(f"effect {effect!r}: `{name}`: {error}") from None
 
 
-def _check_drives(effect: str, params: Mapping[str, Any]) -> None:
-    """RecipeError unless `params` (a step's values as written, some perhaps `Drive`s) are valid for `effect`: the
-    plain ones as its model says, each driven one a drivable parameter whose every level value (start and end, and the
-    steps between) is valid there, and all drives of the step varying one field in one number of levels."""
-    model = registry.get(effect)
-    fixed = {name: value for name, value in params.items() if not isinstance(value, Drive)}
-    drives = {name: value for name, value in params.items() if isinstance(value, Drive)}
-    model.validate(fixed)
-    fields = model.params_model
-    for name in drives:
-        if name not in fields.model_fields:
-            model.validate({name: 0})  # an unknown parameter: the model's own error, listing the valid ones
-        if name not in drivable_fields(fields):
-            raise RecipeError(_not_drivable(effect, name, fields))
-    for what, kinds in (
-        ("field", {d.by for d in drives.values()}),
-        ("number of levels", {d.levels for d in drives.values()}),
-    ):
-        if len(kinds) > 1:
-            shown = " and ".join(repr(kind) for kind in sorted(kinds, key=str))
-            raise RecipeError(f"effect {effect!r}: the drives of one step must vary by one {what}, got {shown}")
-    levels = next((d.levels for d in drives.values()), 0)
-    for level in (*([0, levels - 1] if levels else []), *range(1, levels - 1)):  # the ends as written first
-        model.validate({**fixed, **{name: drive.value(level) for name, drive in drives.items()}})
+_ALONE = re.compile(r"^step 1: ")  # the place the core names in a recipe of one step
 
 
-def _not_drivable(effect: str, name: str, fields: type[EffectParams]) -> str:
-    """Why the parameter `name` of `effect`, whose model is `fields`, cannot be driven, and which can."""
-    why = (
-        "it is a whole number"
-        if name in whole_number_fields(fields)
-        else "it is not a number"
-        if _kind(fields, name) != "number"
-        else "its effect does not declare it drivable"
-    )
-    names = ", ".join(sorted(drivable_fields(fields))) or "none"
-    return f"effect {effect!r}: `{name}` cannot be driven by a field ({why}); its drivable parameters: {names}"
-
-
-def _kind(fields: type[EffectParams], name: str) -> str:
-    """ "number" for a decimal number field, else the field's own type word."""
-    return next(doc.type for doc in fields.fields_doc() if doc.name == name).split(" (")[0]
+def _check_alone(step: "Step") -> None:
+    """RecipeError (UnknownEffectError for an unknown effect) unless the core accepts `step` as a recipe of one step:
+    its effect, parameters, drives and `partition`. The regions a `mask`, a `partition` or a drive's `by` name are the
+    recipe's to check, so the step is put to the core with stand-ins for them: no mask, a declared grid for the
+    partition, `light` for each field parameter, and for each different `by` a different built-in selection."""
+    with registry.holding() as hold:
+        entry = _entry(step, hold)
+    entry = cast("dict[str, Any]", entry)
+    entry.pop("mask", None)
+    document: dict[str, Any] = {"steps": [entry]}
+    if "partition" in entry:
+        entry["partition"], document["regions"] = "stand_in", {"stand_in": {"kind": "grid"}}
+    named = field_name_fields(registry.parameters(step.effect))  # the selections a field parameter names
+    stand_ins: dict[
+        str, str
+    ] = {}  # each field a drive varies by, as one of the built-in selections, a different one each
+    for name, value in entry.get("params", {}).items():
+        if name in named and not isinstance(value, dict):
+            entry["params"][name] = "light"
+        elif isinstance(value, dict) and "by" in value:
+            value["by"] = stand_ins.setdefault(
+                str(value["by"]), ("light", "depth", "subject", "background")[len(stand_ins) % 4]
+            )
+    try:
+        native.check_recipe(document)
+    except RecipeError as error:
+        raise RecipeError(_ALONE.sub("", str(error))) from None
 
 
 def _described(text: str, layer: _Layer, width: int) -> str:
@@ -669,30 +618,9 @@ class Recipe(ValidatedModel):
     def _complete(self) -> "Recipe":
         if not self.steps:
             raise RecipeError("a recipe needs at least one step")
-        check(self.regions)
-        for number, step in enumerate(self.steps, start=1):
-            for key, name, wanted in references(step):
-                needs(f"step {number}", key, name, wanted, self.regions)
-        self._check_names()
         with registry.holding() as hold:  # the rules the core runs by, those of a region's path among them
             native.check_recipe(recipe_dict(self, hold))
         return self
-
-    def _check_names(self) -> None:
-        """RecipeError unless the step names are unique and none is the name of an effect the recipe uses (it would be
-        taken for that effect in an address)."""
-        used = {step.effect for step in self.steps if isinstance(step, Step)}
-        first: dict[str, int] = {}
-        for number, step in enumerate(self.steps, start=1):
-            if step.name is None:
-                continue
-            if step.name in first:
-                raise RecipeError(f"`name` {step.name!r} is the name of steps {first[step.name]} and {number}")
-            if step.name in used:
-                raise RecipeError(
-                    f"step {number}: `name` {step.name!r} is also an effect this recipe uses; choose another"
-                )
-            first[step.name] = number
 
     def parameters(self) -> dict[str, Parameter]:
         """Every number of the recipe that can be set, by address, in the order of the recipe: the numbers of each step

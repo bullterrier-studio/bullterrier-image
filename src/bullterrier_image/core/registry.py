@@ -50,7 +50,16 @@ from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, Un
 from . import looks as look_files
 from . import native
 from . import presets as preset_files
-from .params import EffectParams, core_effect, field_name_fields, lut_fields, picture_fields, scaled, signature
+from .params import (
+    EffectParams,
+    core_effect,
+    field_name_fields,
+    from_checked,
+    lut_fields,
+    picture_fields,
+    signature,
+    table_of,
+)
 from .presets import Preset
 from .values import Lut, Picture, core_table
 
@@ -560,10 +569,10 @@ def _mirror(effect: "ModelledEffect") -> None:
     name = effect.__name__
 
     def run(rgb: np.ndarray, params: dict[str, Any], *, size_ratio: float, **inputs: Any) -> np.ndarray:
-        values = effect.validate(_resolved(params))
+        values = from_checked(effect.params_model, _resolved(params))  # the core has checked and scaled them
         if "size_ratio" in effect.inputs:
             inputs["size_ratio"] = size_ratio
-        result = effect(rgb, scaled(values, size_ratio), **inputs)
+        result = effect(rgb, values, **inputs)
         if result.shape != rgb.shape:
             raise RuntimeError(f"effect {name!r} changed the image shape {rgb.shape} -> {result.shape}")
         return result
@@ -571,7 +580,15 @@ def _mirror(effect: "ModelledEffect") -> None:
     if name in native.effects():
         native.unregister(name)
     declared = [name for name in INPUTS if name == "size_ratio" or name in effect.inputs]
-    native.register(name, effect.category, effect.opacity, run, inputs=declared, fields=effect.fields_named({}))
+    native.register(
+        name,
+        effect.category,
+        effect.opacity,
+        run,
+        inputs=declared,
+        fields=effect.fields_named({}),
+        table=table_of(effect.params_model),
+    )
 
 
 # The only form any other object can take in the dict a recipe is run from: a reference to an object the call holds. A

@@ -67,7 +67,7 @@ def test_an_effect_written_in_python_is_known_to_the_command_line(
     assert run(["effects", "--category", "light"]) == 0
     assert "  zz_plugin: " in capfd.readouterr().out
     assert run(["effects", "zz_plugin"]) == 0
-    assert "help(fx.zz_plugin)" in capfd.readouterr().out
+    assert "amount : number" in capfd.readouterr().out  # documented from its table, like any effect
     imageio.save(photo, tmp_path / "me.png")
     (tmp_path / "r.toml").write_text('name = "r"\nsize = 32\n[[step]]\neffect = "zz_plugin"\n', encoding="utf-8")
     assert run(["render", str(tmp_path / "me.png"), str(tmp_path / "r.toml"), "-o", str(tmp_path / "out")]) == 0

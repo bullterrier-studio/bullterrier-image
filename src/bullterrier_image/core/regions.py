@@ -21,8 +21,6 @@ from typing import Annotated, Any, Literal
 import numpy as np
 from pydantic import BeforeValidator, field_validator, model_validator
 
-from bullterrier_image.errors import RecipeError
-
 from . import native
 from .params import EffectParams, param
 
@@ -45,11 +43,9 @@ __all__ = [
     "Shards",
     "Subject",
     "Svg",
-    "check",
-    "needs",
 ]
 
-BUILT_IN = ("subject", "background", "depth", "light")
+
 FOUND_MAPS = ("subject", "depth")  # the built-in maps found in the photo: handed in (`maps=`) or by a finder
 
 _MOST = 1000  # the most columns, rows, or shares of a grid
@@ -572,100 +568,3 @@ Kind = (
     | RadialGradient
     | Given
 )
-
-
-def _type_of(name: str, declared: Mapping[str, Kind]) -> Literal["partition", "selection"] | None:
-    """What the region `name` is, or None when no such region is declared or built in."""
-    if name in BUILT_IN:
-        return "selection"
-    match declared.get(name):
-        case Grid() | Shards() | Cuts() | Svg() | Bands():
-            return "partition"
-        case Pick() | Path() | Subject() | Band() | Combine() | LinearGradient() | RadialGradient() | Given():
-            return "selection"
-        case _:
-            return None
-
-
-def needs(
-    owner: str,
-    field: str,
-    name: str,
-    wanted: Literal["partition", "selection"] | None,
-    declared: Mapping[str, Kind],
-) -> None:
-    """RecipeError unless `name` (what `owner`'s `field` refers to, say "region 'glass'" or "step 2") is a region of
-    the `wanted` kind, or any region when `wanted` is None. The message names the owner, field and name and lists the
-    valid names (the built-in ones and those in `declared`)."""
-    have = _type_of(name, declared)
-    if have is not None and wanted in (None, have):
-        return
-    kind = wanted or "region"
-    valid = (
-        ", ".join(other for other in (*BUILT_IN, *declared) if wanted in (None, _type_of(other, declared))) or "none"
-    )
-    problem = "which is no region" if have is None else f"a {have}, but it needs a {wanted}"
-    hint = (
-        "" if declared else " (this recipe declares no regions of its own: add them with `regions=` or [region.NAME])"
-    )
-    raise RecipeError(f"{owner}: `{field}` names {name!r}, {problem}; valid {kind}s: {valid}{hint}")
-
-
-def _references(kind: Kind) -> tuple[str, ...]:
-    """The names of the regions that `kind` is made from."""
-    match kind:
-        case Pick() | Band() | Bands():
-            return (kind.of,)
-        case Combine():
-            return kind.of
-        case Subject():
-            return () if kind.per is None else (kind.per,)
-        case Given() | LinearGradient() | RadialGradient():
-            return ()
-        case _:
-            return () if kind.fit is None else (kind.fit,)
-
-
-def check(declared: Mapping[str, Kind]) -> None:
-    """RecipeError unless the declared regions are consistent: a `fit` names a selection, a `Pick`'s `of` a partition, a
-    `Band`'s, `Bands`' or `Combine`'s `of` a selection, no name is one of the built-ins and regions do not refer to each
-    other in a cycle. Builds nothing, needs no picture; the
-    message names the region and lists the valid names."""
-    for name, kind in declared.items():
-        if name in BUILT_IN:
-            raise RecipeError(f"region {name!r} is a built-in region ({', '.join(BUILT_IN)}) and cannot be declared")
-        if isinstance(kind, Pick):
-            needs(f"region {name!r}", "of", kind.of, "partition", declared)
-        elif isinstance(kind, Band | Bands):
-            needs(f"region {name!r}", "of", kind.of, "selection", declared)
-        elif isinstance(kind, Combine):
-            for of in kind.of:
-                needs(f"region {name!r}", "of", of, "selection", declared)
-        elif isinstance(kind, Subject):
-            if kind.per is not None:
-                needs(f"region {name!r}", "per", kind.per, "partition", declared)
-        elif isinstance(kind, _Laid) and kind.fit is not None:
-            needs(f"region {name!r}", "fit", kind.fit, "selection", declared)
-    _no_cycle(declared)
-
-
-def _no_cycle(declared: Mapping[str, Kind]) -> None:
-    """RecipeError if declared regions refer to each other in a cycle. One walk that visits every region once (and
-    keeps no Python stack), however many ways lead to a region and however long the chains."""
-    done: set[str] = set()
-    for start in declared:
-        if start in done:
-            continue
-        path, walks = [start], [iter(_references(declared[start]))]
-        while walks:
-            for ref in walks[-1]:
-                if ref in path:
-                    loop = " -> ".join(repr(each) for each in [*path[path.index(ref) :], ref])
-                    raise RecipeError(f"regions refer to each other in a cycle: {loop}")
-                if ref in declared and ref not in done:
-                    path.append(ref)
-                    walks.append(iter(_references(declared[ref])))
-                    break
-            else:  # every reference of the last region on the path is checked
-                done.add(path.pop())
-                walks.pop()

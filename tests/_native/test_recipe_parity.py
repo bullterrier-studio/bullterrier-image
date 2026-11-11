@@ -842,8 +842,8 @@ def core_accepts_file(text: str, presets: dict | None = None) -> bool:
 
 
 @pytest.mark.parametrize(("what", "text", "valid"), REFERENCE_ROWS, ids=[row[0] for row in REFERENCE_ROWS])
-def test_the_core_and_python_accept_and_refuse_the_same_references(tmp_path, what, text, valid):
-    assert python_accepts_file(tmp_path, text) == valid, "Python's checks"
+def test_a_name_must_name_a_region_of_the_form_its_place_needs(tmp_path, what, text, valid):
+    assert python_accepts_file(tmp_path, text) == valid, "the facade"
     assert core_accepts_file(text) == valid, "the core"
 
 

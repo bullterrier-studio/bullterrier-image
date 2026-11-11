@@ -38,7 +38,10 @@ a new finite float32 image of the same shape (the core refuses another dtype or 
 `ValueError` naming the effect: cast with `.astype(np.float32)` yourself), deterministic (randomness from a `seed`
 field), never modifying its input. Every parameter is a `param` field with a description; a number also has a unit
 (px, fraction, degrees...; an unknown one is refused naming the valid ones) and an inclusive range holding its default.
-`category` is one of `CATEGORIES`. Mistakes in a definition raise when the module is imported. An effect that works
+`category` is one of `CATEGORIES`. The core checks a step's values against the declaration and scales the pixel ones
+to the picture, so the function receives them complete, checked and already scaled (a `px` radius written for 480
+arrives as working pixels); it declares `size_ratio` only for light or density that is per working pixel beyond what the
+units scale. Mistakes in a definition raise when the module is imported. An effect that works
 from a map (the subject's silhouette, the depth, a region) has a field parameter,
 `field: FieldName = param("subject", doc=...)`, and receives the map as the
 keyword-only argument of that name, without a default (`*, field: np.ndarray`, float32 (h, w), 0..1); one that draws

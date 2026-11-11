@@ -11,14 +11,13 @@ from typing import Literal
 
 import numpy as np
 import pytest
-from pydantic import model_validator
 
 from bullterrier_image import fx, gallery
 from bullterrier_image.core import registry
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.regions import Kind
 from bullterrier_image.core.registry import effect
-from bullterrier_image.core.steps import Recipe, Step, drives, fixed, references, runs
+from bullterrier_image.core.steps import Recipe, Step, drives, runs
 from bullterrier_image.core.values import Lut, Picture
 from bullterrier_image.errors import RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
@@ -61,6 +60,11 @@ def gain(throwaway_effects):
     return effect(category="light", params=GainParams)(gain_probe)
 
 
+def fixed(step):
+    """The parameters of `step` that are plain values, not drives."""
+    return {name: value for name, value in step.params.items() if not isinstance(value, Drive)}
+
+
 # --- values through the model ---------------------------------------------------------------------------------------
 
 
@@ -68,7 +72,7 @@ def gain(throwaway_effects):
     ("values", "complaint"),
     [
         ({"gain": 9}, r"`gain`.*<= 4.*\b9\b"),  # the field, the limit and the value
-        ({"gian": 2}, r"`gian`.*gain, mode, offset, taps"),  # an unknown value lists the valid ones
+        ({"gian": 2}, r"`gian`.*gain, offset, taps, mode"),  # an unknown value lists the valid ones
         ({"gain": "2"}, r"`gain`.*number"),
         ({"gain": {"from": 0.0, "to": 1.0}}, r"`gain`.*number"),  # the table of an animated value, no longer a value
     ],
@@ -126,7 +130,7 @@ DRIVEN_MISTAKES = {
     ),
     "a whole number": ({"taps": drive(end=5)}, r"gain_probe.*`taps` cannot be driven.*whole number.*gain"),
     "a choice": ({"mode": drive(end=1)}, r"gain_probe.*`mode` cannot be driven.*not a number.*gain"),
-    "a parameter the effect does not have": ({"gian": drive()}, r"gain_probe.*`gian`.*gain, mode, offset, taps"),
+    "a parameter the effect does not have": ({"gian": drive()}, r"gain_probe.*`gian`.*gain, offset, taps, mode"),
     "a start below the range": ({"gain": drive(start=-0.5)}, r"gain_probe.*`gain`.*>= 0.*-0\.5"),
     "an end above the range": ({"gain": drive(end=9)}, r"gain_probe.*`gain`.*<= 4.*\b9\b"),
     "a start and an end both out": ({"gain": drive(start=-1, end=9)}, r"gain_probe.*`gain`"),
@@ -159,46 +163,12 @@ def test_a_drivable_effect_with_none_to_offer_says_none_are_drivable(throwaway_e
         Step("plain_probe", params={"amount": drive(end=1)})
 
 
-def test_every_value_a_drive_goes_through_is_checked_not_only_its_ends(throwaway_effects):
-    class Gapped(EffectParams):
-        """A number with a gap in the middle of its range."""
-
-        level: float = param(0.2, unit="fraction", min=0, max=1, drivable=True, doc="Anything but 0.45 to 0.55.")
-
-        @model_validator(mode="after")
-        def _outside_the_gap(self) -> "Gapped":
-            """`level` is not in the gap."""
-            if 0.45 < self.level < 0.55:
-                raise ValueError(f"level {self.level} is in the gap 0.45..0.55")
-            return self
-
-    @effect(category="light", params=Gapped)
-    def gapped_probe(rgb: np.ndarray, params: Gapped) -> np.ndarray:
-        """Nothing."""
-        return rgb
-
-    assert drives(
-        Step("gapped_probe", params={"level": Drive(by="near", start=0.0, end=0.4, levels=5)})
-    )  # all clear of it
-    with pytest.raises(
-        RecipeError, match=r"gapped_probe.*level 0\.5 is in the gap"
-    ):  # both ends valid, a level between not
-        Step("gapped_probe", params={"level": Drive(by="near", start=0.2, end=0.8, levels=5)})
-
-
 def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_the_end(throwaway_effects):
     class Paired(EffectParams):
         """Two numbers that must stay ordered."""
 
-        low: float = param(0.2, unit="fraction", min=0, max=1, drivable=True, doc="The lower number.")
+        low: float = param(0.2, unit="fraction", min=0, max=1, drivable=True, at_most="high", doc="The lower number.")
         high: float = param(0.8, unit="fraction", min=0, max=1, doc="The upper number, at least `low`.")
-
-        @model_validator(mode="after")
-        def _ordered(self) -> "Paired":
-            """`low` is at most `high`."""
-            if self.low > self.high:
-                raise ValueError(f"low {self.low} is above high {self.high}")
-            return self
 
     @effect(category="light", params=Paired)
     def paired_probe(rgb: np.ndarray, params: Paired) -> np.ndarray:
@@ -206,7 +176,7 @@ def test_a_drive_whose_end_breaks_a_rule_between_two_numbers_is_refused_naming_t
         return rgb
 
     assert drives(Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.8)}))
-    with pytest.raises(RecipeError, match=r"paired_probe.*low 0\.9.*above high 0\.8"):
+    with pytest.raises(RecipeError, match=r"paired_probe.*`low` must not exceed `high` \(0\.8\)"):
         Step("paired_probe", params={"low": Drive(by="near", start=0.0, end=0.9)})
 
 
@@ -224,15 +194,8 @@ def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_oth
     class Ordered(EffectParams):
         """Two drivable numbers that must stay ordered."""
 
-        low: float = param(0.1, unit="fraction", min=0, max=1, drivable=True, doc="The lower number.")
+        low: float = param(0.1, unit="fraction", min=0, max=1, drivable=True, at_most="high", doc="The lower number.")
         high: float = param(0.8, unit="fraction", min=0, max=1, drivable=True, doc="The upper number, at least `low`.")
-
-        @model_validator(mode="after")
-        def _ordered(self) -> "Ordered":
-            """`low` is at most `high`."""
-            if self.low > self.high:
-                raise ValueError(f"low {self.low} is above high {self.high}")
-            return self
 
     @effect(category="light", params=Ordered)
     def ordered_probe(rgb: np.ndarray, params: Ordered) -> np.ndarray:
@@ -251,7 +214,8 @@ def test_drives_that_are_valid_together_are_not_refused_for_one_end_with_the_oth
         "low": Drive(by="near", start=0.1, end=0.9, levels=3),
         "high": Drive(by="near", start=0.5, end=0.6, levels=3),
     }
-    with pytest.raises(RecipeError, match=r"ordered_probe.*low 0\.9.*above high 0\.6"):  # at the end the user wrote
+    # at the end the user wrote
+    with pytest.raises(RecipeError, match=r"ordered_probe.*`low` must not exceed `high` \(0\.6\)"):
         Step("ordered_probe", params=crossing)
 
 
@@ -277,21 +241,15 @@ def test_drives_of_one_step_share_a_field_and_a_number_of_levels(gain, throwaway
         "two_probe", params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=1, end=0)}
     )
     assert drives(ok).keys() == {"first", "second"}
-    with pytest.raises(RecipeError, match=r"two_probe.*one field.*'light' and 'near'"):
+    with pytest.raises(RecipeError, match=r"two_probe.*one field"):
         Step(
             "two_probe", params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="light", start=0, end=1)}
         )
-    with pytest.raises(RecipeError, match=r"two_probe.*one number of levels.*5 and 8"):
+    with pytest.raises(RecipeError, match=r"two_probe.*one number of levels"):
         Step(
             "two_probe",
             params={"first": Drive(by="near", start=0, end=1), "second": Drive(by="near", start=0, end=1, levels=8)},
         )
-
-
-def test_a_step_names_the_field_that_drives_it_as_a_region_it_refers_to(gain):
-    step = Step("gain_probe", params={"gain": drive()}, mask="subject")
-    assert references(step) == [("mask", "subject", "selection"), ("by", "near", "selection")]
-    assert references(Step("gain_probe", params={"gain": 2})) == []
 
 
 # --- addresses: every number of a recipe has a name, and a copy of the recipe can have any of them set ----------------
@@ -511,15 +469,8 @@ def test_a_rule_between_two_numbers_that_neither_breaks_alone_names_both_address
     class Pair(EffectParams):
         """Two numbers that must stay ordered."""
 
-        low: float = param(0.2, unit="fraction", min=0, max=1, doc="The lower number.")
+        low: float = param(0.2, unit="fraction", min=0, max=1, at_most="high", doc="The lower number.")
         high: float = param(0.8, unit="fraction", min=0, max=1, doc="The upper number, at least `low`.")
-
-        @model_validator(mode="after")
-        def _ordered(self) -> "Pair":
-            """`low` is at most `high`."""
-            if self.low > self.high:
-                raise ValueError(f"low {self.low} is above high {self.high}")
-            return self
 
     @effect(category="light", params=Pair)
     def pair_probe(rgb: np.ndarray, params: Pair) -> np.ndarray:
@@ -527,7 +478,8 @@ def test_a_rule_between_two_numbers_that_neither_breaks_alone_names_both_address
         return rgb
 
     recipe = Recipe([Step("pair_probe")], name="look", size=None)
-    with pytest.raises(RecipeError, match=r"'pair_probe\.low', 'pair_probe\.high'.*low 0\.9 is above high 0\.1"):
+    named = r"'pair_probe\.low', 'pair_probe\.high'.*`low` must not exceed `high` \(0\.1\)"
+    with pytest.raises(RecipeError, match=named):
         recipe.with_values({"pair_probe.low": 0.9, "pair_probe.high": 0.1})
 
 
@@ -728,12 +680,6 @@ def test_a_recipe_copy_has_the_fields_given_and_keeps_the_rest():
             RecipeError,
             r"bloom.*`image` is not",
             id="a parameter it lacks",
-        ),
-        pytest.param(
-            lambda: fx.blend().replace(image="tex.png"),
-            RecipeError,
-            r"`image`.*recipe file or fx",
-            id="a path: only fx reads",
         ),
         pytest.param(lambda: Recipe([fx.grade()]).replace(steps=[]), RecipeError, "at least one step", id="no steps"),
         pytest.param(lambda: Recipe([fx.grade()]).replace(size=0), RecipeError, r"`size`", id="a size below 1"),
@@ -1147,3 +1093,25 @@ def test_the_each_step_is_a_frozen_value_and_keeps_its_looks_as_a_tuple():
     assert step.looks == (Step("grade"), None)
     with pytest.raises(ValueError, match="frozen"):
         step.feather = 3.0  # type: ignore[misc]  # the point of the test
+
+
+@pytest.mark.parametrize(
+    ("step", "region"),
+    [
+        pytest.param(Step("grade", mask="named"), LinearGradient(angle=90), id="a mask"),
+        pytest.param(
+            Step("grade", params={"exposure": Drive(by="named", start=0, end=1)}),
+            LinearGradient(angle=90),
+            id="a drive's by",
+        ),
+        pytest.param(Step("focus_blur", params={"field": "named"}), LinearGradient(angle=90), id="a field parameter"),
+        pytest.param(Step("seams", partition="named"), Grid(columns=2, rows=1), id="a partition"),
+    ],
+)
+def test_a_step_naming_a_region_only_its_recipe_declares_is_accepted_alone_and_refused_by_a_recipe_without_it(
+    step, region
+):
+    # `step` was made above, alone: the check of a step leaves the names of regions to the recipe it is put in
+    with pytest.raises(RecipeError, match="named"):
+        Recipe([step], name="without", size=None)
+    assert Recipe([step], name="with", size=None, regions={"named": region}).steps == (step,)

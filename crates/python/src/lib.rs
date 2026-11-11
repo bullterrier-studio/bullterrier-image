@@ -148,14 +148,17 @@ fn apply<'py>(
 }
 
 /// The names of the effects the core can run, sorted: its own and the Python functions registered with `register`. With
-/// `declared`, only the effects whose parameters the core declares (`params` describes them): the ones it implements
-/// itself.
+/// `declared`, only the effects the core implements itself (it declares their parameters in Rust), not a Python function
+/// registered with a table.
 #[pyfunction]
 #[pyo3(signature = (*, declared=false))]
 fn effects(declared: bool) -> Vec<String> {
     let mut names = bullterrier_image::effects();
     if declared {
-        names.retain(|name| bullterrier_image::effect(name).is_ok_and(|found| found.params().is_some()));
+        let python = registered_from_python();
+        names.retain(|name| {
+            !python.contains(name) && bullterrier_image::effect(name).is_ok_and(|found| found.params().is_some())
+        });
     }
     names
 }
@@ -439,13 +442,24 @@ fn register(
         fields,
         function: function.clone().unbind(),
     };
-    bullterrier_image::register(Arc::new(effect)).map_err(core_error)
+    bullterrier_image::register(Arc::new(effect)).map_err(core_error)?;
+    registered_from_python().insert(name.to_owned());
+    Ok(())
+}
+
+/// The names registered with `register`, the effects that are Python functions: their table, if they have one, is not a
+/// declaration the core implements.
+fn registered_from_python() -> std::sync::MutexGuard<'static, std::collections::BTreeSet<String>> {
+    static NAMES: std::sync::Mutex<std::collections::BTreeSet<String>> =
+        std::sync::Mutex::new(std::collections::BTreeSet::new());
+    NAMES.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 /// Remove the effect `register` added as `name`. `ValueError` if there is none: the core's own effects stay.
 #[pyfunction]
 fn unregister(name: &str) -> PyResult<()> {
     if bullterrier_image::unregister(name) {
+        registered_from_python().remove(name);
         Ok(())
     } else {
         Err(PyValueError::new_err(format!("no effect was registered as {name:?}")))

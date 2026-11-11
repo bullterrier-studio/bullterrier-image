@@ -263,11 +263,9 @@ def _set(entry: dict, *keys: str) -> dict:
 
 def _effect_step(entry: dict, folder: Path) -> Step:
     """The `Step` of a step the core read, its picture and lookup table paths read."""
-    # the core made the files an effect it runs names into paths that stand on their own; those of an effect written in
-    # Python are as written, so they are found beside the recipe here
-    beside = Path() if registry.parameters(entry["effect"])._core_effect is not None else folder  # noqa: SLF001
+    # the core made the files an effect names into paths that stand on their own (every effect has a table)
     return Step(
         entry["effect"],
-        params=with_files(entry["effect"], entry.get("params", {}), beside),
+        params=with_files(entry["effect"], entry.get("params", {}), Path()),
         **_set(entry, "mask", "opacity", "blend_mode", "preset", "partition", "name"),
     )

@@ -240,7 +240,8 @@ def test_a_picture_path_is_read_relative_to_the_recipe_file_keeping_its_alpha(la
     recipe = load_recipe(_layer(tmp_path / "recipes", "'../assets/logo.png'"))
     monkeypatch.chdir(tmp_path)  # the folder the process runs in does not matter
     image = runs(recipe.steps[1])[0].params["image"]
-    assert (image.width, image.height, image.label) == (2, 1, "../assets/logo.png")
+    assert (image.width, image.height) == (2, 1)
+    assert Path(image.label).resolve() == (tmp_path / "assets" / "logo.png").resolve()  # the core joined it to the file
     np.testing.assert_allclose(image.pixels[0], np.array([[1, 0, 0, 1], [0, 0, 1, 128 / 255]]), atol=1e-6)
 
 
@@ -250,12 +251,10 @@ def test_an_absolute_picture_path_is_read_as_it_is(layer_probe, tmp_path):
     assert runs(recipe.steps[1])[0].params["image"].width == 2
 
 
-@pytest.mark.parametrize(
-    ("written", "pixel"),
-    [("'#ff8000'", [1, 128 / 255, 0, 1]), ("[0.25, 0.5, 1.0]", [0.25, 0.5, 1, 1])],
-    ids=["hex", "numbers"],
-)
-def test_a_picture_parameter_may_be_a_colour_and_no_file_is_read(layer_probe, tmp_path, written, pixel):
+def test_a_picture_parameter_may_be_a_hex_colour_and_no_file_is_read(layer_probe, tmp_path):
+    """A colour is only `'#rrggbb'` in a file: the parameter format's picture is a name or a path, so three numbers are
+    refused, for a plugin's picture as for the core's."""
+    written, pixel = "'#ff8000'", [1, 128 / 255, 0, 1]
     step = runs(load_recipe(_layer(tmp_path, written)).steps[1])[0]
     out = registry.apply("layer_probe", np.zeros((2, 3, 3), np.float32), **step.params)
     np.testing.assert_allclose(out, np.broadcast_to(pixel[:3], (2, 3, 3)), atol=1e-6)
@@ -482,7 +481,7 @@ def test_a_look_may_hold_a_picture_given_as_a_path_relative_to_the_file(layer_pr
         "looks = [{ effect = 'layer_probe', image = '../assets/logo.png' }]\n",
     )
     (each,) = load_recipe(path).steps
-    assert runs(each)[0].params["image"].label == "../assets/logo.png"
+    assert Path(runs(each)[0].params["image"].label).resolve() == (tmp_path / "assets" / "logo.png").resolve()
 
 
 DRIVEN_FILE = """
@@ -534,7 +533,7 @@ def test_a_look_of_an_each_can_be_driven_in_a_recipe_file(tmp_path):
 DRIVE_MISTAKES = {
     "a parameter the effect does not declare drivable": (
         'effect = "bloom"\nthreshold = { by = "depth", start = 0, end = 0.5 }',
-        r"step 1: effect 'bloom': `threshold` cannot be driven.*drivable parameters: amount, radius",
+        r"step 1: effect 'bloom': `threshold` cannot be driven.*drivable parameters: radius, amount",
     ),
     "a drive with a key called self": (
         'effect = "bloom"\nradius = { by = "depth", start = 0, end = 9, self = 1 }',

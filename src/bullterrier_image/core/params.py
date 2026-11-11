@@ -546,12 +546,6 @@ def cyclic_of(info: FieldInfo) -> bool:
     return bool(_extra(info).get("cyclic"))
 
 
-def whole_number_fields(model: type[EffectParams]) -> frozenset[str]:
-    """The fields of `model` that hold a whole number (`int`): a range of values for one is rounded to whole numbers."""
-    hints = typing.get_type_hints(model)
-    return frozenset(name for name in model.model_fields if _scalar(hints[name]) == {int})
-
-
 def picture_fields(model: type[EffectParams]) -> frozenset[str]:
     """The fields of `model` that hold a `Picture` (or none): a recipe file writes a path for one, `fx` takes a path or
     an array."""
@@ -611,25 +605,100 @@ def signature(model: type[EffectParams]) -> inspect.Signature:
     )
 
 
-def scaled[P: EffectParams](params: P, factor: float) -> P:
-    """A copy of `params` with every pixel value (a field with the unit `px`) multiplied by `factor` and every
-    `density` (marks per 1000 design px²) divided by `factor` squared: the same look at another size. A whole number is
-    rounded. When shrinking (`factor` below 1) a pixel value stops at the field's `min`, which keeps a small picture
-    valid (a cell of at least 3 pixels); growing has no ceiling, as a range is in design pixels and the copy is not
-    checked against it. Other units are unchanged."""
-    whole = whole_number_fields(type(params))
-    changes = {}
-    for name, info in type(params).model_fields.items():
-        unit = unit_of(info)
-        if unit == "density":
-            # marks per area: an area grows with the square of a length
-            changes[name] = getattr(params, name) / factor**2
-        elif unit == "px":
-            value = getattr(params, name) * factor
-            value = round(value) if name in whole else value
-            changes[name] = max(bounds(info)[0], value) if factor < 1 else value
-    # pydantic's own copy, which checks nothing: a pixel value grown past its design range is meant (see above)
-    return BaseModel.model_copy(params, update=changes)
+_COLOUR = tuple[float, float, float]  # a `Color` without its validation: what a hint says of a colour
+
+
+def _hex(colour: Any) -> str:
+    """A colour default (`'#rrggbb'`, `'#rgb'` or three numbers) as the `'#rrggbb'` text the parameter format writes."""
+    channels = native.parse_color(colour if isinstance(colour, str) else list(colour))
+    if channels is None:
+        raise ValueError(f"{colour!r} is not a colour")
+    return "#" + "".join(f"{round(channel * 255):02x}" for channel in channels)  # constant: 8-bit levels
+
+
+def table_of(model: type[EffectParams]) -> dict[str, Any]:
+    """The parameters of `model` in the ecosystem's parameter format (the dict `_core.register(.., table=)` takes):
+    `{"doc": ..., "fields": [...]}`, each field with its kind, meaning, default, unit, bounds and flags. ValueError
+    naming the field when its type is not one of the format's kinds."""
+    hints, named = typing.get_type_hints(model), typing.get_type_hints(model, include_extras=True)
+    fields = []
+    for name, info in model.model_fields.items():
+        extra, annotation = _extra(info), hints[name]
+        members = _scalar(annotation)
+        low, high = bounds(info)
+        lengths = {
+            "min_length": next((m.min_length for m in info.metadata if isinstance(m, annotated_types.MinLen)), None),
+            "max_length": next((m.max_length for m in info.metadata if isinstance(m, annotated_types.MaxLen)), None),
+        }
+        nullable = type(None) in _members(annotation)
+        default, written = info.default, dict[str, Any]()
+        if _choices(annotation):
+            kind, written["choices"] = "choice", [str(choice) for choice in _choices(annotation)]
+        elif members == {bool}:
+            kind = "bool"
+        elif members == {int}:
+            kind = "int"
+        elif members == {float}:
+            kind = "float"
+        elif members == {_COLOUR}:
+            kind, default = "color", None if default is None else _hex(default)
+        elif get_origin(annotation) is tuple and get_args(annotation) == (_COLOUR, Ellipsis):
+            kind, default = "colors", [_hex(item) for item in default]
+            written |= {key: value for key, value in lengths.items() if value is not None}
+        elif named[name] == FieldName:
+            kind = "field"
+        elif Lut in members:
+            kind, default = "lut", None
+        elif Picture in members:
+            kind, default, nullable = "picture", None, True
+        elif members == {str}:
+            kind = "text"
+            written |= {key: value for key, value in lengths.items() if value is not None}
+            if extra.get("min_distinct") is not None:
+                written["min_distinct"] = extra["min_distinct"]
+        else:
+            raise ValueError(
+                f"parameter model {model.__name__!r}, field `{name}`: its type is not one the parameter format has "
+                "(a number, a switch, a choice, a colour, a list of colours, a field name, a text, a picture or a "
+                "lookup table)"
+            )
+        if (nullable and kind in {"color"}) or kind == "picture":
+            written["nullable"] = True
+        numeric = kind in {"float", "int"}
+        entry = {
+            "name": name,
+            "kind": kind,
+            "meaning": info.description or "",
+            "default": default,
+            "unit": unit_of(info) if numeric else None,
+            "min": low if numeric else None,
+            "max": high if numeric else None,
+            "cyclic": cyclic_of(info),
+            "drivable": bool(extra.get("drivable")),
+            "advanced": bool(extra.get("advanced")),
+            **written,
+        }
+        if extra.get("at_most") is not None:
+            entry["at_most"] = extra["at_most"]
+        fields.append(entry)
+    return {"doc": inspect.cleandoc(model.__doc__ or ""), "fields": fields}
+
+
+def from_checked[P: EffectParams](model: type[P], values: Mapping[str, Any]) -> P:
+    """The model for `values`, which the core has checked and scaled (every field, a colour as a list, a lookup table
+    and a picture as the objects they stand for): built as they are, with no validation, because a pixel value scaled to
+    a bigger picture may lie beyond its design range."""
+    made = {}
+    for name, value in values.items():
+        hint = model.model_fields[name].annotation
+        if hint is Lut and value is None:
+            value = Lut.identity()  # a table left out is the identity table
+        elif _COLOUR in _scalar(hint) and value is not None:
+            value = tuple(value)
+        elif get_origin(hint) is tuple and value is not None:
+            value = tuple(tuple(item) for item in value)
+        made[name] = value
+    return BaseModel.model_construct.__func__(model, **made)  # type: ignore[attr-defined]  # pydantic's, past the guard
 
 
 def _range_problem(spec: _Spec) -> str | None:
@@ -700,6 +769,7 @@ def _field(model: str, name: str, annotation: Any, spec: Any) -> tuple[Any, Any]
             "drivable": spec.drivable,
             "cyclic": spec.cyclic,
             "at_most": spec.at_most,
+            "min_distinct": spec.field_kwargs.get("min_distinct"),
         },
         **constraints,
         **kwargs,

@@ -375,7 +375,26 @@ impl fmt::Display for Error {
                     write!(formatter, "{place}: ")?;
                 }
                 match constraint {
-                    Constraint::Unknown(_) => write!(formatter, "effect '{effect}': `{field}` {constraint}"),
+                    Constraint::Unknown(valid) => {
+                        let near = crate::recipe::near::closest(field, valid.iter().copied());
+                        let hint = match near.as_slice() {
+                            [] => String::new(),
+                            [only] => format!(" (did you mean `{only}`?)"),
+                            several => format!(
+                                " (did you mean {}?)",
+                                several
+                                    .iter()
+                                    .map(|name| format!("`{name}`"))
+                                    .collect::<Vec<_>>()
+                                    .join(" or ")
+                            ),
+                        };
+                        write!(
+                            formatter,
+                            "effect '{effect}': `{field}` is not a parameter{hint}; the parameters are: {}",
+                            valid.join(", ")
+                        )
+                    }
                     _ => write!(formatter, "effect '{effect}': `{field}` {constraint}, got {value}"),
                 }
             }

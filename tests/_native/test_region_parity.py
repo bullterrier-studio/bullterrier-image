@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from bullterrier_image.core import bridge
+from bullterrier_image.core import bridge, registry
 from bullterrier_image.core.framing import Framing
 from bullterrier_image.core.params import Drive
 from bullterrier_image.core.regions import (
@@ -17,7 +17,7 @@ from bullterrier_image.core.regions import (
     Subject,
     Svg,
 )
-from bullterrier_image.core.steps import Each, Recipe, Step, references
+from bullterrier_image.core.steps import Each, Recipe, Step, drives, runs
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, SubjectNotFoundError
 from bullterrier_image.loader import load_recipe
 
@@ -129,9 +129,24 @@ def test_a_depth_finder_that_finds_nothing_is_the_depth_not_found(photo):
 # --- the shipped looks and examples -------------------------------------------------------------------------------
 
 
+def names_used(entry: Step | Each) -> list[str]:
+    """The names a step refers to: its mask, the partition it draws or goes over, the fields that drive it and the
+    fields its effect works from; for an `Each`, those of its looks as well."""
+    named = [] if entry.mask is None else [entry.mask]
+    if isinstance(entry, Each):
+        return [*named, entry.each, *(name for look in runs(entry) for name in names_used(look))]
+    fields = registry.get(entry.effect).fields_named(entry.params).values()
+    return [
+        *named,
+        *dict.fromkeys(drive.by for drive in drives(entry).values()),
+        *fields,
+        *([entry.partition] if entry.partition else []),
+    ]
+
+
 def used_regions(recipe: Recipe) -> list[str]:
     """The regions the steps use, or that those are made from."""
-    todo = [name for step in recipe.steps for _, name, _ in references(step)]
+    todo = [name for step in recipe.steps for name in names_used(step)]
     names: set[str] = set()
     while todo:
         name = todo.pop()

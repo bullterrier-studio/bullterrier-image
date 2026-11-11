@@ -21,8 +21,7 @@ from bullterrier_image.core.params import (
     drivable_fields,
     field_name_fields,
     param,
-    scaled,
-    whole_number_fields,
+    table_of,
 )
 from bullterrier_image.core.params import signature as signature_of
 from bullterrier_image.core.values import Color, FieldName, Lut, Picture
@@ -509,11 +508,6 @@ def test_every_kind_of_field_refuses_values_of_another_kind(values, field):
         Kinds(**values)
 
 
-def test_whole_number_fields_are_the_int_fields():
-    assert whole_number_fields(Kinds) == frozenset({"count"})
-    assert whole_number_fields(Probe) == frozenset({"count"})
-
-
 def test_the_published_colour_pattern_matches_a_whole_value_only():
     pattern = Probe.model_json_schema()["properties"]["tint"]["anyOf"][0]["pattern"]
     assert re.search(pattern, "#fff")
@@ -783,47 +777,6 @@ class Sized(EffectParams):
     amount: float = param(0.5, unit="fraction", min=0, max=1, doc="How much of it.")
     count: int = param(4, unit="count", min=1, max=9, doc="How many.")
     rate: float = param(2.0, unit="density", min=0, max=50, doc="Marks per 1000 design px squared.")
-
-
-@pytest.mark.parametrize(
-    ("factor", "rate"),
-    [
-        pytest.param(1, 2.0, id="by 1 nothing changes"),
-        pytest.param(2, 0.5, id="doubled size: a quarter of the density, the same marks in the same picture"),
-        pytest.param(0.5, 8.0, id="halved size: four times the density"),
-        pytest.param(0.01, 20000.0, id="below the design size the density grows, with no ceiling"),
-    ],
-)
-def test_a_density_scales_with_the_inverse_of_the_area(factor, rate):
-    assert scaled(Sized(), factor).rate == pytest.approx(rate)
-
-
-@pytest.mark.parametrize(
-    ("factor", "radius", "cell", "shift"),
-    [
-        pytest.param(1, 24.0, 10, -10, id="by 1 nothing changes"),
-        pytest.param(2, 48.0, 20, -20, id="doubled"),
-        pytest.param(0.5, 12.0, 5, -5, id="halved"),
-        pytest.param(0.1, 2.4, 3, -1, id="a tenth: a whole number is rounded, a minimum is a floor"),
-        pytest.param(0.01, 1.0, 3, 0, id="a hundredth: every floor, a negative reaches 0 and not its minimum"),
-        pytest.param(100, 2400.0, 1000, -1000, id="past the range: the range is in design pixels, no ceiling"),
-    ],
-)
-def test_pixel_fields_scale_by_the_factor_and_nothing_else_does(factor, radius, cell, shift):
-    sized = scaled(Sized(), factor)
-    assert (sized.radius, sized.cell, sized.shift) == pytest.approx((radius, cell, shift))
-    assert isinstance(sized.cell, int)
-    assert (sized.amount, sized.count) == (0.5, 4)  # a fraction and a count are not pixels
-
-
-def test_a_scaled_model_carries_no_size_ratio_because_the_runner_hands_it_to_the_effect():
-    assert not hasattr(scaled(Sized(), 2), "size_ratio")
-
-
-def test_scaling_gives_a_new_model_and_leaves_the_first_alone():
-    first = Sized()
-    assert scaled(first, 2) is not first
-    assert first.radius == 24.0
 
 
 # --- parameters declared in Rust ---------------------------------------------------------------------------------
@@ -1266,3 +1219,20 @@ def test_a_limit_must_name_another_field_of_the_model():
         model_of(height("low", 10, at_most="tall"), height("high", 100))
     with pytest.raises(ValueError, match=r"`low`.*at_most.*`low`"):
         model_of(height("low", 10, at_most="low"))
+
+
+OPTIONAL_KEYS = ("choices", "nullable", "min_length", "max_length", "min_distinct", "at_most")  # absent means none
+
+
+def without_none(field: dict[str, Any]) -> dict[str, Any]:
+    """A field of a table with the optional keys that say nothing (none, false, empty) left out."""
+    return {key: value for key, value in field.items() if key not in OPTIONAL_KEYS or value not in (None, False, [])}
+
+
+@pytest.mark.parametrize("effect", _core.effects(declared=True))
+def test_the_table_of_a_model_is_the_table_the_core_declares(effect):
+    """`table_of` writes a model in the parameter format: for the model built from a Rust declaration it is that
+    declaration again, field for field (a plugin's model, written by the same function, means what the core reads)."""
+    written, declared = table_of(registry.parameters(effect)), _core.params(effect)
+    assert written["doc"] == declared["doc"].strip()
+    assert [without_none(field) for field in written["fields"]] == [without_none(field) for field in declared["fields"]]

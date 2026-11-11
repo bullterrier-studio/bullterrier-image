@@ -19,7 +19,7 @@ from onnx import TensorProto, helper
 
 from bullterrier_image import BackendUnavailableError
 from bullterrier_image.core import native, registry
-from bullterrier_image.core.params import EffectParams, core_effect, param, scaled
+from bullterrier_image.core.params import EffectParams, core_effect, param
 from bullterrier_image.core.registry import effect, unregister
 from bullterrier_image.core.values import FieldName, Picture
 
@@ -182,23 +182,6 @@ def depth_probe(throwaway_effects):
         return np.repeat(field[..., None], 3, axis=2)
 
     return effect(category="utilities", params=DepthProbeParams)(depth_probe)
-
-
-@pytest.fixture
-def apply_as_rendered() -> Callable[..., np.ndarray]:
-    """`apply_as_rendered(name, rgb, **values)`: the effect `name` on `rgb` as a recipe renders it at the picture's own
-    size: every `px` value (given or default) is written for 480 and multiplied by the longest side over 480, and the
-    result is mixed into `rgb` by the effect's default step opacity. Arrays among the values are the effect's inputs (a
-    field), the rest its parameters."""
-
-    def apply(name: str, rgb: np.ndarray, **values: object) -> np.ndarray:
-        function = registry.get(name)
-        inputs = {key: value for key, value in values.items() if isinstance(value, np.ndarray)}
-        params = function.validate({key: value for key, value in values.items() if key not in inputs})
-        out = function(rgb, scaled(params, max(rgb.shape[:2]) / 480), **inputs)
-        return rgb + np.float32(function.opacity) * (out - rgb)
-
-    return apply
 
 
 @pytest.fixture

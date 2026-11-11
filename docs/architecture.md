@@ -13,7 +13,7 @@ opacity and inputs (`pub(crate) const META: Meta`) and has `pub(crate) fn render
 documentation is the `///` doc of `Params`, its Python model `class XParams(EffectParams, core="x")` is built from that
 declaration, and category and opacity come from the core (`@effect(params=XParams)` on a hand-written Python model of a core
 effect refuses them). The core's registry (`Effect` trait, `register`) also
-takes foreign effects, such as a Python function (`_core.register(name, category, opacity, fn, *, inputs=, fields=)`; `fn(rgb,
+takes foreign effects, such as a Python function (a `table=` in the parameter format gives it the parameters of a declared effect: checked and scaled by the core; `_core.register(name, category, opacity, fn, *, inputs=, fields=, table=)`; `fn(rgb,
 params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect only the inputs it declares: `size_ratio`
 (1 if undeclared), `partition` (`Labels`), under each field parameter's name a `Layer` and under each lookup table parameter's name a `Lut`
 (`Inputs::lut`; none is the identity). A `lut` parameter (`LutName`) holds the name of a table the photo was given

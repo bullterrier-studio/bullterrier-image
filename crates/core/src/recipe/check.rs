@@ -8,6 +8,7 @@ use super::needs::{Use, Uses};
 use super::references::{self, Form};
 use super::{Drive, Each, Entry, Recipe, Regions, STEP_KEYS, Step, drive};
 use crate::effect::Input;
+use crate::params::Kind;
 use crate::registry::Registry;
 use crate::{Error, Presets};
 
@@ -171,17 +172,26 @@ impl Rules<'_> {
         let drives = drive::in_params(&step.effect, &params, place)?;
         if let Some(table) = effect.params() {
             for (name, _) in &drives {
-                if table.fields.iter().any(|field| field.name == name && !field.drivable) {
+                if let Some(field) = table.fields.iter().find(|field| field.name == name && !field.drivable) {
                     let drivable: Vec<&str> = table
                         .fields
                         .iter()
                         .filter(|field| field.drivable)
                         .map(|f| f.name)
                         .collect();
+                    let why = match field.kind {
+                        Kind::Int => " (a whole number)",
+                        Kind::Float => "",
+                        _ => " (not a number)",
+                    };
                     return Err(Error::Recipe(format!(
-                        "{place}: effect '{}': `{name}` cannot be driven by a field; its drivable parameters: {}",
+                        "{place}: effect '{}': `{name}` cannot be driven by a field{why}; its drivable parameters: {}",
                         step.effect,
-                        drivable.join(", ")
+                        if drivable.is_empty() {
+                            "none".to_owned()
+                        } else {
+                            drivable.join(", ")
+                        }
                     )));
                 }
             }

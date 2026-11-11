@@ -416,6 +416,12 @@ ignore_names = [
     "columns",  # `Grid.columns`, written to the core by `model_dump` like the fields above
     "resample",  # `Framing.resample` and `Edge.scale`, written to the core by `model_dump` like the fields above
     "scale",
+    "of",  # `Pick.of` and the like: region fields written to the core by `model_dump`, like the ones above
+    "per",
+    "fit",
+    "runs",  # the steps a step runs, and the drives of a step: read by the tests that look inside recipes
+    "drives",
+    "whole",  # `Parameter.whole`: set by the core's numbers, read by the callers that map a signal onto a number
     "x",  # `Line.x` and `RadialGradient.x`, written to the core by `model_dump` like the fields above
     "y",
     "angle",  # fields of `Framing` and the regions, as above; the last Python effect that read these names (disperse) is gone

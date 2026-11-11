@@ -148,9 +148,9 @@ input. The injected inputs, declared only if needed: `partition` (piece labels o
 check all of this for every effect.
 In the core the inputs arrive as `Inputs` (only those declared) and a field as a `Layer` under its parameter's name; a foreign
 (Python) effect gets them as keyword arguments of `fn(rgb, params, **inputs)`: `size_ratio`, `partition` (int32), each field a
-float32 `(h, w)` array. An effect the core cannot describe (no parameter table, as every Python one today) receives its values
-as written, in design pixels, unscaled, and scales them itself by `size_ratio`; the Python registry wrapper does (validate, scale,
-call).
+float32 `(h, w)` array. A Python effect has a parameter table like any other (the registry writes it from the model and registers it
+with the core), so the core checks its values and scales the pixel ones: the function receives them complete, checked and scaled to
+the picture, and takes `size_ratio` only for light or density that is per working pixel beyond what the units scale.
 The runner applies a step's `mask`, `opacity` and `blend_mode`, never the effect. No parameter may be named like a step key
 (`effect`, `mask`, `opacity`, `blend_mode`, `preset`, `partition`, `each`, `looks`, `name`) or an injected input; registering one fails. An effect whose natural
 strength is below full declares its steps' default opacity, `@effect(..., opacity=0.7)`, instead of an opacity parameter.
