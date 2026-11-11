@@ -93,6 +93,7 @@ mod ntsc;
 mod numbered_pieces;
 mod numbers;
 mod outline;
+mod palette;
 mod paper_texture;
 mod parallax;
 mod params;

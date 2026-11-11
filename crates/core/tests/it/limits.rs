@@ -863,6 +863,20 @@ fn a_gif_whose_frame_is_larger_than_its_screen_is_refused_without_the_memory_for
     Ok(())
 }
 
+#[test]
+fn palette_finds_256_colours_and_one_more_is_refused_naming_the_value() -> Outcome {
+    let values = crate::common::pictures::varied(1, 1000);
+    let picture = Picture::new(1, 1000, &values)?;
+    assert_eq!(bullterrier_image::palette(&picture, 256, 0)?.len(), 256);
+    let refused = bullterrier_image::palette(&picture, 257, 0).err();
+    assert!(
+        matches!(&refused, Some(error) if error.kind() == ErrorKind::Recipe
+            && error.to_string().contains("colors") && error.to_string().contains("257")),
+        "{refused:?}"
+    );
+    Ok(())
+}
+
 // ---- completeness ------------------------------------------------------------------------------------------------
 
 /// The fields of the numeric bounds of `Region::check` that bound nothing allocated or run, with why. (The table above has

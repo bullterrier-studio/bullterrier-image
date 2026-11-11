@@ -7,13 +7,13 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Meta};
-use crate::ops::cluster::{Point, Start, kmeans, mean, nearest};
+use crate::ops::cluster::{Point, Start};
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{ATKINSON, FLOYD_STEINBERG, Tile, diffuse, ordered};
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
 use crate::ops::par;
-use crate::ops::random::{Rng, mix};
+use crate::palette::{self, Search};
 use crate::params::{Choice, Color, Params};
 use crate::{Image, Inputs, Picture};
 
@@ -194,9 +194,6 @@ pub struct Params {
     pub offset_angle: f32,
 }
 
-/// The name of the stream that picks the sample dots; the k-means starts from the stream of the seed itself.
-const SAMPLING: u64 = 1; // constant: names the stream of the sample, any number but the seed's own
-
 /// The colours of the fixed palettes as 0xrrggbb, as their authors publish them (sRGB):
 /// - gameboy: the four greens widely used to draw a Game Boy screen, darkest to lightest (a community palette; the real DMG
 ///   panel's colours differ and depend on the display).
@@ -315,40 +312,18 @@ fn colours(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
 
 /// The `photo` palette: see [`colours`].
 fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
-    let sample = count(params.sample);
-    let searched: Cow<'_, [Point]> = if sample < matched.len() {
-        let stream = (mix(params.seed, &[SAMPLING]) >> 32) as u32; // constant: the hash's upper half
-        let chosen = Rng::seeded(stream).sample(matched.len(), sample);
-        Cow::Owned(chosen.into_iter().map(|at| matched[at]).collect())
-    } else {
-        Cow::Borrowed(matched)
+    let search = Search {
+        colors: count(params.colors),
+        start: match params.init {
+            Init::Spread => Start::Spread,
+            Init::Random => Start::Random,
+        },
+        rounds: count(params.iterations),
+        tolerance: params.tolerance,
+        sample: count(params.sample),
+        seed: params.seed,
     };
-    let start = match params.init {
-        Init::Spread => Start::Spread,
-        Init::Random => Start::Random,
-    };
-    let centres = kmeans(
-        &searched,
-        count(params.colors),
-        start,
-        count(params.iterations),
-        params.tolerance,
-        params.seed,
-    );
-    let mut sums = vec![[0.0_f64; 3]; centres.len()];
-    let mut members = vec![0_usize; centres.len()];
-    for (dot, label) in dots.iter().zip(nearest(matched, &centres)) {
-        for (total, &value) in sums[usize::from(label)].iter_mut().zip(dot) {
-            *total += f64::from(value);
-        }
-        members[usize::from(label)] += 1;
-    }
-    // a centre nobody is nearest to has no colour to give
-    sums.iter()
-        .zip(&members)
-        .filter(|(_, count)| **count > 0)
-        .map(|(sum, &count)| mean(sum, count))
-        .collect()
+    palette::found(dots, matched, &search).into_iter().map(|(colour, _)| colour).collect()
 }
 
 /// The `chosen` method on `values` (`size` dots), as a pattern of palette indices.
