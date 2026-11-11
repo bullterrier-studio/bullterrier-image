@@ -52,6 +52,10 @@ ALLOWED: dict[tuple[str, str], str] = {
     ("_native/test__core.py", "bullterrier_image._native"): (
         "the boundary between the package and the Rust core: which parameter values reach the core, and how"
     ),
+    ("_native/test_plugin_table.py", "bullterrier_image._native"): (
+        "the boundary a plugin's parameter table crosses (`_core.register(.., table=)`, `_core.schema`): what the core "
+        "checks and what the function receives"
+    ),
 }
 
 _PATCHERS = ("monkeypatch.setattr", "monkeypatch.delattr", "monkeypatch.setitem", "monkeypatch.delitem")

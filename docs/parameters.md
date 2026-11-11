@@ -26,6 +26,14 @@ default: none is the identity table; the table reaches the effect in `Inputs`, s
 choice; an effect with any other (other optional values) keeps a Python model, each field `param(default, doc=...)`, until its
 port extends the macro.
 
+**A table at run time.** An effect declared outside Rust (a Python plugin) hands the core its table as data in the same
+format: `Table::from_json` (the format's rules, refusing a broken description with `Error::Declaration` naming the parameter;
+the strings it reads live as long as the process) and `_core.register(.., table=..)`. The core then checks, scales, documents
+and describes the effect as it does a declared one, and the function receives the complete, checked values with the pixel ones
+scaled to the picture. `Table::json_schema` (`_core.schema`) writes the JSON schema of a table's values, with the table's own
+keys `unit`, `cyclic`, `drivable` and `advanced`. Proved by the format's fixtures (every valid one read, every invalid one
+refused) and by reading back the table of every effect the core declares.
+
 **The format.** What a parameter is, as JSON (keys, kinds, the closed list of units, ranges, `cyclic`, `drivable`,
 `advanced`), is the ecosystem's parameter format, version 3: [docs/parameter-format/parameters.md](docs/parameter-format/parameters.md),
 with its [schema](docs/parameter-format/schemas/parameter-3.schema.json) and

@@ -171,6 +171,7 @@ mod stretch;
 mod svg;
 mod svg_drawing;
 mod swirl;
+mod table_json;
 mod threads;
 mod threads_rows;
 mod tile;

@@ -83,7 +83,7 @@ impl Scalar {
     }
 
     /// The value as JSON.
-    fn value(self) -> Value {
+    pub(super) fn value(self) -> Value {
         match self {
             Self::Int(whole) => Value::from(whole),
             Self::Float(real) => Value::from(real),
@@ -97,7 +97,7 @@ impl Scalar {
 
 impl Field {
     /// `value` in normal form, or the rule it breaks.
-    fn normal(&self, value: &Value) -> Result<Value, Constraint> {
+    pub(super) fn normal(&self, value: &Value) -> Result<Value, Constraint> {
         if self.nullable && value.is_null() {
             return Ok(Value::Null);
         }

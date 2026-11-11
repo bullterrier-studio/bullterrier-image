@@ -25,7 +25,7 @@ use crate::params::Scalar;
 /// | [`Error::BackendUnavailable`] | `BackendUnavailable` | `BackendUnavailableError` |
 /// | [`Error::Lut`] | `Lut` | `LutError` |
 /// | [`Error::Project`] | `Project` | `ProjectError` |
-/// | [`Error::Duplicate`], [`Error::Params`], [`Error::Inputs`], [`Error::Foreign`] | `Other` | none: a `ValueError` |
+/// | [`Error::Duplicate`], [`Error::Params`], [`Error::Inputs`], [`Error::Declaration`], [`Error::Foreign`] | `Other` | none: a `ValueError` |
 ///
 /// The ones in the last row are the caller's programming errors, or, for [`Error::Foreign`], whatever an effect that
 /// runs outside the core raised: running an effect trusts the parameters it is given (see
@@ -89,6 +89,8 @@ pub enum Error {
         /// The value that was given (boxed to keep `Error` small).
         value: Box<Value>,
     },
+    /// A parameter table written as data breaks a rule of the parameter format; the text names the parameter and the rule.
+    Declaration(String),
     /// A recipe breaks a rule; the text says which, naming the step (`step 2`, as [`Error::Invalid`] does in its
     /// `place`) and the key.
     Recipe(String),
@@ -290,7 +292,11 @@ impl Error {
             Self::BackendUnavailable(_) => ErrorKind::BackendUnavailable,
             Self::Lut(_) => ErrorKind::Lut,
             Self::Project(_) => ErrorKind::Project,
-            Self::Duplicate(_) | Self::Params { .. } | Self::Inputs(_) | Self::Foreign { .. } => ErrorKind::Other,
+            Self::Duplicate(_)
+            | Self::Params { .. }
+            | Self::Inputs(_)
+            | Self::Declaration(_)
+            | Self::Foreign { .. } => ErrorKind::Other,
         }
     }
 
@@ -375,6 +381,7 @@ impl fmt::Display for Error {
             }
             Self::Recipe(message)
             | Self::Inputs(message)
+            | Self::Declaration(message)
             | Self::InvalidImage(message)
             | Self::NonFinite(message)
             | Self::ImageRead(message)
@@ -409,6 +416,7 @@ impl std::error::Error for Error {
             | Self::Invalid { .. }
             | Self::Recipe(_)
             | Self::Inputs(_)
+            | Self::Declaration(_)
             | Self::MapNotFound { .. }
             | Self::InvalidImage(_)
             | Self::NonFinite(_)

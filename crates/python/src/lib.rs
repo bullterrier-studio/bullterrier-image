@@ -10,7 +10,7 @@ mod run;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use bullterrier_image::params::Color;
+use bullterrier_image::params::{Color, Table};
 use bullterrier_image::{
     BlendMode, Category, Effect, Error, ErrorKind, FieldParam, Image, Input, Inputs, Labels, Layer, Picture, Recipe,
     STEP_KEYS,
@@ -40,7 +40,8 @@ mod _core {
     #[pymodule_export]
     use super::{
         CoreError, apply, check, documentation, effect, effects, main, params, parse_color, read_recipe,
-        read_recipe_source, region_presets, register, shipped_looks, shipped_presets, summary, unregister, vocabulary,
+        read_recipe_source, region_presets, register, schema, shipped_looks, shipped_presets, summary, unregister,
+        vocabulary,
     };
 
     #[pymodule_export]
@@ -174,6 +175,19 @@ fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
         .params()
         .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
     from_json(py, &serde_json::to_value(table).map_err(value_error)?)
+}
+
+/// The JSON schema (draft 2020-12) of the values of the parameters of the effect called `effect`, a dict: each parameter a
+/// property with `description`, `default`, `minimum` and `maximum`, `unit`, `cyclic`, `drivable` and `advanced`.
+///
+/// `CoreError` if the core has no effect of that name or the effect describes no parameters.
+#[pyfunction]
+fn schema<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
+    let table = bullterrier_image::effect(effect)
+        .map_err(core_error)?
+        .params()
+        .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
+    from_json(py, &table.json_schema())
 }
 
 /// Runs the command line `bt-image` with `argv` (the arguments after the program's name) and returns its exit code. Results go
@@ -359,7 +373,7 @@ fn shipped_looks() -> Vec<(&'static str, &'static str)> {
 /// that raises, or returns anything but a float32 array of the picture's shape, makes `apply` raise `ValueError`
 /// naming the effect.
 #[pyfunction]
-#[pyo3(signature = (name, category, opacity, function, *, inputs=Vec::new(), fields=None))]
+#[pyo3(signature = (name, category, opacity, function, *, inputs=Vec::new(), fields=None, table=None))]
 fn register(
     name: &str,
     category: &str,
@@ -367,6 +381,7 @@ fn register(
     function: &Bound<'_, PyAny>,
     inputs: Vec<String>,
     fields: Option<&Bound<'_, PyDict>>,
+    table: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<()> {
     let category = Category::ALL
         .iter()
@@ -412,7 +427,11 @@ fn register(
         })
         .transpose()?
         .unwrap_or_default();
+    let table = table
+        .map(|description| Table::from_json(&to_json(description.as_any())?).map_err(core_error))
+        .transpose()?;
     let effect = PythonEffect {
+        table,
         name: name.to_owned(),
         category,
         opacity,
@@ -440,6 +459,7 @@ struct PythonEffect {
     opacity: f64,
     inputs: Vec<Input>,
     fields: Vec<FieldParam>,
+    table: Option<Table>,
     function: Py<PyAny>,
 }
 
@@ -523,6 +543,10 @@ impl Effect for PythonEffect {
 
     fn fields(&self) -> &[FieldParam] {
         &self.fields
+    }
+
+    fn params(&self) -> Option<Table> {
+        self.table.clone()
     }
 
     fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
