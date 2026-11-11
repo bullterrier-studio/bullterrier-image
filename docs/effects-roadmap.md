@@ -314,7 +314,7 @@ A look is added to `examples/recipes/` by the batch that builds its last missing
 
 ## Still planned
 
-E7: scipy users left: `finding/subject.py`, `ops/pieces.py`.
+E7: scipy is gone (the last user, `ops/pieces.py`, was replaced by the core's `number_pieces`).
 
 **Feature batch after E5 (E5b) ✓.** Halftone inks with a per-ink offset, line screens, ink separation and dither inks, then
 the risograph recipe. The Rust port of those effects (E5) stayed a parity port; the new capability followed it.

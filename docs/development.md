@@ -25,11 +25,8 @@ a `commit-msg` hook checks ([CLAUDE.md](../CLAUDE.md#git-conventions)). Contribu
 ## Adding an effect
 
 Adding an effect adds files named for it and edits none. `uv run poe new-effect my_effect --category light` writes, working
-as written once `uv sync` has rebuilt the extension: `src/bullterrier_image/effects/my_effect/effect.py` (+ `__init__.py`;
-parameter model and pure function `def my_effect(rgb, params) -> rgb` under `@effect(category="...", params=...)`,
-docstring = its documentation, body `_core.apply("my_effect", rgb, params.model_dump())`),
-`crates/core/src/effects/my_effect.rs` (the kernel: `Params` with the model's fields, `render`; the build script finds
-it), `tests/effects/my_effect/test_my_effect.py`, `examples/effects/my_effect.toml` (example recipe, size 480, makes
+as written once `uv sync` has rebuilt the extension: `crates/core/src/effects/my_effect.rs` (the kernel: `Params`
+declares the fields, `render`; the build script finds it) and `examples/effects/my_effect.toml` (example recipe, size 480, makes
 its picture `docs/gallery/my_effect.jpg` via `uv run poe gallery --only my_effect`). Effects never import each other: shared code goes
 to `src/bullterrier_image/ops/`. Shared tests then check shape, range, determinism, no input mutation, category, docstring,
 defaults, example recipe, shared parameter names (`amount`, not `strength`).
@@ -65,14 +62,13 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   sheet.py                 contact sheets (the core's)
   fx.py                    effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                public namespace: core's recipe names, default finders bound (`finding`)
-  imageio.py     adapters  facade over the core's file reading and writing (formats, EXIF, colour profiles); Pillow only for `to_pil`/`from_pil`
+  imageio.py     adapters  facade over the core's file reading and writing (formats, EXIF, colour profiles); Pillow only for `to_pil`/`from_pil` (until E7 batch 2)
   loader.py                load_recipe: reads a recipe file (TOML) and pictures it names, through imageio
   finding/                 subject_matte(rgb) -> alpha, depth_map(rgb) -> depth, inverse_depth(rgb) (before per-photo
                            scaling): thin names for the core's finders (IS-Net, Depth Anything V2 on ONNX Runtime, or Apple
                            Vision for the subject, `crates/finders`), whose runtime library `bt-image install onnx` keeps
   (presets/ and looks/     moved to crates/core/data/ and compiled into the core: data, not code)
-  effects/       effects   the effect library, one package per effect (code only), found automatically;
-                           _template/ is what `poe new-effect` copies
+  effects/_template/       what `poe new-effect` copies (not a package, not in the wheel)
   plugin.py                effect-author API, also for other packages (EffectParams, param, Color, Picture, effect)
   core/          core      registry.py, params.py (parameter models), presets.py, looks.py, types.py, vocabulary.py, and the
                            recipe model: steps.py (`Step`, `Recipe`), regions.py and framing.py (their declarations),
@@ -88,7 +84,7 @@ crates/python/   the PyO3 bindings that build `bullterrier_image._native._core`;
 examples/        demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/),
                  older experiments (experiments/), a Python example; see examples/README.md
 docs/            effect catalogue (effects/, generated: index + page per category), its pictures (gallery/), roadmap, design decisions
-tests/           mirrors src/: tests/effects/<effect>/test_<effect>.py per effect package
+tests/           mirrors src/; tests/effects/<effect>/ holds only what Python can break
 ```
 
 Each module owns one decision, callers never see it: `imageio` only place that knows file formats, `finding` only place that

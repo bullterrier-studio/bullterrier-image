@@ -21,5 +21,5 @@ pub use manifest::{Item, Status, read_manifest, report_html, write_record};
 pub use names::{file_name, safe_name};
 pub use project::{Format, Project, RecipeSource, Settings};
 pub use run::{Found, Given, RunOptions, needed_maps, run};
-pub use stages::write_stages;
+pub use stages::{number_pieces, write_stages};
 pub use starter::init_project;

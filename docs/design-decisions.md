@@ -69,14 +69,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   so that an 'M' is `cell` px wide, and the cell's height is the font's `hhea` ascent plus descent, each rounded up (`cell_size`
   agrees with the Pillow atlas's for every cell from 1 to 200). Pillow hints its glyphs and image's are unhinted, so strokes
   differ by anti-aliasing (a mean absolute coverage of 0.01 to 0.1 per glyph, Pillow's a little heavier), never in the order
-  of a palette or the size of a cell. *Transitional:* the Python copy of the font (`src/bullterrier_image/fonts/`) stays until
-  its last Python readers go: `disperse` (E6-4b), the numbered pieces and the sheet's labels (Pillow, R6).
+  of a palette or the size of a cell.
 - **Effects are found through entry points, on first use.** The registry imports every module of the entry-point group
-  `bullterrier_image.effects` the first time it is queried, once, under a lock; bullterrier-image's own effect library is one such entry
-  point and a third-party package declares its own, written against the public `bullterrier_image.plugin`. *Reason:* importing
+  `bullterrier_image.effects` the first time it is queried, once, under a lock; a third-party package declares its own, written
+  against the public `bullterrier_image.plugin` (bullterrier-image's own effects are the core's and have no package since E7). *Reason:* importing
   every effect (and scipy, pydantic) made `import bullterrier_image` cost a quarter of a second before anything was used, and
   left outside packages no way into recipes or the command line; entry points are PyPA's standard plugin mechanism
-  (pytest, Sphinx, flake8 use it). *Consequence:* a checkout needs `uv sync` to install the entry point; a plugin that
+  (pytest, Sphinx, flake8 use it). *Consequence:* a plugin that
   fails to import is a `BullterrierImageError` naming it, `BT_IMAGE_PLUGINS=builtin` skips third-party packages, effect names
   are unique across every installed package, and registering is for import time (queries are thread-safe once loaded).
 - **`ops` modules arrive with their first consumer.** *Reason:* code nothing uses is a cost with no benefit, and a
@@ -101,8 +100,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   own font. *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would
   drift apart. *Consequence:* `text` and `type_on` leave the roadmap.
 - **One bundled monospaced font, no `font` parameter.** Glyph effects draw with JetBrains Mono Regular (SIL OFL 1.1),
-  shipped in the wheel as `src/bullterrier_image/fonts/JetBrainsMono-Regular.ttf` (`ops/glyphs.FONT`). `sheet`, the banner
-  and the piece-number digits use the same file. There is no `font` parameter, `BT_IMAGE_FONTS`, system-font search or
+  compiled into the core (`crates/core/data/fonts/`). `sheet` and the piece-number digits use the same file; the banner script
+  (`docs/make_banner.py`, a dev-only Pillow script) reads it from there. There is no `font` parameter, `BT_IMAGE_FONTS`, system-font search or
   Pillow fallback. *Reason:* a font found on the system made the output depend on the host, a missing path failed at
   render time, and the file escaped the cache fingerprint; one cited asset gives the same look on every host with the
   same library versions. It covers the Latin ramps and the block elements `█▓▒░▀▄`, which a system monospaced font often

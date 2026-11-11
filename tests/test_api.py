@@ -15,7 +15,6 @@ from pydantic import BaseModel
 
 import bullterrier_image
 import bullterrier_image.core.bridge
-import bullterrier_image.effects
 import bullterrier_image.gallery as gallery
 import bullterrier_image.plugin
 from bullterrier_image import (
@@ -158,7 +157,7 @@ def test_the_render_family_has_one_public_home_and_core_does_not_offer_its_own(n
 @pytest.mark.parametrize("name", ["get", "apply", "describe", "categories", "summary", "CATEGORIES"])
 def test_effect_queries_live_only_in_the_registry(name):
     assert hasattr(registry, name)
-    assert not hasattr(bullterrier_image.effects, name)
+    assert not hasattr(bullterrier_image, name)
 
 
 # --- steps are checked when they are made, wherever they come from ------------------------------------------------

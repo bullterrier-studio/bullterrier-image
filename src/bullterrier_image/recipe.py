@@ -19,7 +19,7 @@ from typing import cast
 
 import numpy as np
 
-from .core import bridge
+from .core import bridge, native
 from .core import looks as shipped_looks
 from .core.bridge import maps_needed, needs_finder
 from .core.finder import Finder
@@ -49,7 +49,6 @@ from .errors import RecipeError
 from .finding import subject
 from .finding.depth import depth_finder
 from .loader import load_recipe
-from .ops.pieces import number_pieces
 
 __all__ = [
     "Band",
@@ -228,7 +227,7 @@ def _stage(recipe: Recipe, photo: np.ndarray, kind: str, place: int | str | None
             return Stage(f"region {place!r} (white = chosen)", _grey(picture))
         case "partition":
             pieces = int(picture.max()) + 1
-            return Stage(f"region {place!r} ({pieces} pieces, numbered)", number_pieces(photo, picture, pieces))
+            return Stage(f"region {place!r} ({pieces} pieces, numbered)", native.number_pieces(photo, picture))
         case "step":
             return Stage(f"{place}. {recipe.steps[cast(int, place) - 1].describe()}", picture)
         case "cut_out":

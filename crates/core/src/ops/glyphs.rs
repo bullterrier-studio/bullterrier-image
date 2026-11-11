@@ -15,8 +15,7 @@ use super::length;
 use super::outlines::{Cubic, Limits, chords};
 use super::raster::{Polygons, coverage};
 
-/// The bundled font. Its licence text is `data/fonts/OFL.txt`; the Python package keeps its own copy of the file for
-/// Pillow until the last Python user is ported.
+/// The bundled font. Its licence text is `data/fonts/OFL.txt`.
 const FONT: &[u8] = include_bytes!("../../data/fonts/JetBrainsMono-Regular.ttf");
 
 /// The scanlines a pixel row of a glyph is measured at: a slanting border is then within 1/16 of a pixel of the exact

@@ -4,14 +4,16 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use bullterrier_image::{Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage};
-use numpy::{AllowTypeChange, PyArray1, PyArray2, PyArray3, PyArrayLike2, PyArrayMethods};
+use numpy::{AllowTypeChange, PyArray1, PyArray2, PyArray3, PyArrayLike2, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyList, PyTuple};
 use serde_json::{Value, json};
 
 use super::lut::tables_of;
-use super::{CoreError, core_error, found, from_json, photo_array, picture_of, pictures_of, to_json, value_error};
+use super::{
+    CoreError, core_error, found, from_json, labels_of, photo_array, picture_of, pictures_of, to_json, value_error,
+};
 
 /// Run `recipe` on `rgb` (float32, C-contiguous, `(height, width, 3)`) and return the picture it makes: a new float32
 /// array `(height, width, 3)`, or `(height, width, 4)` (straight alpha last) when the recipe's frame has a `transparent`
@@ -255,6 +257,27 @@ pub(crate) fn trace<'py>(
         .map(|stage| stage_of(py, stage))
         .collect::<PyResult<Vec<_>>>()?;
     PyList::new(py, shown)
+}
+
+/// `rgb` (a float32 `(height, width, 3)` array) dimmed, with a white line along every border between the pieces of
+/// `partition` (int32 `(height, width)`, numbered from 0) and each piece's number in white inside it: how a trace shows a
+/// partition. A new float32 `(height, width, 3)` array. `CoreError` if the two differ in size.
+#[pyfunction]
+pub(crate) fn number_pieces<'py>(
+    py: Python<'py>,
+    rgb: &Bound<'py, PyAny>,
+    partition: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyArray3<f32>>> {
+    let readonly = photo_array(rgb)?;
+    let &[height, width, _] = readonly.shape() else {
+        return Err(value_error("a picture is (height, width, 3)"));
+    };
+    let photo = Image::new(height, width, readonly.as_slice().map_err(value_error)?).map_err(core_error)?;
+    let labels = labels_of(partition)?;
+    let drawn = py
+        .detach(|| bullterrier_image::pipeline::number_pieces(&photo, &labels))
+        .map_err(core_error)?;
+    image_array(py, drawn)
 }
 
 /// The options of a render: the longest side `size`, if asked for, `threads` (0: every core) and the `band` of rows.

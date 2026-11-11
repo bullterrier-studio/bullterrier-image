@@ -7,10 +7,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-from bullterrier_image import imageio
-from bullterrier_image.ops import glyphs
-
 ROOT = Path(__file__).parent.parent
+FONT = ROOT / "crates" / "core" / "data" / "fonts" / "JetBrainsMono-Regular.ttf"
 RESULTS = ROOT / "examples" / "output" / "bullterrier"
 LOOKS = ["neon-pulse", "glitch-noir", "ascii-colour", "halftone-print", "ember-glitch"]
 TILE_HEIGHT, GAP, MARGIN, LABEL = 620, 18, 36, 44
@@ -19,7 +17,7 @@ BACKGROUND, TEXT, MUTED = (13, 14, 18), (232, 234, 240), (130, 135, 148)
 
 def tile(path: Path) -> Image.Image:
     """The picture at `path`, scaled to the banner's tile height with its proportions kept."""
-    picture = imageio.to_pil(imageio.load(path))
+    picture = Image.open(path).convert("RGB")
     return picture.resize((round(picture.width * TILE_HEIGHT / picture.height), TILE_HEIGHT), Image.Resampling.LANCZOS)
 
 
@@ -32,8 +30,8 @@ def main() -> None:
     height = MARGIN * 2 + TILE_HEIGHT + LABEL
     canvas = Image.new("RGB", (width, height), BACKGROUND)
     draw = ImageDraw.Draw(canvas)
-    font = ImageFont.truetype(glyphs.FONT, 22)
-    small = ImageFont.truetype(glyphs.FONT, 18)
+    font = ImageFont.truetype(FONT, 22)
+    small = ImageFont.truetype(FONT, 18)
 
     x, y = MARGIN, MARGIN
     canvas.paste(original, (x, y))

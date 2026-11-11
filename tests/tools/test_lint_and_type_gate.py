@@ -132,7 +132,7 @@ OFFENCES = {
     ),
     "a test importing a private name": (
         TEST_MODULE,
-        "from bullterrier_image.ops.glyphs import _load_font\n\n\ndef test_probe():\n    assert callable(_load_font)\n",
+        "from bullterrier_image.core.registry import _load\n\n\ndef test_probe():\n    assert callable(_load)\n",
         ruff,
         "PLC2701",
     ),

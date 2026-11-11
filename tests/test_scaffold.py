@@ -70,7 +70,6 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
     for path in written:
         assert path in (files.example, files.kernel), path
         assert "$" not in path.read_text(encoding="utf-8"), f"{path.name} still holds a template placeholder"
-    assert not files.package.exists()  # the kernel is the whole effect: no Python folder
     assert files.kernel in written
     recipe = tomllib.loads(files.example.read_text(encoding="utf-8"))
     assert recipe["name"] == "lamp_probe"
@@ -81,12 +80,11 @@ def test_a_new_effect_is_new_files_in_the_places_its_name_gives(checkout):
 @pytest.mark.parametrize(
     "existing",
     [
-        "src/bullterrier_image/effects/lamp_probe/notes.txt",
         "examples/effects/lamp_probe.toml",
         "docs/gallery/lamp_probe.jpg",
         "crates/core/src/effects/lamp_probe.rs",
     ],
-    ids=["package", "example recipe", "picture", "Rust kernel"],
+    ids=["example recipe", "picture", "Rust kernel"],
 )
 def test_a_name_any_of_whose_files_exists_is_refused(checkout, existing):
     (checkout / existing).parent.mkdir(parents=True, exist_ok=True)

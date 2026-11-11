@@ -1,4 +1,4 @@
-"""The facade of `starburst`: its preset and the `size_ratio` a recipe hands it. The spikes are tested in Rust."""
+"""The facade of `starburst`: the `size_ratio` a recipe hands it. The spikes and the sparkle look are tested in Rust."""
 
 import numpy as np
 import pytest
@@ -8,20 +8,6 @@ from bullterrier_image.core import registry
 
 NAME = "starburst"
 SIZE = 201
-
-
-def test_the_preset_sparkle_scatters_glints_over_a_bright_area_where_plain_spikes_flood_it() -> None:
-    """A bright block: the preset's spikes without its spacing wrap the whole block in light; with it a few small
-    separate glints are lit."""
-    picture = np.zeros((SIZE, SIZE, 3), np.float32)
-    picture[60:140, 60:140] = 0.95
-    sparkle = registry.presets(NAME)["sparkle"].params
-    glitter = registry.apply(NAME, picture, **sparkle, seed=1)
-    flood = registry.apply(NAME, picture, **{**sparkle, "spacing": 0.0})
-    lit_glitter = (glitter - picture).max(axis=-1) > 0.02
-    lit_flood = (flood - picture).max(axis=-1) > 0.02
-    assert lit_glitter.any()
-    assert lit_glitter.sum() < lit_flood.sum() / 4
 
 
 @pytest.mark.parametrize(("spacing", "design_spacing"), [(0.0, 0.0), (25.8, 12.9)], ids=["every point", "a random few"])

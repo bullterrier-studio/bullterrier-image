@@ -123,7 +123,10 @@ fn grey(layer: &Layer) -> Result<Image, Error> {
 
 /// `photo` dimmed with a white line on each side of every border between the pieces of `labels` and, in each piece, its number
 /// in white, centred on the pixel of the piece nearest its middle (a number wider than the picture is cut off at its edge).
-fn number_pieces(photo: &Image, labels: &Labels) -> Result<Image, Error> {
+///
+/// # Errors
+/// [`Error::Inputs`] if `photo` and `labels` are of different sizes.
+pub fn number_pieces(photo: &Image, labels: &Labels) -> Result<Image, Error> {
     let (height, width) = (labels.height(), labels.width());
     let piece = labels.values();
     let mut out: Vec<[f32; 3]> = photo

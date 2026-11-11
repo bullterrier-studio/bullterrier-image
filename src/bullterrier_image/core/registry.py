@@ -6,12 +6,11 @@ module is imported, naming itself, instead of in some recipe much later.
 
 Where the effects come from: the first query (`get`, `all_effects`, `describe`, `categories`, any of them) loads every
 installed effect package, once. An effect package is an entry point of the group `bullterrier_image.effects` naming a
-module whose import registers its effects: bullterrier-image's own effects are one (`bullterrier_image.effects`,
-declared in bullterrier-image's `pyproject.toml`) and are loaded first; a third-party package declares its own (see
-`bullterrier_image.plugin`). With the environment variable `BT_IMAGE_PLUGINS=builtin` only bullterrier-image's own are
-loaded. A package that fails to load raises `BullterrierImageError` naming its entry point, and the next query tries
-again. The registry names no effect package itself, so `core` never imports `effects`, and importing bullterrier-image
-loads no effect at all.
+module whose import registers its effects: bullterrier-image's own effects are the core's and need no package; a
+third-party package declares its own (see `bullterrier_image.plugin`). With the environment variable
+`BT_IMAGE_PLUGINS=builtin` no package is loaded. A package that fails to load raises `BullterrierImageError` naming its
+entry point, and the next query tries again. The registry names no effect package itself, and importing
+bullterrier-image loads no effect at all.
 
 Ordering and threads: every listing is sorted by effect name. Loading happens once, under a lock: threads that make the
 first query together wait for it and all see the whole table. After that, queries only read, so rendering from several
@@ -315,8 +314,8 @@ def category(name: str) -> str:
 
 def categories() -> dict[str, list[str]]:
     """Every category, in the order of `CATEGORIES`, with the sorted names of its effects (empty if it has none)."""
-    _load_effect_packages()
-    return {c: sorted(name for name, fn in _EFFECTS.items() if fn.category == c) for c in CATEGORIES}
+    effects = all_effects()
+    return {c: [name for name, fn in effects.items() if fn.category == c] for c in CATEGORIES}
 
 
 def parameters(name: str) -> type[EffectParams]:

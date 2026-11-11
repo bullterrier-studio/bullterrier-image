@@ -9,7 +9,7 @@ authors = [
     { name = "Janis Cakstins", email = "janis.cakstins@gmail.com" }
 ]
 # 3.12 is the oldest version the code needs (PEP 695 generics are its newest syntax); the suite is green on 3.12, 3.13
-# and 3.14. 3.15 is not listed until numpy, scipy and Pillow have wheels for it.
+# and 3.14. 3.15 is not listed until numpy and Pillow have wheels for it.
 requires-python = ">=3.12"
 keywords = ["photo", "image effects", "ascii art", "glitch", "halftone", "background removal", "recipe"]
 classifiers = [
@@ -30,9 +30,7 @@ classifiers = [
 # Lower bounds are the oldest releases the suite passes with on Python 3.12 (`uv run poe check-min-deps` runs it against
 # exactly these). Below them: Pillow 11.0.0 (it draws the fonts and resizes in places, and writes the tests' picture
 # files; the core reads and writes ours) cannot build the geotagged picture of the metadata test, pydantic 2.7.0 fails
-# at import, scipy 1.16 is the floor the radial effects needed (an `affine_transform`
-# warning; they run in Rust now, so lower it when the floors are next re-measured, or when scipy goes), and numpy 1.26
-# is the first series with Python 3.12 wheels.
+# at import, and numpy 1.26 is the first series with Python 3.12 wheels.
 # No upper bounds: nothing is known to break on a newer release.
 dependencies = [
     "annotated-types>=0.4.0",
@@ -42,7 +40,6 @@ dependencies = [
     # library (Apple Vision and --map subject=FILE still work)
     "pillow>=11.1.0",
     "pydantic>=2.7.1",
-    "scipy>=1.16.0",
 ]
 
 [project.urls]
@@ -51,12 +48,6 @@ Issues = "https://github.com/bullterrier-studio/bullterrier-image/issues"
 
 [project.scripts]
 bt-image = "bullterrier_image.cli:main"
-
-# Effect packages: the registry imports every module of this group on its first query
-# (bullterrier_image.core.registry). Our own effects come in the way a third party's do; an editable install
-# (`uv sync`) provides this entry point too.
-[project.entry-points."bullterrier_image.effects"]
-bullterrier_image = "bullterrier_image.effects"
 
 # maturin builds the Rust extension `bullterrier_image._native._core` (crates/python) and packs it with the Python code of src/
 [build-system]
@@ -378,14 +369,10 @@ strict_equality = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 show_error_codes = true
-# NOT enabled: warn_return_any (scipy and parts of numpy return Any: pure noise here), disallow_any_generics (bare
+# NOT enabled: warn_return_any (parts of numpy return Any: pure noise here), disallow_any_generics (bare
 # np.ndarray everywhere), full --strict.
 # The pydantic plugin types each model's constructor from its fields, so a misspelt parameter name is a type error.
 plugins = ["pydantic.mypy"]
-
-[[tool.mypy.overrides]]
-module = ["scipy.*"]
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["tests.*"]
@@ -429,6 +416,8 @@ ignore_names = [
     "octaves",
     "persistence",
     "samples",
+    "x",  # `Line.x` and `RadialGradient.x`, written to the core by `model_dump` like the fields above
+    "y",
     "angle",  # fields of `Framing` and the regions, as above; the last Python effect that read these names (disperse) is gone
     "edge",
     "jitter",
@@ -471,7 +460,7 @@ DEP004 = ["packaging"]
 root_package = "bullterrier_image"
 
 [[tool.importlinter.contracts]]
-name = "Layers: app > adapters > effects > core > ops > errors"
+name = "Layers: app > adapters > plugin > core > ops > errors"
 type = "layers"
 containers = ["bullterrier_image"]
 exhaustive = true  # a new top-level module must be placed in a layer here
@@ -484,21 +473,13 @@ layers = [
     "sheet | fx",
     "recipe",
     "imageio : finding : loader",  # adapters: file formats, finding the subject, recipe files (the loader reads pictures through imageio)
-    "effects",
-    "plugin",  # the effect-author API for other packages: core's names, so bullterrier-image's own effects may use it too
+    "plugin",  # the effect-author API for other packages: core's names
     "core",  # may import ops
     "ops",
     # the exceptions, and the home of the Rust extension (`_native._core`): they import nothing, so every layer may use
     # them
     "errors | _native",
 ]
-
-[[tool.importlinter.contracts]]
-name = "Effects never import each other"
-type = "independence"
-# Every effect folder in effects/. `_`-prefixed modules cannot be excluded by a wildcard, and none hold Python
-# code: code that two effects share belongs in ops/.
-modules = ["bullterrier_image.effects.*"]
 
 [[tool.importlinter.contracts]]
 name = "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > values > native > types"

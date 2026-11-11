@@ -31,7 +31,7 @@ install the package (`pip install`, or `uv sync` for an editable checkout):
 bullterrier-image then finds the effect like its own, by name, in TOML recipes, `fx.tint(...)`, `bt-image effects` and
 every other command: the registry imports every module of that group the first time it is asked about an effect. A
 package that fails to import stops that query with a `BullterrierImageError` naming its entry point;
-`BT_IMAGE_PLUGINS=builtin` loads only bullterrier-image's own effects.
+`BT_IMAGE_PLUGINS=builtin` loads no package.
 
 The contract: an effect is a pure function of a float32 RGB image `(h, w, 3)` in 0..1 and its parameter model, returning
 a new finite float32 image of the same shape (the core refuses another dtype or a NaN, as a broken effect, with a

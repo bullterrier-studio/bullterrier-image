@@ -61,7 +61,7 @@ mod _core {
     };
 
     #[pymodule_export]
-    use super::run::{check_recipe, known_maps, locate, needs, numbers, refine_edge, render, trace};
+    use super::run::{check_recipe, known_maps, locate, needs, number_pieces, numbers, refine_edge, render, trace};
 }
 
 create_exception!(

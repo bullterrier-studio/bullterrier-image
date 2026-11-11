@@ -42,14 +42,13 @@ inside the package (`Recipe`, `fx`, `RecipeError`, effects, parameters) carry no
 A **microkernel**: a small `core` (contracts, registry, recipe engine) plus **plugins** (effects) found by auto-discovery. A
 recipe is a **pipes-and-filters** list of steps, each a pure filter `image -> image`. One **vertical slice** per effect, joined by
 its name; `tests/` mirrors `src/`:
-`crates/core/src/effects/<name>.rs` (an effect the core runs; a Python one is `src/bullterrier_image/effects/<name>/`, code only),
+`crates/core/src/effects/<name>.rs` (the kernel, which declares and runs the effect),
 `examples/effects/<name>.toml`, `docs/gallery/<name>.jpg`. `gallery.effect_files(name)` is the one place that knows these paths.
 Shared numeric code lives in `ops/`, named by concept.
 
 ```
 app        cli (starts the core's command line), pipeline, gallery, sheet, fx, public API   (may import anything below)
 adapters   imageio (files), finding (finding the subject), loader (recipe files)   (may import core, ops)
-effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param), values (Color, FieldName, Picture, Lut), registry, steps (the recipe model:
            Step, Each, Recipe), regions and framing (its declarations), finder (Finder), native (the extension's
@@ -59,7 +58,7 @@ errors     BullterrierImageError and its subclasses                            (
 _native    home of the Rust extension `_native._core`, beside errors          (imports nothing from bullterrier_image)
 ```
 **Architecture rules.** Reference for the Rust core, runner, regions, files, threads and bindings: `docs/architecture.md`; read it before touching them.
-- A ported effect has **no Python folder**: the registry registers every effect the core declares (`registry._register_core_effects`) with a function that calls `_core.apply("<name>", rgb, params.model_dump())`.
+- An effect has **no Python folder**: the registry registers every effect the core declares (`registry._register_core_effects`) with a function that calls `_core.apply("<name>", rgb, params.model_dump())`.
 - Rust effects never refer to each other.
 - The ratio of design px (480 on the longest side) is derived from that working picture, never passed in.
 - Every user number that drives allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of `Region::check` with neither a row nor a reason.
@@ -71,8 +70,7 @@ _native    home of the Rust extension `_native._core`, beside errors          (i
 
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
-Nothing imports `effects`: the registry loads every entry point of the group `bullterrier_image.effects` on first query. In a
-checkout, `uv sync` installs ours; without it no effect is found.
+The registry loads every entry point of the group `bullterrier_image.effects` (other packages' effects) on first query.
 
 ## Rules
 

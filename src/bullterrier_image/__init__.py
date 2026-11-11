@@ -85,7 +85,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     __version__: str
 
 # Each public name by the module it lives in ("." for the submodules themselves). Importing these eagerly would load
-# numpy, Pillow, pydantic and scipy for a bare `import bullterrier_image`, about 0.25 s, before anything is used (PEP
+# numpy, Pillow and pydantic for a bare `import bullterrier_image`, about 0.25 s, before anything is used (PEP
 # 562).
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),

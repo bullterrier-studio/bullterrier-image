@@ -1,5 +1,5 @@
 """Third-party effect packages: written against `bullterrier_image.plugin`, declared as an entry point of the group
-`bullterrier_image.effects`, found by the registry like bullterrier-image's own effects.
+`bullterrier_image.effects`, found by the registry.
 
 Each test installs a throwaway package the way an installer would (the package plus a `.dist-info` folder holding its
 `entry_points.txt`) in a folder put on `PYTHONPATH`, and runs a fresh interpreter, so the registry loads the effect

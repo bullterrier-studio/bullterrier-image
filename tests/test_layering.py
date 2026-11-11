@@ -3,7 +3,7 @@ import sees. Each layer may import only the layers below it:
 
     app        cli > pipeline | gallery > sheet | checks | fx > recipe
     adapters   imageio, finding, loader (recipe files)
-    effects    one folder per effect; never import each other
+    plugin     the effect-author API for other packages
     core       bridge > steps > framing | registry | regions | finder > presets | looks > params | vocabulary
                > native > types
     ops        may import errors
@@ -33,13 +33,12 @@ PACKAGE = Path(bullterrier_image.__file__).parent
 ROOT = PACKAGE.parent.parent  # the repository: pyproject.toml holds the contracts
 LINT_IMPORTS = Path(sys.executable).with_name("lint-imports")  # `uv run lint-imports` from the repository root
 
-LAYERS = "Layers: app > adapters > effects > core > ops > errors"
-EFFECTS_APART = "Effects never import each other"
+LAYERS = "Layers: app > adapters > plugin > core > ops > errors"
 CORE_ORDER = (
     "Core: bridge > steps > framing|registry|regions|finder > presets|looks > params|vocabulary > values > native "
     "> types"
 )
-CONTRACTS = [LAYERS, EFFECTS_APART, CORE_ORDER]
+CONTRACTS = [LAYERS, CORE_ORDER]
 
 
 def fresh_python(code: str) -> subprocess.CompletedProcess:
@@ -62,11 +61,6 @@ def lint(cwd: Path, pythonpath: Path | None = None) -> subprocess.CompletedProce
 def lint_a_copy_with(tmp_path: Path, module: str, line: str) -> subprocess.CompletedProcess:
     """Lint a copy of the package (and its contracts) in which `module` also has the import `line`."""
     shutil.copytree(PACKAGE, tmp_path / "bullterrier_image", ignore=shutil.ignore_patterns("__pycache__"))
-    for folder in (HOST, OTHER):
-        probe = tmp_path / "bullterrier_image" / "effects" / folder
-        probe.mkdir(exist_ok=True)
-        for name in ("__init__.py", "effect.py"):
-            (probe / name).write_text('"""A probe effect folder of the test."""\n', encoding="utf-8")
     shutil.copy(ROOT / "pyproject.toml", tmp_path)
     target = tmp_path / "bullterrier_image" / module
     target.write_text(target.read_text(encoding="utf-8") + f"\n{line}  # injected by the test\n", encoding="utf-8")
@@ -80,35 +74,14 @@ def test_the_package_keeps_every_import_contract():
         assert re.search(rf"{re.escape(name)} KEPT", result.stdout), f"{name!r} not reported kept:\n{result.stdout}"
 
 
-# Two effect folders, as a package of Python effects has them (the core's effects have none, and fewer than two are left
-# written in Python): a host that imports, and the one it must not import. `lint_a_copy_with` makes them in its copy.
-HOST, OTHER = "probe_host", "probe_other"
-
 # One forbidden import per rule, each in a copy of the package: the linter must fail, naming the module and the rule.
 FORBIDDEN = {
-    "effect to effect": (
-        f"effects/{HOST}/effect.py",
-        f"import bullterrier_image.effects.{OTHER}",
-        f"bullterrier_image.effects.{HOST}.effect",
-        EFFECTS_APART,
-    ),
     "ops to core": ("ops/maps.py", "import bullterrier_image.core.params", "bullterrier_image.ops.maps", LAYERS),
     "errors to ops": ("errors.py", "import bullterrier_image.ops.maps", "bullterrier_image.errors", LAYERS),
     "errors to core": ("errors.py", "import bullterrier_image.core.params", "bullterrier_image.errors", LAYERS),
-    "core to effects": ("core/steps.py", "import bullterrier_image.effects", "bullterrier_image.core.steps", LAYERS),
+    "core to plugin": ("core/steps.py", "import bullterrier_image.plugin", "bullterrier_image.core.steps", LAYERS),
     "core to imageio": ("core/bridge.py", "import bullterrier_image.imageio", "bullterrier_image.core.bridge", LAYERS),
-    "effects to imageio": (
-        f"effects/{HOST}/effect.py",
-        "import bullterrier_image.imageio",
-        f"bullterrier_image.effects.{HOST}.effect",
-        LAYERS,
-    ),
-    "effect folder to effect folder": (
-        f"effects/{HOST}/effect.py",
-        f"import bullterrier_image.effects.{OTHER}.effect",
-        f"bullterrier_image.effects.{HOST}.effect",
-        EFFECTS_APART,
-    ),
+    "plugin to imageio": ("plugin.py", "import bullterrier_image.imageio", "bullterrier_image.plugin", LAYERS),
     "recipe to pipeline": ("recipe.py", "import bullterrier_image.pipeline", "bullterrier_image.recipe", LAYERS),
     "fx to gallery": ("fx.py", "import bullterrier_image.gallery", "bullterrier_image.fx", LAYERS),
     "pipeline to cli": ("pipeline.py", "import bullterrier_image.cli", "bullterrier_image.pipeline", LAYERS),
@@ -184,13 +157,13 @@ ALLOWED = {
     "core to errors": ("core/vocabulary.py", "import bullterrier_image.errors"),
     "ops to errors": ("ops/maps.py", "import bullterrier_image.errors"),
     "ops to the Rust extension": ("ops/maps.py", "from bullterrier_image._native import _core"),
-    "an effect to the Rust extension": (f"effects/{HOST}/effect.py", "from bullterrier_image._native import _core"),
+    "plugin to the Rust extension": ("plugin.py", "from bullterrier_image._native import _core"),
 }
 
 
 @pytest.mark.parametrize(("module", "line"), ALLOWED.values(), ids=ALLOWED.keys())
 def test_a_layer_may_import_the_layers_below_it(module, line, tmp_path):
-    """Owner rulings: the layers are linear, app > adapters > effects > core > ops > errors, so core may use ops, and
+    """Owner rulings: the layers are linear, app > adapters > plugin > core > ops > errors, so core may use ops, and
     the exceptions, which import nothing, sit below everything so every layer may raise them."""
     result = lint_a_copy_with(tmp_path, module, line)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -217,7 +190,7 @@ def _effects_declared_in_the_source() -> set[str]:
 
 def test_importing_the_package_loads_no_effect_and_no_heavy_library():
     """`import bullterrier_image` stays fast: the effects, and the libraries they need, load when used."""
-    heavy = ["bullterrier_image.effects", "scipy", "pydantic", "numpy", "PIL", "onnxruntime"]
+    heavy = ["pydantic", "numpy", "PIL", "onnxruntime"]
     code = (
         "import json, sys\nimport bullterrier_image\n"
         f"json.dump([m for m in {heavy!r} if m in sys.modules], sys.stdout)\n"

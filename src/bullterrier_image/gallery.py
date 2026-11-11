@@ -1,8 +1,7 @@
 """The developer commands on a source checkout: what is generated from the effects (the gallery pictures,
 `docs/effects/`, `fx.pyi`) and the files of a new effect (`new_effect`, from the template).
 
-Everything about an effect is found by its name, in a layout that mirrors the package: its code in
-`src/bullterrier_image/effects/<name>/`, its Rust kernel in `crates/core/src/effects/`, its example recipe in
+Everything about an effect is found by its name: its Rust kernel in `crates/core/src/effects/`, its example recipe in
 `examples/effects/` and its gallery picture in `docs/gallery/`.
 `effect_files` is the one place that says so; everything else asks it. Effects carry their own documentation
 (category, docstring, signature), so nothing here is written by hand and no effect needs a shared file edited. The
@@ -69,7 +68,6 @@ def render_effects_pages() -> dict[str, str]:
 class EffectFiles(NamedTuple):
     """Where everything about one effect lives in a source checkout, by its name."""
 
-    package: Path  # src/bullterrier_image/effects/<name>/: its Python code; an effect the core runs has none
     example: Path  # examples/effects/<name>.toml: the short recipe that shows it, rendered for its picture
     picture: Path  # docs/gallery/<name>.jpg: its gallery picture (JPEG, longest side 480 px), shown by the catalogue
     kernel: Path  # crates/core/src/effects/<name>.rs: its Rust kernel, which declares and runs it (once ported)
@@ -78,7 +76,6 @@ class EffectFiles(NamedTuple):
 def effect_files(name: str, *, checkout: Path = CHECKOUT) -> EffectFiles:
     """Where the files of an effect called `name` live in `checkout`, whether or not they exist (yet)."""
     return EffectFiles(
-        package=_layout(checkout).effects / name,
         example=checkout / "examples" / "effects" / f"{name}.toml",
         picture=checkout / "docs" / "gallery" / f"{name}.jpg",
         kernel=checkout / "crates" / "core" / "src" / "effects" / f"{name}.rs",
@@ -279,7 +276,7 @@ def _names_fx_defines() -> set[str]:
 class _Layout(NamedTuple):
     """Where the files shared by all effects live in a source checkout."""
 
-    effects: Path  # src/bullterrier_image/effects, one folder per effect: its presence makes a folder a source checkout
+    kernels: Path  # crates/core/src/effects, one Rust file per effect: its presence makes a folder a source checkout
     template: Path  # the files a new effect's folder is made from (string.Template: $name, $Name, $category)
     photo: Path  # the demo photo every example recipe is shown on
     pages: Path  # docs/effects/: the generated catalogue, an index and a page per category
@@ -289,7 +286,7 @@ class _Layout(NamedTuple):
 def _layout(checkout: Path) -> _Layout:
     package = checkout / "src" / "bullterrier_image"
     return _Layout(
-        effects=package / "effects",
+        kernels=checkout / "crates" / "core" / "src" / "effects",
         template=package / "effects" / "_template",
         photo=checkout / "examples" / "photos" / "bullterrier.jpeg",
         pages=checkout / "docs" / "effects",
@@ -302,9 +299,9 @@ def _chosen(only: Sequence[str], checkout: Path) -> list[str]:
     names = list(only) or sorted(registry.describe())
     for name in names:
         registry.get(name)  # UnknownEffectError, listing the effects, for a name that is none
-    if not _layout(checkout).effects.is_dir():
+    if not _layout(checkout).kernels.is_dir():
         raise ProjectError(
-            f"{checkout} has no src/bullterrier_image/effects: this needs a source checkout of bullterrier-image"
+            f"{checkout} has no crates/core/src/effects: this needs a source checkout of bullterrier-image"
         )
     missing = [
         str(path) for path in (effect_files(name, checkout=checkout).example for name in names) if not path.is_file()
