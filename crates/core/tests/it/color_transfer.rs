@@ -89,7 +89,11 @@ fn transfer_sized(
         step = step.param(*key, value.clone());
     }
     Ok(photo
-        .render(&Recipe::new([step]), &Presets::new(), Options::default().with_threads(threads))?
+        .render(
+            &Recipe::new([step]),
+            &Presets::new(),
+            Options::default().with_threads(threads),
+        )?
         .into_values())
 }
 
@@ -266,7 +270,10 @@ fn a_large_nearly_flat_bright_reference_gives_its_spread_at_any_thread_count() -
     // 300 x 400 pixels of one bright colour with a 0.01 wobble: the spread is a thousandth of the mean's square, where
     // a sum of squares loses digits
     let (height, width) = (300, 400);
-    let reference: Vec<f32> = varied_seeded(height, width, 3).iter().map(|level| 0.8 + 0.01 * level).collect();
+    let reference: Vec<f32> = varied_seeded(height, width, 3)
+        .iter()
+        .map(|level| 0.8 + 0.01 * level)
+        .collect();
     let photo = varied(height, width);
     let (want_mean, want_deviation) = statistics(&reference);
     let one = transfer_sized(height, width, 1, &photo, Some(rgb(height, width, &reference)?), &[])?;
@@ -282,7 +289,14 @@ fn a_large_nearly_flat_bright_reference_gives_its_spread_at_any_thread_count() -
         );
     }
     for threads in [2, 3, 10] {
-        let more = transfer_sized(height, width, threads, &photo, Some(rgb(height, width, &reference)?), &[])?;
+        let more = transfer_sized(
+            height,
+            width,
+            threads,
+            &photo,
+            Some(rgb(height, width, &reference)?),
+            &[],
+        )?;
         assert_close(&more, &one, 1e-5, "threads");
     }
     Ok(())
