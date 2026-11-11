@@ -479,7 +479,7 @@ layers = [
     "__main__",  # `python -m bullterrier_image`: runs the command line
     "cli",  # app, split so its modules cannot form cycles: recipe imports no other app module
     "pipeline | gallery",
-    "sheet | checks | fx",
+    "sheet | fx",
     "recipe",
     "imageio : finding : loader",  # adapters: file formats, finding the subject, recipe files (the loader reads pictures through imageio)
     "effects",
