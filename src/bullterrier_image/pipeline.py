@@ -43,7 +43,6 @@ from .core.bridge import core_finder
 from .core.finder import Finder
 from .core.regions import FOUND_MAPS
 from .core.steps import recipe_dict
-from .loader import load_recipe
 from .recipe import Recipe, default_finder
 
 _PROJECT_FILE = "bt-image.toml"
@@ -194,7 +193,7 @@ def run(
     with registry.holding() as hold:
         given = {
             "photos": [str(photo) for photo in project.photos],
-            "recipes": [recipe_dict(r if isinstance(r, Recipe) else load_recipe(r), hold) for r in project.recipes],
+            "recipes": [recipe_dict(r, hold) if isinstance(r, Recipe) else str(r) for r in project.recipes],
             "output": str(project.output),
             "formats": list(project.formats),
             "sizes": list(project.sizes),

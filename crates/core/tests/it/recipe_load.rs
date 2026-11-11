@@ -139,3 +139,28 @@ fn a_name_is_a_look_and_anything_else_is_a_file_or_an_error_saying_both_were_tri
     assert!(nothing.contains("the looks: "), "{nothing}");
     Ok(())
 }
+
+#[test]
+fn a_recipe_read_from_a_source_is_checked_and_a_refusal_starts_with_the_source_and_names_the_step() -> Outcome {
+    let presets = bullterrier_image::Presets::shipped()?;
+    let good = Recipe::from_toml("[[step]]\neffect = \"grade\"\n")?;
+    assert_eq!(good.clone().checked_from("good.toml", &presets)?, good);
+    let typo = Recipe::from_toml("[[step]]\neffect = \"grade\"\n[[step]]\neffect = \"slice_shif\"\n")?;
+    let said = typo
+        .checked_from("typo.toml", &presets)
+        .err()
+        .map(|error| error.to_string())
+        .unwrap_or_default();
+    assert!(
+        said.starts_with("typo.toml: step 2: unknown effect 'slice_shif'; did you mean: slice_shift (effect)"),
+        "{said}"
+    );
+    let range = Recipe::from_toml("[[step]]\neffect = \"grade\"\nexposure = 99\n")?;
+    let said = range
+        .checked_from("range.toml", &presets)
+        .err()
+        .map(|error| error.to_string())
+        .unwrap_or_default();
+    assert!(said.starts_with("range.toml: ") && said.contains("exposure"), "{said}");
+    Ok(())
+}

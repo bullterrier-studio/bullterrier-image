@@ -122,9 +122,9 @@ def write_texture(folder, value) -> None:
     imageio.save(np.full((4, 4, 3), value, np.float32), folder / "assets" / "tex.png")
 
 
-def test_changing_a_picture_file_a_recipe_names_redoes_that_recipe_and_nothing_else(folder, layer_probe):
+def test_changing_a_picture_file_a_recipe_names_redoes_that_recipe_and_nothing_else(folder):
     write_texture(folder, 0.25)
-    write_recipe(folder, "layered", 'effect = "layer_probe"\nimage = "../assets/tex.png"')
+    write_recipe(folder, "layered", 'effect = "blend"\nimage = "../assets/tex.png"')
     project = load_project(folder / "bt-image.toml")
     run(project)
     mark_outputs(folder)

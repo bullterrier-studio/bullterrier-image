@@ -72,13 +72,14 @@ struct Loaded {
 ///
 /// # Errors
 /// What [`Recipe::from_file`] and [`file_name`] refuse; [`Error::Project`] for two recipes whose names give one file name.
-fn load(project: &Project) -> Result<Vec<Loaded>, Error> {
+fn load(project: &Project, presets: &Presets) -> Result<Vec<Loaded>, Error> {
     let mut loaded = Vec::new();
     for source in &project.recipes {
         let (recipe, text) = match source {
             RecipeSource::File(path) => {
                 let text = std::fs::read_to_string(path).unwrap_or_default();
-                (Recipe::from_file(path)?, text)
+                let recipe = Recipe::from_file(path)?.checked_from(&path.display().to_string(), presets)?;
+                (recipe, text)
             }
             RecipeSource::Built(recipe) => ((**recipe).clone(), serde_json::to_string(recipe).unwrap_or_default()),
         };
@@ -107,7 +108,7 @@ fn load(project: &Project) -> Result<Vec<Loaded>, Error> {
 /// What loading and checking the recipes refuses.
 pub fn needed_maps(project: &Project, presets: &Presets) -> Result<BTreeSet<String>, Error> {
     let mut maps = BTreeSet::new();
-    for one in load(project)? {
+    for one in load(project, presets)? {
         let needs = one.recipe.needs(presets)?;
         maps.extend(needs.maps);
         if needs.finds_pieces {
@@ -348,7 +349,7 @@ impl<'a> Context<'a> {
         options: &'a RunOptions<'a>,
         given: &'a Given,
     ) -> Result<Self, Error> {
-        let loaded = load(project)?;
+        let loaded = load(project, presets)?;
         for one in &loaded {
             if one.recipe.frame.transparent != crate::frame::Transparent::None
                 && project

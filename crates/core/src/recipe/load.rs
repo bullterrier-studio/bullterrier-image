@@ -5,8 +5,8 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::Recipe;
-use crate::Error;
 use crate::params::Kind;
+use crate::{Error, Presets};
 
 impl Recipe {
     /// The look called `name` that ships with the crate: a recipe with a `description`, named `name`.
@@ -22,6 +22,29 @@ impl Recipe {
         let mut recipe = Self::from_toml(text)?;
         recipe.name = Some(name.to_owned());
         Ok(recipe)
+    }
+
+    /// This recipe, read from `source` (a file's path or a look's name), held to the rules of a recipe
+    /// ([`checked`](Self::checked)) with any refusal starting with `source`. A step of an effect that is not registered says
+    /// which step it is and what the name is instead (see [`documentation::unknown_effect`](crate::documentation::unknown_effect)).
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] starting with `source`, then the step if the effect is unknown, then what `checked` refuses.
+    pub fn checked_from(self, source: &str, presets: &Presets) -> Result<Self, Error> {
+        let steps = self.steps.clone();
+        self.checked(presets).map_err(|error| match error {
+            Error::UnknownEffect(name) => {
+                let step = steps
+                    .iter()
+                    .position(|entry| matches!(entry, super::Entry::Step(step) if step.effect == name))
+                    .map_or_else(String::new, |at| format!("step {}: ", at + 1));
+                Error::Recipe(format!(
+                    "{source}: {step}{}",
+                    crate::documentation::unknown_effect(&name, presets)
+                ))
+            }
+            other => Error::Recipe(format!("{source}: {other}")),
+        })
     }
 
     /// The recipe `spec` names: a look that ships with the crate if `spec` is exactly its name, else the recipe file at

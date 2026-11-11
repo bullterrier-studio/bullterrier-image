@@ -36,21 +36,8 @@ pub(crate) fn load(specs: &[String]) -> Result<Vec<Recipe>, Error> {
     sources
         .iter()
         .map(|source| {
-            let located = |error: Error| Error::Recipe(format!("{source}: {error}"));
-            let recipe = Recipe::resolve(source)?;
-            let checked = recipe.clone().checked(&presets).map_err(|error| match error {
-                // say which step, and what the name the recipe wrote is instead
-                Error::UnknownEffect(name) => {
-                    let step = recipe
-                        .steps
-                        .iter()
-                        .position(|entry| matches!(entry, Entry::Step(step) if step.effect == name))
-                        .map_or_else(String::new, |at| format!("step {}: ", at + 1));
-                    Error::Recipe(format!("{source}: {step}{}", unknown_effect(&name, &presets)))
-                }
-                other => located(other),
-            })?;
-            file_name(&checked).map_err(located)?;
+            let checked = Recipe::resolve(source)?.checked_from(source, &presets)?;
+            file_name(&checked).map_err(|error| Error::Recipe(format!("{source}: {error}")))?;
             Ok(checked)
         })
         .collect()

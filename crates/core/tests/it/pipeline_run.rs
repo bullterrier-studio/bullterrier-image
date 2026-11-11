@@ -533,3 +533,15 @@ fn a_map_the_disk_cannot_keep_fails_only_its_pair_and_is_found_again_for_the_nex
     assert_eq!(asked.load(Ordering::SeqCst), 2);
     Ok(())
 }
+
+#[test]
+fn a_recipe_file_that_breaks_a_rule_fails_the_run_before_any_work_naming_the_file() -> Outcome {
+    let scene = Scene::new("broken-recipe", &["a.png"])?;
+    let broken = scene.recipe("typo", "effect = \"nope\"")?;
+    let project = scene.project(&["a.png"], &[broken], Settings::default())?;
+    let refused = go(&project, &RunOptions::default(), &Given::default());
+    let said = refused.err().map(|error| error.to_string()).unwrap_or_default();
+    assert!(said.contains("typo.toml: step 1: unknown effect 'nope'"), "{said}");
+    assert!(!scene.root.join("out").exists(), "nothing was made");
+    Ok(())
+}
