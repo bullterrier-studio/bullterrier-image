@@ -18,6 +18,19 @@ its `Unreleased` becomes the release date.
 - The noise effects (`grain`, `vhs`, `paper_texture`, `flow_lines`, `fog`, `noise_field` value, `displace`, `flow_warp`,
   `melt`, `aurora`, torn `edge`) draw position-stable noise, so their pictures changed.
 
+- **BREAKING:** pydantic is no longer a dependency. `Step`, `Each`, `Recipe`, the regions, `Framing` and `Drive` are frozen
+  dataclasses that the Rust core checks when they are made. `model_dump`, `model_validate*`, `model_copy`, `model_construct`,
+  `model_fields`, `parse`, `documentation()` and `fields_doc()` are gone: `to_dict()` and `Class.from_dict(data)` are the one
+  serialisation pair of a step and a recipe, `replace(...)` copies, `help(Class)` lists the fields. An unknown keyword is a
+  `TypeError` (in `from_dict`, a `RecipeError` naming the key); `Recipe([...])` takes `Step`s and `Each`s, not dicts.
+- **BREAKING:** a plugin's `EffectParams` is a plain frozen class, not a pydantic model. Its values are checked by the
+  core; it has `to_dict()` and `replace()`; `core="x"`, a positional params object in an effect call, a picture field's
+  colour default (a picture field defaults to none), `tuple[str, ...]` fields and cyclic whole numbers are gone. An effect
+  the Rust core runs has no Python class: `registry.parameters(name)` is its parameter table.
+- **BREAKING:** `Framing` `angle` is kept as written (the core wraps it when it renders).
+- Constructing a step is ten times cheaper (`fx.grade(...)` 86 to 8.5 microseconds, a five-step `Recipe` 95 to 33).
+- `_core.register` requires a `table=`; the `foreign` arguments of `numbers` and `locate` are gone.
+
 ### Added
 
 - `Options::with_band(rows)` and Python `band=`: render in bands of rows, the whole render's pixels (within float rounding, 1e-4), and

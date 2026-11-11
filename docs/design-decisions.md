@@ -1401,3 +1401,12 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   `bt-image install onnx`. The CLI asks before downloading (`--yes` skips it; no answer is no), the library never asks. The
   console script still points `BT_IMAGE_ONNX_LIB` at the installed Python `onnxruntime` until that dependency goes (R6e).
   `--cache DIR` moves the folder, for the three commands.
+
+- **Pydantic out (E7 batch 6, 2026-11-11).** Every rule a value must obey is the core's (`Table::check`, `Step::check`,
+  `Recipe::checked`, the region, frame and drive readers); the Python classes are frozen dataclasses that hold what the core
+  answers, so a rule has one home and a plugin and a core effect read the same parameter table. Measured on the owner's
+  machine: constructing a step fell about ten times (`fx.grade` 86 to 8.5 µs, `fx.halftone` 162 to 8.3, a five-step
+  `Recipe` 95 to 33), `import pydantic` alone cost about 16 ms and 6 MB of the process (a bare `import bullterrier_image`
+  is lazy and takes 1 to 2 ms; the first `fx` call 55 ms, 40 MB resident). The plugin contract changed with it (see the
+  CHANGELOG): the core scales a plugin's pixel values, so the function receives checked, scaled parameters.
+
