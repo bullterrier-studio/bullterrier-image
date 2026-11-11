@@ -23,8 +23,6 @@ import numpy as np
 from bullterrier_image.core import native
 from bullterrier_image.core.finder import Finder
 
-from ._runtime import onnxruntime_library
-
 
 def depth_map(rgb: np.ndarray) -> np.ndarray:
     """Depth map (height, width, float32 0..1) of `rgb`, same size as `rgb`: 1 = nearest, 0 = farthest.
@@ -34,7 +32,7 @@ def depth_map(rgb: np.ndarray) -> np.ndarray:
 
     Raises BackendUnavailableError like `inverse_depth`.
     """
-    return native.find_depth(rgb, library=onnxruntime_library(), allow_download=True)
+    return native.find_depth(rgb, allow_download=True)
 
 
 def inverse_depth(rgb: np.ndarray) -> np.ndarray:
@@ -47,11 +45,11 @@ def inverse_depth(rgb: np.ndarray) -> np.ndarray:
     Raises BackendUnavailableError when the model cannot run here: `BT_IMAGE_DEPTH_MODEL` names no file, the download
     fails (the message says how to get the file by hand), or ONNX Runtime is not available.
     """
-    return native.find_inverse_depth(rgb, library=onnxruntime_library(), allow_download=True)
+    return native.find_inverse_depth(rgb, allow_download=True)
 
 
 def depth_finder() -> Finder:
     """`depth_map` as a `Finder`. Its identity is a hash of the model: the pinned one when the standard model is meant
     (it is not downloaded to find out), else of the file `BT_IMAGE_DEPTH_MODEL` names, so the same model at another
     path is the same finder. Raises BackendUnavailableError when `BT_IMAGE_DEPTH_MODEL` names no file."""
-    return Finder(native.depth_finder_identity(library=onnxruntime_library()), depth_map)
+    return Finder(native.depth_finder_identity(), depth_map)

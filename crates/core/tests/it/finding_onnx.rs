@@ -91,11 +91,24 @@ fn a_file_that_is_no_onnx_model_is_refused_naming_it_and_the_library() -> Outcom
     Ok(())
 }
 
-/// The ONNX Runtime library the full tier runs with: `BT_IMAGE_ONNX_LIB`, which must be set (the test fails, never skips).
+/// The ONNX Runtime library the full tier runs with: `BT_IMAGE_ONNX_LIB`, else the one `bt-image install onnx` kept in the
+/// cache folder; there must be one (the test fails, never skips).
 fn library() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let named =
-        std::env::var_os("BT_IMAGE_ONNX_LIB").ok_or("set BT_IMAGE_ONNX_LIB to the ONNX Runtime library file")?;
-    Ok(PathBuf::from(named))
+    if let Some(named) = std::env::var_os("BT_IMAGE_ONNX_LIB") {
+        return Ok(PathBuf::from(named));
+    }
+    let kept = bullterrier_image::finding::runtime::path(
+        &bullterrier_image::finding::onnx::cache_dir()?,
+        bullterrier_image::finding::runtime::here()?,
+    );
+    if kept.is_file() {
+        Ok(kept)
+    } else {
+        Err(
+            "set BT_IMAGE_ONNX_LIB to the ONNX Runtime library file, or run `bt-image install onnx --runtime-only`"
+                .into(),
+        )
+    }
 }
 
 fn photo(path: &Path) -> Result<bullterrier_image::Image, Box<dyn std::error::Error>> {

@@ -9,7 +9,7 @@ authors = [
     { name = "Janis Cakstins", email = "janis.cakstins@gmail.com" }
 ]
 # 3.12 is the oldest version the code needs (PEP 695 generics are its newest syntax); the suite is green on 3.12, 3.13
-# and 3.14. 3.15 is not listed until onnxruntime has wheels for it.
+# and 3.14. 3.15 is not listed until numpy, scipy and Pillow have wheels for it.
 requires-python = ">=3.12"
 keywords = ["photo", "image effects", "ascii art", "glitch", "halftone", "background removal", "recipe"]
 classifiers = [
@@ -31,8 +31,8 @@ classifiers = [
 # exactly these). Below them: Pillow 11.0.0 (it draws the fonts and resizes in places, and writes the tests' picture
 # files; the core reads and writes ours) cannot build the geotagged picture of the metadata test, pydantic 2.7.0 fails
 # at import, scipy 1.16 is the floor the radial effects needed (an `affine_transform`
-# warning; they run in Rust now, so lower it when the floors are next re-measured, or when scipy goes), and numpy 1.26 and onnxruntime 1.17
-# are the first series with Python 3.12 wheels.
+# warning; they run in Rust now, so lower it when the floors are next re-measured, or when scipy goes), and numpy 1.26
+# is the first series with Python 3.12 wheels.
 # No upper bounds: nothing is known to break on a newer release.
 dependencies = [
     "annotated-types>=0.4.0",
@@ -40,7 +40,6 @@ dependencies = [
     # the ONNX Runtime library the core loads for the portable finders (no Python import: `finding/_runtime.py` finds its file). No
     # release has Python 3.15 wheels yet: there bullterrier-image installs without it, and the portable backend says where to get the
     # library (Apple Vision and --map subject=FILE still work)
-    "onnxruntime>=1.17.0 ; python_version < '3.15'",
     "pillow>=11.1.0",
     "pydantic>=2.7.1",
     "scipy>=1.16.0",
@@ -385,7 +384,7 @@ show_error_codes = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["scipy.*", "onnxruntime", "onnxruntime.*"]
+module = ["scipy.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -462,8 +461,6 @@ ignore_names = [
 # check_release: tools/release.py imports its sibling script (a script's own folder is first on sys.path)
 known_first_party = ["bullterrier_image", "check_release"]
 [tool.deptry.per_rule_ignores]
-# onnxruntime is installed for the library file it carries, which the core loads: Python never imports it
-DEP002 = ["onnxruntime"]
 # packaging (PEP 440 versions) is used by tools/release.py, a developer command that runs in the dev environment
 DEP004 = ["packaging"]
 

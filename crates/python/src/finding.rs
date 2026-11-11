@@ -118,6 +118,21 @@ pub(crate) fn find_inverse_depth<'py>(
     PyArray1::from_slice(py, answer.values()).reshape(shape)
 }
 
+/// The ONNX Runtime library of this platform, installed in the cache folder (`cache`, else the platform's) if it is not
+/// there yet (this is a download, of about 10 MB); its path. The command `bt-image install onnx` asks first; this does not.
+///
+/// `CoreError` of kind `backend_unavailable` naming the URL and the file when the download or the unpacking fails.
+#[pyfunction]
+#[pyo3(signature = (*, cache=None))]
+pub(crate) fn install_onnx_runtime(cache: Option<PathBuf>) -> PyResult<PathBuf> {
+    let folder = match cache {
+        Some(folder) => folder,
+        None => bullterrier_image::finding::onnx::cache_dir().map_err(core_error)?,
+    };
+    let release = bullterrier_image::finding::runtime::here().map_err(core_error)?;
+    bullterrier_image::finding::runtime::install(release, &folder).map_err(core_error)
+}
+
 /// What the answers of the subject finder `find_subject` would make depend on, as text: the SHA-256 of the portable model
 /// (`onnx:sha256 ...`; the catalogue's for the standard model, else of the local `model_file` or
 /// `BT_IMAGE_SUBJECT_MODEL`) and the release of the ONNX Runtime library that runs it (`library` is as for `find_subject`), or

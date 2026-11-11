@@ -24,8 +24,11 @@ pub(crate) struct InstallArgs {
     #[arg(value_enum)]
     target: Target,
     /// Also the depth model.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "runtime_only")]
     depth: bool,
+    /// Only the ONNX Runtime library, no model.
+    #[arg(long)]
+    runtime_only: bool,
     /// Download without asking.
     #[arg(short, long)]
     yes: bool,
@@ -98,7 +101,7 @@ pub(crate) fn install_command(args: &InstallArgs, console: &mut Console<'_>) -> 
     let library = runtime::path(&cache, release);
     let wanted: Vec<&Model> = models()
         .iter()
-        .filter(|model| model.kind == ModelKind::Subject || args.depth)
+        .filter(|model| !args.runtime_only && (model.kind == ModelKind::Subject || args.depth))
         .filter(|model| standing(model, &cache) != "installed")
         .collect();
     let library_needed = !library.is_file();

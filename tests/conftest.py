@@ -17,7 +17,7 @@ import onnx
 import pytest
 from onnx import TensorProto, helper
 
-from bullterrier_image.core import registry
+from bullterrier_image.core import native, registry
 from bullterrier_image.core.params import EffectParams, core_effect, param, scaled
 from bullterrier_image.core.registry import effect, unregister
 from bullterrier_image.core.values import FieldName, Picture
@@ -262,13 +262,22 @@ def wide_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("COLUMNS", "120")
 
 
+@pytest.fixture(scope="session")
+def onnx_runtime() -> Path:
+    """The ONNX Runtime library the tests that run a model use: the one `bt-image install onnx` keeps, installed now if
+    it is not there (about 10 MB, once per computer)."""
+    return native.install_onnx_runtime()
+
+
 @pytest.fixture
-def echo_model(tmp_path) -> Callable[[int], Path]:
+def echo_model(tmp_path, monkeypatch, onnx_runtime) -> Callable[[int], Path]:
     """`echo_model(channel)` writes a tiny ONNX segmentation model and returns its path. It stands in for the real
     model (an external boundary) and obeys the documented contract: input float32 (1, 3, 1024, 1024) holding v/255 - 0.5
     per RGB channel, first output (1, 1, 1024, 1024) the subject probability. It answers with input `channel` plus 0.5,
     so the probability it reports is that channel's own value: a picture whose red channel paints the subject is found
     exactly there, and a wrong channel order, scale or offset in the caller shows in the answer."""
+
+    monkeypatch.setenv("BT_IMAGE_ONNX_LIB", str(onnx_runtime))
 
     def write(channel: int) -> Path:
         side = 1024
@@ -295,12 +304,14 @@ def echo_model(tmp_path) -> Callable[[int], Path]:
 
 
 @pytest.fixture
-def depth_echo_model(tmp_path, monkeypatch) -> Callable[[int], Path]:
+def depth_echo_model(tmp_path, monkeypatch, onnx_runtime) -> Callable[[int], Path]:
     """`depth_echo_model(channel)` writes a tiny ONNX depth model, points `BT_IMAGE_DEPTH_MODEL` at it and returns its
     path. It stands in for Depth Anything V2 (an external boundary) with the real model's input and output: input
     `pixel_values` float32 (batch, 3, height, width), any height and width, holding (v/255 - mean) / std per RGB
     channel; output `predicted_depth` (batch, height, width), larger = nearer. It answers with input `channel` as it
     receives it, so the depth found is that channel scaled per photo: where the photo is brightest in it is nearest."""
+
+    monkeypatch.setenv("BT_IMAGE_ONNX_LIB", str(onnx_runtime))
 
     def write(channel: int) -> Path:
         graph = helper.make_graph(

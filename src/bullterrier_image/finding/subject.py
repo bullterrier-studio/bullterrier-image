@@ -28,8 +28,6 @@ import numpy as np
 from bullterrier_image.core import native
 from bullterrier_image.core.finder import Finder
 
-from ._runtime import onnxruntime_library
-
 
 def subject_matte(
     rgb: np.ndarray, *, shrink: float = 1.5, feather: float = 1.0, segmenter: str | None = None
@@ -49,7 +47,6 @@ def subject_matte(
         segmenter=segmenter,
         shrink=shrink,
         feather=feather,
-        library=onnxruntime_library(),
         allow_download=True,
     )
 
@@ -64,7 +61,7 @@ def subject_finder(segmenter: str | None = None) -> Finder:
     BackendUnavailableError for an unknown segmenter name (naming the choices) or a backend that cannot run here,
     naming what to do.
     """
-    identity = native.subject_finder_identity(segmenter=segmenter, library=onnxruntime_library())
+    identity = native.subject_finder_identity(segmenter=segmenter)
     chosen = identity.split(":", 1)[0]  # "onnx" or "vision": what the identity was made for, kept for the answers
     return Finder(identity, functools.partial(subject_matte, segmenter=chosen))
 

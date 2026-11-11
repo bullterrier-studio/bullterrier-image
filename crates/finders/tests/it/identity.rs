@@ -18,13 +18,24 @@ fn file(name: &str, content: &[u8]) -> Result<std::path::PathBuf, std::io::Error
     Ok(path)
 }
 
-/// The ONNX Runtime library file this computer is told to use (`BT_IMAGE_ONNX_LIB`), which the identity of a portable
+/// The ONNX Runtime library file this computer is told to use (`BT_IMAGE_ONNX_LIB`, else the kept one), which the identity of a portable
 /// model names the version of.
-fn library() -> Result<std::path::PathBuf, &'static str> {
-    std::env::var_os("BT_IMAGE_ONNX_LIB")
-        .map(std::path::PathBuf::from)
-        .filter(|path| path.is_file())
-        .ok_or("set BT_IMAGE_ONNX_LIB to an ONNX Runtime library file")
+fn library() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    if let Some(named) = std::env::var_os("BT_IMAGE_ONNX_LIB").map(std::path::PathBuf::from) {
+        return Ok(named);
+    }
+    let kept = bullterrier_image::finding::runtime::path(
+        &bullterrier_image::finding::onnx::cache_dir()?,
+        bullterrier_image::finding::runtime::here()?,
+    );
+    if kept.is_file() {
+        Ok(kept)
+    } else {
+        Err(
+            "set BT_IMAGE_ONNX_LIB to an ONNX Runtime library file, or run `bt-image install onnx --runtime-only`"
+                .into(),
+        )
+    }
 }
 
 /// What an identity of a portable model starts with: the model's checksum, then the runtime that runs it.

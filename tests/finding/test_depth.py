@@ -4,7 +4,6 @@ The model is an external boundary: tests give it tiny ONNX models built here and
 the real model's input and output, whose answers follow from the documented model contract, so the expected maps are
 worked out by hand. The real model runs only when it is already in the cache; no test downloads it."""
 
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -254,13 +253,6 @@ def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it
         ask(ramp())
     assert str(missing) in str(caught.value)
     assert not missing.exists()  # pointing at a local file never downloads
-
-
-def test_without_onnxruntime_the_depth_model_is_unavailable_saying_what_to_install(depth_echo_model, monkeypatch):
-    depth_echo_model(0)  # a new file: no session of it is loaded yet
-    monkeypatch.setitem(sys.modules, "onnxruntime", None)  # the library is not installed: importing it fails
-    with pytest.raises(BackendUnavailableError, match="onnxruntime"):
-        depth_map(ramp())
 
 
 # --- the real model, when it is in the cache --------------------------------------------------------------------------

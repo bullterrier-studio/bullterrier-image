@@ -164,7 +164,6 @@ jobs:
           fi
           "$bin/python" "$GITHUB_WORKSPACE/checkout/tools/check_installed.py" "$dist" --from "$FROM"
           uv pip list --python smoke
-          "$bin/python" -c "import onnxruntime; print('onnxruntime', onnxruntime.__version__)"
           "$bin/bt-image" --version
           "$bin/bt-image" --help
           # the project's own smoke command (the template never changes this line)

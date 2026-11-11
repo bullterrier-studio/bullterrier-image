@@ -115,3 +115,21 @@ fn doctor_reports_each_backend_and_exits_1_when_the_one_in_use_does_not_work() -
     }
     Ok(())
 }
+
+#[test]
+fn the_runtime_alone_can_be_asked_for_and_then_no_model_is_in_the_question() -> Outcome {
+    let cache = folder("runtime-only")?;
+    let ran = bt_answering(
+        &["install", "onnx", "--runtime-only", "--cache", &cache.to_string_lossy()],
+        "n\n",
+    );
+    assert!(
+        ran.err.starts_with(&format!("download ONNX Runtime {VERSION} (")),
+        "{}",
+        ran.err
+    );
+    assert!(!ran.err.contains("model"), "{}", ran.err);
+    let both = bt(&["install", "onnx", "--runtime-only", "--depth"]);
+    assert_eq!(both.code, 2, "{}", both.err);
+    Ok(())
+}
