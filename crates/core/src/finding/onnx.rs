@@ -215,6 +215,33 @@ pub fn finder(model: &Model, options: &Options) -> Result<ModelFinder<Session>, 
     Ok(ModelFinder::new(model.kind, Session::open(&library, &file)?))
 }
 
+/// What the ONNX Runtime library `options` lead to says about itself (its release and how it was built), which is part of
+/// what a model's answers depend on: two releases can differ in the last bits. The library is the one a session would load
+/// (see [`runtime::library`](super::runtime::library)), found without downloading; it is loaded here, once for the process.
+///
+/// # Errors
+/// [`Error::BackendUnavailable`] naming the library, and `bt-image install onnx`, when there is none or it cannot be loaded.
+pub fn runtime_info(options: &Options) -> Result<String, Error> {
+    let cache = match &options.cache {
+        Some(folder) => folder.clone(),
+        None => cache_dir()?,
+    };
+    let library = super::runtime::library(&options.clone().with_download(false), &cache)?;
+    if !library.is_file() {
+        return Err(Error::BackendUnavailable(format!(
+            "the ONNX Runtime library {} is not a file: run `bt-image install onnx`, or set BT_IMAGE_ONNX_LIB to the file of a library",
+            library.display()
+        )));
+    }
+    environment(&library).map_err(|error| {
+        Error::BackendUnavailable(format!(
+            "cannot load the ONNX Runtime library {}: {error}",
+            library.display()
+        ))
+    })?;
+    Ok(ort::info().to_owned())
+}
+
 /// The local copy of `model` that `options` name, which must be a file, or none when the standard model is meant.
 ///
 /// # Errors

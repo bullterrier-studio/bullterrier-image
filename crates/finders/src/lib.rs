@@ -94,11 +94,12 @@ pub fn subject_finder(
 /// The identity of the subject finder [`subject_finder`] would make: what its answers depend on, so a cache of them
 /// is kept exactly as long as they could not change. For the portable model the SHA-256 of the model (the catalogue's
 /// when the standard model is meant, so it is not downloaded to find out; else of the local file the options name, so the
-/// same model at another path is the same finder); for Apple Vision the macOS version, whose release brings the model.
+/// same model at another path is the same finder) and the release of the ONNX Runtime library that runs it, which the library
+/// says of itself; for Apple Vision the macOS version, whose release brings the model.
 ///
 /// # Errors
 /// As [`subject_finder`] for the choice of the segmenter and for Vision; [`Error::BackendUnavailable`] naming a local
-/// model file that is not a file.
+/// model file that is not a file, or the ONNX Runtime library that is not there to be asked (the message names the fix).
 pub fn subject_identity(segmenter: Option<Segmenter>, onnx: &Options) -> Result<String, Error> {
     let segmenter = match segmenter {
         Some(chosen) => chosen,
@@ -113,8 +114,8 @@ pub fn subject_identity(segmenter: Option<Segmenter>, onnx: &Options) -> Result<
     }
 }
 
-/// The identity of the depth finder [`depth_finder`] would make: `onnx:sha256 ` and the SHA-256 of the model, as for the
-/// portable subject model.
+/// The identity of the depth finder [`depth_finder`] would make: as for the portable subject model, the SHA-256 of the model and
+/// the release of the ONNX Runtime library that runs it.
 ///
 /// # Errors
 /// [`Error::BackendUnavailable`] naming a local model file that is not a file.
@@ -127,7 +128,7 @@ fn model_identity(model: &Model, onnx: &Options) -> Result<String, Error> {
         None => model.sha256.to_owned(),
         Some(file) => onnx::sha256_of(file)?,
     };
-    Ok(format!("onnx:sha256 {digest}"))
+    Ok(format!("onnx:sha256 {digest}; runtime {}", onnx::runtime_info(onnx)?))
 }
 
 /// The relative inverse depth of `picture` on the depth model's own scale, stretched to the photo's size: larger is

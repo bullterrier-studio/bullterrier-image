@@ -64,7 +64,7 @@ def subject_finder(segmenter: str | None = None) -> Finder:
     BackendUnavailableError for an unknown segmenter name (naming the choices) or a backend that cannot run here,
     naming what to do.
     """
-    identity = native.subject_finder_identity(segmenter=segmenter)
+    identity = native.subject_finder_identity(segmenter=segmenter, library=onnxruntime_library())
     chosen = identity.split(":", 1)[0]  # "onnx" or "vision": what the identity was made for, kept for the answers
     return Finder(identity, functools.partial(subject_matte, segmenter=chosen))
 

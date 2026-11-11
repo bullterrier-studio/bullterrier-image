@@ -120,16 +120,21 @@ pub(crate) fn find_inverse_depth<'py>(
 
 /// What the answers of the subject finder `find_subject` would make depend on, as text: the SHA-256 of the portable model
 /// (`onnx:sha256 ...`; the catalogue's for the standard model, else of the local `model_file` or
-/// `BT_IMAGE_SUBJECT_MODEL`), or the macOS version for Apple Vision (`vision:macOS ...`). `segmenter` is as for
+/// `BT_IMAGE_SUBJECT_MODEL`) and the release of the ONNX Runtime library that runs it (`library` is as for `find_subject`), or
+/// the macOS version for Apple Vision (`vision:macOS ...`). `segmenter` is as for
 /// `find_subject`.
 ///
 /// `CoreError` of kind `backend_unavailable` for an unknown segmenter, Vision where it cannot run, or a model file that
 /// is not a file.
 #[pyfunction]
-#[pyo3(signature = (*, segmenter=None, model_file=None))]
-pub(crate) fn subject_finder_identity(segmenter: Option<&str>, model_file: Option<PathBuf>) -> PyResult<String> {
+#[pyo3(signature = (*, segmenter=None, library=None, model_file=None))]
+pub(crate) fn subject_finder_identity(
+    segmenter: Option<&str>,
+    library: Option<PathBuf>,
+    model_file: Option<PathBuf>,
+) -> PyResult<String> {
     let segmenter = segmenter.map(Segmenter::named).transpose().map_err(core_error)?;
-    let onnx = options(ModelKind::Subject, None, model_file, None, false);
+    let onnx = options(ModelKind::Subject, library, model_file, None, false);
     subject_identity(segmenter, &onnx).map_err(core_error)
 }
 
@@ -138,8 +143,8 @@ pub(crate) fn subject_finder_identity(segmenter: Option<&str>, model_file: Optio
 ///
 /// `CoreError` of kind `backend_unavailable` for a model file that is not a file.
 #[pyfunction]
-#[pyo3(signature = (*, model_file=None))]
-pub(crate) fn depth_finder_identity(model_file: Option<PathBuf>) -> PyResult<String> {
-    let onnx = options(ModelKind::Depth, None, model_file, None, false);
+#[pyo3(signature = (*, library=None, model_file=None))]
+pub(crate) fn depth_finder_identity(library: Option<PathBuf>, model_file: Option<PathBuf>) -> PyResult<String> {
+    let onnx = options(ModelKind::Depth, library, model_file, None, false);
     depth_identity(&onnx).map_err(core_error)
 }

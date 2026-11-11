@@ -54,4 +54,4 @@ def depth_finder() -> Finder:
     """`depth_map` as a `Finder`. Its identity is a hash of the model: the pinned one when the standard model is meant
     (it is not downloaded to find out), else of the file `BT_IMAGE_DEPTH_MODEL` names, so the same model at another
     path is the same finder. Raises BackendUnavailableError when `BT_IMAGE_DEPTH_MODEL` names no file."""
-    return Finder(native.depth_finder_identity(), depth_map)
+    return Finder(native.depth_finder_identity(library=onnxruntime_library()), depth_map)
