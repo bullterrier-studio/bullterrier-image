@@ -65,6 +65,28 @@ impl Layer {
         Ok(Self { height, width, values })
     }
 
+    /// What is wrong with the values of a map, with their least and greatest: `None` when they are all finite and within
+    /// 0..=1, else `values that are not finite`, `values below 0` or `values above 1` (in that order of precedence) and
+    /// `(min .., max ..)`. The rule for a map that enters from outside, in one sentence ([`Layer::new`] says where).
+    #[must_use]
+    pub fn problem(values: &[f32]) -> Option<String> {
+        let (low, high) = values
+            .iter()
+            .fold((f32::INFINITY, f32::NEG_INFINITY), |(low, high), &value| {
+                (low.min(value), high.max(value))
+            });
+        let what = if values.iter().any(|value| !value.is_finite()) {
+            "that are not finite"
+        } else if low < 0.0 {
+            "below 0"
+        } else if high > 1.0 {
+            "above 1"
+        } else {
+            return None;
+        };
+        Some(format!("values {what} (min {low}, max {high})"))
+    }
+
     /// The map of `values` that the caller has kept finite and within 0..=1, and `height` x `width` of: not checked again.
     pub(crate) const fn from_checked(height: usize, width: usize, values: Vec<f32>) -> Self {
         Self { height, width, values }

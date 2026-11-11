@@ -47,7 +47,7 @@ its name; `tests/` mirrors `src/`:
 Shared numeric code lives in `ops/`, named by concept.
 
 ```
-app        cli (starts the core's command line), pipeline, gallery, sheet, fx, public API   (may import anything below)
+app        cli (starts the core's command line), pipeline, gallery, fx, public API   (may import anything below)
 adapters   imageio (files), finding (finding the subject), loader (recipe files)   (may import core, ops)
 plugin     the effect-author API (core's names), public for other packages (may import core)
 core       params (EffectParams, param), values (Color, FieldName, Picture, Lut), registry, steps (the recipe model:
@@ -261,9 +261,9 @@ When a test reaches inside (`tests/test_suite_rules.py` fails on private imports
 - Own test effects: `throwaway_effects`, or `fresh_registry` for an empty registry (public interface only).
 - "Work was skipped" shows in the files (an untouched sentinel), not in a spy.
 
-Test files: the mirror path is `tests/ops/test_maps.py` for `ops/maps.py`; the shared fixtures are `tests/conftest.py` (`photo`,
+Test files: the mirror path is `tests/test_imageio.py` for `imageio.py`; the shared fixtures are `tests/conftest.py` (`photo`,
 `subject`, registry helpers, `echo_model`, `tracked_files`) and `tests/tools/conftest.py` (`project_copy`, `uv_run_env`,
-`git_repo`). One file: `uv run pytest tests/ops/test_maps.py -n 0`. The suite is about 14,000 tests and takes minutes (default
+`git_repo`). One file: `uv run pytest tests/test_imageio.py -n 0`. The suite is about 14,000 tests and takes minutes (default
 "Fast feedback"; `-n 2` for an ad-hoc full run, because `tests/finding` uses about 2.4 GB per worker).
 
 ## Skills

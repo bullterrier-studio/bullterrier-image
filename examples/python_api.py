@@ -9,7 +9,6 @@ machinery for when a look is easier to write as code than as a recipe file.
 from pathlib import Path
 
 from bullterrier_image import Project, Recipe, fx, imageio, run, trace
-from bullterrier_image.sheet import write_stages
 
 HERE = Path(__file__).parent
 PHOTO = HERE / "photos" / "bullterrier.jpeg"
@@ -38,7 +37,9 @@ def main(output: Path = HERE / "output" / "python-api") -> None:
     stages = trace(photo, TOXIC_NEON)
     for stage in stages:
         print(" ", stage.label)
-    print("every step on one sheet:", write_stages(stages, output / "steps"))
+    (output / "steps").mkdir(parents=True, exist_ok=True)
+    for number, stage in enumerate(stages):  # `bt-image steps` also lays them all out on one sheet
+        imageio.save(stage.image, output / "steps" / f"{number:02d}.{'png' if stage.image.shape[2] == 4 else 'jpg'}")
 
     # Or run the look through the whole pipeline, like a recipe file: cached, checked, exported, with a report.
     items = run(Project(photos=(PHOTO,), recipes=(TOXIC_NEON,), output=output / "pipeline", formats=("jpg",)))

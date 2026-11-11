@@ -1,7 +1,7 @@
 """The package's layering: which way imports may point (import-linter, configured in pyproject.toml), and what a fresh
 import sees. Each layer may import only the layers below it:
 
-    app        cli > pipeline | gallery > sheet | checks | fx > recipe
+    app        cli > pipeline | gallery > fx > recipe
     adapters   imageio, finding, loader (recipe files)
     plugin     the effect-author API for other packages
     core       bridge > steps > framing | registry | regions | finder > presets | looks > params | vocabulary
@@ -76,8 +76,8 @@ def test_the_package_keeps_every_import_contract():
 
 # One forbidden import per rule, each in a copy of the package: the linter must fail, naming the module and the rule.
 FORBIDDEN = {
-    "ops to core": ("ops/maps.py", "import bullterrier_image.core.params", "bullterrier_image.ops.maps", LAYERS),
-    "errors to ops": ("errors.py", "import bullterrier_image.ops.maps", "bullterrier_image.errors", LAYERS),
+    "ops to core": ("ops/image.py", "import bullterrier_image.core.params", "bullterrier_image.ops.image", LAYERS),
+    "errors to ops": ("errors.py", "import bullterrier_image.ops.image", "bullterrier_image.errors", LAYERS),
     "errors to core": ("errors.py", "import bullterrier_image.core.params", "bullterrier_image.errors", LAYERS),
     "core to plugin": ("core/steps.py", "import bullterrier_image.plugin", "bullterrier_image.core.steps", LAYERS),
     "core to imageio": ("core/bridge.py", "import bullterrier_image.imageio", "bullterrier_image.core.bridge", LAYERS),
@@ -118,20 +118,20 @@ FORBIDDEN = {
         CORE_ORDER,
     ),
     "ops to the package root": (
-        "ops/maps.py",
+        "ops/image.py",
         "from bullterrier_image import Recipe",
-        "bullterrier_image.ops.maps",
+        "bullterrier_image.ops.image",
         LAYERS,
     ),
     "ops to the package root, relatively": (
-        "ops/maps.py",
+        "ops/image.py",
         "from .. import Recipe",
-        "bullterrier_image.ops.maps",
+        "bullterrier_image.ops.image",
         LAYERS,
     ),
     "the Rust extension's home to ops": (
         "_native/__init__.py",
-        "import bullterrier_image.ops.maps",
+        "import bullterrier_image.ops.image",
         "bullterrier_image._native",
         LAYERS,
     ),
@@ -153,10 +153,10 @@ def test_a_forbidden_import_breaks_its_contract(module, line, importer, contract
 
 
 ALLOWED = {
-    "core to ops": ("core/steps.py", "import bullterrier_image.ops.maps"),
+    "core to ops": ("core/steps.py", "import bullterrier_image.ops.image"),
     "core to errors": ("core/vocabulary.py", "import bullterrier_image.errors"),
-    "ops to errors": ("ops/maps.py", "import bullterrier_image.errors"),
-    "ops to the Rust extension": ("ops/maps.py", "from bullterrier_image._native import _core"),
+    "ops to errors": ("ops/image.py", "import bullterrier_image.errors"),
+    "ops to the Rust extension": ("ops/image.py", "from bullterrier_image._native import _core"),
     "plugin to the Rust extension": ("plugin.py", "from bullterrier_image._native import _core"),
 }
 

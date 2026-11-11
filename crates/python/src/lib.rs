@@ -6,7 +6,6 @@ mod finding;
 mod lut;
 mod pipeline;
 mod run;
-mod sheet;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -54,15 +53,14 @@ mod _core {
     use super::pipeline::{check_project, init_project, project_maps, read_project, run_project};
 
     #[pymodule_export]
-    use super::sheet::contact_sheet;
-
-    #[pymodule_export]
     use super::finding::{
         depth_finder_identity, find_depth, find_inverse_depth, find_subject, kept_onnx_runtime, subject_finder_identity,
     };
 
     #[pymodule_export]
-    use super::run::{check_recipe, known_maps, locate, needs, number_pieces, numbers, refine_edge, render, trace};
+    use super::run::{
+        check_recipe, known_maps, locate, map_problem, needs, number_pieces, numbers, refine_edge, render, trace,
+    };
 }
 
 create_exception!(

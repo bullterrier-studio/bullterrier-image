@@ -73,3 +73,20 @@ fn labels_that_are_not_a_partition_are_refused_naming_the_first_bad_pixel() {
     }
     assert!(Labels::new(1, 2, vec![0, 1], 2).is_ok());
 }
+
+#[test]
+fn the_problem_with_a_map_is_none_for_values_from_0_to_1_and_else_says_which() {
+    for fine in [vec![0.0; 3], vec![1.0; 3], vec![0.5; 3], vec![0.0, 1.0]] {
+        assert_eq!(Layer::problem(&fine), None, "{fine:?}");
+    }
+    for (values, said) in [
+        (vec![0.5, -0.25], "values below 0 (min -0.25, max 0.5)"),
+        (vec![0.5, 1.5], "values above 1 (min 0.5, max 1.5)"),
+        (vec![-1.0, 2.0], "values below 0 (min -1, max 2)"),
+        (vec![0.5, f32::NAN], "values that are not finite"),
+        (vec![0.5, f32::INFINITY], "values that are not finite"),
+    ] {
+        let problem = Layer::problem(&values).unwrap_or_default();
+        assert!(problem.starts_with(said), "{values:?}: {problem}");
+    }
+}

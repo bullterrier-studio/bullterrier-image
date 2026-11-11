@@ -46,7 +46,6 @@ import numpy as np
 
 from bullterrier_image._native import _core
 from bullterrier_image.errors import BullterrierImageError, MapNotFoundError, UnknownEffectError
-from bullterrier_image.ops.maps import map_problem
 
 from . import looks as look_files
 from . import native
@@ -175,7 +174,7 @@ class ModelledEffect[P: EffectParams]:
             )
         if array.shape != rgb.shape[:2]:
             raise MapNotFoundError(f"{where}: its array is {array.shape} but the picture is {rgb.shape[:2]}")
-        if (problem := map_problem(array)) is not None:
+        if (problem := native.map_problem(array)) is not None:
             raise MapNotFoundError(f"{where}: its array has {problem}")
         return _for_the_core(array)
 

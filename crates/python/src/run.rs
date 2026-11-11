@@ -280,6 +280,15 @@ pub(crate) fn number_pieces<'py>(
     image_array(py, drawn)
 }
 
+/// What is wrong with the values of the map `layer` (any array of numbers, converted to float32), with their least and
+/// greatest value; None when they are finite and within 0..1: the one rule for a map that enters from outside.
+#[pyfunction]
+#[expect(clippy::needless_pass_by_value, reason = "pyo3 extracts an array-like by value")]
+pub(crate) fn map_problem(layer: PyArrayLike2<'_, f32, AllowTypeChange>) -> Option<String> {
+    let values: Vec<f32> = layer.as_array().iter().copied().collect();
+    Layer::problem(&values)
+}
+
 /// The options of a render: the longest side `size`, if asked for, `threads` (0: every core) and the `band` of rows.
 fn options_of(size: Option<Count<SIZE>>, threads: Count<THREADS>, band: Option<Count<BAND>>) -> PyResult<Options> {
     let mut options = Options::default().with_threads(threads.within()?);

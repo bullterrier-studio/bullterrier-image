@@ -1,7 +1,7 @@
 """Finding a map in a photo: `Finder`, a function with the name of its answers, `check_map`, the rule a map of a whole
 photo is held to where it enters, and `find_map`, the one place a finder of a whole photo is called.
 
-Dependency direction: imports `errors` and `ops.maps` only.
+Dependency direction: imports `errors` and `native` only.
 """
 
 from collections.abc import Callable
@@ -10,7 +10,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from bullterrier_image.errors import DepthNotFoundError, MapNotFoundError, RecipeError, SubjectNotFoundError
-from bullterrier_image.ops.maps import map_problem
+
+from . import native
 
 __all__ = ["Finder", "answered", "check_map", "find_map"]
 
@@ -56,7 +57,7 @@ def check_map(name: str, layer: np.ndarray, rgb: np.ndarray) -> np.ndarray:
     layer = np.asarray(layer)  # what a caller or a finder gives may be a list, or no map at all
     if layer.shape != rgb.shape[:2]:
         raise error(f"{name} is {layer.shape} but the photo is {rgb.shape[:2]}")
-    if (problem := map_problem(layer)) is not None:
+    if (problem := native.map_problem(layer)) is not None:
         raise error(f"{name} has {problem}: a map must be finite and within 0..1")
     return layer
 
