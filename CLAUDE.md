@@ -47,7 +47,7 @@ its name; `tests/` mirrors `src/`:
 Shared numeric code lives in `ops/`, named by concept.
 
 ```
-app        cli, pipeline, gallery, sheet, checks, fx, public API      (may import anything below)
+app        cli (starts the core's command line), pipeline, gallery, sheet, fx, public API   (may import anything below)
 adapters   imageio (files), finding (finding the subject), loader (recipe files)   (may import core, ops)
 effects    one package per effect                                      (may import plugin, core, ops; never other effects)
 plugin     the effect-author API (core's names), public for other packages (may import core)

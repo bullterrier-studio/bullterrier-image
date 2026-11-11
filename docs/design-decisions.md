@@ -572,7 +572,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   ten of them are gigabytes. At 16 bit (6 bytes a pixel) a 12 MP picture is 72 MB, at 8 bit (3 bytes) 36 MB. 8 bit bands
   visibly in smooth gradients and cannot take a further grade; 16 bit does not; float32 keeps out-of-range values. Decide before
   E5, because kernels are being written against float32.
-- **Open: a frame of reference that the renderer hands an effect (owner decides).** An effect derives three things from the
+- **Was open: a frame of reference that the renderer hands an effect.** An effect derives three things from the
   picture it is given: the canvas size, its own position in it, and the design scale (a `px` value is scaled by the working
   picture's longest side over 480, never passed in). A picture of another size placed on a larger canvas then gets a finer
   grain than its neighbour, and a band of rows would scale, centre and seed by the band instead of the canvas. One input

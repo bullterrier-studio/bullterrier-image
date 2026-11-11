@@ -15,8 +15,8 @@
         print(stage.label)
 
 Layers, each importing only from the ones below it (import-linter checks this in the test suite):
-    app        cli, pipeline (many photos x many recipes), gallery (the effect catalogue), sheet (comparison images),
-               checks (automatic quality checks), fx (effects as step builders), recipe (the public namespace)
+    app        cli (starts the core's command line), pipeline (many photos x many recipes), gallery (the effect
+               catalogue), sheet (comparison images), fx (effects as step builders), recipe (the public namespace)
     adapters   imageio (files and the one in-memory image type), finding (the subject and depth), loader (recipe files)
     effects    the effect library: pure functions image -> image, found automatically
     core       the registry, the recipe model (steps) and its run by the Rust core (bridge)
