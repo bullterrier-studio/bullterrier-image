@@ -141,8 +141,8 @@ impl Presets {
     /// The names of the presets of `effect`, in the order they were written.
     #[must_use]
     pub fn names(&self, effect: &str) -> Vec<&str> {
-        self.by_effect
-            .get(effect)
-            .map_or_else(Vec::new, |presets| presets.iter().map(|(name, _)| name.as_str()).collect())
+        self.by_effect.get(effect).map_or_else(Vec::new, |presets| {
+            presets.iter().map(|(name, _)| name.as_str()).collect()
+        })
     }
 }

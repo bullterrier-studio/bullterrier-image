@@ -200,6 +200,23 @@ pub enum Unit {
     Density,
 }
 
+impl Unit {
+    /// The unit's name in the documentation: `"px"`, `"fraction"`, `"degrees"`.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Px => "px",
+            Self::Fraction => "fraction",
+            Self::Degrees => "degrees",
+            Self::Stops => "stops",
+            Self::Count => "count",
+            Self::Ratio => "ratio",
+            Self::Cycles => "cycles",
+            Self::Density => "density",
+        }
+    }
+}
+
 /// A default or a bound as the declaration writes it: a whole number stays whole, a decimal stays decimal. (A list of
 /// colours is not a scalar, but it is a default all the same, so it is one more way to write one.)
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]

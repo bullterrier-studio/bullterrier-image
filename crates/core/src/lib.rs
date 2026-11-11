@@ -39,6 +39,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod documentation;
 mod effect;
 pub mod effects;
 mod error;

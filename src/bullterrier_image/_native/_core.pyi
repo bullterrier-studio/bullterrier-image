@@ -17,6 +17,7 @@ __all__ = [
     "check_recipe",
     "contact_sheet",
     "depth_finder_identity",
+    "documentation",
     "effect",
     "effects",
     "find_depth",
@@ -39,6 +40,7 @@ __all__ = [
     "shipped_looks",
     "shipped_presets",
     "subject_finder_identity",
+    "summary",
     "trace",
     "unregister",
     "vocabulary",
@@ -141,6 +143,8 @@ def contact_sheet(tiles: Sequence[tuple[str, np.ndarray]], columns: int, tile: i
 def refine_edge(matte: np.ndarray, shrink: float, feather: float) -> np.ndarray: ...
 def region_presets(kind: str) -> dict[str, dict[str, Any]]: ...
 def shipped_presets() -> dict[str, str]: ...
+def documentation(effect: str, *, advanced: bool = True) -> str: ...
+def summary(effect: str) -> str: ...
 def shipped_looks() -> list[tuple[str, str]]: ...
 def vocabulary() -> dict[str, list[str]]: ...
 def register(

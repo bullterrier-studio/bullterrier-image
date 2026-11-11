@@ -355,8 +355,11 @@ def documentation(name: str, *, advanced: bool = True) -> str:
     """The documentation of the effect called `name`: its docstring, then a "Parameters" section with every basic
     field's type, unit, range, default and description, then an "Advanced parameters" section (or, with
     `advanced=False`, one line counting them), then a "Step opacity" section if a step of it has an opacity other than
-    1 by default, then a "Presets" section if it has any. KeyError like `get`."""
+    1 by default, then a "Presets" section if it has any. KeyError like `get`. The core writes it for an effect it
+    declares; an effect registered from Python is written here, the same way."""
     fn = get(name)
+    if fn.params_model._core_effect is not None:  # noqa: SLF001  (the model says which Rust declaration it is)
+        return native.documentation(name, advanced=advanced)
     text = f"{inspect.cleandoc(fn.__doc__ or '')}\n\n{fn.params_model.documentation(advanced)}"
     if fn.opacity != 1:
         text += (
@@ -371,7 +374,10 @@ def documentation(name: str, *, advanced: bool = True) -> str:
 
 def summary(name: str) -> str:
     """The first sentence of the documentation of the effect called `name`, on one line."""
-    text = " ".join((get(name).__doc__ or "").split())
+    fn = get(name)
+    if fn.params_model._core_effect is not None:  # noqa: SLF001  (as in `documentation`)
+        return native.summary(name)
+    text = " ".join((fn.__doc__ or "").split())
     end = _SENTENCE_END.search(text)
     return text[: end.end()] if end else text
 

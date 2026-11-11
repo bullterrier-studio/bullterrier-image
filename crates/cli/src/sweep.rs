@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use bullterrier_image::{Error, Options, Presets, Recipe, Tile, contact_sheet, write};
 use clap::Args as ClapArgs;
 
-use crate::photo::{Maps, each};
 use crate::Console;
+use crate::photo::{Maps, each};
 
 /// The sides of a tile of the comparison sheet, px.
 const TILE: usize = 480; // constant: the size `contact_sheet` has always been asked for here

@@ -39,8 +39,8 @@ mod _core {
 
     #[pymodule_export]
     use super::{
-        CoreError, apply, check, effect, effects, params, read_recipe, region_presets, register, shipped_looks,
-        shipped_presets, unregister, vocabulary,
+        CoreError, apply, check, documentation, effect, effects, params, read_recipe, region_presets, register,
+        shipped_looks, shipped_presets, summary, unregister, vocabulary,
     };
 
     #[pymodule_export]
@@ -175,6 +175,24 @@ fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
         .params()
         .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
     from_json(py, &serde_json::to_value(table).map_err(value_error)?)
+}
+
+/// The documentation of the effect called `effect` the core implements: see `bullterrier_image.documentation.effect`.
+///
+/// `CoreError` if the core implements no effect of that name.
+#[pyfunction]
+#[pyo3(signature = (effect, *, advanced=true))]
+fn documentation(effect: &str, advanced: bool) -> PyResult<String> {
+    let presets = bullterrier_image::Presets::shipped().map_err(core_error)?;
+    bullterrier_image::documentation::effect(effect, &presets, advanced).map_err(core_error)
+}
+
+/// The first sentence of the description of the effect called `effect`, on one line.
+///
+/// `CoreError` if the core implements no effect of that name.
+#[pyfunction]
+fn summary(effect: &str) -> PyResult<String> {
+    bullterrier_image::documentation::summary(effect).map_err(core_error)
 }
 
 /// What the effect called `effect` says about itself: a dict `{"name": str, "category": str, "opacity": float,

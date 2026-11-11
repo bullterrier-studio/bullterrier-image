@@ -57,6 +57,27 @@ impl Category {
         Self::Utilities,
     ];
 
+    /// What the category holds, in a sentence.
+    #[must_use]
+    pub const fn description(self) -> &'static str {
+        match self {
+            Self::Colour => {
+                "Grades, gradient maps, tints and hue changes: they recolour the picture and leave its shapes alone."
+            }
+            Self::Light => "Bloom and local contrast: they add or shape the light in the picture.",
+            Self::Texture => "Grain and other surface texture laid over the picture.",
+            Self::Stylised => "Looks that redraw the picture in a printing or drawing style, such as halftone.",
+            Self::Text => "Pictures redrawn as characters, such as ASCII art.",
+            Self::Distortion => "Warps that bend, ripple or displace the picture's geometry.",
+            Self::Glitch => "Digital-error looks: displaced slices, colour splits and corrupted blocks.",
+            Self::Atmosphere => "Weather and air: fog, haze, rain and the like.",
+            Self::Subject => "Effects that work on the cut-out subject, apart from its background.",
+            Self::Compositing => "Ways of combining the picture with other layers.",
+            Self::Backgrounds => "Generated or replaced backgrounds behind the subject.",
+            Self::Utilities => "Plain helpers such as resizing, cropping and borders.",
+        }
+    }
+
     /// The category's name in recipes and in the catalogue: lowercase, as `"colour"`.
     #[must_use]
     pub const fn name(self) -> &'static str {
