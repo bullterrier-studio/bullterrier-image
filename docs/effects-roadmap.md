@@ -1,6 +1,6 @@
 # Effects roadmap
 
-What bullterrier-image can do today and what could come next. **✓ marks what exists now** (`bt-image effects` lists it with every
+What bullterrier-image can do today and what could be added. **✓ marks what exists now** (`bt-image effects` lists it with every
 parameter); everything else is a proposal. Examples use the Python form `fx.<effect>(...)`; in a recipe file the same call
 is `effect = "<effect>"` plus the same parameters.
 
@@ -12,7 +12,7 @@ Looks that are one effect with a set of values ship as presets of that effect (`
 recipes. A new look first extends an existing effect when every one of its parameters still matters for every look;
 it becomes a new effect only when it is a new idea. The effect set is consolidated: a name that is no longer an effect is a preset, a look or a parameter of the effect that took it over (`bt-image effects NAME` finds it).
 
-**Next:** none scheduled (E6 done). Effects are added only when a video look needs one. Open: "Still planned", at the end.
+**Nothing is scheduled.** The Rust port is complete (R0-R6, E1-E7, 2026-11-11). What could still be built is listed under "On demand", at the end.
 
 ## Colour and tone
 
@@ -312,23 +312,15 @@ What combining effects can give, once the pieces exist:
 
 A look is added to `examples/recipes/` by the batch that builds its last missing effect (Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `particles` exist).
 
-## Still planned
+## On demand (not scheduled)
 
-E7: scipy is gone (the last user, `ops/pieces.py`, was replaced by the core's `number_pieces`).
+Each item is built only when video or scene needs it.
 
-**Feature batch after E5 (E5b) ✓.** Halftone inks with a per-ink offset, line screens, ink separation and dither inks, then
-the risograph recipe. The Rust port of those effects (E5) stayed a parity port; the new capability followed it.
-
-**Subject matte (R6).** Matte refinement as a post-process of the subject matte (the guided filter is the primitive), choosing
-one instance among several (several people, pick one), and an AI upscaler as a model kind in the model catalogue.
-
-**Banded render, before E7.** Run a recipe in bands of rows, each step with the margin its footprint declares, and fall back to
-the whole picture for a whole-picture step; `px` values scale with the whole canvas, not the band. Needs first: a position-hashed
-(counter-based) noise, so that seeded effects (grain, dead pixels, dust and scratches, flow lines) can render a band without
-drawing the rows above it; until then they declare the whole picture. E7's final memory measurement is its acceptance test.
-
-**After E7, in this order of value.** `distance_field`; glass, then emboss and bevel (new rows); `stipple`; `engraving`;
-`crosshatch`; `dissolve`; `color_transfer` (the picture parameter kind may already unblock it: check); `denoise`.
-
-**Input depth.** A 16-bit input is read as sRGB (a watch item): fix in the image files (R5) or E7. Colour management beyond sRGB
-(CMYK, ICC output) is not image's job.
+- **Subject matte (R6 extras).** Matte refinement as a post-process of the subject matte (the guided filter is the primitive),
+  choosing one instance among several (several people, pick one), and an AI upscaler as a model kind in the model catalogue.
+- **Effects, in this order of value.** `distance_field`; glass, then emboss and bevel (new rows); `stipple`; `engraving`;
+  `crosshatch`; `dissolve`; `color_transfer` (the picture parameter kind may already unblock it: check); `denoise`.
+- **Input depth (a watch item).** A 16-bit input is read as sRGB. Colour management beyond sRGB (CMYK, ICC output) is not
+  image's job.
+- **Speed and memory.** `.superpowers/todos/performance.md` (what was measured, what is left), `banded-render-optimisation.md`
+  (the banded render's open items) and `e7-ledger.md` (the E7 batches, their decisions and the breaks they made).

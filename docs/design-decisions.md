@@ -1,7 +1,7 @@
 # Design decisions
 
 The decisions that shape bullterrier-image and still hold, each with its reason and what it costs or commits us to. Rules for
-contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effects roadmap](effects-roadmap.md).
+contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is in the [effects roadmap](effects-roadmap.md).
 
 ## Architecture
 
