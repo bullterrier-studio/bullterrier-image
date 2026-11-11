@@ -73,7 +73,9 @@ struct Moments {
 /// The moments of `pixels` weighted by `alpha` (all 1 without it, `alpha` aligned with `pixels` from `first`), in one
 /// pass: sums taken about the first pixel's colour, so a large, nearly flat picture loses no digits to cancellation.
 fn moments(pixels: &[[f32; 3]], first: usize, alpha: Option<&[f32]>) -> Moments {
-    let origin = pixels.first().map_or([0.0; 3], |&pixel| rgb_to_oklab(pixel).map(f64::from));
+    let origin = pixels
+        .first()
+        .map_or([0.0; 3], |&pixel| rgb_to_oklab(pixel).map(f64::from));
     let (mut weight, mut sum, mut squares) = (0.0, [0.0; 3], [0.0; 3]);
     for (at, &pixel) in pixels.iter().enumerate() {
         let w = alpha.map_or(1.0, |alpha| f64::from(alpha[first + at]));
@@ -119,7 +121,9 @@ fn spread(pixels: &[[f32; 3]], alpha: Option<&[f32]>) -> Option<Spread> {
 
 /// The photo with the reference's colour mood; the photo itself without a reference.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    let reference = inputs.image("reference").and_then(|asset| spread(asset.as_picture().pixels(), asset.alpha()));
+    let reference = inputs
+        .image("reference")
+        .and_then(|asset| spread(asset.as_picture().pixels(), asset.alpha()));
     let own = spread(picture.pixels(), None);
     let (Some(target), Some(own)) = (reference, own) else {
         return picture.map(|pixel| pixel);
