@@ -176,6 +176,18 @@ impl Options {
         self
     }
 
+    /// The ONNX Runtime library file these options name, if any.
+    #[must_use]
+    pub fn library(&self) -> Option<&Path> {
+        self.library.as_deref()
+    }
+
+    /// Whether these options allow downloading what is missing.
+    #[must_use]
+    pub const fn downloads(&self) -> bool {
+        self.allow_download
+    }
+
     /// These options allowing, or not, the download of the model when it is not in the cache folder.
     #[must_use]
     pub const fn with_download(mut self, allow: bool) -> Self {
@@ -195,13 +207,11 @@ impl Options {
 /// ONNX Runtime cannot use them.
 pub fn finder(model: &Model, options: &Options) -> Result<ModelFinder<Session>, Error> {
     let file = model_file(model, options)?;
-    let library = options.library.clone().ok_or_else(|| {
-        Error::BackendUnavailable(
-            "the ONNX Runtime library is not given: set BT_IMAGE_ONNX_LIB to the file of the library \
-             (libonnxruntime.so, libonnxruntime.dylib or onnxruntime.dll), or install the Python package onnxruntime"
-                .to_owned(),
-        )
-    })?;
+    let cache = match &options.cache {
+        Some(folder) => folder.clone(),
+        None => cache_dir()?,
+    };
+    let library = super::runtime::library(options, &cache)?;
     Ok(ModelFinder::new(model.kind, Session::open(&library, &file)?))
 }
 

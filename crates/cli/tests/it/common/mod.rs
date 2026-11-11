@@ -17,7 +17,7 @@ pub(crate) struct Ran {
 pub(crate) fn bt(args: &[&str]) -> Ran {
     let given: Vec<String> = args.iter().map(|&arg| arg.to_owned()).collect();
     let (mut out, mut err) = (Vec::new(), Vec::new());
-    let code = bullterrier_image_cli::main(&given, "9.9.9", &mut out, &mut err);
+    let code = bullterrier_image_cli::main(&given, "9.9.9", &mut std::io::empty(), &mut out, &mut err);
     Ran {
         code,
         out: String::from_utf8_lossy(&out).into_owned(),
@@ -95,4 +95,22 @@ pub(crate) fn pixel(path: &Path, row: usize, column: usize) -> Result<Vec<f32>, 
     let (channels, width) = (image.channels(), image.width());
     let values = image.into_values();
     Ok(values[(row * width + column) * channels..][..channels].to_vec())
+}
+
+/// As `bt`, with `answers` typed on the input.
+pub(crate) fn bt_answering(args: &[&str], answers: &str) -> Ran {
+    let given: Vec<String> = args.iter().map(|&arg| arg.to_owned()).collect();
+    let (mut out, mut err) = (Vec::new(), Vec::new());
+    let code = bullterrier_image_cli::main(
+        &given,
+        "9.9.9",
+        &mut std::io::Cursor::new(answers.as_bytes()),
+        &mut out,
+        &mut err,
+    );
+    Ran {
+        code,
+        out: String::from_utf8_lossy(&out).into_owned(),
+        err: String::from_utf8_lossy(&err).into_owned(),
+    }
 }

@@ -4,11 +4,13 @@ The command line is the Rust core's (`crates/cli`); this is the entry point that
 in Python are loaded first, so a recipe may name them.
 """
 
+import os
 import signal
 import sys
 
 from . import __version__
 from .core import native, registry
+from .finding._runtime import onnxruntime_library
 
 
 def run(argv: list[str]) -> int:
@@ -23,4 +25,8 @@ def main() -> None:
     """The console script `bt-image`: run the command line with `sys.argv` and exit with its code. Ctrl-C ends it at
     once (the shell reports 130): Python's handler would wait for the Rust code, which does not look for it."""
     signal.signal(signal.SIGINT, signal.SIG_DFL)
+    if (
+        library := onnxruntime_library()
+    ) is not None:  # the library of the installed package, until `install onnx` is all
+        os.environ.setdefault("BT_IMAGE_ONNX_LIB", str(library))
     sys.exit(run(sys.argv[1:]))

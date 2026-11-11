@@ -3,6 +3,7 @@
 //! A thin layer over the core: parse, call, print. [`main`] takes the arguments and the two streams, so a test (or the
 //! Python console script) runs it in-process and sees the exit code and the output.
 
+mod backends;
 mod cutout;
 mod effects;
 mod finders;
@@ -14,7 +15,7 @@ mod run;
 mod stamp;
 mod sweep;
 
-use std::io::Write;
+use std::io::{BufRead, Write};
 
 use bullterrier_image::Error;
 use clap::error::ErrorKind;
@@ -76,6 +77,15 @@ enum Command {
     /// List the built-in looks and the effects, one line each.
     #[command(after_help = "example: bt-image effects --category light")]
     Effects(effects::Args),
+    /// Download the ONNX Runtime library and the subject model, after asking.
+    #[command(after_help = "example: bt-image install onnx --depth")]
+    Install(backends::InstallArgs),
+    /// List the models the package knows: where they come from and whether they are installed.
+    #[command(after_help = "example: bt-image models")]
+    Models(backends::CacheArgs),
+    /// Say which subject finders work on this computer, and why not.
+    #[command(after_help = "example: bt-image doctor")]
+    Doctor(backends::CacheArgs),
     /// Process every photo of a project with every recipe: cached, checked, with a report.
     #[command(after_help = "example: bt-image run examples/bt-image.toml --dry-run")]
     Run(run::Args),
@@ -83,6 +93,7 @@ enum Command {
 
 /// The streams a command writes to: results to `out`, progress and errors to `err`.
 pub(crate) struct Console<'a> {
+    pub(crate) input: &'a mut dyn BufRead,
     pub(crate) out: &'a mut dyn Write,
     pub(crate) err: &'a mut dyn Write,
     pub(crate) quiet: bool,
@@ -92,6 +103,18 @@ impl Console<'_> {
     /// A result line, to stdout.
     pub(crate) fn result(&mut self, line: &str) -> Result<(), Error> {
         written(writeln!(self.out, "{line}"))
+    }
+
+    /// Asks `question` on stderr and reads the answer from the input: only `y` or `yes` is a yes, and so is nothing else (an
+    /// input at its end answers no).
+    pub(crate) fn confirm(&mut self, question: &str) -> Result<bool, Error> {
+        written(write!(self.err, "{question} [y/N] "))?;
+        written(self.err.flush())?;
+        let mut answer = String::new();
+        self.input
+            .read_line(&mut answer)
+            .map_err(|error| Error::ImageRead(format!("cannot read the answer: {error}")))?;
+        Ok(matches!(answer.trim().to_lowercase().as_str(), "y" | "yes"))
     }
 
     /// A progress line, to stderr, unless the person asked for quiet.
@@ -109,12 +132,12 @@ fn written(result: std::io::Result<()>) -> Result<(), Error> {
     result.map_err(|error| Error::ImageWrite(format!("cannot write to the terminal: {error}")))
 }
 
-/// Runs `bt-image` with `argv` (the arguments after the program's name) and returns the exit code: 0 success, 1 the command
+/// Runs `bt-image` with `argv` (the arguments after the program's name), reads its answers from `input`, and returns the exit code: 0 success, 1 the command
 /// failed (`error: <what is wrong>` on `err`), 2 wrong usage. `version` is the package's, which `--version` prints.
 ///
 /// With `--debug` (or `BT_IMAGE_DEBUG=1`) an error prints in its debug form. Ctrl-C is the console script's: it restores
 /// the default signal handler, so the process ends with 130.
-pub fn main(argv: &[String], version: &str, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
+pub fn main(argv: &[String], version: &str, input: &mut dyn BufRead, out: &mut dyn Write, err: &mut dyn Write) -> i32 {
     let arguments = std::iter::once("bt-image").chain(argv.iter().map(String::as_str));
     let matches = match Cli::command()
         .version(version.to_owned())
@@ -140,6 +163,7 @@ pub fn main(argv: &[String], version: &str, out: &mut dyn Write, err: &mut dyn W
     };
     let debug = cli.debug || std::env::var(DEBUG_VARIABLE).is_ok_and(|value| value == "1");
     let mut console = Console {
+        input,
         out,
         err,
         quiet: cli.quiet,
@@ -152,6 +176,9 @@ pub fn main(argv: &[String], version: &str, out: &mut dyn Write, err: &mut dyn W
         Command::Sweep(given) => sweep::command(&given, &mut console),
         Command::Cutout(given) => cutout::command(&given, &mut console),
         Command::Effects(given) => effects::command(&given, &mut console),
+        Command::Install(given) => backends::install_command(&given, &mut console),
+        Command::Models(given) => backends::models_command(&given, &mut console),
+        Command::Doctor(given) => backends::doctor_command(&given, &mut console),
         Command::Run(given) => run::command(&given, &mut console),
     };
     match outcome {

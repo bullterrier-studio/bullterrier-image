@@ -185,7 +185,7 @@ fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
 fn main(py: Python<'_>, argv: Vec<String>, version: &str) -> i32 {
     py.detach(|| {
         let (mut out, mut err) = (std::io::stdout(), std::io::stderr());
-        bullterrier_image_cli::main(&argv, version, &mut out, &mut err)
+        bullterrier_image_cli::main(&argv, version, &mut std::io::stdin().lock(), &mut out, &mut err)
     })
 }
 

@@ -22,6 +22,7 @@ bullterrier-image-derive = { path = "crates/derive" }
 # the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring
 clap = { version = "4", default-features = false, features = ["std", "string", "derive", "help", "usage", "error-context", "suggestions"] }  # the command line (`crates/cli`)
 delaunator = { version = "=1.1.0", default-features = false }  # Delaunay triangulation, a hard algorithm; used only in `ops/triangles.rs`
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }  # unpacks the ONNX Runtime archive (`finding/runtime.rs`, feature `onnx`): pure Rust
 glob = "0.3"  # the photos of a project: globs relative to its file (`pipeline/project.rs`), dotfiles skipped as a shell does
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
 libm = "0.2"  # erfc, for the normal distribution function (`ops/gauss.rs`): pure Rust, MIT, no C
@@ -51,10 +52,12 @@ serde_path_to_error = "0.1"
 # https downloads of model and runtime files (`finding/download.rs`, feature `onnx`): rustls with the bundled Mozilla CA list, no system TLS, no OpenSSL
 ureq = { version = "3", default-features = false, features = ["rustls"] }
 sha2 = { version = "0.10", default-features = false, features = ["std"] }  # fingerprints, the identity of the core, and the checksum of a model file
+tar = { version = "0.4", default-features = false }  # the tarball of ONNX Runtime on macOS and Linux (`finding/runtime.rs`)
 svgtypes = { version = "0.16", default-features = false, features = ["std"] }  # path data, for the path regions
 syn = "3"
 tiff = { version = "0.11", default-features = false }  # the `image` crate's own TIFF decoder (its features are on there), read directly for 32-bit levels
 toml = { version = "1", default-features = false, features = ["std", "parse", "serde", "preserve_order"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }  # the zip of ONNX Runtime on Windows (`finding/runtime.rs`)
 zune-core = { version = "0.5", default-features = false }  # with zune-jpeg: the inks of a CMYK JPEG, which `image` mixes to RGB
 zune-jpeg = { version = "0.5", default-features = false, features = ["std"] }
 

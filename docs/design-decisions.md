@@ -1340,3 +1340,11 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   parameter tables and those of the frame and the regions from `REGION_ROWS` and `FRAME_ROWS` (`recipe/numbers.rs`). The checks
   of `Frame` and `Region` keep their own bounds, for readability; a parity test holds each row to its check (the edge accepted, one
   step beyond refused) and a completeness test fails for a numeric field with no row. Python's `Recipe.with_values` remains.
+- **`install onnx`, `models` and `doctor` are the CLI's half of "ONNX is optional".** The package pins ONNX Runtime 1.23.2 (the
+  newest release that publishes macOS on Intel, Linux and Windows on x86-64 and arm64) with the size and SHA-256 of each
+  platform's archive (`finding/runtime.rs`); `install` downloads the archive through the verified `download::fetch`, takes the
+  one library file out of its `lib` folder and keeps it in the cache folder, `onnxruntime-1.23.2/` beside the models. The library
+  is found as: `BT_IMAGE_ONNX_LIB`, else the kept file, else (with downloads allowed) a download, else an error naming
+  `bt-image install onnx`. The CLI asks before downloading (`--yes` skips it; no answer is no), the library never asks. The
+  console script still points `BT_IMAGE_ONNX_LIB` at the installed Python `onnxruntime` until that dependency goes (R6e).
+  `--cache DIR` moves the folder, for the three commands.

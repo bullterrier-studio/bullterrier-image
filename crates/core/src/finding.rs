@@ -6,6 +6,8 @@
 pub mod download;
 #[cfg(feature = "onnx")]
 pub mod onnx;
+#[cfg(feature = "onnx")]
+pub mod runtime;
 
 use crate::ops::length::{float, whole};
 use crate::ops::resample::{Filter, Resize};
