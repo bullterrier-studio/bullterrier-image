@@ -128,35 +128,13 @@ fn beside(value: Option<&mut Value>, folder: &Path) {
 /// What helps a person who typed `name` for a look that is not one: the closest looks (a few edits away), then all of them.
 fn unknown_look(name: &str) -> String {
     let looks = crate::shipped::looks();
-    let reach = (name.chars().count() / 3).max(2); // constant: about one edit in three letters, at least two
-    let mut near: Vec<(usize, &str)> = looks
-        .iter()
-        .map(|(known, _)| (edits(name, known), *known))
-        .filter(|(distance, _)| *distance <= reach)
-        .collect();
-    near.sort_unstable();
+    let near = super::near::closest(name, looks.iter().map(|(known, _)| *known));
     let hint = if near.is_empty() {
         String::new()
     } else {
-        let names: Vec<String> = near.iter().take(3).map(|(_, known)| format!("{known:?}")).collect();
+        let names: Vec<String> = near.iter().map(|known| format!("{known:?}")).collect();
         format!("did you mean {}? ", names.join(" or "))
     };
     let all: Vec<&str> = looks.iter().map(|(known, _)| *known).collect();
     format!("{hint}the looks: {}", all.join(", "))
-}
-
-/// The number of single-letter edits (insert, delete, change) between `one` and `other`: Levenshtein's distance.
-fn edits(one: &str, other: &str) -> usize {
-    let other: Vec<char> = other.chars().collect();
-    let mut row: Vec<usize> = (0..=other.len()).collect();
-    for (i, a) in one.chars().enumerate() {
-        let mut diagonal = row[0];
-        row[0] = i + 1;
-        for (j, b) in other.iter().enumerate() {
-            let above = row[j + 1];
-            row[j + 1] = (diagonal + usize::from(a != *b)).min(above + 1).min(row[j] + 1);
-            diagonal = above;
-        }
-    }
-    row[other.len()]
 }
