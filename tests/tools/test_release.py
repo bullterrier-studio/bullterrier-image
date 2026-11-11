@@ -404,7 +404,7 @@ def with_hook(git_repo, script: str) -> None:
     """The released-once project, with a hook `python hook.py VERSION` whose body is `script`, committed and pushed."""
     released_once(git_repo)
     git_repo.write("hook.py", "import sys\nversion = sys.argv[-1]\n" + script)
-    git_repo.write("crate.txt", "0.0.0\n")
+    git_repo.write("crate.txt", "unbumped\n")
     pyproject = git_repo.read("pyproject.toml") + f'\n[tool.release]\nafter-bump = ["{sys.executable} hook.py"]\n'
     git_repo.commit("chore: add a release hook", {"pyproject.toml": pyproject})
     git_repo.push()
@@ -436,7 +436,7 @@ def test_a_hook_that_fails_stops_the_release_and_puts_the_tree_back(git_repo):
     assert "as it was" in result.stderr
     assert snapshot(git_repo) == before  # no commit, no tag, the same files; nothing reached origin
     assert not (git_repo.path / "stray.txt").exists()
-    assert git_repo.read("crate.txt") == "0.0.0\n"
+    assert git_repo.read("crate.txt") == "unbumped\n"
 
 
 def test_without_the_key_a_release_commits_only_its_own_files(git_repo):
