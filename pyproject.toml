@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Style photos with composable effects (ASCII, halftone, glitch, colour schemes, dispersing particles)."
 readme = "README.md"
 license = "MIT AND OFL-1.1"
-license-files = ["LICENSE", "LICENSE-FONT"]
+license-files = ["LICENSE", "LICENSE-FONT", "THIRD-PARTY-NOTICES.md"]
 authors = [
     { name = "Janis Cakstins", email = "janis.cakstins@gmail.com" }
 ]
@@ -169,7 +169,7 @@ rust-test-layout = { cmd = "python tools/check_rust_test_layout.py", help = "Che
 dead-code = { cmd = "vulture src", help = "Find dead code in src (vulture)" }
 # The project's own gates and the steps only `full` runs: the template ships these two lines as no-ops and never changes
 # them again, so a project replaces each with a sequence of its tasks without a conflict at the next update
-project-gates = { cmd = "uv run python tools/dev.py check-generated", help = "The project's own gates, run last by check and full: fx.pyi and docs/effects/ are what regenerate writes" }
+project-gates = { sequence = ["uv run python tools/dev.py check-generated", "uv run python tools/notices.py"], default_item_type = "cmd", help = "The project's own gates, run last by check and full: fx.pyi and docs/effects/ are what regenerate writes, THIRD-PARTY-NOTICES.md is what cargo-about writes" }
 project-full = { sequence = [{ ref = "rust-test-full" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "check-min-deps" }], default_item_type = "cmd", help = "The project's own steps that only full runs: the whole Rust matrices, the scaffold test, the audit (needs the network) and the suite on the lowest dependencies" }
 # The steps `check` and `full` share, cheapest first, stopping at the first failure
 gates = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "test" }, { ref = "project-gates" }], default_item_type = "cmd", help = "Every gate except the proofs that each gate can fail (format, lint, workflows, dead code, docs, dependencies, types, tests, the project's own)" }
