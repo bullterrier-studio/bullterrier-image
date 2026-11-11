@@ -14,6 +14,7 @@ mod blend;
 mod blend_effect;
 mod bloom;
 mod chromatic_aberration;
+mod color_transfer;
 mod colour;
 mod colour_mix;
 mod compare;

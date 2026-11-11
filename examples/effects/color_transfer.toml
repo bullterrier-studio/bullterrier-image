@@ -1,0 +1,9 @@
+# The demo photo takes the colour mood of a night sky picture, keeping its own lightness.
+name = "color_transfer"
+size = 480
+
+[[step]]
+effect = "color_transfer"
+reference = "../assets/night-sky.jpg"
+amount = 0.7
+preserve_luminance = true

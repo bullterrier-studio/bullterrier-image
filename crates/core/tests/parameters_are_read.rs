@@ -182,6 +182,17 @@ fn conditional() -> Vec<Conditional> {
             field: "resample",
             with: vec![("image", json!("asset"))],
         },
+        // without a reference the step leaves the photo as it is, whatever else is set
+        Conditional {
+            effect: "color_transfer",
+            field: "amount",
+            with: vec![("reference", json!("asset"))],
+        },
+        Conditional {
+            effect: "color_transfer",
+            field: "preserve_luminance",
+            with: vec![("reference", json!("asset"))],
+        },
         // on a 12 px picture the default ghosts (size 30 px) screen it to white, hiding the light's own features; the
         // default ring (72 px out, 12 px wide) lies wholly beyond the picture
         Conditional {

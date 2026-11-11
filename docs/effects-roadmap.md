@@ -28,7 +28,7 @@ it becomes a new effect only when it is a new idea. The effect set is consolidat
 | `color_balance` ✓ | A colour pushed into the shadows, midtones and highlights: split toning, duotone, teal and orange (presets `split_tone`, `color_balance`, `teal_orange`). | `fx.color_balance(shadows="#3a1bff", highlights="#ff2bd6")` |
 | `channel_mixer` ✓ | 3x3 matrix between channels. | `fx.channel_mixer(red_from_red=0, red_from_green=1, green_from_red=1, green_from_green=0)` |
 | `invert` ✓ (a preset of `levels`) | Negative. | `fx.levels(preset="invert")` |
-| `color_transfer` | Match the colour mood of a reference photo. Wanted first by a piece that recreates a reference picture: its colours were read off by eye. Acceptance: a look that, given the reference, reproduces its colours. Pairs with `palette_from_photo`. | `fx.color_transfer(reference="ref.jpg")` |
+| `color_transfer` ✓ | Match the colour mood of a reference photo. Statistics transfer in Oklab; `preserve_luminance` moves only the colours. Pairs with `palette_from_photo`. | `fx.color_transfer(reference="ref.jpg")` |
 | `lut` ✓ | Apply a `.cube` 3D colour lookup table: how grades are handed over. | `fx.lut(file="film.cube", amount=0.8)` |
 | `black_and_white` ✓ (a preset of `channel_mixer`) | Mono conversion; set the rows for a colour filter. | `fx.channel_mixer(preset="black_and_white")` |
 | `sepia` ✓ (a preset of `gradient_map`) | Warm monochrome. | `fx.gradient_map(preset="sepia")` |
