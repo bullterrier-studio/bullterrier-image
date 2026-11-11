@@ -50,7 +50,7 @@ mod _core {
     use super::lut::PyLut;
 
     #[pymodule_export]
-    use super::pipeline::{check_project, project_maps, read_project, run_project};
+    use super::pipeline::{check_project, init_project, project_maps, read_project, run_project};
 
     #[pymodule_export]
     use super::sheet::contact_sheet;

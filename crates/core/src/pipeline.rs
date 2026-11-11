@@ -11,6 +11,7 @@ mod project;
 mod run;
 mod sheet_files;
 mod stages;
+mod starter;
 
 pub use cache::MapCache;
 pub use checks::{matte_warnings, still_warnings};
@@ -21,3 +22,4 @@ pub use names::{file_name, safe_name};
 pub use project::{Format, Project, RecipeSource, Settings};
 pub use run::{Found, Given, RunOptions, needed_maps, run};
 pub use stages::write_stages;
+pub use starter::init_project;

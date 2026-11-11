@@ -152,19 +152,10 @@ def load_project(path: str | Path) -> Project:
 
 
 def init_project(directory: str | Path = ".") -> Path:
-    """Write a starter `bt-image.toml`, a `photos/` folder and two small recipes into `directory`; returns the file."""
-    directory = Path(directory)
-    target = directory / _PROJECT_FILE
-    if target.exists():
-        raise FileExistsError(f"{target} already exists")
-    (directory / "photos").mkdir(parents=True, exist_ok=True)
-    recipes = directory / "recipes"
-    if not recipes.exists():
-        recipes.mkdir()
-        for name, text in _STARTER_RECIPES.items():
-            (recipes / name).write_text(text, encoding="utf-8")
-    target.write_text(_STARTER_PROJECT, encoding="utf-8")
-    return target
+    """Write a starter `bt-image.toml`, a `photos/` folder and two small recipes into `directory`; returns the file.
+
+    Raises ProjectError if the project file is there already."""
+    return native.init_project(directory)
 
 
 def run(
@@ -228,52 +219,3 @@ def run(
             log=log,
         )
     return [Item(**item) for item in items]
-
-
-_STARTER_PROJECT = """# bullterrier-image project: `bt-image run` processes every photo with every recipe.
-photos  = ["photos/*.jpg", "photos/*.jpeg", "photos/*.png"]   # globs, relative to this file
-recipes = ["recipes"]                                         # recipe files, or folders of them
-output  = "out"                                               # results, plus index.html to look through them
-
-[export]
-formats = ["jpg"]       # jpg, png or webp
-sizes   = []            # longest side(s) in px, e.g. [2048, 1080]; empty = the size each recipe renders at
-quality = 92            # jpg only: png and webp are lossless
-
-[checks]                # problems are reported as warnings; they never stop an export
-subject_share = [0.02, 0.97]   # a cut-out outside this share of the photo is flagged
-"""
-
-_STARTER_RECIPES = {
-    "glitch.toml": """# Digital damage: colour channels pulled apart, bands knocked sideways, film grain.
-name = "glitch"
-size = 1600
-
-[[step]]
-effect = "slice_shift"
-preset = "glitch"
-bands = 8
-amount = 24
-seed = 4
-
-[[step]]
-effect = "rgb_split"
-angle = 0
-amount = 2.7
-edge = "wrap"
-
-[[step]]
-effect = "grain"
-amount = 0.07
-size = 0.48
-""",
-    "cutout-black.toml": """# Just the subject, on pure black (found by Apple Vision on macOS, else a portable model).
-name = "cutout-black"
-size = 1600
-
-[[step]]
-effect = "gradient"
-colors = ["#000000"]
-mask = "background"
-""",
-}

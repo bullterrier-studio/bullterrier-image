@@ -754,7 +754,7 @@ def test_init_writes_a_working_starter_project(tmp_path, photo):
     items = run(load_project(target), finders={"subject": Finder("stand-in", finder)})
     assert sorted((i.recipe, i.status) for i in items) == [("cutout-black", "done"), ("glitch", "done")]
     assert len(finder.seen) == 1
-    with pytest.raises(FileExistsError):
+    with pytest.raises(ProjectError, match="already exists"):
         init_project(tmp_path / "new")
 
 

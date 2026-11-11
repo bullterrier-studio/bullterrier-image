@@ -26,6 +26,15 @@ pub(crate) fn read_project(py: Python<'_>, path: PathBuf) -> PyResult<Bound<'_, 
     from_json(py, &project.to_json())
 }
 
+/// Writes a starter project into `directory`; returns its `bt-image.toml`.
+///
+/// `CoreError` of kind `project` if one is there already, `image_write` if something cannot be written.
+#[pyfunction]
+#[expect(clippy::needless_pass_by_value, reason = "PyO3 extracts a path argument by value")]
+pub(crate) fn init_project(directory: PathBuf) -> PyResult<PathBuf> {
+    bullterrier_image::pipeline::init_project(&directory).map_err(core_error)
+}
+
 /// The project `given` (a dict as `read_project` returns, whose `recipes` are paths or any dict standing for a recipe
 /// built in code) held to the rules of a project, as a dict with its settings normalised (the sizes largest first).
 ///

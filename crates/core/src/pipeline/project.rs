@@ -94,7 +94,7 @@ pub struct Project {
 }
 
 /// The name of a project file.
-const FILE: &str = "bt-image.toml";
+pub(super) const FILE: &str = "bt-image.toml";
 /// The photos of a project that names none.
 const DEFAULT_PHOTOS: [&str; 4] = ["photos/*.jpg", "photos/*.jpeg", "photos/*.png", "photos/*.webp"]; // constant: where photos usually are
 

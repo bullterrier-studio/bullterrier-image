@@ -1,0 +1,8 @@
+# Just the subject, on pure black (found by Apple Vision on macOS, else a portable model).
+name = "cutout-black"
+size = 1600
+
+[[step]]
+effect = "gradient"
+colors = ["#000000"]
+mask = "background"

@@ -2,6 +2,7 @@
 # extension's own (`help(_core.apply)`); `uv run poe stubtest` (in `poe check`) checks this stub against it.
 
 import os
+import pathlib
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol, final
 
@@ -21,6 +22,7 @@ __all__ = [
     "find_depth",
     "find_inverse_depth",
     "find_subject",
+    "init_project",
     "known_maps",
     "needs",
     "params",
@@ -119,6 +121,7 @@ def subject_finder_identity(
     *, segmenter: str | None = None, model_file: str | os.PathLike[str] | None = None
 ) -> str: ...
 def depth_finder_identity(*, model_file: str | os.PathLike[str] | None = None) -> str: ...
+def init_project(directory: str | os.PathLike[str]) -> pathlib.Path: ...
 def read_project(path: str | os.PathLike[str]) -> dict[str, Any]: ...
 def check_project(given: Mapping[str, Any]) -> dict[str, Any]: ...
 def project_maps(given: Mapping[str, Any]) -> list[str]: ...

@@ -252,3 +252,22 @@ fn json_that_is_not_a_project_is_refused_naming_the_key_and_the_value() {
         );
     }
 }
+
+#[test]
+fn a_starter_project_is_a_project_that_reads_and_is_not_made_over_an_existing_one() -> Outcome {
+    let root = std::env::temp_dir().join(format!("bt-image-init-{}", std::process::id()));
+    drop(std::fs::remove_dir_all(&root));
+    let file = bullterrier_image::pipeline::init_project(&root.join("new"))?;
+    assert_eq!(file, root.join("new").join("bt-image.toml"));
+    assert!(root.join("new/photos").is_dir());
+    std::fs::write(root.join("new/photos/one.jpg"), b"")?;
+    let project = Project::read(&file)?;
+    assert_eq!(names(&project.photos), ["one.jpg"]);
+    assert_eq!(project.recipes.len(), 2, "{:?}", project.recipes);
+    let again = bullterrier_image::pipeline::init_project(&root.join("new"));
+    assert!(
+        matches!(&again, Err(error) if error.to_string().contains("bt-image.toml already exists")),
+        "{again:?}"
+    );
+    Ok(())
+}
