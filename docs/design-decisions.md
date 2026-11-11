@@ -567,11 +567,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   tested with stand-in models, a test of a real model asserts coarse properties only. *Reason:* better models keep
   appearing, and pulling one in should be cheap.
 
-- **Open: the storage precision of a finished layer (owner decides).** Kernels work on float32 pictures. A picture held
-  between steps or kept for later costs 12 bytes a pixel as float32: 12 MP = 144 MB, A3 at 300 dpi (about 17 MP) = 200 MB, so
-  ten of them are gigabytes. At 16 bit (6 bytes a pixel) a 12 MP picture is 72 MB, at 8 bit (3 bytes) 36 MB. 8 bit bands
-  visibly in smooth gradients and cannot take a further grade; 16 bit does not; float32 keeps out-of-range values. Decide before
-  E5, because kernels are being written against float32.
+- **Settled: a picture and a layer are stored as float32, as built.** A picture (`Image`) holds 12 bytes a pixel (three `f32`,
+  and a fourth plane for alpha), a map (`Layer`) 4 bytes; 12 MP is 144 MB, A3 at 300 dpi (about 17 MP) 200 MB. Sixteen bit would
+  halve that and 8 bit quarter it, but 8 bit bands in smooth gradients and cannot take a further grade, and float32 keeps
+  out-of-range values between steps. Revisit only with a memory measurement that shows a need.
 - **Was open: a frame of reference that the renderer hands an effect.** An effect derives three things from the
   picture it is given: the canvas size, its own position in it, and the design scale (a `px` value is scaled by the working
   picture's longest side over 480, never passed in). A picture of another size placed on a larger canvas then gets a finer
