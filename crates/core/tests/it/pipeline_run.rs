@@ -90,7 +90,7 @@ const GRADE: &str = "effect = \"grade\"\nexposure = 0.3";
 const CUT: &str = "effect = \"gradient\"\ncolors = [\"#000000\"]\nmask = \"background\"";
 
 fn go(project: &Project, options: &RunOptions<'_>, given: &Given) -> Result<Vec<Item>, Error> {
-    run(project, &Presets::new(), options, given, &mut |_| {})
+    run(project, &Presets::new(), options, given, &mut |_| Ok(()))
 }
 
 fn statuses(items: &[Item]) -> Vec<(&str, &str, &str)> {
@@ -463,5 +463,73 @@ fn a_recipe_name_gives_its_files_a_safe_name_and_a_partition_is_shown_with_its_p
             "_sheet.jpg"
         ]
     );
+    Ok(())
+}
+
+#[test]
+fn a_log_that_fails_stops_the_run_after_the_record_of_what_was_finished_is_written() -> Outcome {
+    let scene = Scene::new("interrupt", &["a.png", "b.png"])?;
+    let recipes = [scene.recipe("warm", GRADE)?];
+    let project = scene.project(&["a.png", "b.png"], &recipes, Settings::default())?;
+    let mut told = 0;
+    let stopped = run(&project, &Presets::new(), &plain(), &Given::default(), &mut |_| {
+        told += 1;
+        if told == 2 {
+            Err(Error::Recipe("Ctrl-C".to_owned()))
+        } else {
+            Ok(())
+        }
+    });
+    assert!(
+        matches!(&stopped, Err(Error::Recipe(message)) if message == "Ctrl-C"),
+        "{stopped:?}"
+    );
+    let record = bullterrier_image::pipeline::read_manifest(&scene.root.join("out"));
+    assert_eq!(
+        record.len(),
+        2,
+        "both pairs were finished and recorded before the second line was told: {record:?}"
+    );
+    let again = go(&project, &plain(), &Given::default())?;
+    assert!(again.iter().all(|item| item.status == Status::Skipped));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_map_the_disk_cannot_keep_fails_only_its_pair_and_is_found_again_for_the_next() -> Outcome {
+    use std::os::unix::fs::PermissionsExt;
+    let scene = Scene::new("readonly", &["a.png"])?;
+    let recipes = [
+        scene.recipe("cut1", CUT)?,
+        scene.recipe("cut2", &format!("{CUT}\nopacity = 0.5"))?,
+    ];
+    let project = scene.project(&["a.png"], &recipes, Settings::default())?;
+    let cache = scene.root.join("out/.cache");
+    std::fs::create_dir_all(&cache)?;
+    std::fs::set_permissions(&cache, std::fs::Permissions::from_mode(0o500))?;
+    let asked = Arc::new(AtomicUsize::new(0));
+    let given = Given {
+        finders: found(&asked, "stand-in", false),
+        ..Given::default()
+    };
+    let mut lines = 0;
+    let items = run(&project, &Presets::new(), &plain(), &given, &mut |_| {
+        lines += 1;
+        std::fs::set_permissions(&cache, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| Error::ImageWrite(e.to_string()))
+    })?;
+    assert_eq!(items[0].status, Status::Failed, "{items:?}");
+    assert!(
+        items[0]
+            .error
+            .clone()
+            .unwrap_or_default()
+            .contains("cannot remember a map"),
+        "{:?}",
+        items[0].error
+    );
+    assert_eq!(items[1].status, Status::Done, "the next pair finds the map again");
+    assert_eq!(asked.load(Ordering::SeqCst), 2);
     Ok(())
 }

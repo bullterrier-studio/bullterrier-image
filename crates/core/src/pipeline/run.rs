@@ -290,7 +290,8 @@ impl PhotoState<'_> {
                     .insert(name.to_owned(), (ErrorKind::MapNotFound, message.clone()));
                 return Err(Error::map_not_found(name, message));
             }
-            drop(self.cache.put(&key, &layer)); // a failure to write is the disk's, not the map's: not remembered
+            // a map the disk cannot keep fails the pair that asked, and is not remembered: the next pair asks again
+            self.cache.put(&key, &layer)?;
             layer
         };
         self.maps.insert(name.to_owned(), layer.clone());
@@ -330,7 +331,7 @@ impl Finder for CropFinder {
             )?,
             Err(error) => return Err(error),
         };
-        drop(self.cache.put(&key, &layer));
+        self.cache.put(&key, &layer)?;
         Ok(layer)
     }
 }
@@ -489,7 +490,8 @@ impl<'a> Context<'a> {
 /// still exist, are skipped unless `force`. Recipes are validated first, so a typo fails at once. A map is asked at most once
 /// per photo, and never again for a photo whose map is remembered in the project's cache by a finder of the same identity; if it
 /// fails, the recipes of that photo that need it fail, and the rest run. The record is updated after every pair, so an
-/// interrupted run keeps what it finished. `log` is told of each pair.
+/// interrupted run keeps what it finished. `log` is told of each pair, after the record is written; an error from it stops the
+/// run (an interrupt).
 ///
 /// # Errors
 /// [`Error::Project`] for two recipes of one file name, a recipe that cuts the picture out exported to jpg, an `only` that
@@ -500,7 +502,7 @@ pub fn run(
     presets: &Presets,
     options: &RunOptions<'_>,
     given: &Given,
-    log: &mut dyn FnMut(&str),
+    log: &mut dyn FnMut(&str) -> Result<(), Error>,
 ) -> Result<Vec<Item>, Error> {
     let context = Context::new(project, presets, options, given)?;
     let photos = context.photos()?;
@@ -541,7 +543,7 @@ pub fn run(
             if ran {
                 context.record(&items, &photo_refs, &recipe_names)?;
             }
-            log(&said);
+            log(&said)?;
         }
     }
     if !options.dry_run {
