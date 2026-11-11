@@ -6,7 +6,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish.workspace = true
+keywords = ["image", "photo", "effects", "filters", "recipes"]
+categories = ["multimedia::images", "graphics"]
+readme = "README.md"
+include = ["src/**", "data/**", "build.rs", "README.md", "LICENSE"]
+publish = true  # one of the two crates published to crates.io (the others are implementation crates of the wheel)
 
 [features]
 # Running models through ONNX Runtime (`finding::onnx`): the library is loaded at run time, none is bundled. The published wheel enables it.

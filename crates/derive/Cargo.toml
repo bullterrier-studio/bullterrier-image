@@ -6,7 +6,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish.workspace = true
+keywords = ["derive", "image", "effects", "parameters"]
+categories = ["development-tools::procedural-macro-helpers"]
+readme = "README.md"
+include = ["src/**", "README.md", "LICENSE"]
+publish = true  # one of the two crates published to crates.io (the others are implementation crates of the wheel)
 
 [lib]
 proc-macro = true

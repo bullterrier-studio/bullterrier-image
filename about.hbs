@@ -7,7 +7,7 @@ tools/notices.py --write`; do not edit by hand.
 ## Licences
 
 {{#each overview}}
-- [{{{name}}}](#{{id}}) ({{count}} crates)
+- [{{{name}}}](#{{id}})
 {{/each}}
 
 {{#each licenses}}
@@ -16,7 +16,9 @@ tools/notices.py --write`; do not edit by hand.
 Used by:
 
 {{#each used_by}}
+{{#unless (eq crate.repository "https://github.com/bullterrier-studio/bullterrier-image")}}
 - {{crate.name}} {{crate.version}}{{#if crate.repository}} ({{crate.repository}}){{/if}}
+{{/unless}}
 {{/each}}
 
 ```text

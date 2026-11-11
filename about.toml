@@ -24,6 +24,7 @@ targets = [
     "aarch64-pc-windows-msvc",
 ]
 
-# this project's own crates (publish = false) are not third-party
+# this project's own crates are not third-party: the private ones are ignored here (publish = false), the two published ones
+# by their repository in about.hbs
 [private]
 ignore = true

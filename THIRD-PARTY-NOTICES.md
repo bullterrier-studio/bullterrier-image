@@ -6,14 +6,14 @@ tools/notices.py --write`; do not edit by hand.
 
 ## Licences
 
-- [MIT License](#MIT) (146 crates)
-- [ISC License](#ISC) (25 crates)
-- [Apache License 2.0](#Apache-2.0) (6 crates)
-- [Unicode License v3](#Unicode-3.0) (5 crates)
-- [zlib License](#Zlib) (2 crates)
-- [BSD 2-Clause "Simplified" License](#BSD-2-Clause) (1 crates)
-- [BSD 3-Clause "New" or "Revised" License](#BSD-3-Clause) (1 crates)
-- [Community Data License Agreement Permissive 2.0](#CDLA-Permissive-2.0) (1 crates)
+- [MIT License](#MIT)
+- [ISC License](#ISC)
+- [Apache License 2.0](#Apache-2.0)
+- [Unicode License v3](#Unicode-3.0)
+- [zlib License](#Zlib)
+- [BSD 2-Clause "Simplified" License](#BSD-2-Clause)
+- [BSD 3-Clause "New" or "Revised" License](#BSD-3-Clause)
+- [Community Data License Agreement Permissive 2.0](#CDLA-Permissive-2.0)
 
 ## Apache License 2.0
 
@@ -3770,6 +3770,36 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## MIT License
+
+Used by:
+
+
+```text
+MIT License
+
+Copyright (c) 2026 Janis Cakstins
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ```
 
 ## MIT License

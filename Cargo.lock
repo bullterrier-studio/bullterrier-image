@@ -101,7 +101,7 @@ dependencies = [
 
 [[package]]
 name = "bullterrier-image"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "bullterrier-image-derive",
  "delaunator",
@@ -133,7 +133,7 @@ dependencies = [
 
 [[package]]
 name = "bullterrier-image-cli"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "bullterrier-image",
  "bullterrier-image-finders",
@@ -142,7 +142,7 @@ dependencies = [
 
 [[package]]
 name = "bullterrier-image-derive"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "bullterrier-image-finders"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "bullterrier-image",
  "image",
@@ -163,7 +163,7 @@ dependencies = [
 
 [[package]]
 name = "bullterrier-image-python"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "bullterrier-image",
  "bullterrier-image-cli",

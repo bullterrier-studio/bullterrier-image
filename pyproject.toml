@@ -155,8 +155,10 @@ rust-test-layout = { cmd = "python tools/check_rust_test_layout.py", help = "Che
 dead-code = { cmd = "vulture src", help = "Find dead code in src (vulture)" }
 # The project's own gates and the steps only `full` runs: the template ships these two lines as no-ops and never changes
 # them again, so a project replaces each with a sequence of its tasks without a conflict at the next update
+# `cargo publish --dry-run` of the two published crates, packaged and built from their tarballs (needs the network for the index)
+publish-check = { cmd = "cargo publish --dry-run -p bullterrier-image-derive -p bullterrier-image --allow-dirty", help = "Package the two published crates, build them from their tarballs and stop before uploading (needs the network)" }
 project-gates = { sequence = ["uv run python tools/disk.py", "uv run python tools/dev.py check-generated", "uv run python tools/notices.py"], default_item_type = "cmd", help = "The project's own gates, run last by check and full: fx.pyi and docs/effects/ are what regenerate writes, THIRD-PARTY-NOTICES.md is what cargo-about writes; first, the incremental build output goes when the disk has under 15 GB free" }
-project-full = { sequence = [{ ref = "rust-test-full" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "check-min-deps" }], default_item_type = "cmd", help = "The project's own steps that only full runs: the whole Rust matrices, the scaffold test, the audit (needs the network) and the suite on the lowest dependencies" }
+project-full = { sequence = [{ ref = "rust-test-full" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "publish-check" }, { ref = "check-min-deps" }], default_item_type = "cmd", help = "The project's own steps that only full runs: the whole Rust matrices, the scaffold test, the audit and the publish dry run (both need the network) and the suite on the lowest dependencies" }
 # The steps `check` and `full` share, cheapest first, stopping at the first failure
 gates = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "test" }, { ref = "project-gates" }], default_item_type = "cmd", help = "Every gate except the proofs that each gate can fail (format, lint, workflows, dead code, docs, dependencies, types, tests, the project's own)" }
 fast = { sequence = [{ ref = "rust-fmt" }, "ruff format --check .", { ref = "rust-lint" }, "ruff check .", "mypy", { ref = "rust-test" }], default_item_type = "cmd", help = "The inner loop: format, lint, types and the Rust tests; the Python suite, dead code, dependencies, the build checks and the gate proofs are left to check and full" }
@@ -495,6 +497,11 @@ exhaustive = true  # a new core module must be placed in a layer here
 layers = ["bridge", "steps", "framing | registry | regions | finder", "presets | looks", "params | vocabulary", "values", "native", "types"]
 # `native` (the extension's entry points, raising the package's exceptions) imports no core module; params and registry call it,
 # and `values` makes the core's lookup table through it.
+
+# Commands `uv run poe release` runs after it bumps the version, with the new version as the last argument: the published crates
+# carry the package's version (tools/crate_versions.py), and what they change joins the release commit.
+[tool.release]
+after-bump = ["uv run --no-sync python tools/crate_versions.py"]
 
 # Read by git-cliff when `uv run poe release` writes a release's section of CHANGELOG.md: the Conventional Commits since
 # the last tag, grouped as Keep a Changelog does. A commit only appears if a parser below names its group; the rest

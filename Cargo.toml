@@ -7,7 +7,7 @@ resolver = "3"
 members = ["crates/cli", "crates/core", "crates/derive", "crates/finders", "crates/python"]
 
 [workspace.package]
-version = "0.0.0"  # never published on its own: the Python package's version (pyproject.toml) is the release's
+version = "0.1.0"  # the Python package's version (pyproject.toml) is the release's; `tools/crate_versions.py` keeps them equal
 edition = "2024"
 rust-version = "1.99.1"  # the toolchain rust-toolchain.toml pins
 license = "MIT"
@@ -18,7 +18,7 @@ publish = false
 bullterrier-image = { path = "crates/core" }
 bullterrier-image-cli = { path = "crates/cli" }
 bullterrier-image-finders = { path = "crates/finders" }
-bullterrier-image-derive = { path = "crates/derive" }
+bullterrier-image-derive = { path = "crates/derive", version = "=0.1.0" }  # `version` is what crates.io needs of a published crate; kept equal to the package version by `tools/crate_versions.py`
 # the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring
 clap = { version = "4", default-features = false, features = ["std", "string", "derive", "help", "usage", "error-context", "suggestions"] }  # the command line (`crates/cli`)
 delaunator = { version = "=1.1.0", default-features = false }  # Delaunay triangulation, a hard algorithm; used only in `ops/triangles.rs`

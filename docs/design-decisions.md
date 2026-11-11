@@ -1083,6 +1083,21 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
     the picture height) or normalises over the picture is `Whole`; relaxing them needs the frame of reference described under
     "Determinism" (position-hashed noise, the band's offset and the canvas size). No banded renderer exists yet.
 
+- **Two crates go to crates.io: `bullterrier-image` (the core) and `bullterrier-image-derive` (its derive macros).** The other
+  crates (`-cli`, `-finders`, `-python`) are implementation crates of the wheel and stay `publish = false`. Both published crates
+  carry the package's version (`[workspace.package] version`, the derive requirement `version = "=X"` and `Cargo.lock`):
+  `poe release` runs `tools/crate_versions.py` as its `after-bump` hook (`[tool.release]`), and a test fails when the crates and
+  `pyproject.toml` disagree; a pre-release is spelled as SemVer does (`0.2.0rc1` is `0.2.0-rc.1`). *Reason:* one version to say
+  and to remember, one release. *Packaging, measured:* the core is 268 files, 1.9 MiB (599 KiB compressed), built from its tarball
+  with the derive crate patched in, `cargo test --release` passed the library tests, the contract tests and 1,510 of the 1,513 integration tests (the three
+  that failed read workspace files the tarball does not have: two `examples/` pictures and the test that names the path crates;
+  cargo then stopped, so the two remaining test binaries did not run). `include` ships the
+  sources, data, `build.rs`, README and licence, not the tests (`tests/` is 200 files of fixtures). `poe publish-check` (in
+  `poe full`) is `cargo publish --dry-run` of both. *The identity of a published build:* `build.rs` hashes the crate's sources,
+  data and manifest; the workspace `Cargo.lock` and the path crates it also hashes in a checkout are absent from a tarball, so
+  the versions of the dependencies come from the user's lock file and the identity cannot see them (the README says so). The
+  owner publishes by hand the first time; CI has no publish job.
+
 ## Effects
 
 - **`edges` 'dog' draws the difference of Gaussians itself, not its gradient** (XDoG, Winnemöller et al.). *Reason:*
