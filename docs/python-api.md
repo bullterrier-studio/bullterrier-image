@@ -63,6 +63,10 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   (a `RecipeError` naming the key). The regions, `Framing` and `Drive` are frozen dataclasses of keyword fields too;
   the core checks each when it is made; `help(Grid)` lists their fields, with unit and
   range.
+- **Shapes.** `Path.rect(x, y, w, h)` and `Path.ellipse(cx, cy, rx, ry)` are `Path` regions (`samples=` as for `Path`) for the
+  common shapes: `regions={"box": Path.rect(0.1, 0.2, 0.5, 0.3)}`. All numbers are shares of the frame (0 to 1 across and down),
+  so an ellipse is a circle only in a square frame (in a 3:2 frame, `Path.ellipse(0.5, 0.5, 0.2, 0.3)` is a circle). A size
+  that is not above 0 is a `RecipeError` naming it.
 - **What ships.** `bullterrier_image.looks()`: `{name: description}`, each loads with `load_recipe(name)`.
   `fx.<effect>.presets`: `{preset: {parameter: value}}`, used as `fx.<effect>(preset=...)`. A misspelt parameter or
   look name gets the nearest ones.

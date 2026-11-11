@@ -18,6 +18,8 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal, get_args
 
+from bullterrier_image.errors import RecipeError
+
 from . import native
 from .pieces import _Piece, piece
 
@@ -370,6 +372,30 @@ class Path(_Laid):
             )
         },
     )
+
+    @classmethod
+    def rect(cls, x: float, y: float, w: float, h: float, **fields: Any) -> "Path":
+        """The rectangle with top-left corner (`x`, `y`), `w` wide and `h` high, as shares of the frame (0 to 1 across
+        and down): `Path.rect(0.1, 0.2, 0.5, 0.3)`. `w` and `h` are above 0. Other fields (`samples`) as for `Path`."""
+        _positive(w=w, h=h)
+        return cls(d=f"M {x:.9g} {y:.9g} H {x + w:.9g} V {y + h:.9g} H {x:.9g} Z", **fields)
+
+    @classmethod
+    def ellipse(cls, cx: float, cy: float, rx: float, ry: float, **fields: Any) -> "Path":
+        """The ellipse centred on (`cx`, `cy`) with radii `rx` across and `ry` down, as shares of the frame (0 to 1):
+        `Path.ellipse(0.5, 0.5, 0.3, 0.3)`. `rx` and `ry` are above 0. Shares stretch with the frame, so the ellipse is
+        a circle only in a square frame; in a wider one give `rx` a smaller share than `ry`."""
+        _positive(rx=rx, ry=ry)
+        left, right = f"{cx - rx:.9g} {cy:.9g}", f"{cx + rx:.9g} {cy:.9g}"
+        arc = f"A {rx:.9g} {ry:.9g} 0 0 1"
+        return cls(d=f"M {left} {arc} {right} {arc} {left} Z", **fields)
+
+
+def _positive(**sizes: float) -> None:
+    """Refuse a size that is not above 0, naming it and its value."""
+    for name, value in sizes.items():
+        if not value > 0:  # also refuses nan
+            raise RecipeError(f"`{name}` must be above 0, got {value}")
 
 
 @piece(_region("svg"))

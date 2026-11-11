@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image import RecipeError
+from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.recipe import (
     Band,
     Bands,
@@ -27,6 +28,7 @@ from bullterrier_image.recipe import (
     Shards,
     Subject,
     Svg,
+    render,
 )
 
 WAVE = "M 0.38 0 C 0.15 0.45, 0.85 0.55, 0.62 1"
@@ -121,3 +123,59 @@ def test_every_field_is_documented_in_help_with_its_unit_and_range(model):
     for each in fields(model):
         assert f"{each.name} : " in text
         assert each.metadata["doc"]
+
+
+# --- Path.rect and Path.ellipse: a shape as shares of the frame ----------------------------------------------------
+
+
+def painted_red(region: Path, picture: np.ndarray) -> np.ndarray:
+    """A boolean map of the pixels a red `gradient` step masked to `region` turned red."""
+    steps = [Step("gradient", params={"colors": ["#ff0000"]}, mask="shape")]
+    out = render(picture, Recipe(steps, size=None, regions={"shape": region}))
+    return (out == np.array([1.0, 0.0, 0.0], np.float32)).all(axis=-1)
+
+
+def test_a_rect_paints_its_pixels_and_none_outside_it(photo):
+    height, width = photo.shape[:2]
+    red = painted_red(Path.rect(0.25, 0.25, 0.5, 0.5), photo)
+    inside = np.zeros((height, width), bool)
+    inside[height // 4 : 3 * height // 4, width // 4 : 3 * width // 4] = True  # whole pixels: the shares divide evenly
+    np.testing.assert_array_equal(red, inside)
+
+
+def test_a_rect_is_the_path_written_by_hand(photo):
+    by_hand = Path(d="M 0.1 0.2 H 0.6 V 0.7 H 0.1 Z")
+    np.testing.assert_array_equal(painted_red(Path.rect(0.1, 0.2, 0.5, 0.5), photo), painted_red(by_hand, photo))
+
+
+def test_an_ellipse_covers_the_pixels_whose_centres_are_inside_it(photo):
+    height, width = photo.shape[:2]
+    cx, cy, rx, ry = 0.5, 0.45, 0.3, 0.25
+    red = painted_red(Path.ellipse(cx, cy, rx, ry), photo)
+    across = ((np.arange(width) + 0.5) / width - cx) / rx
+    down = ((np.arange(height) + 0.5) / height - cy) / ry
+    distance = np.hypot(down[:, None], across[None, :])  # 1 on the border
+    far = np.abs(distance - 1) > 0.15  # leave the border pixels, which are partly covered
+    np.testing.assert_array_equal(red[far], (distance < 1)[far])
+    assert red[height // 2, width // 2]
+    assert not red[0, 0]
+
+
+@pytest.mark.parametrize(
+    ("make", "name"),
+    [
+        (lambda size: Path.rect(0.1, 0.1, size, 0.5), "w"),
+        (lambda size: Path.rect(0.1, 0.1, 0.5, size), "h"),
+        (lambda size: Path.ellipse(0.5, 0.5, size, 0.2), "rx"),
+        (lambda size: Path.ellipse(0.5, 0.5, 0.2, size), "ry"),
+    ],
+    ids=["w", "h", "rx", "ry"],
+)
+@pytest.mark.parametrize("size", [0, -0.2, float("nan")], ids=["zero", "negative", "nan"])
+def test_a_size_that_is_not_above_zero_is_refused_naming_it(make, name, size):
+    with pytest.raises(RecipeError, match=rf"`{name}`.*{size}"):
+        make(size)
+
+
+def test_a_shape_takes_the_other_fields_of_a_path():
+    assert Path.rect(0, 0, 1, 1, samples=8).samples == 8
