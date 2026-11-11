@@ -427,3 +427,110 @@ fn cutout_refuses_a_map_that_is_not_the_subject_one_of_another_size_and_one_give
     }
     Ok(())
 }
+
+/// Where the tile `index` of the sweep sheet starts: a gap, then tiles of 480 px with a gap after each.
+fn tile_column(index: usize) -> usize {
+    14 + index * (480 + 14) + 240
+}
+
+#[test]
+fn sweep_puts_the_recipe_at_each_value_of_a_parameter_side_by_side() -> Outcome {
+    let root = scene("sweep")?;
+    let (me, recipe, out) = (at(&root, "me.png"), at(&root, "recipes/a.toml"), at(&root, "s.png"));
+    let ran = bt(&[
+        "sweep",
+        &me,
+        &recipe,
+        "grade.exposure",
+        "-1..1",
+        "-o",
+        &out,
+        "--count",
+        "3",
+        "--columns",
+        "3",
+    ]);
+    assert_eq!(ran.code, 0, "{}", ran.err);
+    assert_eq!(ran.out.trim(), out);
+    assert!(
+        ran.err.contains("rendering 3 value(s) of grade.exposure..."),
+        "{}",
+        ran.err
+    );
+    let sheet = bullterrier_image::read(&root.join("s.png"))?;
+    assert_eq!(
+        (sheet.width(), sheet.height()),
+        (14 + 3 * (480 + 14), 14 + 480 + 30 + 14)
+    );
+    // the picture's middle row: exposure -1 is darker than 0 is darker than +1 (worked out: brighter exposure, brighter pixel)
+    let level = |index: usize| pixel(&root.join("s.png"), 14 + 240, tile_column(index)).map(|pixel| pixel[1]);
+    let (dark, same, bright) = (level(0)?, level(1)?, level(2)?);
+    assert!(dark < same && same < bright, "{dark} {same} {bright}");
+    Ok(())
+}
+
+#[test]
+fn sweep_takes_a_negative_range_and_a_whole_number_shows_each_whole_value_once() -> Outcome {
+    let root = scene("sweep-whole")?;
+    text(
+        &root.join("w.toml"),
+        "name = \"w\"\nsize = 32\n[[step]]\neffect = \"slice_shift\"\n",
+    )?;
+    let (me, recipe, out) = (at(&root, "me.png"), at(&root, "w.toml"), at(&root, "w.png"));
+    // 1..3 in 5 steps is 1, 1.5, 2, 2.5, 3: rounded to even 1, 2, 2, 2, 3 and each shown once
+    let ran = bt(&["sweep", &me, &recipe, "slice_shift.bands", "1..3", "-o", &out]);
+    assert_eq!(ran.code, 0, "{}", ran.err);
+    assert!(ran.err.contains("rendering 3 value(s)"), "{}", ran.err);
+    let negative = bt(&[
+        "sweep",
+        &me,
+        &at(&root, "recipes/a.toml"),
+        "grade.exposure",
+        "-1..0",
+        "-o",
+        &at(&root, "n.png"),
+        "--count",
+        "2",
+    ]);
+    assert_eq!(negative.code, 0, "{}", negative.err);
+    Ok(())
+}
+
+#[test]
+fn a_sweep_that_cannot_be_made_is_refused_before_any_work_naming_the_fix() -> Outcome {
+    let root = scene("sweep-refused")?;
+    let (me, recipe) = (at(&root, "me.png"), at(&root, "recipes/a.toml"));
+    for (args, says) in [
+        (vec!["grade.exposur", "0..1"], "did you mean grade.exposure"),
+        (
+            vec!["grade.exposure", "0..0"],
+            "a sweep needs a range: start and end are both 0",
+        ),
+        (
+            vec!["grade.exposure", "0..1", "--count", "1"],
+            "count must be 2 to 24 tiles, got 1",
+        ),
+        (
+            vec!["grade.exposure", "0..1", "--count", "25"],
+            "count must be 2 to 24 tiles, got 25",
+        ),
+        (vec!["grade.exposure", "0..99"], "\"grade.exposure\""),
+    ] {
+        let mut command = vec!["sweep", &me, &recipe];
+        command.extend(args.iter().copied());
+        let out = at(&root, "nope.png");
+        command.extend(["-o", &out]);
+        let ran = bt(&command);
+        assert_eq!(ran.code, 1, "{says}");
+        assert!(
+            ran.err.starts_with("error: ") && ran.err.contains(says),
+            "{says}: {}",
+            ran.err
+        );
+        assert!(!root.join("nope.png").exists(), "nothing was rendered: {says}");
+    }
+    let usage = bt(&["sweep", &me, &recipe, "grade.exposure", "0-1"]);
+    assert_eq!(usage.code, 2);
+    assert!(usage.err.contains("0-1"), "{}", usage.err);
+    Ok(())
+}

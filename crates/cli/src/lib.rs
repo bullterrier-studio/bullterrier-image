@@ -11,6 +11,7 @@ mod recipes;
 mod render;
 mod run;
 mod stamp;
+mod sweep;
 
 use std::io::Write;
 
@@ -65,6 +66,9 @@ enum Command {
         after_help = "example: bt-image steps examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml"
     )]
     Steps(render::StepsArgs),
+    /// Render one parameter of a recipe across a range of values, side by side in one image.
+    #[command(after_help = "example: bt-image sweep examples/photos/bullterrier.jpeg glitch rgb_split.amount 0..20")]
+    Sweep(sweep::Args),
     /// Save just the subject on a transparent background.
     #[command(after_help = "example: bt-image cutout examples/photos/bullterrier.jpeg -o out/cutout.png --feather 2")]
     Cutout(cutout::Args),
@@ -141,6 +145,7 @@ pub fn main(argv: &[String], version: &str, out: &mut dyn Write, err: &mut dyn W
         Command::Render(given) => render::render(&given, &mut console),
         Command::Sheet(given) => render::sheet(&given, &mut console),
         Command::Steps(given) => render::steps(&given, &mut console),
+        Command::Sweep(given) => sweep::command(&given, &mut console),
         Command::Cutout(given) => cutout::command(&given, &mut console),
         Command::Run(given) => run::command(&given, &mut console),
     };
