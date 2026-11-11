@@ -24,16 +24,14 @@ reader `loader` (TOML to `Recipe`, in the adapters layer) and `bridge` (running 
 both build on this module and do not know each other.
 """
 
-import difflib
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from importlib import import_module
 from typing import Any, Literal
 
 import numpy as np
 from pydantic import Field, field_validator, model_validator
-from pydantic.fields import FieldInfo
 
 from bullterrier_image.errors import RecipeError
 
@@ -703,19 +701,15 @@ class Recipe(ValidatedModel):
         frame (`frame.angle`). A step is addressed by its `name`, else by its effect (`gain`) when the recipe has one
         such step, else by the effect and its number among them (`gain#2`; an `Each` is `each`, `each#2`); the other
         forms an address may take are listed in `with_values`. Each is described by a `Parameter`: its value now (at its
-        default where the recipe does not write it), unit, range and what it does."""
-        found: dict[str, Parameter] = {}
-        for head, step in zip(self._heads(), self.steps, strict=True):
-            found |= {f"{head}.{rest}": number for rest, number in _step_numbers(step).items()}
-        for name, kind in self.regions.items():
-            found |= {f"region.{name}.{field}": number for field, number in _numbers(kind).items()}
-        return found | {f"frame.{field}": number for field, number in _numbers(self.frame).items()}
+        default where the recipe does not write it), unit, range and what it does. The core knows the addresses
+        (`Recipe::numbers`)."""
+        document, foreign = self._document(), self._foreign()
+        return {found["address"]: _parameter(found) for found in native.numbers(document, foreign)}
 
     def parameter(self, address: str) -> Parameter:
         """The number at `address` (see `parameters`; any form an address may take); RecipeError naming the address
         when there is none, with what is valid."""
-        target, rest = self._reach(address, {})
-        return self._numbers_of(target)[rest]
+        return _parameter(native.locate(self._document(), address, self._foreign())["number"])
 
     def with_values(self, values: Mapping[str, float]) -> "Recipe":
         """A copy of the recipe with each number at an address of `values` set to its value; the recipe itself is left
@@ -727,14 +721,15 @@ class Recipe(ValidatedModel):
         so is an address the recipe does not have
         (listing the valid ones and the nearest), a driven number set by itself (set its `.start`, `.end` or `.levels`)
         and a `.start` of a number that is not driven."""
+        document, foreign = self._document(), self._foreign()
         changes: dict[tuple, dict[str, Any]] = {}
         where: dict[tuple, dict[str, str]] = {}  # the address that set each number
-        cache: dict[tuple, dict[str, Parameter]] = {}
         for address, value in values.items():
-            target, rest = self._reach(address, cache)
+            located = native.locate(document, address, foreign)
+            target, rest = tuple(located["place"]), located["rest"]
             if isinstance(value, np.generic):
                 value = value.item()  # a number from numpy is the Python number it holds
-            if self._numbers_of(target, cache)[rest].whole and isinstance(value, float) and value.is_integer():
+            if located["number"]["whole"] and isinstance(value, float) and value.is_integer():
                 value = int(value)
             if rest in changes.get(target, {}):
                 raise RecipeError(f"{where[target][rest]!r} and {address!r} reach the same number: give it one value")
@@ -757,137 +752,43 @@ class Recipe(ValidatedModel):
                 ) from None
         return self.replace(steps=steps, frame=frame, regions=regions)
 
-    def _heads(self) -> list[str]:
-        """What each step's address starts with, in order: its name, else its effect (`each` for an `Each`) when it is
-        the recipe's only step of that kind, else the effect and its number among those (`gain#2`)."""
-        kinds = [_called(step) for step in self.steps]
-        seen: dict[str, int] = {}
-        heads = []
-        for step, kind in zip(self.steps, kinds, strict=True):
-            seen[kind] = seen.get(kind, 0) + 1
-            heads.append(step.name or (kind if kinds.count(kind) == 1 else f"{kind}#{seen[kind]}"))
-        return heads
+    def _foreign(self) -> dict[str, list[dict[str, Any]]]:
+        """The numbers of the effects this recipe uses that are written in Python, as the core cannot read them from a
+        table of its own: the declaration of each field that has a range."""
+        steps = [look for step in self.steps for look in (step.looks if isinstance(step, Each) else (step,))]
+        written = {step.effect for step in steps if isinstance(step, Step)}
+        foreign: dict[str, list[dict[str, Any]]] = {}
+        for effect in sorted(written):
+            model = registry.parameters(effect)
+            if model._core_effect is not None:  # noqa: SLF001  (the model says which Rust declaration it is)
+                continue
+            foreign[effect] = [
+                {
+                    "name": name,
+                    "unit": unit_of(info) or "",
+                    "doc": info.description or "",
+                    "min": bounds(info)[0],
+                    "max": bounds(info)[1],
+                    "whole": info.annotation is int,
+                    "cyclic": cyclic_of(info),
+                    "default": info.default,
+                }
+                for name, info in model.model_fields.items()
+                if bounds(info)[0] is not None
+            ]
+        return foreign
 
-    def _reach(self, address: str, cache: dict[tuple, dict[str, Parameter]]) -> tuple[tuple, str]:
-        """What `address` points at, as (the step, region or frame, the rest of the address): `(("step", index), rest)`,
-        `(("region", name), rest)` or `(("frame",), rest)`; RecipeError naming the address when it points at nothing."""
-        parts = address.split(".")
-        if len(parts) < 2:
-            raise RecipeError(
-                f"{address!r}: not an address; write a step's number as `step.number`, a region's as "
-                "`region.name.number` and the frame's as `frame.number` (see `Recipe.parameters`)"
-            )
-        head = parts[0]
-        if head == "frame":
-            target: tuple = ("frame",)
-            rest, label = ".".join(parts[1:]), "'frame'"
-        elif head == "region":
-            if len(parts) < 3:
-                raise RecipeError(f"{address!r}: a region's number is addressed `region.{parts[1]}.number`")
-            name = ".".join(parts[1:-1])
-            if name not in self.regions:
-                raise RecipeError(
-                    f"{address!r}: no region {name!r}; the recipe's regions: {', '.join(self.regions) or 'none'}"
-                )
-            target, rest, label = ("region", name), parts[-1], f"region {name!r}"
-        else:
-            target, rest, label = ("step", self._step_index(head, address)), ".".join(parts[1:]), repr(head)
-        numbers = self._numbers_of(target, cache)
-        if rest in numbers:
-            return target, rest
-        base, _, part = rest.rpartition(".")
-        if f"{rest}.start" in numbers:
-            raise RecipeError(
-                f"{address!r}: {rest!r} is driven by a field: set {rest}.start, {rest}.end or {rest}.levels"
-            )
-        if base in numbers and part in ("start", "end", "levels"):
-            raise RecipeError(f"{address!r}: {base!r} is not driven by a field, so it has no {part!r}")
-        near = difflib.get_close_matches(address, list(self.parameters()), n=3)
-        hint = f"; did you mean {', '.join(near)}?" if near else ""
-        raise RecipeError(f"{address!r}: {label} has no number {rest!r}; its numbers: {', '.join(numbers)}{hint}")
-
-    def _step_index(self, head: str, address: str) -> int:
-        """The index of the step an address starts with `head` for: a step's name, its effect (`each` for an `Each`)
-        when the recipe has one such step, or its effect and number (`gain#2`, from 1); RecipeError otherwise."""
-        heads = self._heads()
-        if head in heads:
-            return heads.index(head)
-        kind, _, number = head.partition("#")
-        same = [index for index, step in enumerate(self.steps) if _called(step) == kind]
-        if number and same:
-            if number.isdigit() and 1 <= int(number) <= len(same):
-                return same[int(number) - 1]
-            raise RecipeError(f"{address!r}: no step {head!r}; the recipe has {len(same)} {kind!r} steps")
-        if len(same) == 1 and not number:
-            return same[0]  # the recipe's only step of that effect, though it has a name
-        if len(same) > 1:
-            numbered = ", ".join(f"{kind}#{n}.{address.partition('.')[2]}" for n in range(1, len(same) + 1))
-            raise RecipeError(f"{address!r}: the recipe has {len(same)} {kind!r} steps; write one of {numbered}")
-        listed = [*heads, *(f"region.{name}" for name in self.regions), "frame"]
-        raise RecipeError(f"{address!r}: no step, region or frame called {head!r}; it has: {', '.join(listed)}")
-
-    def _numbers_of(
-        self, target: tuple, cache: dict[tuple, dict[str, Parameter]] | None = None
-    ) -> dict[str, Parameter]:
-        """The numbers (by the rest of an address) of the step, region or frame `target` (see `_reach`)."""
-        if cache is not None and target in cache:
-            return cache[target]
-        match target:
-            case ("step", index):
-                found = _step_numbers(self.steps[index])
-            case ("region", name):
-                found = _numbers(self.regions[name])
-            case _:
-                found = _numbers(self.frame)
-        if cache is not None:
-            cache[target] = found
-        return found
+    def _document(self) -> dict[str, Any]:
+        """The recipe as the dict the core reads."""
+        with registry.holding() as hold:
+            return recipe_dict(self, hold)
 
 
-def _called(step: Step | Each) -> str:
-    """What a step is called in an address when it has no name: its effect, or `each`."""
-    return step.effect if isinstance(step, Step) else "each"
-
-
-def _number(value: float, info: FieldInfo, *, whole: bool = False) -> Parameter:
-    """The `Parameter` of the number of value `value` that the field `info` declares."""
-    low, high = bounds(info)
-    return Parameter(value, unit_of(info) or "", low, high, info.description or "", whole, cyclic_of(info))
-
-
-def _numbers(model: EffectParams) -> dict[str, Parameter]:
-    """The numbers of the parameter model `model` (an effect's, a region kind's or the framing), by field, at the values
-    it holds: every field that has a range, so not a colour, a choice, a text or a list."""
-    return {
-        name: _number(getattr(model, name), info, whole=info.annotation is int)
-        for name, info in type(model).model_fields.items()
-        if bounds(info)[0] is not None
-    }
-
-
-def _step_numbers(step: Step | Each) -> dict[str, Parameter]:
-    """The numbers of a step by the rest of an address: an effect's (a driven one as `.start`, `.end` and `.levels`),
-    then `opacity`; an `Each`'s `feather`, `opacity` and its looks' as `looks[0].gain`."""
-    if isinstance(step, Each):
-        found = {
-            "feather": _number(step.feather, Each.model_fields["feather"]),
-            "opacity": _number(step.opacity, Each.model_fields["opacity"]),
-            "seed": _number(step.seed, Each.model_fields["seed"], whole=True),
-        }
-        for index, look in enumerate(step.looks):
-            if isinstance(look, Step):
-                found |= {f"looks[{index}].{rest}": number for rest, number in _step_numbers(look).items()}
-        return found
-    found = {}
-    for name, number in _numbers(registry.get(step.effect).validate(fixed(step))).items():
-        if name in drives(step):
-            drive = drives(step)[name]
-            found[f"{name}.start"] = replace(number, value=drive.start)
-            found[f"{name}.end"] = replace(number, value=drive.end)
-            found[f"{name}.levels"] = _number(drive.levels, Drive.model_fields["levels"], whole=True)
-        else:
-            found[name] = number
-    return found | {"opacity": _number(step.opacity, Step.model_fields["opacity"])}
+def _parameter(found: Mapping[str, Any]) -> Parameter:
+    """The `Parameter` that the core's description `found` of a number gives."""
+    return Parameter(
+        found["value"], found["unit"], found["min"], found["max"], found["doc"], found["whole"], found["cyclic"]
+    )
 
 
 def _set_step(step: Step | Each, put: Mapping[str, Any]) -> Step | Each:

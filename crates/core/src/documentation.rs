@@ -303,7 +303,7 @@ fn real(value: f64) -> String {
 }
 
 /// `text` as Python's `repr` writes a string: in single quotes, in double ones if it holds a single quote and no double.
-fn quoted(text: &str) -> String {
+pub(crate) fn quoted(text: &str) -> String {
     let quote = if text.contains('\'') && !text.contains('"') {
         '"'
     } else {

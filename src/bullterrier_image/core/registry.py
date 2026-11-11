@@ -259,6 +259,8 @@ def get(name: str) -> ModelledEffect:
 
 
 def _not_an_effect(name: str) -> str:
+    # Still Python: it reads the presets of effects registered from Python, which the core does not hold; the core's own
+    # `documentation::unknown_effect` (the command line) says the same for the catalogue it holds.
     """Why `name` is no effect: everything it is, listed together (a preset of some effects, a built-in look, a
     parameter of some effects, a phrase in the summary of some effects), or else the close matches among effects,
     presets and looks."""

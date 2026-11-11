@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use bullterrier_image::documentation::general;
-use bullterrier_image::{Error, Options, Presets, Recipe, Tile, contact_sheet, write};
+use bullterrier_image::{Error, Foreign, Options, Presets, Recipe, Tile, contact_sheet, write};
 use clap::Args as ClapArgs;
 
 use crate::Console;
@@ -89,7 +89,7 @@ fn variants(recipe: &Recipe, args: &Args, presets: &Presets) -> Result<Vec<(Stri
             general(start)
         )));
     }
-    let number = recipe.number(&args.target)?;
+    let number = recipe.number(&args.target, &Foreign::new())?;
     let mut values = linspace(start, end, args.count);
     if number.whole {
         values = values.into_iter().map(f64::round_ties_even).collect();
@@ -101,7 +101,7 @@ fn variants(recipe: &Recipe, args: &Args, presets: &Presets) -> Result<Vec<(Stri
         .map(|value| {
             Ok((
                 format!("{label}={}", general(value)),
-                recipe.with_value(&args.target, value, presets)?,
+                recipe.with_value(&args.target, value, presets, &Foreign::new())?,
             ))
         })
         .collect()

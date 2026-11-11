@@ -392,6 +392,8 @@ class EffectParams(ValidatedModel):
 
     @classmethod
     def documentation(cls, advanced: bool = True) -> str:
+        # Still Python: effects registered from Python, the framing and the regions have no table in the core to format;
+        # an effect the core declares is documented by `documentation::effect` (`registry.documentation`).
         """A "Parameters" section (numpydoc style) with each basic field's type, unit, range, default and description,
         then an "Advanced parameters" section of the same form if there are advanced fields. With `advanced=False` those
         are left out and one line says how many."""

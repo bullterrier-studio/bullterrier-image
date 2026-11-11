@@ -519,7 +519,7 @@ fn a_sweep_that_cannot_be_made_is_refused_before_any_work_naming_the_fix() -> Ou
             vec!["grade.exposure", "0..1", "--count", "25"],
             "count must be 2 to 24 tiles, got 25",
         ),
-        (vec!["grade.exposure", "0..99"], "\"grade.exposure\""),
+        (vec!["grade.exposure", "0..99"], "'grade.exposure'"),
     ] {
         let mut command = vec!["sweep", &me, &recipe];
         command.extend(args.iter().copied());

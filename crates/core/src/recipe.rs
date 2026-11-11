@@ -34,7 +34,7 @@ pub mod region;
 pub use drive::Drive;
 pub use frame::Frame;
 pub use needs::Needs;
-pub use numbers::Number;
+pub use numbers::{Declared, Foreign, Home, Located, Number};
 pub use region::{Region, Regions};
 
 /// The keys of a step besides its effect's parameters, written the same in a file and in code: no parameter of an

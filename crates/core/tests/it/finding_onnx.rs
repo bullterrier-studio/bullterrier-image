@@ -63,13 +63,14 @@ fn a_local_model_that_is_no_file_is_refused_naming_it() {
 }
 
 #[test]
-fn without_a_library_the_refusal_names_the_variable_and_the_package() -> Outcome {
+fn without_a_library_the_refusal_names_the_variable_and_the_command_that_installs_it() -> Outcome {
     let cache = folder("no-library")?;
     let local = cache.join("any.onnx");
     std::fs::write(&local, b"x")?;
-    let message = refusal(&Options::new().with_model_file(&local));
+    // an empty cache folder: no library is kept there, whatever this computer has installed
+    let message = refusal(&Options::new().with_model_file(&local).with_cache(&cache));
     assert!(
-        message.contains("BT_IMAGE_ONNX_LIB") && message.contains("onnxruntime"),
+        message.contains("BT_IMAGE_ONNX_LIB") && message.contains("bt-image install onnx"),
         "{message}"
     );
     Ok(())

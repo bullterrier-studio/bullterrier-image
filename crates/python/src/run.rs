@@ -8,7 +8,7 @@ use numpy::{AllowTypeChange, PyArray1, PyArray2, PyArray3, PyArrayLike2, PyArray
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBool, PyDict, PyList, PyTuple};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use super::lut::tables_of;
 use super::{CoreError, core_error, found, from_json, photo_array, picture_of, pictures_of, to_json, value_error};
@@ -133,6 +133,86 @@ pub(crate) fn needs<'py>(
 #[pyfunction]
 pub(crate) fn known_maps(recipe: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
     Ok(recipe_of(recipe)?.known_maps().into_iter().map(str::to_owned).collect())
+}
+
+/// The numbers of the effects written in Python, which the core has no table of: `{effect: [{"name", "unit", "doc", "min",
+/// "max", "whole", "cyclic", "default"}]}`.
+fn foreign_of(given: Option<&Bound<'_, PyDict>>) -> PyResult<bullterrier_image::Foreign> {
+    let mut foreign = bullterrier_image::Foreign::new();
+    for (effect, numbers) in given.into_iter().flatten() {
+        let mut declared = Vec::new();
+        for number in numbers.try_iter()? {
+            let number = number?;
+            let field = |key: &str| number.get_item(key);
+            declared.push(bullterrier_image::Declared {
+                name: field("name")?.extract()?,
+                unit: field("unit")?.extract()?,
+                doc: field("doc")?.extract()?,
+                min: field("min")?.extract()?,
+                max: field("max")?.extract()?,
+                whole: field("whole")?.extract()?,
+                cyclic: field("cyclic")?.extract()?,
+                default: field("default")?.extract()?,
+            });
+        }
+        foreign.insert(effect.extract()?, declared);
+    }
+    Ok(foreign)
+}
+
+/// A number of a recipe as a dict: `address`, `value` (none if unset), `unit`, `doc`, `whole`, `cyclic`, `min` and `max`.
+fn number_dict(number: &bullterrier_image::Number) -> Value {
+    json!({
+        "address": number.address,
+        "value": number.value,
+        "unit": number.unit,
+        "doc": number.doc,
+        "whole": number.whole,
+        "cyclic": number.cyclic,
+        "min": number.min,
+        "max": number.max,
+    })
+}
+
+/// Every number of `recipe` (a dict, as for `render`) that can be set, in the order of the recipe: a list of dicts as
+/// `locate` gives under `number`. See `Recipe::numbers` in the core for the addresses.
+///
+/// `CoreError` if a step names an effect that is not registered.
+#[pyfunction]
+#[pyo3(signature = (recipe, foreign=None))]
+pub(crate) fn numbers<'py>(
+    py: Python<'py>,
+    recipe: &Bound<'py, PyDict>,
+    foreign: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let all = recipe_of(recipe)?.numbers(&foreign_of(foreign)?).map_err(core_error)?;
+    from_json(py, &Value::Array(all.iter().map(number_dict).collect()))
+}
+
+/// The number of `recipe` (a dict, as for `render`) at `address` and where it lives: `{"place": ["step", index] |
+/// ["region", name] | ["frame"], "rest": str, "number": {address, value, unit, doc, whole, cyclic, min, max}}`.
+///
+/// `CoreError` of kind `recipe` naming the address, what is there and the nearest addresses, when it points at nothing.
+#[pyfunction]
+#[pyo3(signature = (recipe, address, foreign=None))]
+pub(crate) fn locate<'py>(
+    py: Python<'py>,
+    recipe: &Bound<'py, PyDict>,
+    address: &str,
+    foreign: Option<&Bound<'py, PyDict>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let found = recipe_of(recipe)?
+        .locate(address, &foreign_of(foreign)?)
+        .map_err(core_error)?;
+    let place = match found.place {
+        bullterrier_image::Home::Step(index) => json!(["step", index]),
+        bullterrier_image::Home::Region(name) => json!(["region", name]),
+        _ => json!(["frame"]),
+    };
+    from_json(
+        py,
+        &json!({"place": place, "rest": found.rest, "number": number_dict(&found.number)}),
+    )
 }
 
 /// Every stage of rendering `recipe` on `rgb`, with the arguments and the failures of `render`: a list of `(kind,
