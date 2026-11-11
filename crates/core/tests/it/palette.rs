@@ -17,7 +17,7 @@ fn blocks(rows: &[(usize, [f32; 3])]) -> (usize, Vec<f32>) {
     (values.len() / 30, values)
 }
 
-fn dominant(rows: &[(usize, [f32; 3])], colors: i64, seed: u32) -> Result<Vec<[f32; 3]>, Error> {
+fn dominant(rows: &[(usize, [f32; 3])], colors: i64, seed: i128) -> Result<Vec<[f32; 3]>, Error> {
     let (height, values) = blocks(rows);
     palette(&Picture::new(height, 10, &values)?, colors, seed)
 }
@@ -79,5 +79,28 @@ fn a_number_of_colours_outside_1_to_256_is_refused_naming_the_value() -> Result<
         );
     }
     assert!(palette(&picture, 1, 0).is_ok());
+    Ok(())
+}
+
+#[test]
+fn a_seed_outside_0_to_4294967295_is_refused_naming_the_value() -> Result<(), Error> {
+    let values = varied(4, 4);
+    let picture = Picture::new(4, 4, &values)?;
+    for bad in [-1_i128, 1 << 32, 1 << 70] {
+        let refused = palette(&picture, 2, bad).err();
+        assert!(
+            matches!(&refused, Some(error) if error.kind() == ErrorKind::Recipe
+                && error.to_string().contains("seed")),
+            "{bad}: {refused:?}"
+        );
+    }
+    let negative = palette(&picture, 2, -1).err().map(|error| error.to_string());
+    assert_eq!(
+        negative.as_deref(),
+        Some("effect 'palette': `seed` must be >= 0, got -1")
+    );
+    for good in [0, i128::from(u32::MAX)] {
+        assert!(palette(&picture, 2, good).is_ok(), "{good}");
+    }
     Ok(())
 }

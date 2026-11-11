@@ -185,3 +185,14 @@ def test_palette_refuses_a_number_of_colours_outside_1_to_256_naming_the_value(c
 def test_palette_refuses_what_is_no_picture():
     with pytest.raises(InvalidImageError, match="array"):
         imageio.palette([[1.0]])  # type: ignore[arg-type]  # the refusal is the point
+
+
+@pytest.mark.parametrize(("seed", "shown"), [(-1, "-1"), (2**32, "4294967296"), (2**70, "1.18059")])
+def test_palette_refuses_a_seed_outside_0_to_4294967295_naming_the_value(seed, shown):
+    with pytest.raises(RecipeError, match=rf"seed.*{shown}"):
+        imageio.palette(np.zeros((2, 2, 3), np.float32), 1, seed=seed)
+
+
+@pytest.mark.parametrize("seed", [0, 2**32 - 1])
+def test_palette_takes_the_smallest_and_largest_seed(seed):
+    assert imageio.palette(np.zeros((2, 2, 3), np.float32), 1, seed=seed) == ["#000000"]

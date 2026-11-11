@@ -8,10 +8,11 @@ use super::{core_error, photo_array, picture_of};
 /// text, largest share of the pixels first; fewer when the picture has fewer distinct colours. The same `rgb`, `colors`
 /// and `seed` give the same list. The core does the work without the GIL.
 ///
-/// `CoreError` of kind `recipe` naming `colors` and its value unless it is from 1 to 256; of kind `invalid_image` for an
+/// `CoreError` of kind `recipe` naming `colors` and its value unless it is from 1 to 256, or `seed` and its value unless it is
+/// from 0 to 4294967295; of kind `invalid_image` for an
 /// `rgb` that is no such array.
 #[pyfunction]
-pub(crate) fn palette(py: Python<'_>, rgb: &Bound<'_, PyAny>, colors: i64, seed: u32) -> PyResult<Vec<String>> {
+pub(crate) fn palette(py: Python<'_>, rgb: &Bound<'_, PyAny>, colors: i64, seed: i128) -> PyResult<Vec<String>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let found = py

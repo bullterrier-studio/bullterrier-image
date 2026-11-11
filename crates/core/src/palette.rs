@@ -7,6 +7,8 @@ use crate::ops::cluster::{Point, Start, kmeans, mean, nearest};
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::random::{Rng, mix};
 use crate::params::Scalar;
+use serde_json::Value;
+
 use crate::{Constraint, Error, Picture};
 
 /// The most colours a palette holds.
@@ -79,20 +81,38 @@ pub(crate) fn found(dots: &[Point], matched: &[Point], search: &Search) -> Vec<(
 ///
 /// # Errors
 /// [`Error::Invalid`] (kind [`ErrorKind::Recipe`](crate::ErrorKind::Recipe)) naming `colors` and its value unless it is
-/// from 1 to 256.
-pub fn palette(image: &Picture<'_>, colors: i64, seed: u32) -> Result<Vec<[f32; 3]>, Error> {
-    let invalid = |constraint| Error::Invalid {
+/// from 1 to 256, and naming `seed` and its value unless it is from 0 to 4294967295.
+pub fn palette(image: &Picture<'_>, colors: i64, seed: i128) -> Result<Vec<[f32; 3]>, Error> {
+    let invalid = |field: &str, constraint, value: Value| Error::Invalid {
         place: None,
         effect: "palette".to_owned(),
-        field: "colors".to_owned(),
+        field: field.to_owned(),
         constraint,
-        value: Box::new(colors.into()),
+        value: Box::new(value),
     };
     if colors < 1 {
-        return Err(invalid(Constraint::AtLeast(Scalar::Int(1))));
+        return Err(invalid("colors", Constraint::AtLeast(Scalar::Int(1)), colors.into()));
     }
     let Some(colors) = usize::try_from(colors).ok().filter(|_| colors <= MOST_COLORS) else {
-        return Err(invalid(Constraint::AtMost(Scalar::Int(MOST_COLORS))));
+        return Err(invalid(
+            "colors",
+            Constraint::AtMost(Scalar::Int(MOST_COLORS)),
+            colors.into(),
+        ));
+    };
+    // a number beyond i64 is shown in floating point: it only has to name the value that was refused
+    #[expect(clippy::cast_precision_loss, reason = "the value is only shown, in the refusal")]
+    let shown = || i64::try_from(seed).map_or_else(|_| Value::from(seed as f64), Value::from);
+    let seed = match u32::try_from(seed) {
+        Ok(seed) => seed,
+        Err(_) if seed < 0 => return Err(invalid("seed", Constraint::AtLeast(Scalar::Int(0)), shown())),
+        Err(_) => {
+            return Err(invalid(
+                "seed",
+                Constraint::AtMost(Scalar::Int(i64::from(u32::MAX))),
+                shown(),
+            ));
+        }
     };
     let dots = image.pixels();
     let matched: Vec<Point> = dots.iter().map(|&pixel| rgb_to_oklab(pixel)).collect();
