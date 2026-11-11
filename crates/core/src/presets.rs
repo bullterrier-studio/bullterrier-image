@@ -20,7 +20,7 @@ pub struct Preset {
 /// The presets of the effects, by effect and name.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Presets {
-    by_effect: BTreeMap<String, BTreeMap<String, Preset>>,
+    by_effect: BTreeMap<String, Vec<(String, Preset)>>,
 }
 
 impl Presets {
@@ -78,7 +78,7 @@ impl Presets {
             )));
         };
         let described = registry.effect(effect).ok().and_then(|found| found.params());
-        let mut presets = BTreeMap::new();
+        let mut presets = Vec::new();
         for (name, preset) in written {
             let owner = format!("preset '{name}' of '{effect}'");
             let Value::Object(fields) = preset else {
@@ -100,7 +100,7 @@ impl Presets {
                     .check(effect, &params)
                     .map_err(|error| Error::Recipe(format!("{owner}: {error}")))?;
             }
-            presets.insert(name.clone(), Preset { description, params });
+            presets.push((name.clone(), Preset { description, params }));
         }
         self.by_effect.insert(effect.to_owned(), presets);
         Ok(())
@@ -109,7 +109,10 @@ impl Presets {
     /// The preset called `preset` of `effect`.
     #[must_use]
     pub fn get(&self, effect: &str, preset: &str) -> Option<&Preset> {
-        self.by_effect.get(effect)?.get(preset)
+        self.by_effect
+            .get(effect)?
+            .iter()
+            .find_map(|(name, found)| (name == preset).then_some(found))
     }
 
     /// The parameters of `step` with its preset's under them: the ones given win. `place` (`step 2`) leads the message
@@ -135,11 +138,11 @@ impl Presets {
         Ok(params)
     }
 
-    /// The names of the presets of `effect`, sorted.
+    /// The names of the presets of `effect`, in the order they were written.
     #[must_use]
     pub fn names(&self, effect: &str) -> Vec<&str> {
         self.by_effect
             .get(effect)
-            .map_or_else(Vec::new, |presets| presets.keys().map(String::as_str).collect())
+            .map_or_else(Vec::new, |presets| presets.iter().map(|(name, _)| name.as_str()).collect())
     }
 }

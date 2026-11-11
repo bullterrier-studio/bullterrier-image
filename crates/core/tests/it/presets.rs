@@ -32,7 +32,7 @@ fn presets_are_kept_as_written_by_effect_and_name() -> Outcome {
             params: params(&json!({"cell": 8, "cells": 7, "tint": "#0af"})),
         })
     );
-    assert_eq!(presets.names("probe"), ["plain", "wide"]);
+    assert_eq!(presets.names("probe"), ["wide", "plain"], "in the order written");
     assert_eq!(presets.get("probe", "narrow"), None);
     assert_eq!(presets.get("grade", "wide"), None);
     assert_eq!(presets.names("grade"), Vec::<&str>::new());
@@ -131,7 +131,7 @@ fn presets_are_read_from_toml_text_and_checked_like_any() -> Outcome {
         "grade",
         "# the warm one\n[warm]\ndescription = \"Golden hour.\"\ntemperature = 0.25\nexposure = 1\n\n[plain]\ndescription = \"Nothing.\"\n",
     )?;
-    assert_eq!(presets.names("grade"), ["plain", "warm"]);
+    assert_eq!(presets.names("grade"), ["warm", "plain"]);
     assert_eq!(
         presets
             .get("grade", "warm")
@@ -210,4 +210,15 @@ fn toml_a_recipe_has_no_use_for_is_refused_as_a_recipe_file_does() {
             "{rule}: {refused:?}"
         );
     }
+}
+
+#[test]
+fn the_presets_of_an_effect_are_listed_in_the_order_the_file_wrote_them() -> Result<(), bullterrier_image::Error> {
+    let mut presets = bullterrier_image::Presets::new();
+    presets.add_toml(
+        "grade",
+        "[warm]\ndescription = \"Warmer.\"\ntemperature = 1\n[cool]\ndescription = \"Cooler.\"\ntemperature = -1\n[alpha]\ndescription = \"Last.\"\n",
+    )?;
+    assert_eq!(presets.names("grade"), ["warm", "cool", "alpha"]);
+    Ok(())
 }

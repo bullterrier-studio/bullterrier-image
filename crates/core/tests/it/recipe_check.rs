@@ -528,7 +528,7 @@ fn a_preset_lies_under_the_given_parameters() -> Outcome {
     assert!(
         refused
             .as_deref()
-            .is_some_and(|text| text.contains("narrow") && text.contains("plain, wide")),
+            .is_some_and(|text| text.contains("narrow") && text.contains("wide, plain")),
         "{refused:?}"
     );
     // an effect with no presets says so
