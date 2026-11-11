@@ -31,7 +31,6 @@ classifiers = [
 # exactly these). Below them: pydantic 2.7.0 fails at import, and numpy 1.26 is the first series with Python 3.12 wheels.
 # No upper bounds: nothing is known to break on a newer release.
 dependencies = [
-    "annotated-types>=0.4.0",
     "numpy>=1.26.4",
     "pydantic>=2.7.1",
 ]

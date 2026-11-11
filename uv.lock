@@ -110,7 +110,6 @@ name = "bullterrier-image"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "annotated-types" },
     { name = "numpy" },
     { name = "pydantic" },
 ]
@@ -145,7 +144,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "annotated-types", specifier = ">=0.4.0" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "pydantic", specifier = ">=2.7.1" },
 ]
