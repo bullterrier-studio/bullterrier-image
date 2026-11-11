@@ -269,7 +269,7 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | --- | --- | --- |
 | `avatar` ✓ (a recipe, [avatar.toml](../examples/transparent/avatar.toml)) | Square crop on the subject, optional circle: framing and transparency settings. | `aspect = 1.0`, `anchor = "subject"`, `size = 512`, `transparent = "circle"` |
 | `upscale` ✓ (a setting) | Resampling to a `size` above the photo's own (an optional AI model is not built). | `size = 4096` |
-| `palette_from_photo` | Extract dominant colours to feed other steps. Wanted with `color_transfer`: a reference picture's colours in, the stops of a `gradient_map` or the colours of a `gradient` out. | `palette = photo.palette(5)` |
+| `palette_from_photo` ✓ | Extract dominant colours to feed other steps: a reference picture's colours in, the stops of a `gradient_map` or the colours of a `gradient` out. A function over a numpy array, largest share first. | `bullterrier_image.palette(rgb, colors=5, *, seed=0)` |
 | `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml rgb_split.amount 0..20` |
 | `compare` (CLI) | Before/after slider page. | `bt-image compare a.jpg b.jpg` |
 | `avatar pack` (export) | Every size a set of platforms asks for. | `[export] preset = "avatars"` |
