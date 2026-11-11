@@ -17,6 +17,7 @@ import onnx
 import pytest
 from onnx import TensorProto, helper
 
+from bullterrier_image import BackendUnavailableError
 from bullterrier_image.core import native, registry
 from bullterrier_image.core.params import EffectParams, core_effect, param, scaled
 from bullterrier_image.core.registry import effect, unregister
@@ -264,9 +265,14 @@ def wide_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(scope="session")
 def onnx_runtime() -> Path:
-    """The ONNX Runtime library the tests that run a model use: the one `bt-image install onnx` keeps, installed now if
-    it is not there (about 10 MB, once per computer)."""
-    return native.install_onnx_runtime()
+    """The ONNX Runtime library the tests that run a model use: the one `bt-image install onnx` keeps (`uv run poe
+    setup` installs it, once per computer). The tests never download it: they fail at once, naming the fix."""
+    try:
+        return native.kept_onnx_runtime()
+    except BackendUnavailableError as error:
+        pytest.fail(
+            f"{error}\nrun `uv run poe setup` (or `uv run bt-image install onnx --runtime-only --yes`)", pytrace=False
+        )
 
 
 @pytest.fixture

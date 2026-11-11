@@ -197,7 +197,7 @@ new-effect = { cmd = "uv run python tools/dev.py new-effect", help = "Create a n
 # atomic push of main and the tag (CONTRIBUTING.md, "Releasing")
 release = { cmd = "python tools/release.py", help = "Release VERSION from main (e.g. 0.1.0rc1 to TestPyPI, 0.1.0 to PyPI): check, plan, ask, bump, tag, push [--dry-run] [--yes]" }
 # `default_install_hook_types` in .pre-commit-config.yaml names the three hook types, so a bare `install` covers them
-setup = { sequence = ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage", "python tools/rust_tools.py install"], default_item_type = "cmd", help = "Install the git hooks, the commit-message template and the cargo tools the gate runs (once per clone)" }
+setup = { sequence = ["pre-commit install --install-hooks", "git config --local commit.template .gitmessage", "python tools/rust_tools.py install", "uv run bt-image install onnx --runtime-only --yes"], default_item_type = "cmd", help = "Install the git hooks, the commit-message template, the cargo tools the gate runs and the ONNX Runtime library the model tests use (once per clone)" }
 
 # Read by tools/check_commit_message.py (the commit-msg hook): Conventional Commits 1.0 with these limits.
 [tool.commit-message]
