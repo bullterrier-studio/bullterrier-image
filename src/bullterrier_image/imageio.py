@@ -3,23 +3,20 @@
 Every other module works on a single image representation: a float32 array of shape (height, width, 3),
 RGB, values 0..1, sRGB-encoded (display-referred, not linear). This module is the one door for picture files: the
 Rust core reads and writes them (formats, EXIF rotation, ICC profiles, 8-bit conversion), so none of that leaks into
-effects. It also converts to and from Pillow images (`to_pil`, `from_pil`) and reads `.cube` colour tables.
+effects. It also resizes pictures and reads `.cube` colour tables.
 """
 
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
 
 from bullterrier_image.core import native
 from bullterrier_image.core.values import Lut, read_lut
 from bullterrier_image.ops.image import as_image
 
-__all__ = ["from_pil", "load", "load_lut", "load_map", "load_picture", "save", "to_pil"]
+__all__ = ["load", "load_lut", "load_map", "load_picture", "resize", "save"]
 
-_EIGHT_BIT = 255.0  # the largest 8-bit value
 _RGBA = 4  # the channels of RGBA
-_PREMULTIPLIED = {"La": "LA", "RGBa": "RGBA"}  # Pillow's premultiplied modes, and their straight-alpha forms
 
 
 def load(path: str | Path) -> np.ndarray:
@@ -105,25 +102,12 @@ def save(image: np.ndarray, path: str | Path, quality: int = 95) -> None:
     native.write(path, as_image(image, alpha=True), quality)
 
 
-def to_pil(image: np.ndarray) -> Image.Image:
-    """Convert to a Pillow image: RGB for (height, width, 3), RGBA (straight alpha last) for (height, width, 4). The
-    picture is checked as `save` checks it."""
-    return Image.fromarray((as_image(image, alpha=True) * _EIGHT_BIT + 0.5).astype(np.uint8))
+def resize(image: np.ndarray, longest_side: int) -> np.ndarray:
+    """`image` scaled so its longest side is `longest_side` px, the aspect kept: a new float32 array of the new shape
+    (alpha, if there is one, scaled with the colour).
 
-
-def from_pil(img: Image.Image) -> np.ndarray:
-    """Convert a Pillow image to RGB float32 0..1: Pillow's own conversion to RGBA, then the 8-bit levels over 255.
-
-    Transparency (an alpha channel, a transparent palette entry or colour key) is composited over white, so a colour
-    hidden under a transparent pixel never shows. No colour profile is applied, and only 8-bit modes are supported
-    (RGB, RGBA, L, LA, 1, P, the premultiplied La and RGBa, CMYK converted by Pillow's plain formula): Pillow clips
-    the levels of a 16-bit or float image to 0..255 on conversion, which gives wrong colours, not an error. To read a
-    file as a viewer shows it, with its profile and full precision, use `load`.
+    Lanczos for a shrink and bicubic for a growth, on floats, so a soft edge stays soft; the result is within 0..1. An
+    image already that size comes back as it is. The picture is checked as `save` checks it; InvalidImageError for
+    another array, RecipeError for a size beyond what a picture may have.
     """
-    if img.mode in _PREMULTIPLIED:  # Pillow cannot convert these to RGBA directly; it un-premultiplies on the way
-        img = img.convert(_PREMULTIPLIED[img.mode])
-    rgba = np.asarray(img.convert("RGBA"), np.float32) / _EIGHT_BIT
-    alpha = rgba[..., 3:]
-    rgb = rgba[..., :3] * alpha
-    rgb += 1.0 - alpha
-    return rgb
+    return native.resize(as_image(image, alpha=True), longest_side)

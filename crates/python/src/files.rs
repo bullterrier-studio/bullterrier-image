@@ -1,4 +1,4 @@
-//! `_core.read`, `_core.read_map` and `_core.write`: image files, read and written by the core.
+//! `_core.read`, `_core.read_map`, `_core.write` (image files, read and written by the core) and `_core.resize`.
 
 use std::path::PathBuf;
 
@@ -50,6 +50,23 @@ pub(crate) fn write(py: Python<'_>, path: PathBuf, image: &Bound<'_, PyAny>, qua
     let image = image_of(image)?;
     py.detach(|| bullterrier_image::write_with_quality(&path, &image, quality))
         .map_err(core_error)
+}
+
+/// `image` (a C-contiguous float32 array `(height, width, 3 or 4)`) scaled so its longest side is `longest_side` px, the
+/// aspect kept: Lanczos for a shrink, bicubic for a growth, on floats, within 0..1. A new array of the new shape (alpha
+/// resized with the colour). `CoreError` for an array that is no such picture or a size beyond what a picture may have.
+#[pyfunction]
+pub(crate) fn resize<'py>(
+    py: Python<'py>,
+    image: &Bound<'py, PyAny>,
+    longest_side: u32,
+) -> PyResult<Bound<'py, PyArray3<f32>>> {
+    let image = image_of(image)?;
+    let scaled = py
+        .detach(|| bullterrier_image::pipeline::resize(&image, longest_side))
+        .map_err(core_error)?;
+    let shape = [scaled.height(), scaled.width(), scaled.channels()];
+    PyArray1::from_vec(py, scaled.into_values()).reshape(shape)
 }
 
 /// The image the C-contiguous float32 array `array` `(height, width, 3 or 4)` holds, copied.

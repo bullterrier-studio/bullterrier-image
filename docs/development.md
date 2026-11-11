@@ -62,7 +62,7 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
   sheet.py                 contact sheets (the core's)
   fx.py                    effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                public namespace: core's recipe names, default finders bound (`finding`)
-  imageio.py     adapters  facade over the core's file reading and writing (formats, EXIF, colour profiles); Pillow only for `to_pil`/`from_pil` (until E7 batch 2)
+  imageio.py     adapters  facade over the core's file reading and writing (formats, EXIF, colour profiles); `resize`
   loader.py                load_recipe: reads a recipe file (TOML) and pictures it names, through imageio
   finding/                 subject_matte(rgb) -> alpha, depth_map(rgb) -> depth, inverse_depth(rgb) (before per-photo
                            scaling): thin names for the core's finders (IS-Net, Depth Anything V2 on ONNX Runtime, or Apple

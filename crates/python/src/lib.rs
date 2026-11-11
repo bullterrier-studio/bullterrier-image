@@ -11,6 +11,7 @@ mod sheet;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use bullterrier_image::params::Color;
 use bullterrier_image::{
     BlendMode, Category, Effect, Error, ErrorKind, FieldParam, Image, Input, Inputs, Labels, Layer, Picture, Recipe,
     STEP_KEYS,
@@ -39,12 +40,12 @@ mod _core {
 
     #[pymodule_export]
     use super::{
-        CoreError, apply, check, documentation, effect, effects, main, params, read_recipe, read_recipe_source,
-        region_presets, register, shipped_looks, shipped_presets, summary, unregister, vocabulary,
+        CoreError, apply, check, documentation, effect, effects, main, params, parse_color, read_recipe,
+        read_recipe_source, region_presets, register, shipped_looks, shipped_presets, summary, unregister, vocabulary,
     };
 
     #[pymodule_export]
-    use super::files::{read, read_map, write};
+    use super::files::{read, read_map, resize, write};
 
     #[pymodule_export]
     use super::lut::PyLut;
@@ -672,6 +673,14 @@ fn found(value: &Bound<'_, PyAny>) -> String {
 /// The most levels a value handed to the core may nest: `serde_json`'s own limit on a JSON document, which a recipe is the
 /// form of, so the core refuses what it could not read back anyway before anything walks it.
 const MOST_NESTING: usize = 128; // constant: serde_json's recursion limit
+
+/// The colour `value` writes as three floats 0..1 (red, green, blue): `'#rrggbb'` or `'#rgb'` (either case, spaces around
+/// allowed) or a list of three numbers from 0 to 1. None for anything else: the one reading of a colour, the core's.
+#[pyfunction]
+fn parse_color(value: &Bound<'_, PyAny>) -> Option<(f64, f64, f64)> {
+    let [red, green, blue] = Color::channels(&to_json(value).ok()?)?;
+    Some((red, green, blue))
+}
 
 /// `value` (parameters as Pydantic's `model_dump` gives them) as JSON, for the core to read with serde.
 fn to_json(value: &Bound<'_, PyAny>) -> PyResult<Value> {

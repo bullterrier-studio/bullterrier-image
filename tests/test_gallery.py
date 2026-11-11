@@ -24,7 +24,7 @@ from bullterrier_image.core.params import EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.values import Color
 from bullterrier_image.finding.depth import depth_map
-from bullterrier_image.ops.resample import resize
+from bullterrier_image.imageio import resize
 
 
 class AmountParams(EffectParams):
@@ -416,7 +416,8 @@ def test_gallery_pictures_of_a_recipe_that_takes_depth_show_the_depth_models_map
     )
     gallery.render_gallery(only=["depth_probe"], checkout=checkout)
     picture = imageio.load(gallery.effect_files("depth_probe", checkout=checkout).picture)
-    expected = resize(depth_map(imageio.load(checkout / "examples" / "photos" / "bullterrier.jpeg")), 480)
+    depth = depth_map(imageio.load(checkout / "examples" / "photos" / "bullterrier.jpeg"))
+    expected = resize(np.dstack([depth] * 3), 480)[..., 0]
     assert picture.shape[:2] == expected.shape
     assert np.abs(picture[..., 0] - expected).mean() < 0.02  # JPEG and resampling only
 

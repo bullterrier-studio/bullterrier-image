@@ -139,6 +139,7 @@ mod registry;
 mod relight;
 mod render;
 mod resample;
+mod resize;
 mod rgb_split;
 mod rim_light;
 mod ripple;

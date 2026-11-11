@@ -112,7 +112,6 @@ source = { editable = "." }
 dependencies = [
     { name = "annotated-types" },
     { name = "numpy" },
-    { name = "pillow" },
     { name = "pydantic" },
 ]
 
@@ -128,6 +127,7 @@ dev = [
     { name = "mypy" },
     { name = "onnx" },
     { name = "packaging" },
+    { name = "pillow" },
     { name = "pip-audit" },
     { name = "poethepoet" },
     { name = "pre-commit" },
@@ -147,7 +147,6 @@ dev = [
 requires-dist = [
     { name = "annotated-types", specifier = ">=0.4.0" },
     { name = "numpy", specifier = ">=1.26.4" },
-    { name = "pillow", specifier = ">=11.1.0" },
     { name = "pydantic", specifier = ">=2.7.1" },
 ]
 
@@ -163,6 +162,7 @@ dev = [
     { name = "mypy", specifier = ">=2.4.0" },
     { name = "onnx", specifier = ">=1.23.2" },
     { name = "packaging", specifier = ">=26.3" },
+    { name = "pillow", specifier = ">=11.1.0" },
     { name = "pip-audit", specifier = ">=2.10.1" },
     { name = "poethepoet", specifier = ">=0.49.0" },
     { name = "pre-commit", specifier = ">=4.7.0" },

@@ -32,6 +32,7 @@ __all__ = [
     "number_pieces",
     "numbers",
     "params",
+    "parse_color",
     "project_maps",
     "read",
     "read_map",
@@ -42,6 +43,7 @@ __all__ = [
     "region_presets",
     "register",
     "render",
+    "resize",
     "run_project",
     "shipped_looks",
     "shipped_presets",
@@ -199,6 +201,8 @@ def trace(
     threads: int = ...,
 ) -> list[tuple[str, int | str | None, np.ndarray]]: ...
 def number_pieces(rgb: np.ndarray, partition: np.ndarray) -> np.ndarray: ...
+def parse_color(value: object) -> tuple[float, float, float] | None: ...
+def resize(image: np.ndarray, longest_side: int) -> np.ndarray: ...
 def read(path: str | os.PathLike[str]) -> np.ndarray: ...
 def read_map(path: str | os.PathLike[str]) -> np.ndarray: ...
 def write(path: str | os.PathLike[str], image: np.ndarray, quality: int = 95) -> None: ...

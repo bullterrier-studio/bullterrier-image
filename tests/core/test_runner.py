@@ -22,7 +22,7 @@ from bullterrier_image.core import bridge
 from bullterrier_image.core.params import Drive, EffectParams, param
 from bullterrier_image.core.registry import effect
 from bullterrier_image.core.steps import Each, Recipe, Step
-from bullterrier_image.ops.resample import resize
+from bullterrier_image.imageio import resize
 from bullterrier_image.recipe import Band, Finder, Framing, Given, Grid, Pick, Shards, Subject
 
 MASKED = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="masked", size=None)

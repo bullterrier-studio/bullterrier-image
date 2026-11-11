@@ -31,7 +31,7 @@ from bullterrier_image.core.values import FieldName
 from bullterrier_image.errors import BackendUnavailableError, RecipeError
 from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_matte
-from bullterrier_image.ops.resample import resize
+from bullterrier_image.imageio import resize
 from bullterrier_image.recipe import Band, Grid, Subject
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"

@@ -15,7 +15,7 @@ mod starter;
 
 pub use cache::MapCache;
 pub use checks::{matte_warnings, still_warnings};
-pub use export::export_still;
+pub use export::{export_still, resize};
 pub use identity::{core_identity, fingerprint, identity_files};
 pub use manifest::{Item, Status, read_manifest, report_html, write_record};
 pub use names::{file_name, safe_name};

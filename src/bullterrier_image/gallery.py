@@ -26,7 +26,6 @@ from .core.bridge import maps_needed
 from .errors import ProjectError
 from .finding.depth import depth_map
 from .finding.subject import subject_matte
-from .ops.resample import resize
 from .recipe import load_recipe, render
 
 CHECKOUT = (
@@ -105,7 +104,7 @@ def render_gallery(only: Sequence[str] = (), force: bool = False, *, checkout: P
             maps[needed] = _FINDERS[needed](photo)  # once for all the recipes that need it
         picture = render(photo, recipe, maps=maps, threads=0)  # one picture at a time: every core
         files.picture.parent.mkdir(parents=True, exist_ok=True)
-        imageio.save(resize(picture, _SIDE), files.picture, quality=_QUALITY)
+        imageio.save(imageio.resize(picture, _SIDE), files.picture, quality=_QUALITY)
     return todo
 
 

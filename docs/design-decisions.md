@@ -239,8 +239,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   TOML, JSON and YAML are codecs over that dict (`save_recipe`), the pipeline fingerprints the dict, not `repr`.
   *Reason:* one shape for every format, and the one Rust's serde form takes. *Consequence:* a step must keep its preset's
   name beside the merged values (today it keeps only the values).
-- **A photo is checked once, where it enters.** `render`, `trace`, `render_all`, `Step.apply` and `imageio.save` (and
-  `to_pil`) take a numpy array through `ops.image.as_image`: unsigned integer levels are divided by their type's largest
+- **A photo is checked once, where it enters.** `render`, `trace`, `render_all`, `Step.apply` and `imageio.save` and
+  `imageio.resize` take a numpy array through `ops.image.as_image`: unsigned integer levels are divided by their type's largest
   value (uint8 by 255, uint16 by 65535), floats must be finite (`NonFiniteImageError`) and within 0..1; any other shape
   (greyscale, RGBA where only RGB is taken), `bool`, signed integers, `uint32`/`uint64` (levels of no known white), a Pillow image or a list is an `InvalidImageError`
   naming what was found and the fix. Nothing is clipped. *Reason:* a uint8 photo rendered silent garbage and saved all
@@ -447,7 +447,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   (`crates/core/src/files.rs`) decodes with the `image` crate (PNG, JPEG, GIF, WebP, TIFF, BMP), reads 32-bit integer and
   float TIFFs with `tiff`, takes a CMYK JPEG's inks from `zune-jpeg`, and converts an embedded RGB, grey or CMYK profile
   to sRGB with `moxcms`, all pure Rust (no C library, so the wheels and the sdist build everywhere). `imageio` adds only
-  what a Python caller needs: compositing over white, the array checks of `save`, `to_pil`/`from_pil`, `load_lut`.
+  what a Python caller needs: compositing over white, the array checks of `save`, `load_lut`, `resize`.
   *Reason:* a Rust user of the crate needs the same files without Python, and one reader means the CLI, the library and
   the Rust API see the same pixels. *Consequences, each decided:* `write` makes png, jpg/jpeg and webp, and any other
   extension is a `BackendUnavailableError` naming it; WebP is lossless and `quality` applies to JPEG only (the lossy
@@ -457,8 +457,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   pixel; the embedded sRGB profile is littlecms's with its date fixed (`crates/core/data/srgb.icc`), and is read back as
   sRGB without conversion; PNG is written at the best compression, JPEG at 4:4:4. *Differences from Pillow, measured:* a
   JPEG decodes within 3 to 4 levels of 255 on photos (more on a few-pixel image), a CMYK press profile can differ by up to
-  10 levels from littlecms, and a PNG or JPEG write is 2 to 3 times slower for a smaller file. Pillow stays a
-  dependency for fonts and the Python resizers until the core has its own.
+  10 levels from littlecms, and a PNG or JPEG write is 2 to 3 times slower for a smaller file. Pillow left the runtime
+  dependencies in E7 (`to_pil`/`from_pil` deleted; `imageio.resize` and colour parsing are the core's); it is a dev
+  dependency for the tests' picture files and the banner script.
 - **This is a Rust project with a Python interface, as polars is; Python stays only where Rust has no equivalent.** The
   product is the crate and, later, a backend service for creators, so nothing in the hot or service path is Python. Python is
   the binding, numpy interop, Pydantic builders for the Python interface (Rust validates on its own: enums, and `Table::check`

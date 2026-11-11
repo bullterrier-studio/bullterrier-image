@@ -240,8 +240,16 @@ impl Color {
         clippy::cast_possible_truncation,
         reason = "a channel is from 0 to 1 and a colour holds f32"
     )]
-    pub(crate) fn parse(value: &Value) -> Option<Self> {
+    #[must_use]
+    pub fn parse(value: &Value) -> Option<Self> {
         colour(value).map(|channels| Self(channels.map(|channel| channel as f32)))
+    }
+
+    /// The channels `value` writes as [`parse`](Self::parse) reads them, but as the exact decimals (`#102030` gives
+    /// 16/255, not that `f32` widened): what a recipe written back as text should hold.
+    #[must_use]
+    pub fn channels(value: &Value) -> Option<[f64; 3]> {
+        colour(value)
     }
 }
 

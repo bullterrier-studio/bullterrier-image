@@ -107,7 +107,7 @@ pub fn export_still(
         let picture = match size {
             None => image,
             Some(longest) => {
-                copy = scaled(image, longest)?;
+                copy = resize(image, longest)?;
                 &copy
             }
         };
@@ -127,8 +127,13 @@ pub fn export_still(
     Ok(written)
 }
 
-/// `image` scaled so its longest side is `longest` px (colour and alpha, as a picture is resized everywhere).
-fn scaled(image: &Image, longest: u32) -> Result<Image, Error> {
+/// `image` scaled so its longest side is `longest` px, the aspect kept (colour and alpha, as a picture is resized
+/// everywhere): the other side is rounded to the nearest whole pixel, at least 1. A shrink uses the Lanczos kernel, a growth
+/// the bicubic one, on floats, and the result is within 0..1. An image already that size is returned as it is.
+///
+/// # Errors
+/// [`Error::Recipe`] if the new size has more pixels than a picture may have.
+pub fn resize(image: &Image, longest: u32) -> Result<Image, Error> {
     let picture = image.as_picture();
     let Some(resize) = Resize::to_longest_side(picture.height(), picture.width(), longest)? else {
         return Ok(image.clone());

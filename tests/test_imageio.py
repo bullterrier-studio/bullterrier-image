@@ -15,75 +15,6 @@ def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
     assert np.abs(back - photo).max() <= 1 / 255
 
 
-# --- every pixel format loads as sRGB float RGB 0..1 ----------------------------------------------------------------
-# Each case is a one-row picture Pillow writes in that mode, with the RGB values (0..1) a viewer shows for each pixel,
-# worked out by hand: a grey level v is (v, v, v); a 16-bit level is level / 65535; a pixel with alpha a over the
-# white background is colour * a + 1 * (1 - a).
-
-
-def palette_row(indices, colours, **info) -> Image.Image:
-    img = Image.new("P", (len(indices), 1))
-    img.putpalette([channel for colour in colours for channel in colour])
-    img.putdata(indices)
-    img.info.update(info)
-    return img
-
-
-def row(pixels, dtype, mode=None) -> Image.Image:
-    return Image.fromarray(np.array([pixels], dtype), mode)
-
-
-def palette_over_white(**info) -> Image.Image:
-    return palette_row([0, 1], [(255, 0, 0), (0, 0, 255)], **info)
-
-
-FROM_PIL = [  # (picture, expected RGB per pixel, by hand): what `from_pil` gives for a Pillow image of each 8-bit mode
-    pytest.param(row([(255, 0, 0), (0, 102, 255)], np.uint8), [(1, 0, 0), (0, 0.4, 1)], id="RGB"),
-    pytest.param(row([0, 51], np.uint8), [(0, 0, 0), (0.2, 0.2, 0.2)], id="L"),
-    pytest.param(row([False, True], bool), [0, 1], id="1-bit"),
-    pytest.param(palette_over_white(), [(1, 0, 0), (0, 0, 1)], id="P"),
-    pytest.param(palette_over_white(transparency=0), [1, (0, 0, 1)], id="P, transparent index over white"),
-    pytest.param(
-        row([(255, 0, 0, 0), (255, 0, 0, 128), (0, 0, 255, 255)], np.uint8, "RGBA"),
-        [1, (1, 127 / 255, 127 / 255), (0, 0, 1)],
-        id="RGBA over white",
-    ),
-    pytest.param(row([(0, 0), (0, 51)], np.uint8, "LA"), [1, 0.8], id="LA over white"),
-    pytest.param(  # alpha 51 = 0.2: the straight grey is premultiplied 10 * 5 = 50, so the sum is exact
-        Image.frombytes("La", (2, 1), bytes([0, 0, 10, 51])),
-        [1, (10 / 255 + 1 - 51 / 255,) * 3],
-        id="La, premultiplied",
-    ),
-    pytest.param(
-        Image.frombytes("RGBa", (2, 1), bytes([0, 0, 0, 0, 10, 0, 20, 51])),
-        [1, (10 / 255 + 1 - 51 / 255, 1 - 51 / 255, 20 / 255 + 1 - 51 / 255)],
-        id="RGBa, premultiplied",
-    ),
-]  # fmt: skip
-
-
-@pytest.mark.parametrize(("picture", "expected"), FROM_PIL)
-def test_from_pil_gives_the_8_bit_levels_with_transparency_over_white(picture, expected):
-    rgb = imageio.from_pil(picture)
-    assert rgb.dtype == np.float32
-    assert rgb.shape == (1, len(expected), 3)
-    np.testing.assert_allclose(rgb[0], [np.broadcast_to(value, 3) for value in expected], atol=1e-6)
-
-
-def test_from_pil_applies_no_colour_profile_where_load_does(tmp_path):
-    grey = Image.fromarray(np.array([[128]], np.uint8))
-    grey.save(tmp_path / "linear.png", icc_profile=linear_grey_profile())
-    with Image.open(tmp_path / "linear.png") as opened:
-        np.testing.assert_allclose(imageio.from_pil(opened), 128 / 255, atol=1e-6)  # as stored
-    assert imageio.load(tmp_path / "linear.png")[0, 0, 0] > 0.7  # load applies the profile
-
-
-def test_from_pil_clips_a_16_bit_level_it_does_not_support_instead_of_refusing_it():
-    """Documented limit: Pillow's conversion saturates 16-bit levels at white, so use `load` for them."""
-    half = row([32768], np.uint16)
-    np.testing.assert_allclose(imageio.from_pil(half), 1.0)
-
-
 def test_the_colour_under_a_transparent_pixel_never_shows(tmp_path):
     hidden = np.zeros((4, 6, 4), np.uint8)
     hidden[..., :3] = np.random.default_rng(3).integers(0, 256, (4, 6, 3))  # any colour, alpha 0 everywhere
@@ -204,3 +135,22 @@ def test_saving_refuses_nan_and_infinity_naming_the_pixel_and_writes_nothing(tmp
     with pytest.raises(NonFiniteImageError, match="row 1, column 2"):
         imageio.save(rgb, tmp_path / "odd.png")
     assert not (tmp_path / "odd.png").exists()
+
+
+@pytest.mark.parametrize(
+    ("shape", "side", "expected"), [((40, 80, 3), 20, (10, 20, 3)), ((30, 20, 4), 60, (60, 40, 4))]
+)
+def test_resize_gives_the_picture_a_longest_side_and_keeps_its_channels(shape, side, expected):
+    picture = np.random.default_rng(2).random(shape, dtype=np.float32)
+    out = imageio.resize(picture, side)
+    assert out.shape == expected
+    assert out.dtype == np.float32
+    assert out.min() >= 0
+    assert out.max() <= 1
+
+
+def test_resize_returns_a_picture_of_that_size_as_it_is_and_refuses_what_is_no_picture():
+    picture = np.random.default_rng(2).random((12, 16, 3), dtype=np.float32)
+    np.testing.assert_array_equal(imageio.resize(picture, 16), picture)
+    with pytest.raises(InvalidImageError, match="array"):
+        imageio.resize([[1.0]], 16)  # type: ignore[arg-type]  # the refusal is the point

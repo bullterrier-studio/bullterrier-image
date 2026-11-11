@@ -11,14 +11,12 @@ Promises:
 """
 
 import hashlib
-import math
 import os
 import re
 from collections.abc import Sequence
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Literal, Self
 
 import numpy as np
-from PIL import ImageColor
 from pydantic import BeforeValidator, PlainValidator, StringConstraints, WithJsonSchema
 
 from bullterrier_image._native import _core
@@ -37,16 +35,12 @@ def is_number(value: object) -> bool:
 
 def _to_color(value: object) -> tuple[float, float, float]:
     """A colour as written ('#rrggbb', '#rgb', three numbers 0..1, a numpy array of three) -> its three floats 0..1."""
-    if isinstance(value, str) and _HEX.fullmatch(value.strip()):
-        red, green, blue = (channel / 255.0 for channel in ImageColor.getrgb(value.strip()))  # constant: 8-bit levels
-        return red, green, blue
-    parts: list[Any] = []
     if isinstance(value, np.ndarray) and value.ndim == 1:
-        parts = value.tolist()
+        value = value.tolist()
     elif isinstance(value, list | tuple):
-        parts = list(value)
-    if len(parts) == 3 and all(is_number(c) and math.isfinite(c) and 0 <= c <= 1 for c in parts):
-        return float(parts[0]), float(parts[1]), float(parts[2])
+        value = [part.item() if isinstance(part, np.generic) else part for part in value]
+    if (found := native.parse_color(value)) is not None:
+        return found
     raise ValueError(f"a colour is '#rrggbb', '#rgb' or three numbers from 0 to 1, got {value!r}")
 
 

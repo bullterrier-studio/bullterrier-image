@@ -43,8 +43,7 @@ the result is laid over its input by `ops/blend` (blend mode, opacity, mask), an
 0..1) and `Labels` (piece numbers) are the maps. **Files** (`crates/core/src/files.rs`, `files/`): `read` (RGB or RGBA with straight alpha, upright, first frame, an embedded
 profile converted to sRGB), `read_map`, `write` and `write_with_quality` (png, jpg, webp; only the sRGB profile
 embedded); a fixed pixel limit and a decoder memory cap; `ErrorKind::ImageRead`, `ImageWrite` and `BackendUnavailable`.
-`imageio.py` calls them through `core/native.py` and keeps what is Python's (composite over white, array checks, Pillow
-conversions). `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
+`imageio.py` calls them through `core/native.py` and keeps what is Python's (composite over white, array checks). `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
 for every binding). **Regions:** `Recipe.regions` is an ordered `Regions` of the 13 typed kinds in `bullterrier_image::region`
 (`Region`, `kind` required; ranges in `Region::check`); `Recipe::needs(&Presets) -> Needs { maps, finds_pieces }` and
 `Recipe::known_maps()` say what a photo must be given or find. Maps are found before step 1; every other region is made the first
