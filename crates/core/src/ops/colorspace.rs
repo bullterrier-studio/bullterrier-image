@@ -110,6 +110,28 @@ pub(crate) fn rgb_to_oklab(pixel: [f32; 3]) -> [f32; 3] {
     TO_LAB.map(|row| row[0] * cones[0] + row[1] * cones[1] + row[2] * cones[2])
 }
 
+/// Ottosson's matrix from lightness and the two colour axes to the cube roots of the cone responses (Oklab, 2020).
+const FROM_LAB: [[f32; 3]; 3] = [
+    [1.0, 0.396_337_78, 0.215_803_76], // constant: Ottosson (2020), Oklab, Lab to cube-rooted cones (row 1)
+    [1.0, -0.105_561_346, -0.063_854_17], // constant: Ottosson (2020), Oklab, Lab to cube-rooted cones (row 2)
+    [1.0, -0.089_484_18, -1.291_485_5], // constant: Ottosson (2020), Oklab, Lab to cube-rooted cones (row 3)
+];
+
+/// Ottosson's matrix from cone responses to linear sRGB (Oklab, 2020).
+const FROM_CONES: [[f32; 3]; 3] = [
+    [4.076_741_7, -3.307_711_6, 0.230_969_93], // constant: Ottosson (2020), Oklab, cones to linear sRGB (row 1)
+    [-1.268_438, 2.609_757_4, -0.341_319_4],   // constant: Ottosson (2020), Oklab, cones to linear sRGB (row 2)
+    [-0.004_196_086, -0.703_418_6, 1.707_614_7], // constant: Ottosson (2020), Oklab, cones to linear sRGB (row 3)
+];
+
+/// Convert Oklab (L, a, b) back to gamma-encoded sRGB; the inverse of [`rgb_to_oklab`]. A colour outside the sRGB gamut
+/// comes back with a channel outside 0..1; nothing is clipped.
+pub(crate) fn oklab_to_rgb(pixel: [f32; 3]) -> [f32; 3] {
+    let roots = FROM_LAB.map(|row| row[0] * pixel[0] + row[1] * pixel[1] + row[2] * pixel[2]);
+    let cones = roots.map(|root| root * root * root);
+    FROM_CONES.map(|row| linear_to_srgb(row[0] * cones[0] + row[1] * cones[1] + row[2] * cones[2]))
+}
+
 const OFFSETS: [f32; 3] = [5.0, 3.0, 1.0]; // constant: the red, green and blue channels' offsets in sectors (HSV)
 const SECTORS: f32 = 6.0; // constant: the hue circle is six sectors, red to yellow to green to cyan to blue to magenta (HSV)
 
@@ -173,7 +195,7 @@ mod tests {
     //! YIQ against the FCC's published matrix and its known inverse. The conversions are `pub(crate)`, so no public route
     //! shows them apart from the effects built on them.
 
-    use super::{rgb_to_oklab, rgb_to_yiq, yiq_to_rgb};
+    use super::{oklab_to_rgb, rgb_to_oklab, rgb_to_yiq, yiq_to_rgb};
 
     #[test]
     fn the_primaries_and_white_have_the_published_oklab() {
@@ -230,6 +252,36 @@ mod tests {
                     let back = yiq_to_rgb(rgb_to_yiq(colour));
                     assert!(
                         back.iter().zip(colour).all(|(a, b)| (a - b).abs() < 1e-5),
+                        "{colour:?}: {back:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn oklab_to_rgb_returns_the_published_primaries_and_inverts_rgb_to_oklab() {
+        // Ottosson's published values (as in the forward test), read the other way
+        for (lab, rgb) in [
+            ([1.0, 0.0, 0.0], [1.0, 1.0, 1.0]),
+            ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0]),
+            ([0.6280, 0.2249, 0.1258], [1.0, 0.0, 0.0]),
+            ([0.8664, -0.2339, 0.1795], [0.0, 1.0, 0.0]),
+            ([0.4520, -0.0325, -0.3115], [0.0, 0.0, 1.0]),
+        ] {
+            let got = oklab_to_rgb(lab);
+            assert!(
+                got.iter().zip(rgb).all(|(a, b)| (a - b).abs() < 2e-3),
+                "{lab:?}: {got:?}"
+            );
+        }
+        for red in 0_u8..=8 {
+            for green in 0_u8..=8 {
+                for blue in 0_u8..=8 {
+                    let colour = [red, green, blue].map(|level| f32::from(level) / 8.0);
+                    let back = oklab_to_rgb(rgb_to_oklab(colour));
+                    assert!(
+                        back.iter().zip(colour).all(|(a, b)| (a - b).abs() < 1e-4),
                         "{colour:?}: {back:?}"
                     );
                 }
