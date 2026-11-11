@@ -96,6 +96,7 @@ refine_edge = entry(_core.refine_edge)
 map_problem = entry(_core.map_problem)
 parse_color = entry(_core.parse_color)
 resize = entry(_core.resize)
+palette = entry(_core.palette)
 read_project = entry(_core.read_project)
 init_project = entry(_core.init_project)
 main = _core.main  # never raises: it returns the exit code

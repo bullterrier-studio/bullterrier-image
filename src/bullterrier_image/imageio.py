@@ -14,7 +14,7 @@ from bullterrier_image.core import native
 from bullterrier_image.core.values import Lut, read_lut
 from bullterrier_image.ops.image import as_image
 
-__all__ = ["load", "load_lut", "load_map", "load_picture", "resize", "save"]
+__all__ = ["load", "load_lut", "load_map", "load_picture", "palette", "resize", "save"]
 
 _RGBA = 4  # the channels of RGBA
 
@@ -111,3 +111,20 @@ def resize(image: np.ndarray, longest_side: int) -> np.ndarray:
     another array, RecipeError for a size beyond what a picture may have.
     """
     return native.resize(as_image(image, alpha=True), longest_side)
+
+
+def palette(rgb: np.ndarray, colors: int = 5, *, seed: int = 0) -> list[str]:
+    """The `colors` dominant colours of a photo as hex strings, **largest share of the pixels first**.
+
+    Each is `'#rrggbb'`, so the list goes straight into `fx.gradient_map(stops=...)` or `fx.gradient(colors=...)`:
+
+        stops = palette(imageio.load("reference.jpg"), 3)
+        look = Recipe([fx.gradient_map(stops=stops)])
+
+    `colors` is 1 to 256 (RecipeError naming the value otherwise); fewer come back when the photo has fewer distinct
+    colours. Colours are grouped as the eye tells them apart (Oklab) and each is the average of its group, so a flat
+    block of colour comes back exactly. Of equal shares the lighter colour comes first. The same photo, `colors` and
+    `seed` always give the same list; another `seed` may find slightly different colours. The photo is checked as
+    `render` checks it: InvalidImageError for another array.
+    """
+    return native.palette(as_image(rgb), colors, seed)

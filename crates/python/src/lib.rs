@@ -4,6 +4,7 @@
 mod files;
 mod finding;
 mod lut;
+mod palette;
 mod pipeline;
 mod regions;
 mod run;
@@ -50,6 +51,9 @@ mod _core {
 
     #[pymodule_export]
     use super::lut::PyLut;
+
+    #[pymodule_export]
+    use super::palette::palette;
 
     #[pymodule_export]
     use super::pipeline::{check_project, init_project, project_maps, read_project, run_project};

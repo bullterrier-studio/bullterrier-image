@@ -4,7 +4,15 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from bullterrier_image import BackendUnavailableError, InvalidImageError, NonFiniteImageError, imageio
+import bullterrier_image
+from bullterrier_image import (
+    BackendUnavailableError,
+    InvalidImageError,
+    NonFiniteImageError,
+    RecipeError,
+    fx,
+    imageio,
+)
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -154,3 +162,26 @@ def test_resize_returns_a_picture_of_that_size_as_it_is_and_refuses_what_is_no_p
     np.testing.assert_array_equal(imageio.resize(picture, 16), picture)
     with pytest.raises(InvalidImageError, match="array"):
         imageio.resize([[1.0]], 16)  # type: ignore[arg-type]  # the refusal is the point
+
+
+def test_palette_gives_hex_strings_largest_share_first_that_gradient_map_accepts():
+    picture = np.zeros((10, 4, 3), np.float32)
+    picture[:6] = (1.0, 0.0, 0.0)  # 6 rows red, 3 green, 1 blue
+    picture[6:9] = (0.0, 1.0, 0.0)
+    picture[9:] = (0.0, 0.0, 1.0)
+    stops = imageio.palette(picture, 3)
+    assert stops == ["#ff0000", "#00ff00", "#0000ff"]
+    assert imageio.palette(picture, 3) == stops  # the same seed, the same list
+    fx.gradient_map(stops=stops)  # a step is made: the core accepts what palette gives
+    assert bullterrier_image.palette is imageio.palette
+
+
+@pytest.mark.parametrize("colors", [0, -2, 257])
+def test_palette_refuses_a_number_of_colours_outside_1_to_256_naming_the_value(colors):
+    with pytest.raises(RecipeError, match=rf"colors.*{colors}"):
+        imageio.palette(np.zeros((2, 2, 3), np.float32), colors)
+
+
+def test_palette_refuses_what_is_no_picture():
+    with pytest.raises(InvalidImageError, match="array"):
+        imageio.palette([[1.0]])  # type: ignore[arg-type]  # the refusal is the point
