@@ -407,6 +407,7 @@ ignore_decorators = [
 ignore_names = [
     # public API a caller uses, which no line of ours does: a `Recipe` sets numbers by address, an `Item` says what happened
     "with_values",
+    "write_stages",  # `examples/python_api.py` saves the stages of a trace with it
     "status",
     "warnings",
     # fields of the `Framing` and region models: `steps.recipe_dict` writes them to the core with `model_dump`, which reads

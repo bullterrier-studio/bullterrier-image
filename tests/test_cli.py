@@ -76,7 +76,9 @@ def test_an_effect_written_in_python_is_known_to_the_command_line(
 
 def test_the_console_entry_point_restores_the_default_signal_handler_and_answers(tmp_path):
     code = "import sys\nfrom bullterrier_image import cli\nsys.argv = ['bt-image', '--version']\ncli.main()\n"
-    done = subprocess.run([sys.executable, "-c", code], cwd=tmp_path, capture_output=True, text=True, check=False)
+    done = subprocess.run(
+        [sys.executable, "-c", code], cwd=tmp_path, capture_output=True, encoding="utf-8", check=False
+    )
     assert done.returncode == 0, done.stderr
     assert done.stdout.startswith("bt-image ")
 
