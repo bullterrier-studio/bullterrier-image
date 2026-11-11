@@ -473,3 +473,210 @@ fn the_numbers_of_an_effect_the_core_does_not_run_are_the_ones_its_owner_declare
     );
     Ok(())
 }
+
+// --- one convention for directions and lengths -------------------------------------------------------------------
+// A number is a direction (cyclic degrees, 0 to 360, clockwise from the right), a rotation (cyclic, -180 to 180,
+// clockwise when positive), a length (px) or a share of something named. The lists below hold each number of a region
+// or the frame that breaks the convention by its name, with the reason.
+
+/// Degrees numbers that are how far something is turned although named `angle`: the reason each is a rotation.
+const ROTATIONS: &[(&str, &str)] = &[("frame.angle", "how far the photo is turned before the steps")];
+/// Lengths written as a share, with what the share is of.
+const LENGTHS_AS_SHARES: &[(&str, &str)] = &[
+    ("region.radial_gradient.radius", "the picture's shorter side"),
+    ("region.band.feather", "the field's range of values"),
+    ("frame.margin", "the longer side of the subject's box"),
+    ("frame.corner_radius", "the picture's shorter side"),
+];
+const ROTATION_WORDS: &[&str] = &["turn", "rotate", "rotation"];
+const DIRECTION_WORDS: &[&str] = &["angle", "direction"];
+const LENGTH_WORDS: &[&str] = &[
+    "length",
+    "width",
+    "size",
+    "offset",
+    "height",
+    "spacing",
+    "radius",
+    "span",
+    "gap",
+    "cell",
+    "thickness",
+    "distance",
+    "reach",
+    "margin",
+    "feather",
+    "wavelength",
+    "amplitude",
+];
+const POSITIONS: &[&str] = &["x", "y", "at", "base"]; // a position is a fraction of each axis, not a length
+
+/// Whether `doc` says it runs clockwise (not "counter-clockwise" or "anticlockwise").
+fn says_clockwise(doc: &str) -> bool {
+    let doc = doc.to_lowercase();
+    doc.match_indices("clockwise").any(|(at, _)| {
+        !doc[..at]
+            .chars()
+            .next_back()
+            .is_some_and(|before| before.is_ascii_lowercase() || before == '-')
+    })
+}
+
+/// What breaks the convention among `numbers`, as one line each.
+fn convention_problems(numbers: &[Item]) -> Vec<String> {
+    let mut problems = Vec::new();
+    for number in numbers {
+        let address = number.address.as_str();
+        let field = address.rsplit('.').next().unwrap_or(address);
+        let words: Vec<&str> = field.split('_').collect();
+        if number.unit == "degrees" {
+            let rotation = words.iter().any(|word| ROTATION_WORDS.contains(word))
+                || ROTATIONS.iter().any(|(listed, _)| *listed == address);
+            let (low, high, what) = if rotation {
+                (-180.0, 180.0, "rotation")
+            } else if words.iter().any(|word| DIRECTION_WORDS.contains(word)) {
+                (0.0, 360.0, "direction")
+            } else {
+                problems.push(format!("{address} is in degrees but no direction or rotation"));
+                continue;
+            };
+            if !number.cyclic || (number.min, number.max) != (low, high) {
+                problems.push(format!(
+                    "{address} is a {what}: cyclic, {low} to {high}, not {} to {}",
+                    number.min, number.max
+                ));
+            }
+            if !says_clockwise(&number.doc) {
+                problems.push(format!("{address} is a {what}: its doc must say it runs clockwise"));
+            }
+        }
+        let named: Vec<&str> = words
+            .iter()
+            .copied()
+            .filter(|word| !["x", "y", "min", "max"].contains(word))
+            .collect();
+        let last = named.last().copied().unwrap_or(field);
+        let length = LENGTH_WORDS.contains(&last) && !POSITIONS.contains(&field);
+        if number.unit == "fraction"
+            && (length || number.doc.contains("long side"))
+            && !LENGTHS_AS_SHARES.iter().any(|(listed, _)| *listed == address)
+        {
+            problems.push(format!(
+                "{address} is a length in a share: give it in px, or list it in LENGTHS_AS_SHARES"
+            ));
+        }
+    }
+    problems
+}
+
+/// A number as the convention reads it.
+struct Item {
+    address: String,
+    unit: String,
+    min: f64,
+    max: f64,
+    cyclic: bool,
+    doc: String,
+}
+
+fn named_number(address: &str, unit: &str, min: f64, max: f64, cyclic: bool, doc: &str) -> Item {
+    Item {
+        address: address.to_owned(),
+        unit: unit.to_owned(),
+        min,
+        max,
+        cyclic,
+        doc: doc.to_owned(),
+    }
+}
+
+#[test]
+fn the_convention_check_flags_what_breaks_it_and_passes_what_keeps_it() {
+    let good = [
+        named_number(
+            "region.r.angle",
+            "degrees",
+            0.0,
+            360.0,
+            true,
+            "Clockwise from pointing right.",
+        ),
+        named_number(
+            "region.r.turn",
+            "degrees",
+            -180.0,
+            180.0,
+            true,
+            "Clockwise when positive.",
+        ),
+        named_number("region.r.width", "px", 0.0, 100.0, false, "How wide."),
+        named_number("region.r.x", "fraction", 0.0, 1.0, false, "Where across."),
+    ];
+    assert_eq!(convention_problems(&good), Vec::<String>::new());
+    let bad = [
+        (
+            "a direction over -180..180",
+            named_number("region.r.angle", "degrees", -180.0, 180.0, true, "Clockwise."),
+        ),
+        (
+            "a direction that is not cyclic",
+            named_number("region.r.angle", "degrees", 0.0, 360.0, false, "Clockwise."),
+        ),
+        (
+            "a direction that runs the other way",
+            named_number("region.r.angle", "degrees", 0.0, 360.0, true, "Counter-clockwise."),
+        ),
+        (
+            "a rotation over 0..360",
+            named_number("region.r.turn", "degrees", 0.0, 360.0, true, "Clockwise."),
+        ),
+        (
+            "an unlisted degrees field",
+            named_number("region.r.lean", "degrees", 0.0, 45.0, false, "How far it leans."),
+        ),
+        (
+            "a length in a share",
+            named_number("region.r.width", "fraction", 0.0, 1.0, false, "How wide."),
+        ),
+    ];
+    for (what, number) in bad {
+        assert_eq!(convention_problems(&[number]).len(), 1, "{what}");
+    }
+}
+
+#[test]
+fn every_direction_rotation_and_length_of_a_region_or_the_frame_keeps_the_convention() -> Outcome {
+    let regions: [(&str, Region); 7] = [
+        ("shards", Shards::default().into()),
+        ("svg", Svg::default().into()),
+        ("subject", Subject::default().into()),
+        ("band", Band::default().into()),
+        ("bands", Bands::default().into()),
+        ("linear_gradient", LinearGradient::default().into()),
+        ("radial_gradient", RadialGradient::default().into()),
+    ];
+    let mut recipe = pulse();
+    for (name, region) in regions {
+        recipe = recipe.with_region(name, region);
+    }
+    let numbers: Vec<Item> = recipe
+        .numbers(&Foreign::new())?
+        .into_iter()
+        .filter(|number| number.address.starts_with("region.") || number.address.starts_with("frame."))
+        .map(|number| Item {
+            address: number.address,
+            unit: number.unit,
+            min: number.min,
+            max: number.max,
+            cyclic: number.cyclic,
+            doc: number.doc,
+        })
+        .collect();
+    assert_eq!(convention_problems(&numbers), Vec::<String>::new());
+    // the lists name only numbers that exist and are still what they are listed as
+    let have: Vec<&str> = numbers.iter().map(|number| number.address.as_str()).collect();
+    for (listed, _) in ROTATIONS.iter().chain(LENGTHS_AS_SHARES) {
+        assert!(have.contains(listed), "{listed} is listed but is no number");
+    }
+    Ok(())
+}
