@@ -1326,3 +1326,17 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   interior beyond the band, the backdrop) contribute. *Footprint:* `light_wrap` reads one blur's reach whatever `width` is
   (a pixel changes only where the backdrop is in reach, and the nearest backdrop pixel is then too); proven on rectangles
   with distant edges, which also let `outline` say `Radius(width + glow + 1)`.
+- **The command line is the core's, run inside the Python process.** `crates/cli` (clap) holds every command; `main(argv, version,
+  out, err)` takes the streams, so tests run it in-process and read the exit code and the output. The wheel has no second binary:
+  `_core.main` runs it, which keeps effects registered from Python known to it (`registry.load_plugins` imports them first), and
+  the console script restores Python's default Ctrl-C handler so the process ends with 130. *Reason:* one parser, one set of
+  messages, and a Rust user of the crate gets the command line too. *Consequences:* the run is stamped in UTC (the standard
+  library knows no zone); a name typed wrong is matched by edit distance, not `difflib`; messages quote with Rust's `{:?}` unless
+  they copy a Python text; an effect written in Python is listed by name and category and documented by `help(fx.NAME)`.
+- **One loader for recipe files in a run.** `pipeline.run` hands recipe files to the core (`Recipe::from_file`, then
+  `Recipe::checked_from`, which names the file and the step); Python's `load_recipe` stays public API for programs. The limit:
+  a picture or lookup-table path of an effect written in Python is passed as written, not made relative to the recipe's folder.
+- **Sweeps and addresses are the core's.** `Recipe::numbers`, `number` and `with_value` read the numbers of steps from the effects'
+  parameter tables and those of the frame and the regions from `REGION_ROWS` and `FRAME_ROWS` (`recipe/numbers.rs`). The checks
+  of `Frame` and `Region` keep their own bounds, for readability; a parity test holds each row to its check (the edge accepted, one
+  step beyond refused) and a completeness test fails for a numeric field with no row. Python's `Recipe.with_values` remains.

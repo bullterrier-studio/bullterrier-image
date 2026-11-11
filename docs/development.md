@@ -59,11 +59,10 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
 
 ```
 src/bullterrier_image/                  layers, top to bottom; each imports only from layers below
-  cli.py         app       the `bt-image` command (no logic of its own); `python -m bullterrier_image` runs it too
+  cli.py         app       the entry point of the `bt-image` command, which is the core's (`crates/cli`); `python -m bullterrier_image` runs it too
   pipeline.py              many photos x many recipes: cache, checks, export, report
   gallery.py               what is generated from effects (catalogue page, pictures, fx.pyi); new-effect, driven by tools/dev.py
-  sheet.py                 contact sheets, step sheets, parameter sweeps
-  checks.py                automatic quality checks
+  sheet.py                 contact sheets (the core's)
   fx.py                    effects as validated step builders for Python (+ generated fx.pyi)
   recipe.py                public namespace: core's recipe names, default finders bound (`finding`)
   imageio.py     adapters  facade over the core's file reading and writing (formats, EXIF, colour profiles); Pillow only for `to_pil`/`from_pil`
