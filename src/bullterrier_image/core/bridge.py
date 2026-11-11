@@ -206,12 +206,18 @@ class _Finds:
     raises the `CoreError` that says so (the core must tell "found nothing" from a failure); an answer that is no map
     of the crop (none at all, the wrong size, values outside 0..1) is a failure, raised as it is."""
 
-    def __init__(self, finder: Any) -> None:
+    def __init__(self, finder: Any, name: str = "subject") -> None:
         self._finder = finder
+        self._name = name
 
     def find(self, rgb: np.ndarray) -> np.ndarray:
         try:
             answer = self._finder.find(rgb)
         except MapNotFoundError as error:
             raise native.found_nothing(error) from error
-        return answered("subject", answer, rgb)
+        return answered(self._name, answer, rgb)
+
+
+def core_finder(finder: Any, name: str) -> Any:
+    """`finder`, the finder of the map `name`, as the core asks it: finding nothing is said as the core hears it."""
+    return _Finds(finder, name)

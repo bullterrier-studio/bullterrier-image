@@ -317,9 +317,9 @@ fn layer_of(name: &str, array: &Bound<'_, PyAny>) -> Result<Layer, Error> {
 }
 
 /// A Python object with a method `find(rgb)`, as the core's finder of the map `name`.
-struct PyFinder {
-    name: String,
-    finder: Py<PyAny>,
+pub(crate) struct PyFinder {
+    pub(crate) name: String,
+    pub(crate) finder: Py<PyAny>,
 }
 
 impl PyFinder {

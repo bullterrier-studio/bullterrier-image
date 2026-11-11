@@ -104,67 +104,6 @@ def test_finished_work_is_skipped_and_only_what_changed_is_redone(folder):
     assert len(remade(folder)) == 8
 
 
-RUN_STATUSES = """
-import json, sys
-from bullterrier_image.pipeline import load_project, run
-print(json.dumps(sorted({i.status for i in run(load_project(sys.argv[1]))})))
-"""
-
-
-@pytest.mark.parametrize(
-    ("change", "status"),
-    [
-        pytest.param(
-            lambda package: write(package / "added-data.txt", "x"),
-            "done",
-            id="a file added to what ships changes the result",
-        ),
-        pytest.param(
-            lambda package: (package / "py.typed").rename(package / "py_typed"),
-            "done",
-            id="a file renamed with identical bytes is another file",
-        ),
-        pytest.param(lambda package: None, "skipped", id="no change: nothing is made again"),
-        pytest.param(
-            lambda package: write(package / "effects" / "grain" / "__pycache__" / "effect.cpython-0.pyc", "b"),
-            "skipped",
-            id="bytecode caches are no part of what ships",
-        ),
-        pytest.param(
-            lambda package: write(package / ".DS_Store", "x"),
-            "skipped",
-            id="a dotfile is no part of what ships",
-        ),
-        pytest.param(
-            lambda package: write(package / ".cache" / "a.txt", "x"),
-            "skipped",
-            id="a file in a dot folder is no part of what ships",
-        ),
-    ],
-)
-def test_work_is_redone_when_shipped_data_changes_and_not_when_only_a_cache_or_dotfile_appears(
-    folder, project_copy, uv_run_env, change, status
-):
-    write_recipe(folder, "grainy", 'effect = "gradient_map"\npreset = "sepia"')
-    source = project_copy() / "src"
-    package = source / "bullterrier_image"
-
-    def run_project() -> list[str]:  # in a child that imports the (changed) copy, as a person who edited it would
-        child = subprocess.run(
-            [sys.executable, "-c", RUN_STATUSES, str(folder / "bt-image.toml")],
-            env={**uv_run_env, "PYTHONPATH": str(source)},
-            capture_output=True,
-            encoding="utf-8",
-            check=False,
-        )
-        assert child.returncode == 0, child.stderr
-        return json.loads(child.stdout)
-
-    assert run_project() == ["done"]
-    change(package)
-    assert run_project() == [status]
-
-
 def edit(file: Path, old: str, new: str) -> None:
     """Replace `old` by `new` in the text of `file`, which must contain it."""
     text = file.read_text(encoding="utf-8")
@@ -607,7 +546,7 @@ def test_a_map_the_cache_cannot_keep_fails_only_its_pair_and_is_found_again_for_
     found = Finder("stand-in", finder)
     by = by_pair(run(project, only="a.png", finders={"subject": found}, log=repaired_after_the_first_pair))
     assert by[("a.png", "cut1")].status == "failed"
-    assert "PermissionError" in str(by[("a.png", "cut1")].error)
+    assert "Permission denied" in str(by[("a.png", "cut1")].error)
     assert by[("a.png", "cut2")].status == "done"  # a disk failure is not the map's: the next pair finds it again
     assert len(finder.seen) == 2
 

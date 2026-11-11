@@ -24,6 +24,7 @@ __all__ = [
     "known_maps",
     "needs",
     "params",
+    "project_maps",
     "read",
     "read_map",
     "read_project",
@@ -32,6 +33,7 @@ __all__ = [
     "region_presets",
     "register",
     "render",
+    "run_project",
     "shipped_looks",
     "shipped_presets",
     "subject_finder_identity",
@@ -119,6 +121,19 @@ def subject_finder_identity(
 def depth_finder_identity(*, model_file: str | os.PathLike[str] | None = None) -> str: ...
 def read_project(path: str | os.PathLike[str]) -> dict[str, Any]: ...
 def check_project(given: Mapping[str, Any]) -> dict[str, Any]: ...
+def project_maps(given: Mapping[str, Any]) -> list[str]: ...
+def run_project(
+    given: Mapping[str, Any],
+    finders: Mapping[str, tuple[str, Any]],
+    *,
+    pictures: Mapping[str, np.ndarray] | None = None,
+    luts: Mapping[str, Lut] | None = None,
+    force: bool = False,
+    dry_run: bool = False,
+    only: str | None = None,
+    generated: str = "",
+    log: Callable[[str], None] | None = None,
+) -> list[dict[str, Any]]: ...
 def contact_sheet(tiles: Sequence[tuple[str, np.ndarray]], columns: int, tile: int) -> np.ndarray: ...
 def refine_edge(matte: np.ndarray, shrink: float, feather: float) -> np.ndarray: ...
 def region_presets(kind: str) -> dict[str, dict[str, Any]]: ...

@@ -117,9 +117,3 @@ class Framing(EffectParams):
         """The framing of `values` (field name -> value, all optional); RecipeError naming each bad field, the
         constraint and the value, and listing the fields when an unknown one is given."""
         self._init_checked("", **values)
-
-    @property
-    def has_alpha(self) -> bool:
-        """True when the framing cuts the picture out after the last step, giving it an alpha channel (so a render
-        of its recipe is RGBA, for a PNG or WebP, not a JPEG)."""
-        return self.transparent != "none"

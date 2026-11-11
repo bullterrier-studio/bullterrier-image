@@ -50,7 +50,7 @@ mod _core {
     use super::lut::PyLut;
 
     #[pymodule_export]
-    use super::pipeline::{check_project, read_project};
+    use super::pipeline::{check_project, project_maps, read_project, run_project};
 
     #[pymodule_export]
     use super::sheet::contact_sheet;
@@ -542,7 +542,7 @@ fn labels_of(partition: &Bound<'_, PyAny>) -> PyResult<Labels> {
 }
 
 /// The picture of every `(name, array)` in `pictures`: float32 `(height, width, 4)` arrays of straight-alpha RGBA.
-fn pictures_of(pictures: Option<&Bound<'_, PyDict>>) -> PyResult<Vec<(String, Image)>> {
+pub(crate) fn pictures_of(pictures: Option<&Bound<'_, PyDict>>) -> PyResult<Vec<(String, Image)>> {
     pictures
         .into_iter()
         .flatten()
