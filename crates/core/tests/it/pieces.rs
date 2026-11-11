@@ -3,6 +3,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
+use bullterrier_image::params::Table;
 use bullterrier_image::region::{Bands, Given, Grid, Pick, Shares, Subject, Svg};
 use bullterrier_image::{
     Category, Effect, Error, ErrorKind, FieldParam, Finder, Image, Input, Inputs, Layer, Options, Photo, Picture,
@@ -69,6 +70,10 @@ impl Effect for Spy {
 
     fn fields(&self) -> &[FieldParam] {
         &self.fields
+    }
+
+    fn params(&self) -> Table {
+        crate::common::run::table_of_fields(&self.fields)
     }
 
     fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {

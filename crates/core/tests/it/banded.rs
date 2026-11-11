@@ -162,13 +162,9 @@ fn band_matrix(bands: &[usize], sized_bands: &[usize]) -> Outcome {
         let table = one.params();
         let partitioned = one.inputs().contains(&Input::Partition);
         let mut is_banded = false;
-        for setting in table.as_ref().map_or_else(|| vec![Setting::new()], variants) {
-            let completed = match &table {
-                Some(table) => match table.check(&name, &setting) {
-                    Ok(completed) => completed,
-                    Err(_) => continue, // a combination the effect refuses
-                },
-                None => setting.clone(),
+        for setting in variants(&table) {
+            let Ok(completed) = table.check(&name, &setting) else {
+                continue; // a combination the effect refuses
             };
             // whether an effect is Whole does not depend on the picture's scale
             if one.footprint(&Value::Object(completed))?.margin().is_none() {
@@ -283,7 +279,7 @@ fn px_sweep(sides: &[usize]) -> Outcome {
     let mut cases = 0;
     for name in effects() {
         let one = effect(&name)?;
-        let Some(table) = one.params() else { continue };
+        let table = one.params();
         let partitioned = one.inputs().contains(&Input::Partition);
         for setting in variants(&table).iter().filter(|setting| in_px(&table, setting)) {
             let Ok(completed) = table.check(&name, setting) else {

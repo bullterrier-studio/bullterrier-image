@@ -101,10 +101,6 @@ fn good() -> Vec<(&'static str, Recipe)> {
             "a built-in selection as a step's partition",
             Recipe::new([bordered(Some("subject"))]),
         ),
-        (
-            "an effect with no table keeps its parameters as given",
-            Recipe::new([bordered(Some("subject")).param("anything", json!([1, "two"]))]),
-        ),
         ("an each step over a declared region", with_regions(Recipe::new([each]))),
         (
             "an each step with hard borders",
@@ -413,14 +409,14 @@ fn a_field_parameter_names_a_region_by_its_value_or_its_default_and_must_name_on
             declared(),
             Some("'nowhere'"),
         ),
-        (Step::new("fielded").param("near", 3), declared(), Some("names a field")),
+        (Step::new("fielded").param("near", 3), declared(), Some("`near`")),
     ];
     for (step, regions, said) in rows {
         let result = recipe(step, regions).checked(&Presets::new());
         match said {
             None => assert!(result.is_ok(), "{result:?}"),
             Some(said) => assert!(
-                matches!(&result, Err(error @ Error::Recipe(_)) if error.to_string().contains(said)
+                matches!(&result, Err(error @ (Error::Recipe(_) | Error::Invalid { .. })) if error.to_string().contains(said)
                     && error.to_string().contains("step 1")),
                 "{said}: {result:?}"
             ),

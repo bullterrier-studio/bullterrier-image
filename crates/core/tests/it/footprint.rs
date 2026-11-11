@@ -59,7 +59,7 @@ fn rows(values: &[f32], channels: usize, from: usize, to: usize) -> &[f32] {
 /// `effect` run on rows `from..to` of the picture and of its map, with the parameters `params`, at `ratio`.
 fn run(
     one: &dyn Effect,
-    table: Option<&Table>,
+    table: &Table,
     params: &Setting,
     ratio: f64,
     (from, to): (usize, usize),
@@ -80,22 +80,14 @@ fn run(
     let mut inputs = Inputs::default()
         .with_size_ratio(ratio)
         .with_place(Place::new(HEIGHT, WIDTH, from));
-    for field in table
-        .iter()
-        .flat_map(|table| &table.fields)
-        .filter(|field| field.kind == Kind::Field)
-    {
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Field) {
         inputs = inputs.with_field(field.name, &cropped);
     }
     if one.inputs().contains(&Input::Partition) {
         inputs = inputs.with_partition(&pieces);
     }
     let asset = asset();
-    for field in table
-        .iter()
-        .flat_map(|table| &table.fields)
-        .filter(|field| field.kind == Kind::Picture)
-    {
+    for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
         if params[field.name].is_string() {
             inputs = inputs.with_image(field.name, &asset);
         }
@@ -107,12 +99,8 @@ fn run(
 /// The ways `one` says less than `Whole` and is wrong, with `params` as written; none if it is `Whole`.
 fn problems_of(one: &dyn Effect, given: &Setting, picture: &[f32], map: &Layer) -> Result<Vec<String>, Box<dyn Error>> {
     let table = one.params();
-    let completed = match &table {
-        Some(table) => match table.check(one.name(), given) {
-            Ok(completed) => completed,
-            Err(_) => return Ok(Vec::new()), // a combination the effect refuses
-        },
-        None => given.clone(),
+    let Ok(completed) = table.check(one.name(), given) else {
+        return Ok(Vec::new()); // a combination the effect refuses
     };
     // the footprint is asked about what the render is given
     let params = completed;
@@ -120,11 +108,11 @@ fn problems_of(one: &dyn Effect, given: &Setting, picture: &[f32], map: &Layer) 
     let Some(margin) = footprint.margin() else {
         return Ok(Vec::new());
     };
-    let whole = run(one, table.as_ref(), &params, RATIO, (0, HEIGHT), (picture, map))?.into_values();
+    let whole = run(one, &table, &params, RATIO, (0, HEIGHT), (picture, map))?.into_values();
     let mut problems = Vec::new();
     for first in BANDS {
         let (from, to) = (first.saturating_sub(margin), (first + BAND + margin).min(HEIGHT));
-        let band = run(one, table.as_ref(), &params, RATIO, (from, to), (picture, map))?.into_values();
+        let band = run(one, &table, &params, RATIO, (from, to), (picture, map))?.into_values();
         let own = rows(&band, 3, first - from, first - from + BAND);
         if let Some(at) = first_difference_within(own, rows(&whole, 3, first, first + BAND), SAME) {
             problems.push(format!(
@@ -165,7 +153,7 @@ fn problems(one: &dyn Effect) -> Result<Vec<String>, Box<dyn Error>> {
         rectangle(4..HEIGHT - 4)?,
     ];
     let table = one.params();
-    let cases = table.as_ref().map_or_else(|| vec![Setting::new()], variants);
+    let cases = variants(&table);
     let mut found = Vec::new();
     for map in &maps {
         for case in &cases {
@@ -183,13 +171,8 @@ fn every_effect_that_says_it_reads_less_than_the_whole_picture_gives_the_same_ro
     for name in effects() {
         let one = effect(&name)?;
         found.extend(problems(&*one)?);
-        let defaults = one
-            .params()
-            .map(|table| table.check(&name, &Setting::new()))
-            .transpose()?;
-        if let Some(defaults) = defaults
-            && one.footprint(&Value::Object(defaults))? != Footprint::Whole
-        {
+        let defaults = one.params().check(&name, &Setting::new())?;
+        if one.footprint(&Value::Object(defaults))? != Footprint::Whole {
             not_whole += 1;
         }
     }
@@ -418,7 +401,7 @@ impl Effect for Claim {
         self.inner.fields()
     }
 
-    fn params(&self) -> Option<Table> {
+    fn params(&self) -> Table {
         self.inner.params()
     }
 

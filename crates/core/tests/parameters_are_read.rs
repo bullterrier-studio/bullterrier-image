@@ -1106,9 +1106,10 @@ fn changes(
 /// What is wrong with the effect's parameters, one sentence each: a parameter nothing reads, or a row of `rows` that
 /// is not needed or does not help.
 fn problems(effect: &dyn Effect, rows: &[Conditional]) -> Result<Vec<String>, Box<dyn Error>> {
-    let Some(table) = effect.params() else {
+    let table = effect.params();
+    if table.fields.is_empty() {
         return Ok(Vec::new());
-    };
+    }
     let mut problems = Vec::new();
     for field in &table.fields {
         let name = format!("{}.{}", effect.name(), field.name);
@@ -1146,7 +1147,9 @@ fn problems(effect: &dyn Effect, rows: &[Conditional]) -> Result<Vec<String>, Bo
 fn names_a_parameter(row: &Conditional) -> Result<bool, Box<dyn Error>> {
     Ok(effect(row.effect)?
         .params()
-        .is_some_and(|table| table.fields.iter().any(|field| field.name == row.field)))
+        .fields
+        .iter()
+        .any(|field| field.name == row.field))
 }
 
 /// A foreign effect that brightens by `gain` and declares `ignored`, which it never reads: the known-bad case.
@@ -1161,7 +1164,7 @@ impl Effect for Brighten {
         Category::Utilities
     }
 
-    fn params(&self) -> Option<Table> {
+    fn params(&self) -> Table {
         let float = |name, default| Field {
             name,
             kind: Kind::Float,
@@ -1180,10 +1183,10 @@ impl Effect for Brighten {
             drivable: false,
             advanced: false,
         };
-        Some(Table {
+        Table {
             doc: "The parameters of brighten.",
             fields: vec![float("gain", 1.0), float("ignored", 0.5)],
-        })
+        }
     }
 
     fn apply(
@@ -1219,7 +1222,7 @@ impl Effect for Follow {
         FIELDS.get_or_init(|| [FieldParam::new("follow", "depth")])
     }
 
-    fn params(&self) -> Option<Table> {
+    fn params(&self) -> Table {
         let base = Field {
             name: "follow",
             kind: Kind::Field,
@@ -1246,10 +1249,10 @@ impl Effect for Follow {
             nullable: true,
             ..base.clone()
         };
-        Some(Table {
+        Table {
             doc: "The parameters of follow.",
             fields: vec![base, tint],
-        })
+        }
     }
 
     fn apply(
@@ -1303,7 +1306,7 @@ fn every_parameter_of_every_effect_of_the_core_is_read() -> Outcome {
     let mut walked = 0;
     for name in &names {
         let effect = effect(name)?;
-        if effect.params().is_some() {
+        if !effect.params().fields.is_empty() {
             walked += 1;
         }
         let problems = problems(&*effect, &rows)?;

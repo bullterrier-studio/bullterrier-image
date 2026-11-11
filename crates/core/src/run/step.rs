@@ -155,17 +155,13 @@ pub(super) struct StepRun {
 fn complete(
     effect: &dyn Effect,
     name: &str,
-    given: Map<String, Value>,
+    given: &Map<String, Value>,
     ratio: f64,
     place: &str,
 ) -> Result<Value, Error> {
-    Ok(match effect.params() {
-        Some(table) => {
-            let design = table.check(name, &given).map_err(|error| error.at(place))?;
-            Value::Object(table.scaled(design, ratio))
-        }
-        None => Value::Object(given),
-    })
+    let table = effect.params();
+    let design = table.check(name, given).map_err(|error| error.at(place))?;
+    Ok(Value::Object(table.scaled(design, ratio)))
 }
 
 /// The table each lookup table parameter of `effect` names in `runs` (the parameters are the same at every level of a
@@ -179,9 +175,7 @@ fn tables(
     assets: &mut Assets<'_>,
     place: &str,
 ) -> Result<Vec<(String, Arc<Lut>)>, Error> {
-    let Some(table) = effect.params() else {
-        return Ok(Vec::new());
-    };
+    let table = effect.params();
     let params = match runs {
         Runs::One { scaled: params } => params,
         Runs::Driven { levels, .. } => &levels[0],
@@ -210,9 +204,7 @@ fn pictures(
     assets: &mut Assets<'_>,
     place: &str,
 ) -> Result<Vec<(String, Arc<Image>)>, Error> {
-    let Some(table) = effect.params() else {
-        return Ok(Vec::new());
-    };
+    let table = effect.params();
     let params = match runs {
         Runs::One { scaled: params } => params,
         Runs::Driven { levels, .. } => &levels[0],
@@ -260,7 +252,7 @@ impl StepRun {
                     for (name, drive) in &drives {
                         values.insert(name.clone(), Value::from(drive.value(level)));
                     }
-                    complete(&*effect, &step.effect, values, ratio, place)
+                    complete(&*effect, &step.effect, &values, ratio, place)
                 })
                 .collect::<Result<_, _>>()?;
             Runs::Driven {
@@ -270,7 +262,7 @@ impl StepRun {
             }
         } else {
             Runs::One {
-                scaled: complete(&*effect, &step.effect, given, ratio, place)?,
+                scaled: complete(&*effect, &step.effect, &given, ratio, place)?,
             }
         };
         let luts = tables(&*effect, &runs, assets, place)?;

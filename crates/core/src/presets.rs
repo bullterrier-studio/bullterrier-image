@@ -77,7 +77,7 @@ impl Presets {
                 "the presets of '{effect}' are a table with one table for each preset, got {table}"
             )));
         };
-        let described = registry.effect(effect).ok().and_then(|found| found.params());
+        let described = registry.effect(effect).ok().map(|found| found.params());
         let mut presets = Vec::new();
         for (name, preset) in written {
             let owner = format!("preset '{name}' of '{effect}'");

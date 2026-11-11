@@ -2,17 +2,13 @@
 //! are worked out by hand from the recipe and the ranges the effects, regions and frame document.
 
 use bullterrier_image::region::{Band, Bands, LinearGradient, RadialGradient, Shards, Subject, Svg};
-use bullterrier_image::{Declared, Drive, Each, Entry, Error, Foreign, Frame, Home, Presets, Recipe, Region, Step};
+use bullterrier_image::{Drive, Each, Entry, Error, Frame, Home, Presets, Recipe, Region, Step};
 use serde_json::{Value, json};
 
 use crate::common::Outcome;
 
 fn addresses(recipe: &Recipe) -> Result<Vec<String>, Error> {
-    Ok(recipe
-        .numbers(&Foreign::new())?
-        .into_iter()
-        .map(|number| number.address)
-        .collect())
+    Ok(recipe.numbers()?.into_iter().map(|number| number.address).collect())
 }
 
 fn json(recipe: &Recipe) -> Result<Value, serde_json::Error> {
@@ -42,7 +38,7 @@ fn a_step_has_the_numbers_its_effect_declares_then_its_opacity() -> Outcome {
         found.contains(&"frame.angle".to_owned()),
         "the frame's numbers end the list: {found:?}"
     );
-    let exposure = pulse().number("grade.exposure", &Foreign::new())?;
+    let exposure = pulse().number("grade.exposure")?;
     assert!(
         !exposure.whole && !exposure.cyclic && exposure.min < 0.0 && exposure.max > 0.0,
         "{exposure:?}"
@@ -63,19 +59,19 @@ fn a_step_is_addressed_by_its_name_its_effect_or_the_effect_and_its_number() -> 
         found.iter().any(|address| address.starts_with("pixel_grid.")),
         "{found:?}"
     );
-    let changed = two.with_value("grade#2.exposure", 0.9, &Presets::new(), &Foreign::new())?;
+    let changed = two.with_value("grade#2.exposure", 0.9, &Presets::new())?;
     assert_eq!(json(&changed)?["steps"][1]["params"]["exposure"], json!(0.9));
     assert_eq!(
         json(&changed)?["steps"][0]["params"]["exposure"],
         json!(0.1),
         "the other step is left"
     );
-    let ambiguous = refused(two.with_value("grade.exposure", 0.5, &Presets::new(), &Foreign::new()));
+    let ambiguous = refused(two.with_value("grade.exposure", 0.5, &Presets::new()));
     assert!(
         ambiguous.contains("2 'grade' steps") && ambiguous.contains("grade#1.exposure, grade#2.exposure"),
         "{ambiguous}"
     );
-    let beyond = refused(two.with_value("grade#3.exposure", 0.5, &Presets::new(), &Foreign::new()));
+    let beyond = refused(two.with_value("grade#3.exposure", 0.5, &Presets::new()));
     assert!(beyond.contains("no step 'grade#3'"), "{beyond}");
     let (mut first, mut second) = (
         Step::new("grade").param("exposure", 0.1),
@@ -83,7 +79,7 @@ fn a_step_is_addressed_by_its_name_its_effect_or_the_effect_and_its_number() -> 
     );
     (first.name, second.name) = (Some("one".to_owned()), Some("two".to_owned()));
     let both = Recipe::new([first, second]);
-    let second_one = both.with_value("grade#2.exposure", 0.8, &Presets::new(), &Foreign::new())?;
+    let second_one = both.with_value("grade#2.exposure", 0.8, &Presets::new())?;
     assert_eq!(
         json(&second_one)?["steps"][1]["params"]["exposure"],
         json!(0.8),
@@ -95,7 +91,7 @@ fn a_step_is_addressed_by_its_name_its_effect_or_the_effect_and_its_number() -> 
     let by_name = Recipe::new([named]);
     assert!(addresses(&by_name)?.contains(&"pulse.exposure".to_owned()));
     assert_eq!(
-        by_name.number("grade.exposure", &Foreign::new())?.address,
+        by_name.number("grade.exposure")?.address,
         "pulse.exposure",
         "the only step of its effect, though named"
     );
@@ -105,7 +101,7 @@ fn a_step_is_addressed_by_its_name_its_effect_or_the_effect_and_its_number() -> 
 #[test]
 fn a_value_is_set_in_a_copy_and_a_whole_number_takes_only_a_whole_value() -> Outcome {
     let original = pulse();
-    let changed = original.with_value("grade.exposure", -1.5, &Presets::new(), &Foreign::new())?;
+    let changed = original.with_value("grade.exposure", -1.5, &Presets::new())?;
     assert_eq!(json(&changed)?["steps"][0]["params"]["exposure"], json!(-1.5));
     assert_eq!(
         json(&original)?["steps"][0]["params"]["exposure"],
@@ -113,13 +109,13 @@ fn a_value_is_set_in_a_copy_and_a_whole_number_takes_only_a_whole_value() -> Out
         "the original is left as it is"
     );
     let whole = Recipe::new([Step::new("slice_shift")]);
-    let bands = whole.number("slice_shift.bands", &Foreign::new())?;
+    let bands = whole.number("slice_shift.bands")?;
     assert!(bands.whole, "{bands:?}");
     assert_eq!(
-        json(&whole.with_value("slice_shift.bands", 6.0, &Presets::new(), &Foreign::new())?)?["steps"][0]["params"]["bands"],
+        json(&whole.with_value("slice_shift.bands", 6.0, &Presets::new())?)?["steps"][0]["params"]["bands"],
         json!(6)
     );
-    let fractional = refused(whole.with_value("slice_shift.bands", 6.5, &Presets::new(), &Foreign::new()));
+    let fractional = refused(whole.with_value("slice_shift.bands", 6.5, &Presets::new()));
     assert!(
         fractional.contains("whole number") && fractional.contains("slice_shift.bands"),
         "{fractional}"
@@ -130,13 +126,13 @@ fn a_value_is_set_in_a_copy_and_a_whole_number_takes_only_a_whole_value() -> Out
 #[test]
 fn a_value_out_of_its_range_or_not_a_number_is_refused_naming_the_address() {
     for (value, says) in [(99.0, "exposure"), (f64::NAN, "finite"), (f64::INFINITY, "finite")] {
-        let said = refused(pulse().with_value("grade.exposure", value, &Presets::new(), &Foreign::new()));
+        let said = refused(pulse().with_value("grade.exposure", value, &Presets::new()));
         assert!(
             said.contains("'grade.exposure'") && said.contains(says),
             "{value}: {said}"
         );
     }
-    let opacity = refused(pulse().with_value("grade.opacity", 1.5, &Presets::new(), &Foreign::new()));
+    let opacity = refused(pulse().with_value("grade.opacity", 1.5, &Presets::new()));
     assert!(
         opacity.contains("'grade.opacity'") && opacity.contains("opacity"),
         "{opacity}"
@@ -151,19 +147,17 @@ fn a_drive_is_set_through_its_start_end_and_levels() -> Outcome {
         assert!(found.contains(&format!("grade.exposure.{part}")), "{found:?}");
     }
     assert!(!found.contains(&"grade.exposure".to_owned()));
-    let end = drive.with_value("grade.exposure.end", 2.0, &Presets::new(), &Foreign::new())?;
+    let end = drive.with_value("grade.exposure.end", 2.0, &Presets::new())?;
     assert_eq!(json(&end)?["steps"][0]["params"]["exposure"]["end"], json!(2.0));
-    let levels = drive.with_value("grade.exposure.levels", 8.0, &Presets::new(), &Foreign::new())?;
+    let levels = drive.with_value("grade.exposure.levels", 8.0, &Presets::new())?;
     assert_eq!(json(&levels)?["steps"][0]["params"]["exposure"]["levels"], json!(8));
-    assert!(
-        refused(drive.with_value("grade.exposure.levels", 40.0, &Presets::new(), &Foreign::new())).contains("levels")
-    );
-    let alone = refused(drive.with_value("grade.exposure", 1.0, &Presets::new(), &Foreign::new()));
+    assert!(refused(drive.with_value("grade.exposure.levels", 40.0, &Presets::new())).contains("levels"));
+    let alone = refused(drive.with_value("grade.exposure", 1.0, &Presets::new()));
     assert!(
         alone.contains("is driven by a field: set exposure.start, exposure.end or exposure.levels"),
         "{alone}"
     );
-    let undriven = refused(pulse().with_value("grade.exposure.start", 1.0, &Presets::new(), &Foreign::new()));
+    let undriven = refused(pulse().with_value("grade.exposure.start", 1.0, &Presets::new()));
     assert!(
         undriven.contains("is not driven by a field, so it has no 'start'"),
         "{undriven}"
@@ -192,14 +186,14 @@ fn an_each_step_has_its_feather_opacity_seed_and_the_numbers_of_its_looks() -> O
         found.iter().all(|address| !address.contains("looks[1]")),
         "a look that is none has no numbers"
     );
-    let changed = recipe.with_value("each.looks[0].exposure", 0.7, &Presets::new(), &Foreign::new())?;
+    let changed = recipe.with_value("each.looks[0].exposure", 0.7, &Presets::new())?;
     assert_eq!(
         json(&changed)?["steps"][0]["looks"][0]["params"]["exposure"],
         json!(0.7)
     );
-    let feather = recipe.with_value("each.feather", 3.0, &Presets::new(), &Foreign::new())?;
+    let feather = recipe.with_value("each.feather", 3.0, &Presets::new())?;
     assert_eq!(json(&feather)?["steps"][0]["feather"], json!(3.0));
-    assert!(recipe.number("each.seed", &Foreign::new())?.whole);
+    assert!(recipe.number("each.seed")?.whole);
     Ok(())
 }
 
@@ -214,25 +208,22 @@ fn the_numbers_of_a_region_and_of_the_frame_are_addressed_by_their_names() -> Ou
             ..Band::default()
         },
     );
-    assert_eq!(
-        recipe.number("region.near.low", &Foreign::new())?.address,
-        "region.near.low"
-    );
-    let moved = recipe.with_value("region.near.low", 0.4, &Presets::new(), &Foreign::new())?;
+    assert_eq!(recipe.number("region.near.low")?.address, "region.near.low");
+    let moved = recipe.with_value("region.near.low", 0.4, &Presets::new())?;
     assert_eq!(json(&moved)?["regions"]["near"]["low"], json!(0.4));
-    let turned = recipe.with_value("frame.angle", 400.0, &Presets::new(), &Foreign::new())?;
+    let turned = recipe.with_value("frame.angle", 400.0, &Presets::new())?;
     assert_eq!(
         json(&turned)?["frame"]["angle"],
         json!(400.0),
         "a cyclic angle takes any value"
     );
-    assert!(recipe.number("frame.angle", &Foreign::new())?.cyclic);
-    let above = refused(recipe.with_value("region.near.low", 0.9, &Presets::new(), &Foreign::new()));
+    assert!(recipe.number("frame.angle")?.cyclic);
+    let above = refused(recipe.with_value("region.near.low", 0.9, &Presets::new()));
     assert!(
         above.contains("'region.near.low'") && above.contains("`low`"),
         "{above}"
     );
-    let tall = refused(recipe.with_value("frame.margin", 3.0, &Presets::new(), &Foreign::new()));
+    let tall = refused(recipe.with_value("frame.margin", 3.0, &Presets::new()));
     assert!(tall.contains("'frame.margin'") && tall.contains("margin"), "{tall}");
     Ok(())
 }
@@ -256,7 +247,7 @@ fn an_address_that_points_at_nothing_names_what_there_is_and_the_nearest() {
         ("frame.nothing", "'frame' has no number 'nothing'"),
     ];
     for (address, says) in cases {
-        let said = refused(recipe.with_value(address, 0.5, &Presets::new(), &Foreign::new()));
+        let said = refused(recipe.with_value(address, 0.5, &Presets::new()));
         assert!(said.starts_with(&format!("'{address}': ")), "{address}: {said}");
         assert!(said.contains(says), "{address}: expected {says:?} in {said}");
     }
@@ -339,13 +330,13 @@ fn a_rows_range_is_the_range_the_check_holds_the_number_to() -> Outcome {
         .with_region("g", LinearGradient::default())
         .with_region("d", RadialGradient::default());
     let presets = Presets::new();
-    for number in recipe.numbers(&Foreign::new())? {
+    for number in recipe.numbers()? {
         if !(number.address.starts_with("region.") || number.address.starts_with("frame.")) || number.cyclic {
             continue;
         }
         let (low, high) = (number.min, number.max);
         for edge in [low, high] {
-            let said = recipe.with_value(&number.address, edge, &presets, &Foreign::new());
+            let said = recipe.with_value(&number.address, edge, &presets);
             // `band.low` and `band.high` bound each other: the edge of one is refused by the other's current value
             let ordered = matches!(number.address.rsplit('.').next(), Some("low" | "high"));
             assert!(
@@ -356,7 +347,7 @@ fn a_rows_range_is_the_range_the_check_holds_the_number_to() -> Outcome {
         }
         let step = if number.whole { 1.0 } else { 0.001 };
         for beyond in [low - step, high + step] {
-            let said = refused(recipe.with_value(&number.address, beyond, &presets, &Foreign::new()));
+            let said = refused(recipe.with_value(&number.address, beyond, &presets));
             assert!(
                 said.contains(&format!("'{}'", number.address)),
                 "{} at {beyond} is accepted",
@@ -383,7 +374,7 @@ fn a_number_says_its_value_now_its_unit_and_what_it_does() -> Outcome {
             ..Band::default()
         },
     );
-    let value = |address: &str| recipe.number(address, &Foreign::new()).map(|number| number.value);
+    let value = |address: &str| recipe.number(address).map(|number| number.value);
     assert_eq!(value("grade.exposure")?, Some(0.3), "written");
     assert_eq!(
         value("grade.contrast")?,
@@ -405,20 +396,17 @@ fn a_number_says_its_value_now_its_unit_and_what_it_does() -> Outcome {
         None,
         "an optional number the recipe leaves unset"
     );
-    let exposure = recipe.number("grade.exposure", &Foreign::new())?;
+    let exposure = recipe.number("grade.exposure")?;
     assert_eq!(exposure.unit, "stops");
     assert!(
         exposure.doc.starts_with("Brightness in photographic stops"),
         "{}",
         exposure.doc
     );
-    assert_eq!(recipe.number("region.near.low", &Foreign::new())?.unit, "fraction");
-    assert_eq!(recipe.number("frame.angle", &Foreign::new())?.unit, "degrees");
-    assert!(recipe.number("frame.angle", &Foreign::new())?.doc.len() > 20);
-    assert_eq!(
-        recipe.number("gaussian_blur.radius.levels", &Foreign::new())?.unit,
-        "count"
-    );
+    assert_eq!(recipe.number("region.near.low")?.unit, "fraction");
+    assert_eq!(recipe.number("frame.angle")?.unit, "degrees");
+    assert!(recipe.number("frame.angle")?.doc.len() > 20);
+    assert_eq!(recipe.number("gaussian_blur.radius.levels")?.unit, "count");
     Ok(())
 }
 
@@ -431,46 +419,16 @@ fn an_address_is_located_in_a_step_a_region_or_the_frame_with_the_rest_of_it() -
             ..Band::default()
         },
     );
-    let found = recipe.locate("pixel_grid.opacity", &Foreign::new())?;
+    let found = recipe.locate("pixel_grid.opacity")?;
     assert_eq!((found.place, found.rest.as_str()), (Home::Step(1), "opacity"));
-    let found = recipe.locate("region.near.high", &Foreign::new())?;
+    let found = recipe.locate("region.near.high")?;
     assert_eq!(
         (found.place, found.rest.as_str()),
         (Home::Region("near".to_owned()), "high")
     );
-    let found = recipe.locate("frame.margin", &Foreign::new())?;
+    let found = recipe.locate("frame.margin")?;
     assert_eq!((found.place, found.rest.as_str()), (Home::Frame, "margin"));
     assert_eq!(found.number.address, "frame.margin");
-    Ok(())
-}
-
-#[test]
-fn the_numbers_of_an_effect_the_core_does_not_run_are_the_ones_its_owner_declares() -> Outcome {
-    let recipe = Recipe::new([Step::new("grade"), Step::new("written_elsewhere").param("gain", 0.5)]);
-    let mut foreign = Foreign::new();
-    foreign.insert(
-        "written_elsewhere".to_owned(),
-        vec![Declared {
-            name: "gain".to_owned(),
-            unit: "ratio".to_owned(),
-            doc: "How much.".to_owned(),
-            min: 0.0,
-            max: 4.0,
-            whole: false,
-            cyclic: false,
-            default: Some(2.0),
-        }],
-    );
-    // the core cannot register an effect from here: the recipe is read, not checked, so the numbers are what is declared
-    let found = recipe.number("written_elsewhere.gain", &foreign)?;
-    assert_eq!(
-        (found.value, found.unit.as_str(), found.doc.as_str(), found.max),
-        (Some(0.5), "ratio", "How much.", 4.0)
-    );
-    assert!(
-        recipe.number("written_elsewhere.gain", &Foreign::new()).is_err(),
-        "without the declaration it has no such number"
-    );
     Ok(())
 }
 
@@ -660,7 +618,7 @@ fn every_direction_rotation_and_length_of_a_region_or_the_frame_keeps_the_conven
         recipe = recipe.with_region(name, region);
     }
     let numbers: Vec<Item> = recipe
-        .numbers(&Foreign::new())?
+        .numbers()?
         .into_iter()
         .filter(|number| number.address.starts_with("region.") || number.address.starts_with("frame."))
         .map(|number| Item {

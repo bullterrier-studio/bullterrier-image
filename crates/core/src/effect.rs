@@ -185,12 +185,10 @@ pub trait Effect: Send + Sync {
         &[]
     }
 
-    /// Its parameters, described; none when the effect's owner describes and validates them itself. A render checks,
-    /// completes and scales the values of a described effect (`px` and `density` fields, to the picture's size); an
-    /// effect with none receives them as the step wrote them, in design pixels, and scales them itself by the
-    /// [`Input::SizeRatio`] it declares.
-    fn params(&self) -> Option<Table> {
-        None
+    /// Its parameters, described. A render checks, completes and scales the values of an effect (`px` and `density`
+    /// fields, to the picture's size); an effect with no parameters describes none, which is the default.
+    fn params(&self) -> Table {
+        Table::none()
     }
 
     /// What it reads around a pixel when run with `params`: `Footprint::Whole` unless the effect says it is
@@ -318,8 +316,8 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
         &self.fields
     }
 
-    fn params(&self) -> Option<Table> {
-        Some(P::table())
+    fn params(&self) -> Table {
+        P::table()
     }
 
     fn footprint(&self, params: &Value) -> Result<Footprint, Error> {

@@ -78,16 +78,14 @@ fn a_preset_of_an_effect_the_core_describes_is_checked_by_its_table() {
 }
 
 #[test]
-fn a_preset_of_an_effect_with_no_table_or_not_known_is_kept_as_given() -> Outcome {
+fn a_preset_of_an_effect_not_known_yet_is_kept_as_given() -> Outcome {
     let table = json!({"p": {"description": "D.", "anything": [1, "two"]}});
-    for effect in ["bordered", "not_registered_yet"] {
-        let presets = added(effect, &table)?;
-        assert_eq!(
-            presets.get(effect, "p").map(|preset| preset.params.clone()),
-            Some(params(&json!({"anything": [1, "two"]}))),
-            "{effect}"
-        );
-    }
+    let effect = "not_registered_yet";
+    let presets = added(effect, &table)?;
+    assert_eq!(
+        presets.get(effect, "p").map(|preset| preset.params.clone()),
+        Some(params(&json!({"anything": [1, "two"]}))),
+    );
     Ok(())
 }
 

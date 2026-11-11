@@ -173,7 +173,7 @@ fn file_digests(recipe: &Recipe) -> Result<Vec<String>, Error> {
         else {
             continue;
         };
-        let Some(table) = effect.params() else { continue };
+        let table = effect.params();
         for field in table
             .fields
             .iter()

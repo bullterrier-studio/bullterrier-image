@@ -48,7 +48,10 @@ fn every_invalid_fixture_of_the_format_is_refused() -> Result<(), Box<dyn std::e
 fn the_table_of_every_effect_the_core_declares_is_read_back_as_it_was() -> Result<(), Box<dyn std::error::Error>> {
     let mut seen = 0;
     for name in effects() {
-        let Some(table) = effect(&name)?.params() else { continue };
+        let table = effect(&name)?.params();
+        if table.fields.is_empty() {
+            continue;
+        }
         let written = serde_json::to_value(&table)?;
         let read = Table::from_json(&written).map_err(|error| format!("{name}: {error}"))?;
         assert_eq!(read, table, "{name}");

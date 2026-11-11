@@ -56,21 +56,16 @@ fn entry(name: &str, text: &str) -> String {
     fill(&words, columns.clamp(low, high), "  ", "    ")
 }
 
-/// The one-line entry of the effect `name`: its summary and presets; an effect registered from Python has no table the
-/// core could summarise.
+/// The one-line entry of the effect `name`: its summary and presets.
 fn short(name: &str, presets: &Presets) -> String {
-    match summary(name) {
-        Ok(text) => {
-            let found = presets.names(name);
-            let listed = if found.is_empty() {
-                String::new()
-            } else {
-                format!(" (presets: {})", found.join(", "))
-            };
-            entry(name, &format!("{text}{listed}"))
-        }
-        Err(_) => entry(name, "registered from Python: see help(fx.NAME)"),
-    }
+    let text = summary(name).unwrap_or_default();
+    let found = presets.names(name);
+    let listed = if found.is_empty() {
+        String::new()
+    } else {
+        format!(" (presets: {})", found.join(", "))
+    };
+    entry(name, &format!("{text}{listed}"))
 }
 
 pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Error> {
@@ -105,13 +100,6 @@ pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Err
         return Ok(0);
     }
     if let Some(name) = &args.name {
-        if effect(name).is_ok_and(|found| found.params().is_none()) {
-            // written in Python: the core has no parameter table to document
-            console.result(&format!(
-                "{name}\n    registered from Python: help(fx.{name}) documents it"
-            ))?;
-            return Ok(0);
-        }
         let text = documentation(name, &presets, true).map_err(|error| dress(error, name, &presets))?;
         console.result(&format!("{name}\n{}", indented(&text, "    ")))?;
         return Ok(0);

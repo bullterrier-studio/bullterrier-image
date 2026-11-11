@@ -11,7 +11,7 @@ effect the core declares (`registry._register_core_effects`) with a function tha
 values)`. Its Rust file declares the parameters (`Params`, see "Parameters"), its section of the catalogue, default
 opacity and inputs (`pub(crate) const META: Meta`) and has `pub(crate) fn render(picture: &Picture, params: &Params, inputs: &Inputs) -> Image`; its
 documentation is the `///` doc of `Params`, its table (`native.params("x")`) is that declaration as data, which every Python caller reads; category and opacity come from the core. The core's registry (`Effect` trait, `register`) also
-takes foreign effects, such as a Python function (a `table=` in the parameter format gives it the parameters of a declared effect: checked and scaled by the core; `_core.register(name, category, opacity, fn, *, inputs=, fields=, table=)`; `fn(rgb,
+takes foreign effects, such as a Python function (its `table=`, in the parameter format and required, gives it its parameters, checked and scaled by the core, none for an effect without; `_core.register(name, category, opacity, fn, *, table, inputs=, fields=)`; `fn(rgb,
 params, **inputs)`). `Effect::apply(&Picture, params, &Inputs)` hands an effect only the inputs it declares: `size_ratio`
 (1 if undeclared), `partition` (`Labels`), under each field parameter's name a `Layer` and under each lookup table parameter's name a `Lut`
 (`Inputs::lut`; none is the identity). A `lut` parameter (`LutName`) holds the name of a table the photo was given

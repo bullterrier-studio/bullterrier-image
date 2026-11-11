@@ -23,6 +23,8 @@ from bullterrier_image.errors import RecipeError, SubjectNotFoundError
 PIXEL = np.array([[[0.2, 0.5, 0.7]]], np.float32)  # contrast moves each channel differently
 GRADE = {"temperature": 0.0, "tint": 0.0, "exposure": 0.0, "pivot": 0.5, "saturation": 1.0, "vibrance": 0.0}
 
+NO_PARAMETERS: dict[str, Any] = {"doc": "An effect with no parameters.", "fields": []}
+
 
 def grade_with_contrast(contrast: object) -> np.ndarray:
     return _core.apply("grade", PIXEL, {**GRADE, "contrast": contrast})
@@ -74,7 +76,7 @@ def fill(level: float) -> Callable[[np.ndarray, dict], np.ndarray]:
 @contextmanager
 def registered(name: str, function: Callable, category: str = "utilities", opacity: float = 1.0) -> Iterator[None]:
     """`function` registered as `name` for the block; the registry is the process's, so it is always removed."""
-    _core.register(name, category, opacity, function)
+    _core.register(name, category, opacity, function, table=NO_PARAMETERS)
     try:
         yield
     finally:
@@ -115,7 +117,7 @@ def test_the_effects_the_core_declares_are_the_ones_it_runs_itself_not_the_ones_
 
 def test_an_unknown_category_is_refused_and_registers_nothing():
     with pytest.raises(ValueError, match="sepia"):
-        _core.register("probe_sepia", "sepia", 1.0, fill(0.5))
+        _core.register("probe_sepia", "sepia", 1.0, fill(0.5), table=NO_PARAMETERS)
     assert "probe_sepia" not in _core.effects()
 
 
@@ -131,7 +133,7 @@ def test_an_opacity_outside_0_to_1_or_a_function_that_cannot_be_called_is_refuse
     opacity, function, said
 ):
     with pytest.raises(ValueError, match=said):
-        _core.register("probe_refused", "utilities", opacity, function)
+        _core.register("probe_refused", "utilities", opacity, function, table=NO_PARAMETERS)
     assert "probe_refused" not in _core.effects()
 
 
@@ -188,7 +190,7 @@ def registered_with(
     name: str, function: Callable, inputs: list[str] | None = None, fields: dict[str, str] | None = None
 ) -> Iterator[None]:
     """`function` registered as `name` with the `inputs` and `fields` it declares, for the block."""
-    _core.register(name, "utilities", 1.0, function, inputs=inputs or [], fields=fields)
+    _core.register(name, "utilities", 1.0, function, table=NO_PARAMETERS, inputs=inputs or [], fields=fields)
     try:
         yield
     finally:
@@ -302,7 +304,7 @@ def test_an_offered_input_that_is_no_valid_input_is_refused_naming_it(offered, s
 )
 def test_a_declaration_that_is_no_inputs_or_fields_is_refused_and_registers_nothing(declared, said):
     with pytest.raises((ValueError, TypeError), match=said):
-        _core.register("probe_declared", "utilities", 1.0, fill(0.5), **declared)
+        _core.register("probe_declared", "utilities", 1.0, fill(0.5), table=NO_PARAMETERS, **declared)
     assert "probe_declared" not in _core.effects()
 
 
@@ -360,7 +362,11 @@ def test_the_exception_of_a_foreign_effect_that_a_foreign_effect_ran_comes_back_
             id="an infinite picture",
         ),
         pytest.param(lambda: _core.apply("grade", PIXEL, {}), "other", id="parameters that are not the effect's"),
-        pytest.param(lambda: _core.register("grade", "utilities", 1.0, fill(0.5)), "other", id="a name that is taken"),
+        pytest.param(
+            lambda: _core.register("grade", "utilities", 1.0, fill(0.5), table=NO_PARAMETERS),
+            "other",
+            id="a name that is taken",
+        ),
     ],
 )
 def test_an_error_of_the_core_is_a_value_error_that_names_its_kind(call, kind):
@@ -394,11 +400,9 @@ def test_checking_gives_the_complete_parameters_with_a_whole_number_kept_whole_a
     assert [type(checked[key]) for key in ("cell", "gap")] == [int, float]
 
 
-def test_checking_the_parameters_of_an_effect_the_core_does_not_describe_is_refused_by_name():
+def test_checking_the_parameters_of_an_effect_the_core_does_not_have_is_refused_by_name():
     with pytest.raises(ValueError, match="no_such_effect"):
         _core.check("no_such_effect", {})
-    with registered("probe_double", fill(0.5)), pytest.raises(ValueError, match=r"probe_double.*its own parameters"):
-        _core.check("probe_double", {})
 
 
 def test_a_recipe_is_read_from_json_or_toml_and_any_other_format_is_refused():

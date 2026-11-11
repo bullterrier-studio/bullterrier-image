@@ -104,8 +104,10 @@ impl Effect for Double {
         &self.fields
     }
 
-    fn params(&self) -> Option<Table> {
-        self.table.clone()
+    fn params(&self) -> Table {
+        self.table
+            .clone()
+            .unwrap_or_else(|| crate::common::run::table_of_fields(&self.fields))
     }
 
     fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {

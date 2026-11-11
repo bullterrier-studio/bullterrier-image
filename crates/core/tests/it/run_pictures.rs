@@ -36,8 +36,8 @@ impl Effect for Shower {
         Category::Compositing
     }
 
-    fn params(&self) -> Option<Table> {
-        Some(Table {
+    fn params(&self) -> Table {
+        Table {
             doc: "The parameters of a layer.",
             fields: vec![Field {
                 name: "image",
@@ -57,7 +57,7 @@ impl Effect for Shower {
                 drivable: false,
                 advanced: false,
             }],
-        })
+        }
     }
 
     fn apply(&self, picture: &Picture<'_>, _params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {

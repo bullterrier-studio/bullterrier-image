@@ -36,8 +36,8 @@ impl Effect for Tablet {
         Category::Colour
     }
 
-    fn params(&self) -> Option<Table> {
-        Some(Table {
+    fn params(&self) -> Table {
+        Table {
             doc: "The parameters of a grade.",
             fields: vec![Field {
                 name: "file",
@@ -57,7 +57,7 @@ impl Effect for Tablet {
                 drivable: false,
                 advanced: false,
             }],
-        })
+        }
     }
 
     fn apply(&self, picture: &Picture<'_>, _params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {

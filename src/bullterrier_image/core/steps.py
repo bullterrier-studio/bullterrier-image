@@ -645,12 +645,12 @@ class Recipe:
         forms an address may take are listed in `with_values`. Each is described by a `Parameter`: its value now (at its
         default where the recipe does not write it), unit, range and what it does. The core knows the addresses
         (`Recipe::numbers`)."""
-        return {found["address"]: _parameter(found) for found in native.numbers(self._document(), {})}
+        return {found["address"]: _parameter(found) for found in native.numbers(self._document())}
 
     def parameter(self, address: str) -> Parameter:
         """The number at `address` (see `parameters`; any form an address may take); RecipeError naming the address
         when there is none, with what is valid."""
-        return _parameter(native.locate(self._document(), address, {})["number"])
+        return _parameter(native.locate(self._document(), address)["number"])
 
     def with_values(self, values: Mapping[str, float]) -> "Recipe":
         """A copy of the recipe with each number at an address of `values` set to its value; the recipe itself is left
@@ -666,7 +666,7 @@ class Recipe:
         changes: dict[tuple, dict[str, Any]] = {}
         where: dict[tuple, dict[str, str]] = {}  # the address that set each number
         for address, value in values.items():
-            located = native.locate(document, address, {})
+            located = native.locate(document, address)
             target, rest = tuple(located["place"]), located["rest"]
             if isinstance(value, np.generic):
                 value = value.item()  # a number from numpy is the Python number it holds

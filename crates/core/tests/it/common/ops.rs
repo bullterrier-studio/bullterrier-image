@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
+use bullterrier_image::params::Table;
 use bullterrier_image::region::{Edge, Grid, Shares};
 use bullterrier_image::{
     Category, Effect, Error, FieldParam, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets, Recipe, Region,
@@ -84,6 +85,10 @@ impl Effect for Spy {
 
     fn fields(&self) -> &[FieldParam] {
         &self.fields
+    }
+
+    fn params(&self) -> Table {
+        crate::common::run::table_of_fields(&self.fields)
     }
 
     fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {

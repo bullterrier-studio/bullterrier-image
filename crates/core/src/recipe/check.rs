@@ -258,9 +258,7 @@ fn step_shape(registry: &Registry, presets: &Presets, step: &Step, place: &str) 
         }
     }
     let drives = drive::in_params(&step.effect, &params, place)?;
-    if let Some(table) = effect.params() {
-        check_drives(&table, &step.effect, &params, &drives, place)?;
-    }
+    check_drives(&effect.params(), &step.effect, &params, &drives, place)?;
     match (effect.inputs().contains(&Input::Partition), &step.partition) {
         (true, None) => {
             return Err(Error::Recipe(format!(

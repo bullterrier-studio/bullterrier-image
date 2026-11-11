@@ -131,7 +131,7 @@ fn step_files(step: &mut Value, folder: &Path) {
     else {
         return;
     };
-    let Some(table) = effect.params() else { return };
+    let table = effect.params();
     let Some(Value::Object(params)) = step.get_mut("params") else {
         return;
     };

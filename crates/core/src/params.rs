@@ -99,6 +99,17 @@ pub struct Table {
     pub fields: Vec<Field>,
 }
 
+impl Table {
+    /// The table of an effect that has no parameters.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            doc: "",
+            fields: Vec::new(),
+        }
+    }
+}
+
 /// One parameter, described.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[expect(

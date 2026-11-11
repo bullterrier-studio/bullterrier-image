@@ -60,7 +60,8 @@ fn core_effects() -> Result<Vec<Core>, Box<dyn Error>> {
     let mut found = Vec::new();
     for name in effects() {
         let one = effect(&name)?;
-        if let Some(table) = one.params() {
+        let table = one.params();
+        if !table.fields.is_empty() {
             found.push((one, table));
         }
     }
@@ -574,12 +575,7 @@ fn photo(picture: Picture<'_>, height: usize, width: usize) -> Result<Photo<'_>,
 /// A step of `one` at its defaults; one that takes a partition draws along the subject's (two pieces).
 fn step(one: &dyn Effect) -> Step {
     let mut step = Step::new(one.name());
-    for field in one
-        .params()
-        .iter()
-        .flat_map(|table| &table.fields)
-        .filter(|field| field.kind == Kind::Picture)
-    {
+    for field in one.params().fields.iter().filter(|field| field.kind == Kind::Picture) {
         step = step.param(field.name, "asset");
     }
     if one.inputs().contains(&Input::Partition) {
@@ -837,8 +833,8 @@ impl Effect for Probe {
         Category::Utilities
     }
 
-    fn params(&self) -> Option<Table> {
-        Some(probe_table())
+    fn params(&self) -> Table {
+        probe_table()
     }
 
     fn apply(

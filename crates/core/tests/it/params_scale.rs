@@ -242,16 +242,6 @@ fn a_ratio_of_one_leaves_every_declared_default_as_it_is() -> Outcome {
 }
 
 #[test]
-fn an_effect_that_describes_no_parameters_gets_the_values_as_written_and_the_ratio_if_it_declares_it() -> Outcome {
-    let (_, loose) = measuring()?;
-    render_at(Step::new(loose.name()).param("cell", 10), 2.5)?;
-    let received = loose.received();
-    assert_eq!(received[0].params, json!({"cell": 10}));
-    assert!((received[0].size_ratio - 2.5).abs() < f64::EPSILON);
-    Ok(())
-}
-
-#[test]
 fn scaling_keeps_the_parameters_it_does_not_scale_as_the_step_wrote_them() -> Outcome {
     // a map of the received parameters has every declared field and no other
     let (measure, _) = measuring()?;

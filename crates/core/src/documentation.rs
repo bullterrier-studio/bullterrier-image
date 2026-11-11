@@ -21,11 +21,7 @@ const INDENT: &str = "    ";
 /// has no parameter table to document.
 pub fn effect(name: &str, presets: &Presets, advanced: bool) -> Result<String, Error> {
     let found = crate::registry::effect(name)?;
-    let table = found.params().ok_or_else(|| {
-        Error::Inputs(format!(
-            "{name:?} runs outside the core, which has no parameter table for it: see its own documentation"
-        ))
-    })?;
+    let table = found.params();
     let mut text = format!("{}\n\n{}", table.doc.trim(), parameters(&table, advanced));
     let opacity = found.opacity();
     #[expect(
@@ -64,7 +60,7 @@ pub fn unknown_effect(name: &str, presets: &Presets) -> String {
     let effects: Vec<String> = crate::registry::effects();
     let described: Vec<(String, Table)> = effects
         .iter()
-        .filter_map(|effect| Some((effect.clone(), crate::registry::effect(effect).ok()?.params()?)))
+        .filter_map(|effect| Some((effect.clone(), crate::registry::effect(effect).ok()?.params())))
         .collect();
     let mut meanings: Vec<String> = Vec::new();
     for effect in &effects {
@@ -169,11 +165,7 @@ fn words_of(text: &str) -> Vec<String> {
 /// As [`effect`].
 pub fn summary(name: &str) -> Result<String, Error> {
     let found = crate::registry::effect(name)?;
-    let table = found.params().ok_or_else(|| {
-        Error::Inputs(format!(
-            "{name:?} runs outside the core, which has no parameter table for it"
-        ))
-    })?;
+    let table = found.params();
     let text = table.doc.split_whitespace().collect::<Vec<_>>().join(" ");
     let chars: Vec<char> = text.chars().collect();
     let end = (0..chars.len()).find(|&at| {

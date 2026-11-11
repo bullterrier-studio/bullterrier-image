@@ -27,7 +27,7 @@ fn the_core_effects_are_found_by_name_with_what_each_declares() -> Outcome {
         assert_eq!(effect.category(), category, "{name}");
         assert!((effect.opacity() - 1.0).abs() < f64::EPSILON, "{name}");
         assert_eq!(effect.inputs(), inputs, "{name}");
-        assert!(effect.params().is_some_and(|table| !table.fields.is_empty()), "{name}");
+        assert!(!effect.params().fields.is_empty(), "{name}");
     }
     Ok(())
 }
@@ -60,7 +60,7 @@ fn a_registered_effect_runs_by_its_name_and_declares_what_it_says() -> Outcome {
         (Category::Utilities, &[Input::SizeRatio][..])
     );
     assert!((found.opacity() - 0.25).abs() < f64::EPSILON);
-    assert!(found.params().is_none());
+    assert_eq!(found.params().fields.len(), 1);
     let values = [0.0_f32; 12];
     let image = found.apply(&Picture::new(2, 2, &values)?, json!({"level": 0.5}), &Inputs::default())?;
     assert_eq!(image.into_values(), vec![0.5_f32; 12]);

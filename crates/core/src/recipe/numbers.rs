@@ -5,7 +5,6 @@
 //! `each.looks[0].exposure`, `region.near.low` and `frame.angle`.
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};
 
@@ -14,30 +13,6 @@ use super::{Entry, Recipe, Step};
 use crate::documentation::quoted as q;
 use crate::params::{Kind, Scalar, Unit};
 use crate::{Error, Presets};
-
-/// A number of an effect the core does not run (one written in Python), as its owner describes it.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Declared {
-    /// The parameter's name.
-    pub name: String,
-    /// Its unit.
-    pub unit: String,
-    /// What it does.
-    pub doc: String,
-    /// The lowest value.
-    pub min: f64,
-    /// The highest value.
-    pub max: f64,
-    /// Whether it is a whole number.
-    pub whole: bool,
-    /// Whether it is a turn in degrees.
-    pub cyclic: bool,
-    /// Its value where a step does not write it.
-    pub default: Option<f64>,
-}
-
-/// The numbers of the effects the core does not run, by effect name: what the core cannot read from a table of its own.
-pub type Foreign = BTreeMap<String, Vec<Declared>>;
 
 /// One number of a recipe that can be set, and what it may be.
 #[derive(Clone, Debug, PartialEq)]
@@ -434,7 +409,7 @@ impl Recipe {
 
     /// The numbers of the step `entry` by the rest of an address: an effect's (a driven one as `.start`, `.end` and
     /// `.levels`), then `opacity`; an each step's `feather`, `opacity`, `seed` and its looks' as `looks[0].exposure`.
-    fn step_numbers(entry: &Entry, foreign: &Foreign) -> Result<Vec<(String, Row)>, Error> {
+    fn step_numbers(entry: &Entry) -> Result<Vec<(String, Row)>, Error> {
         match entry {
             Entry::Each(each) => {
                 let mut found = vec![
@@ -444,65 +419,40 @@ impl Recipe {
                 ];
                 for (index, look) in each.looks.iter().enumerate() {
                     if let Some(look) = look {
-                        for (rest, row) in Self::effect_numbers(look, foreign)? {
+                        for (rest, row) in Self::effect_numbers(look)? {
                             found.push((format!("looks[{index}].{rest}"), row));
                         }
                     }
                 }
                 Ok(found)
             }
-            Entry::Step(step) => Self::effect_numbers(step, foreign),
+            Entry::Step(step) => Self::effect_numbers(step),
         }
     }
 
-    fn effect_numbers(step: &Step, foreign: &Foreign) -> Result<Vec<(String, Row)>, Error> {
+    fn effect_numbers(step: &Step) -> Result<Vec<(String, Row)>, Error> {
         let mut found = Vec::new();
-        let table = match crate::registry::effect(&step.effect) {
-            Ok(found) => found.params(),
-            Err(_) if foreign.contains_key(&step.effect) => None,
-            Err(error) => return Err(error),
-        };
-        if let Some(table) = table {
-            for field in &table.fields {
-                let (Kind::Float | Kind::Int, Some(min), Some(max)) = (field.kind, field.min, field.max) else {
-                    continue;
-                };
-                let (min, max) = (scalar(min), scalar(max));
-                let row = Row {
-                    field: field.name,
-                    unit: Cow::Borrowed(field.unit.map_or("", Unit::name)),
-                    doc: Cow::Borrowed(field.meaning),
-                    whole: field.kind == Kind::Int,
-                    cyclic: field.cyclic,
-                    min,
-                    max,
-                };
-                if matches!(step.params.get(field.name), Some(Value::Object(_))) {
-                    found.push((format!("{}.start", field.name), row.clone()));
-                    found.push((format!("{}.end", field.name), row));
-                    found.push((format!("{}.levels", field.name), LEVELS));
-                } else {
-                    found.push((field.name.to_owned(), row));
-                }
-            }
-        } else if let Some(declared) = foreign.get(&step.effect) {
-            for number in declared {
-                let row = Row {
-                    field: "",
-                    unit: Cow::Owned(number.unit.clone()),
-                    doc: Cow::Owned(number.doc.clone()),
-                    whole: number.whole,
-                    cyclic: number.cyclic,
-                    min: number.min,
-                    max: number.max,
-                };
-                if matches!(step.params.get(&number.name), Some(Value::Object(_))) {
-                    found.push((format!("{}.start", number.name), row.clone()));
-                    found.push((format!("{}.end", number.name), row));
-                    found.push((format!("{}.levels", number.name), LEVELS));
-                } else {
-                    found.push((number.name.clone(), row));
-                }
+        let table = crate::registry::effect(&step.effect)?.params();
+        for field in &table.fields {
+            let (Kind::Float | Kind::Int, Some(min), Some(max)) = (field.kind, field.min, field.max) else {
+                continue;
+            };
+            let (min, max) = (scalar(min), scalar(max));
+            let row = Row {
+                field: field.name,
+                unit: Cow::Borrowed(field.unit.map_or("", Unit::name)),
+                doc: Cow::Borrowed(field.meaning),
+                whole: field.kind == Kind::Int,
+                cyclic: field.cyclic,
+                min,
+                max,
+            };
+            if matches!(step.params.get(field.name), Some(Value::Object(_))) {
+                found.push((format!("{}.start", field.name), row.clone()));
+                found.push((format!("{}.end", field.name), row));
+                found.push((format!("{}.levels", field.name), LEVELS));
+            } else {
+                found.push((field.name.to_owned(), row));
             }
         }
         found.push(("opacity".to_owned(), OPACITY));
@@ -510,9 +460,9 @@ impl Recipe {
     }
 
     /// The numbers of `target`, by the rest of an address.
-    fn numbers_of(&self, target: &Home, foreign: &Foreign) -> Result<Vec<(String, Row)>, Error> {
+    fn numbers_of(&self, target: &Home) -> Result<Vec<(String, Row)>, Error> {
         Ok(match target {
-            Home::Step(index) => Self::step_numbers(&self.steps[*index], foreign)?,
+            Home::Step(index) => Self::step_numbers(&self.steps[*index])?,
             Home::Region(name) => {
                 let kind = self.region_kind(name);
                 REGION_ROWS
@@ -530,12 +480,12 @@ impl Recipe {
     }
 
     /// The value now of the number `rest` of `target`.
-    fn value_of(&self, target: &Home, rest: &str, foreign: &Foreign) -> Option<f64> {
+    fn value_of(&self, target: &Home, rest: &str) -> Option<f64> {
         match target {
             Home::Frame => serde_json::to_value(&self.frame).ok()?.get(rest)?.as_f64(),
             Home::Region(name) => serde_json::to_value(self.regions.get(name)?).ok()?.get(rest)?.as_f64(),
             Home::Step(index) => match &self.steps[*index] {
-                Entry::Step(step) => step_value(step, rest, foreign),
+                Entry::Step(step) => step_value(step, rest),
                 Entry::Each(each) => match rest {
                     "feather" => Some(each.feather),
                     "opacity" => Some(each.opacity.unwrap_or(1.0)),
@@ -545,7 +495,7 @@ impl Recipe {
                         each.looks
                             .get(index.parse::<usize>().ok()?)?
                             .as_ref()
-                            .and_then(|look| step_value(look, tail, foreign))
+                            .and_then(|look| step_value(look, tail))
                     }
                 },
             },
@@ -569,31 +519,31 @@ impl Recipe {
     ///
     /// # Errors
     /// [`Error::UnknownEffect`] for a step of an effect that is not registered.
-    pub fn numbers(&self, foreign: &Foreign) -> Result<Vec<Number>, Error> {
+    pub fn numbers(&self) -> Result<Vec<Number>, Error> {
         let mut found = Vec::new();
         for (index, (head, entry)) in self.heads().iter().zip(&self.steps).enumerate() {
-            for (rest, row) in Self::step_numbers(entry, foreign)? {
+            for (rest, row) in Self::step_numbers(entry)? {
                 found.push(number(
                     format!("{head}.{rest}"),
                     &row,
-                    self.value_of(&Home::Step(index), &rest, foreign),
+                    self.value_of(&Home::Step(index), &rest),
                 ));
             }
         }
         for (name, _) in self.regions.iter() {
-            for (rest, row) in self.numbers_of(&Home::Region(name.to_owned()), foreign)? {
+            for (rest, row) in self.numbers_of(&Home::Region(name.to_owned()))? {
                 found.push(number(
                     format!("region.{name}.{rest}"),
                     &row,
-                    self.value_of(&Home::Region(name.to_owned()), &rest, foreign),
+                    self.value_of(&Home::Region(name.to_owned()), &rest),
                 ));
             }
         }
-        for (rest, row) in self.numbers_of(&Home::Frame, foreign)? {
+        for (rest, row) in self.numbers_of(&Home::Frame)? {
             found.push(number(
                 format!("frame.{rest}"),
                 &row,
-                self.value_of(&Home::Frame, &rest, foreign),
+                self.value_of(&Home::Frame, &rest),
             ));
         }
         Ok(found)
@@ -605,22 +555,22 @@ impl Recipe {
     /// # Errors
     /// [`Error::Recipe`] naming the address when there is no such number, with the numbers there are and the nearest
     /// addresses; [`Error::UnknownEffect`] for a step of an effect that is not registered.
-    pub fn number(&self, address: &str, foreign: &Foreign) -> Result<Number, Error> {
-        Ok(self.locate(address, foreign)?.number)
+    pub fn number(&self, address: &str) -> Result<Number, Error> {
+        Ok(self.locate(address)?.number)
     }
 
     /// The number at `address` and where it lives (see [`number`](Self::number)): for whoever sets it in a model of its own.
     ///
     /// # Errors
     /// As [`number`](Self::number).
-    pub fn locate(&self, address: &str, foreign: &Foreign) -> Result<Located, Error> {
-        let (place, rest, row) = self.reach(address, foreign)?;
+    pub fn locate(&self, address: &str) -> Result<Located, Error> {
+        let (place, rest, row) = self.reach(address)?;
         let head = match &place {
             Home::Step(index) => self.heads()[*index].clone(),
             Home::Region(name) => format!("region.{name}"),
             Home::Frame => "frame".to_owned(),
         };
-        let number = number(format!("{head}.{rest}"), &row, self.value_of(&place, &rest, foreign));
+        let number = number(format!("{head}.{rest}"), &row, self.value_of(&place, &rest));
         Ok(Located { place, rest, number })
     }
 
@@ -633,8 +583,8 @@ impl Recipe {
     /// [`Error::Recipe`] naming the address for an address that points at nothing (listing what is there), a driven number
     /// set by itself, a `.start` of a number that is not driven, a `value` that is not finite or not whole where it must
     /// be, or a value the recipe refuses; [`Error::UnknownEffect`] for a step of an effect that is not registered.
-    pub fn with_value(&self, address: &str, value: f64, presets: &Presets, foreign: &Foreign) -> Result<Self, Error> {
-        let (target, rest, row) = self.reach(address, foreign)?;
+    pub fn with_value(&self, address: &str, value: f64, presets: &Presets) -> Result<Self, Error> {
+        let (target, rest, row) = self.reach(address)?;
         let refuse = |why: String| Error::Recipe(format!("{}: {why}", q(address)));
         if !value.is_finite() {
             return Err(refuse(format!("{value} is not a finite number")));
@@ -672,7 +622,7 @@ impl Recipe {
     }
 
     /// What `address` points at: the step, region or frame, the rest of the address, and the number there.
-    fn reach(&self, address: &str, foreign: &Foreign) -> Result<(Home, String, Row), Error> {
+    fn reach(&self, address: &str) -> Result<(Home, String, Row), Error> {
         let refuse = |why: String| Error::Recipe(format!("{}: {why}", q(address)));
         let parts: Vec<&str> = address.split('.').collect();
         if parts.len() < 2 {
@@ -710,7 +660,7 @@ impl Recipe {
                 q(head),
             ),
         };
-        let numbers = self.numbers_of(&target, foreign)?;
+        let numbers = self.numbers_of(&target)?;
         if let Some((_, row)) = numbers.iter().find(|(name, _)| *name == rest) {
             return Ok((target, rest, row.clone()));
         }
@@ -730,11 +680,7 @@ impl Recipe {
                 q(part)
             )));
         }
-        let all: Vec<String> = self
-            .numbers(foreign)?
-            .into_iter()
-            .map(|number| number.address)
-            .collect();
+        let all: Vec<String> = self.numbers()?.into_iter().map(|number| number.address).collect();
         let near = closest(address, all.iter().map(String::as_str));
         let hint = if near.is_empty() {
             String::new()
@@ -816,7 +762,7 @@ fn step_slot<'a>(step: &'a mut Value, rest: &str) -> Option<&'a mut Value> {
 }
 
 /// The value now of the number `rest` of the step `step`: written, else the effect's default.
-fn step_value(step: &Step, rest: &str, foreign: &Foreign) -> Option<f64> {
+fn step_value(step: &Step, rest: &str) -> Option<f64> {
     if rest == "opacity" {
         let default = crate::registry::effect(&step.effect).map_or(1.0, |found| found.opacity());
         return Some(step.opacity.unwrap_or(default));
@@ -825,15 +771,9 @@ fn step_value(step: &Step, rest: &str, foreign: &Foreign) -> Option<f64> {
         return step.params.get(name)?.get(part)?.as_f64();
     }
     step.params.get(rest).and_then(Value::as_f64).or_else(|| {
-        if let Some(table) = crate::registry::effect(&step.effect).ok()?.params() {
-            let field = table.fields.iter().find(|field| field.name == rest)?;
-            return Some(scalar(field.default));
-        }
-        foreign
-            .get(&step.effect)?
-            .iter()
-            .find(|number| number.name == rest)?
-            .default
+        let table = crate::registry::effect(&step.effect).ok()?.params();
+        let field = table.fields.iter().find(|field| field.name == rest)?;
+        Some(scalar(field.default))
     })
 }
 

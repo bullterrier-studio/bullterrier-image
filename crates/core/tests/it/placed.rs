@@ -192,7 +192,7 @@ fn run(
         inputs = inputs.with_place(Place::new(height, width, from));
     }
     let band = Picture::new(to - from, width, &picture[from * width * 3..to * width * 3])?;
-    let table = effect(name)?.params().ok_or("no parameters")?;
+    let table = effect(name)?.params();
     let completed = table.check(name, params.as_object().ok_or("not an object")?)?;
     Ok(apply(name, &band, Value::Object(completed), &inputs)?.into_values())
 }
@@ -200,7 +200,7 @@ fn run(
 /// The rows of margin `name` asks for with `params`; none if it says `Whole`.
 fn margin(name: &str, params: &Value) -> Result<Option<usize>, Box<dyn Error>> {
     let one = effect(name)?;
-    let table: Table = one.params().ok_or("no parameters")?;
+    let table: Table = one.params();
     let given = params.as_object().ok_or("not an object")?;
     let completed = table.check(name, given)?;
     // the pictures here are rendered at a ratio of 1, where the parameters a render gets are the completed ones

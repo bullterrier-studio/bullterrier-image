@@ -102,6 +102,15 @@ impl Effect for Paint {
         &[Input::SizeRatio]
     }
 
+    fn params(&self) -> Table {
+        let mut level = field("level", Kind::Float, Scalar::Float(0.5), "The grey it paints.");
+        level.drivable = true;
+        Table {
+            doc: "A painter.",
+            fields: vec![level],
+        }
+    }
+
     fn apply(&self, picture: &Picture<'_>, params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         let level = params["level"]
             .as_f64()
@@ -192,8 +201,8 @@ impl Effect for Recorder {
         &self.fields
     }
 
-    fn params(&self) -> Option<Table> {
-        self.table.clone()
+    fn params(&self) -> Table {
+        self.table.clone().unwrap_or_else(|| table_of_fields(&self.fields))
     }
 
     fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
@@ -328,6 +337,38 @@ impl Finder for Finds {
     fn find(&self, picture: &Picture<'_>) -> Result<Layer, Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         (self.answer)(picture)
+    }
+}
+
+/// The table of an effect whose only parameters are its field parameters, each named by `fields` (the names live as long
+/// as the test).
+pub(crate) fn table_of_fields(fields: &[FieldParam]) -> Table {
+    let leak = |text: &str| -> &'static str { Box::leak(text.to_owned().into_boxed_str()) };
+    Table {
+        doc: "An effect with field parameters.",
+        fields: fields
+            .iter()
+            .map(|each| {
+                field(
+                    leak(&each.parameter),
+                    Kind::Field,
+                    Scalar::Text(leak(&each.default)),
+                    "A selection.",
+                )
+            })
+            .collect(),
+    }
+}
+
+/// The table of an effect with the drivable decimals `x` and `y` and the whole number `z`.
+pub(crate) fn xyz_table() -> Table {
+    let mut x = field("x", Kind::Float, Scalar::Float(0.0), "A decimal.");
+    x.drivable = true;
+    let mut y = field("y", Kind::Float, Scalar::Float(0.0), "Another decimal.");
+    y.drivable = true;
+    Table {
+        doc: "x, y and z.",
+        fields: vec![x, y, field("z", Kind::Int, Scalar::Int(0), "A whole number.")],
     }
 }
 

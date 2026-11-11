@@ -4,7 +4,7 @@
 use crate::common::Outcome;
 use crate::common::compare::assert_close;
 use crate::common::pictures::counted;
-use crate::common::run::{Paint, Recorder, Registered, length_table, probe_table};
+use crate::common::run::{Paint, Recorder, Registered, length_table, probe_table, xyz_table};
 use bullterrier_image::{Drive, Error, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 use serde_json::{Value, json};
 
@@ -34,15 +34,6 @@ fn a_step_reaches_its_effect_with_the_preset_under_its_values_and_the_defaults_f
     let received = recorder.received();
     assert_eq!(received.len(), 1);
     assert_eq!(received[0].params, expected);
-    Ok(())
-}
-
-#[test]
-fn an_effect_that_describes_no_parameters_gets_them_as_the_step_writes_them() -> Outcome {
-    let recorder = Registered::new(Recorder::new(&[], &[]))?;
-    let step = Step::new(recorder.name()).param("anything", json!([1, "two"]));
-    rendered(&Recipe::new([step]), &Presets::new())?;
-    assert_eq!(recorder.received()[0].params, json!({"anything": [1, "two"]}));
     Ok(())
 }
 
@@ -116,7 +107,7 @@ fn a_driven_effect_with_the_map_on_a_level_is_the_plain_effect_at_that_levels_va
 
 #[test]
 fn only_the_levels_a_pixel_is_on_or_next_to_are_run_and_the_last_is_exactly_the_end() -> Outcome {
-    let recorder = Registered::new(Recorder::new(&[], &[]))?;
+    let recorder = Registered::new(Recorder::new(&[], &[]).with_table(xyz_table()))?;
     // x from 10 to 50 in 5 levels: 10, 20, 30, 40, 50
     let step = Step::new(recorder.name()).param("x", Drive::new("subject", 10.0, 50.0));
     // (the map's values, the x of the runs in order)
@@ -185,7 +176,7 @@ fn a_linear_effect_driven_by_a_map_is_its_parameter_at_the_maps_value_whatever_t
 
 #[test]
 fn every_driven_parameter_of_a_step_moves_with_its_level_and_the_others_stay_as_they_are() -> Outcome {
-    let recorder = Registered::new(Recorder::new(&[], &[]))?;
+    let recorder = Registered::new(Recorder::new(&[], &[]).with_table(xyz_table()))?;
     let step = Step::new(recorder.name())
         .param("x", Drive::new("subject", 10.0, 50.0).levels(2))
         .param("y", Drive::new("subject", 1.0, 5.0).levels(2))

@@ -161,9 +161,7 @@ fn effects(declared: bool) -> Vec<String> {
     let mut names = bullterrier_image::effects();
     if declared {
         let python = registered_from_python();
-        names.retain(|name| {
-            !python.contains(name) && bullterrier_image::effect(name).is_ok_and(|found| found.params().is_some())
-        });
+        names.retain(|name| !python.contains(name));
     }
     names
 }
@@ -178,10 +176,7 @@ fn effects(declared: bool) -> Vec<String> {
 /// `CoreError` if the core implements no effect of that name.
 #[pyfunction]
 fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
-    let table = bullterrier_image::effect(effect)
-        .map_err(core_error)?
-        .params()
-        .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
+    let table = bullterrier_image::effect(effect).map_err(core_error)?.params();
     from_json(py, &serde_json::to_value(table).map_err(value_error)?)
 }
 
@@ -191,10 +186,7 @@ fn params<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
 /// `CoreError` if the core has no effect of that name or the effect describes no parameters.
 #[pyfunction]
 fn schema<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
-    let table = bullterrier_image::effect(effect)
-        .map_err(core_error)?
-        .params()
-        .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
+    let table = bullterrier_image::effect(effect).map_err(core_error)?.params();
     from_json(py, &table.json_schema())
 }
 
@@ -281,14 +273,10 @@ fn vocabulary(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
 /// numbers). A number outside its inclusive range is refused, except an angle declared cyclic, which any real wraps into.
 ///
 /// `CoreError` with the sentence naming the effect, the parameter, the rule and the value, for the first rule `params`
-/// break; also if the core implements no such effect or the effect describes its own parameters (a Python function
-/// registered with `register`).
+/// break; also if the core implements no such effect.
 #[pyfunction]
 fn check<'py>(py: Python<'py>, effect: &str, params: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyAny>> {
-    let table = bullterrier_image::effect(effect)
-        .map_err(core_error)?
-        .params()
-        .ok_or_else(|| PyValueError::new_err(format!("{effect:?} describes its own parameters")))?;
+    let table = bullterrier_image::effect(effect).map_err(core_error)?.params();
     let given = params
         .iter()
         .map(|(key, value)| {
@@ -413,15 +401,15 @@ fn shipped_looks() -> Vec<(&'static str, &'static str)> {
 /// that raises, or returns anything but a float32 array of the picture's shape, makes `apply` raise `ValueError`
 /// naming the effect.
 #[pyfunction]
-#[pyo3(signature = (name, category, opacity, function, *, inputs=Vec::new(), fields=None, table=None))]
+#[pyo3(signature = (name, category, opacity, function, *, table, inputs=Vec::new(), fields=None))]
 fn register(
     name: &str,
     category: &str,
     opacity: f64,
     function: &Bound<'_, PyAny>,
+    table: &Bound<'_, PyDict>,
     inputs: Vec<String>,
     fields: Option<&Bound<'_, PyDict>>,
-    table: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<()> {
     let category = Category::ALL
         .iter()
@@ -467,9 +455,7 @@ fn register(
         })
         .transpose()?
         .unwrap_or_default();
-    let table = table
-        .map(|description| Table::from_json(&to_json(description.as_any())?).map_err(core_error))
-        .transpose()?;
+    let table = Table::from_json(&to_json(table.as_any())?).map_err(core_error)?;
     let effect = PythonEffect {
         table,
         name: name.to_owned(),
@@ -510,7 +496,7 @@ struct PythonEffect {
     opacity: f64,
     inputs: Vec<Input>,
     fields: Vec<FieldParam>,
-    table: Option<Table>,
+    table: Table,
     function: Py<PyAny>,
 }
 
@@ -596,7 +582,7 @@ impl Effect for PythonEffect {
         &self.fields
     }
 
-    fn params(&self) -> Option<Table> {
+    fn params(&self) -> Table {
         self.table.clone()
     }
 

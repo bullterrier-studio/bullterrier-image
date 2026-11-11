@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::common::Outcome;
 use crate::common::pictures::counted;
-use crate::common::run::{Finds, Paint, Recorder, Registered, Shrinks, probe_table};
+use crate::common::run::{Finds, Paint, Recorder, Registered, Shrinks, probe_table, xyz_table};
 use bullterrier_image::region::Given;
 use bullterrier_image::{Drive, Error, ErrorKind, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 
@@ -73,7 +73,7 @@ fn a_field_parameter_receives_the_map_its_step_names_or_the_effects_default() ->
     );
     let mistyped = render(Step::new(recorder.name()).param("near", 3));
     assert!(
-        matches!(&mistyped, Err(error @ Error::Recipe(_)) if error.to_string().contains("`near` names a field")),
+        matches!(&mistyped, Err(error @ Error::Invalid { .. }) if error.to_string().contains("`near`")),
         "{mistyped:?}"
     );
     Ok(())
@@ -114,7 +114,7 @@ fn a_finder_given_again_under_the_same_name_replaces_the_first() -> Outcome {
 
 #[test]
 fn a_drive_the_photo_has_no_map_for_or_that_breaks_a_rule_refuses_the_render_and_nothing_runs() -> Outcome {
-    let recorder = Registered::new(Recorder::new(&[], &[]))?;
+    let recorder = Registered::new(Recorder::new(&[], &[]).with_table(xyz_table()))?;
     let drive = |by: &str| Drive::new(by, 0.0, 1.0);
     let values = counted();
     let photo = Photo::new(Picture::new(4, 6, &values)?);
