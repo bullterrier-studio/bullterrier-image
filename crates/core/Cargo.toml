@@ -42,6 +42,7 @@ proptest.workspace = true
 # the identity of the core: a hash of its sources, computed at build time (`build.rs`)
 [build-dependencies]
 sha2.workspace = true
+toml.workspace = true
 
 [lints]
 workspace = true

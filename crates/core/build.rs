@@ -42,9 +42,24 @@ fn identity(manifest: &Path) -> io::Result<String> {
     let mut files = Vec::new();
     for folder in ["src", "data"] {
         println!("cargo::rerun-if-changed={}", manifest.join(folder).display());
-        collect(&manifest.join(folder), manifest, &mut files)?;
+        collect(&manifest.join(folder), manifest, &mut files, "")?;
     }
     files.push((String::from("Cargo.toml"), manifest.join("Cargo.toml")));
+    for folder in path_crates(manifest)? {
+        println!("cargo::rerun-if-changed={}", manifest.join(&folder).display());
+        collect(
+            &manifest.join(&folder).join("src"),
+            &manifest.join(&folder),
+            &mut files,
+            &folder,
+        )?;
+        for name in ["Cargo.toml", "build.rs"] {
+            let path = manifest.join(&folder).join(name);
+            if path.is_file() {
+                files.push((format!("{folder}/{name}"), path));
+            }
+        }
+    }
     let lock = manifest.join("..").join("..").join("Cargo.lock");
     if lock.is_file() {
         println!("cargo::rerun-if-changed={}", lock.display());
@@ -72,13 +87,19 @@ fn identity(manifest: &Path) -> io::Result<String> {
 }
 
 /// Every file below `folder` as `(path relative to root with `/`, full path)`.
-fn collect(folder: &Path, root: &Path, files: &mut Vec<(String, PathBuf)>) -> io::Result<()> {
+fn collect(folder: &Path, root: &Path, files: &mut Vec<(String, PathBuf)>, prefix: &str) -> io::Result<()> {
     for entry in fs::read_dir(folder)? {
         let path = entry?.path();
         if path.is_dir() {
-            collect(&path, root, files)?;
+            collect(&path, root, files, prefix)?;
         } else if let Ok(relative) = path.strip_prefix(root) {
-            files.push((relative.to_string_lossy().replace('\\', "/"), path.clone()));
+            let relative = relative.to_string_lossy().replace('\\', "/");
+            let named = if prefix.is_empty() {
+                relative
+            } else {
+                format!("{prefix}/{relative}")
+            };
+            files.push((named, path.clone()));
         }
     }
     Ok(())
@@ -143,4 +164,38 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
     }
     writeln!(code, "    ]\n}}")?;
     Ok(code)
+}
+
+/// The folders (relative to the core's, as the manifests write them) of the path crates the core is built from: a dependency
+/// with a `path`, or `workspace = true` for one the workspace gives a `path`. Their code is part of the core's, and a change to
+/// it does not change `Cargo.lock`.
+fn path_crates(manifest: &Path) -> io::Result<Vec<String>> {
+    let read =
+        |path: PathBuf| -> io::Result<toml::Table> { fs::read_to_string(path)?.parse().map_err(io::Error::other) };
+    let core = read(manifest.join("Cargo.toml"))?;
+    let workspace = read(manifest.join("..").join("..").join("Cargo.toml")).unwrap_or_default();
+    let shared = workspace
+        .get("workspace")
+        .and_then(|w| w.get("dependencies"))
+        .and_then(toml::Value::as_table);
+    let mut folders = Vec::new();
+    for (name, dependency) in core
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .into_iter()
+        .flatten()
+    {
+        let table = dependency.as_table();
+        let own = table.and_then(|t| t.get("path")).and_then(toml::Value::as_str);
+        let given = table
+            .filter(|t| t.get("workspace").and_then(toml::Value::as_bool) == Some(true))
+            .and_then(|_| shared?.get(name)?.get("path")?.as_str());
+        match (own, given) {
+            (Some(path), _) => folders.push(path.trim_start_matches("./").to_owned()),
+            (None, Some(path)) => folders.push(format!("../../{path}")),
+            _ => {}
+        }
+    }
+    folders.sort();
+    Ok(folders)
 }

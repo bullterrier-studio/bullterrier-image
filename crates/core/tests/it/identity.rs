@@ -146,3 +146,55 @@ fn putting_a_map_leaves_no_partial_file_and_an_unwritable_folder_is_an_error() -
     assert!(refused.is_err());
     Ok(())
 }
+
+/// The path crates the core depends on, found in the manifests (a dependency with `path`, or `workspace = true` for one
+/// that the workspace gives a `path`): each is code the core is built from, which `Cargo.lock` does not say changed.
+fn path_crates() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let core = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let manifest: toml::Table = toml::from_str(&std::fs::read_to_string(core.join("Cargo.toml"))?)?;
+    let workspace: toml::Table = toml::from_str(&std::fs::read_to_string(core.join("../../Cargo.toml"))?)?;
+    let given = workspace
+        .get("workspace")
+        .and_then(|w| w.get("dependencies"))
+        .and_then(toml::Value::as_table);
+    let mut found = Vec::new();
+    for (name, dependency) in manifest
+        .get("dependencies")
+        .and_then(toml::Value::as_table)
+        .into_iter()
+        .flatten()
+    {
+        let table = dependency.as_table();
+        let own = table.and_then(|t| t.get("path")).and_then(toml::Value::as_str);
+        let shared = table
+            .filter(|t| t.get("workspace").and_then(toml::Value::as_bool) == Some(true))
+            .and_then(|_| given?.get(name)?.get("path")?.as_str());
+        match (own, shared) {
+            (Some(path), _) => found.push(path.trim_start_matches("./").to_owned()),
+            (None, Some(path)) => found.push(format!("../../{path}")),
+            _ => {}
+        }
+    }
+    found.sort();
+    Ok(found)
+}
+
+#[test]
+fn the_identity_covers_every_path_crate_the_core_is_built_from() -> Outcome {
+    let crates = path_crates()?;
+    assert!(
+        !crates.is_empty(),
+        "the derive crate is a path dependency of the core: the manifests were not read"
+    );
+    let files = identity_files();
+    for folder in &crates {
+        for covered in ["Cargo.toml", "src/lib.rs"] {
+            let file = format!("{folder}/{covered}");
+            assert!(
+                files.contains(&file.as_str()),
+                "{file} is not covered: a change to it would keep the key"
+            );
+        }
+    }
+    Ok(())
+}
