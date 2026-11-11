@@ -45,6 +45,7 @@ fn identity(manifest: &Path) -> io::Result<String> {
         collect(&manifest.join(folder), manifest, &mut files, "")?;
     }
     files.push((String::from("Cargo.toml"), manifest.join("Cargo.toml")));
+    files.push((String::from("build.rs"), manifest.join("build.rs")));
     for folder in path_crates(manifest)? {
         println!("cargo::rerun-if-changed={}", manifest.join(&folder).display());
         collect(

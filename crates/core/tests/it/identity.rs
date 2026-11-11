@@ -40,6 +40,7 @@ fn the_identity_of_the_core_covers_its_code_and_the_data_that_ships_with_it() {
         "src/run.rs",
         "data/presets/grade.toml",
         "data/looks/crt.toml",
+        "build.rs",
         "Cargo.toml",
     ] {
         assert!(
