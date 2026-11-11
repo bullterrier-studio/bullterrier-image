@@ -323,7 +323,10 @@ fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
         sample: count(params.sample),
         seed: params.seed,
     };
-    palette::found(dots, matched, &search).into_iter().map(|(colour, _)| colour).collect()
+    palette::found(dots, matched, &search)
+        .into_iter()
+        .map(|(colour, _)| colour)
+        .collect()
 }
 
 /// The `chosen` method on `values` (`size` dots), as a pattern of palette indices.
