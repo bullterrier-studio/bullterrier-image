@@ -22,10 +22,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
 /// The smallest spread of a photo's channel that is scaled up, in Oklab units.
 const MIN_SPREAD: f64 = 0.002; // constant: half an 8-bit step of Oklab lightness; less is rounding noise, not picture
 
-/// Give the photo the colour mood of a reference picture (Reinhard's statistics transfer, in Oklab).
+/// Give the photo the colour mood of a reference picture, so the two look alike.
 ///
-/// Each of Oklab's three channels (lightness L, green-red a, blue-yellow b) is shifted and scaled so that its mean and
-/// standard deviation over the photo become the reference's, then the result is mixed with the original by `amount` (as sRGB levels).
+/// Reinhard's statistics transfer, in Oklab: each of Oklab's three channels (lightness L, green-red a, blue-yellow b)
+/// is shifted and scaled so that its mean and standard deviation over the photo become the reference's, then the
+/// result is mixed with the original by `amount` (as sRGB levels).
 /// A channel of the photo flatter than 0.002 is scaled as if it had that spread, so a flat photo or reference never
 /// divides by zero: a flat photo takes the reference's mean, a flat reference flattens the channel to its mean. Where
 /// the reference has transparency its pixels count in proportion to their alpha, so a fully transparent pixel is
