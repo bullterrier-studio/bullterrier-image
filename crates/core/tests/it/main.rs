@@ -140,6 +140,7 @@ mod rotate;
 mod rounding;
 mod run_frame;
 mod run_luts;
+mod run_many;
 mod run_maps;
 mod run_pictures;
 mod run_regions;

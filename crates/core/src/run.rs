@@ -17,6 +17,7 @@ mod cut;
 mod each;
 mod frame;
 mod laid;
+mod many;
 mod maps;
 mod regions;
 mod size;
