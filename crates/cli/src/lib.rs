@@ -3,6 +3,7 @@
 //! A thin layer over the core: parse, call, print. [`main`] takes the arguments and the two streams, so a test (or the
 //! Python console script) runs it in-process and sees the exit code and the output.
 
+mod cutout;
 mod finders;
 mod init;
 mod photo;
@@ -64,6 +65,9 @@ enum Command {
         after_help = "example: bt-image steps examples/photos/bullterrier.jpeg examples/recipes/ember-glitch.toml"
     )]
     Steps(render::StepsArgs),
+    /// Save just the subject on a transparent background.
+    #[command(after_help = "example: bt-image cutout examples/photos/bullterrier.jpeg -o out/cutout.png --feather 2")]
+    Cutout(cutout::Args),
     /// Process every photo of a project with every recipe: cached, checked, with a report.
     #[command(after_help = "example: bt-image run examples/bt-image.toml --dry-run")]
     Run(run::Args),
@@ -137,6 +141,7 @@ pub fn main(argv: &[String], version: &str, out: &mut dyn Write, err: &mut dyn W
         Command::Render(given) => render::render(&given, &mut console),
         Command::Sheet(given) => render::sheet(&given, &mut console),
         Command::Steps(given) => render::steps(&given, &mut console),
+        Command::Cutout(given) => cutout::command(&given, &mut console),
         Command::Run(given) => run::command(&given, &mut console),
     };
     match outcome {

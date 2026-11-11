@@ -361,3 +361,69 @@ fn a_bad_recipe_is_reported_before_any_work_and_a_missing_photo_is_one_error_lin
     assert!(empty.err.contains("no look or file"), "{}", empty.err);
     Ok(())
 }
+
+#[test]
+fn cutout_with_a_subject_file_uses_it_as_the_transparency_and_refines_it_only_when_asked() -> Outcome {
+    let root = scene("cutout")?;
+    halves(&root.join("matte.png"), (24, 32), (0.0, 1.0))?;
+    let (me, matte, out) = (
+        at(&root, "me.png"),
+        format!("subject={}", at(&root, "matte.png")),
+        at(&root, "c.png"),
+    );
+    let ran = bt(&["cutout", &me, "-o", &out, "--map", &matte]);
+    assert_eq!(ran.code, 0, "{}", ran.err);
+    assert_eq!(ran.out.trim(), out);
+    let (clear, solid) = (pixel(&root.join("c.png"), 5, 3)?, pixel(&root.join("c.png"), 5, 28)?);
+    assert_eq!((clear.len(), clear[3], solid[3]), (4, 0.0, 1.0));
+    let colour = pixel(&root.join("me.png"), 5, 28)?;
+    assert!((solid[0] - colour[0]).abs() < 1.0 / 255.0, "the colour is the photo's");
+    // shrink pulls the cut edge in: the solid column next to the edge turns clear
+    let shrunk = bt(&[
+        "cutout",
+        &me,
+        "-o",
+        &at(&root, "s.png"),
+        "--map",
+        &matte,
+        "--shrink",
+        "2",
+    ]);
+    assert_eq!(shrunk.code, 0, "{}", shrunk.err);
+    assert_eq!(pixel(&root.join("s.png"), 5, 16)?[3], 0.0);
+    assert_eq!(pixel(&root.join("c.png"), 5, 16)?[3], 1.0);
+    Ok(())
+}
+
+#[test]
+fn cutout_refuses_a_map_that_is_not_the_subject_one_of_another_size_and_one_given_twice() -> Outcome {
+    let root = scene("cutout-refused")?;
+    halves(&root.join("matte.png"), (24, 32), (0.0, 1.0))?;
+    halves(&root.join("small.png"), (10, 12), (0.0, 1.0))?;
+    let me = at(&root, "me.png");
+    let map = |name: &str, file: &str| format!("{name}={}", at(&root, file));
+    for (maps, named) in [
+        (
+            vec![map("star", "matte.png")],
+            "cutout takes only --map subject=PICTURE, not \"star\"",
+        ),
+        (
+            vec![map("subject", "small.png")],
+            "the subject map is 12x10 px but the photo is 32x24 px",
+        ),
+        (vec![map("subject", "matte.png"), map("subject", "matte.png")], "twice"),
+    ] {
+        let mut args = vec!["cutout", &me, "-o", "unused.png"];
+        for one in &maps {
+            args.extend(["--map", one]);
+        }
+        let ran = bt(&args);
+        assert_eq!(ran.code, 1, "{named}");
+        assert!(
+            ran.err.starts_with("error: ") && ran.err.contains(named),
+            "{named}: {}",
+            ran.err
+        );
+    }
+    Ok(())
+}

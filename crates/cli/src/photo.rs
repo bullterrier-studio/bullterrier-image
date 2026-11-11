@@ -39,7 +39,7 @@ pub(crate) struct Maps {
 }
 
 /// A clap value parser: `NAME=PICTURE`.
-fn spec(text: &str) -> Result<(String, PathBuf), String> {
+pub(crate) fn spec(text: &str) -> Result<(String, PathBuf), String> {
     match text.split_once('=') {
         Some((name, path)) if !name.is_empty() && !path.is_empty() => Ok((name.to_owned(), PathBuf::from(path))),
         _ => Err(format!(
@@ -62,12 +62,7 @@ pub(crate) fn each<T>(
 ) -> Result<Vec<T>, Error> {
     let presets = Presets::shipped()?;
     let image = read(photo)?.over_white();
-    let mut maps: BTreeMap<String, Layer> = BTreeMap::new();
-    for (name, path) in &given.maps {
-        if maps.insert(name.clone(), read_map(path)?).is_some() {
-            return Err(Error::Recipe(format!("--map {name} is given twice")));
-        }
-    }
+    let maps = read_maps(given)?;
     let mut finders: BTreeMap<String, Arc<dyn Finder>> = BTreeMap::new();
     let mut wanted = std::collections::BTreeSet::new();
     for recipe in recipes {
@@ -107,4 +102,18 @@ pub(crate) fn each<T>(
         .zip(recipes)
         .map(|(photo, recipe)| run(photo, recipe, &presets))
         .collect()
+}
+
+/// The maps `--map` names, read.
+///
+/// # Errors
+/// [`Error::Recipe`] for a name given twice; whatever reading a map refuses.
+pub(crate) fn read_maps(given: &Maps) -> Result<BTreeMap<String, Layer>, Error> {
+    let mut maps = BTreeMap::new();
+    for (name, path) in &given.maps {
+        if maps.insert(name.clone(), read_map(path)?).is_some() {
+            return Err(Error::Recipe(format!("--map {name} is given twice")));
+        }
+    }
+    Ok(maps)
 }
