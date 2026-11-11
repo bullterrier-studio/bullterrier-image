@@ -53,9 +53,10 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
 - **Names.** `Recipe(steps, name="my look!", description="...")`: free text, both optional. Files written for it (the
   command line, a project) are named by its name made safe (`my-look`); an unnamed recipe there is a `RecipeError`.
 - **Reading values.** `step.describe(width=56)` is the short label `trace` shows (an `Each` has one too, and
-  `drive.describe()`); `drive.values()` lists the values a `Drive` takes at its levels. The regions, `Framing` and `Drive` are frozen
-  dataclasses of keyword fields, the core checks them when made (a `RecipeError` naming the field); `help(Grid)` lists
-  their fields, with unit and range.
+  `drive.describe()`); `drive.values()` lists the values a `Drive` takes at its levels. `Step`, `Each` and `Recipe` make
+  one from a dict with `Model.parse(values)` (a `RecipeError` naming the field). The regions, `Framing` and `Drive` are
+  frozen dataclasses of keyword fields that the core checks when made; `help(Grid)` lists their fields, with unit and
+  range.
 - **What ships.** `bullterrier_image.looks()`: `{name: description}`, each loads with `load_recipe(name)`.
   `fx.<effect>.presets`: `{preset: {parameter: value}}`, used as `fx.<effect>(preset=...)`. A misspelt parameter or
   look name gets the nearest ones.
