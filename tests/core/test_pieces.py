@@ -1,7 +1,9 @@
 """The pieces (regions, the frame, a drive) are dataclasses over the core's normal form: they hold exactly the fields
 the core answers with, and a field is required in Python exactly when the core refuses its absence."""
 
+from collections.abc import Callable
 from dataclasses import MISSING, fields
+from typing import Any
 
 import pytest
 
@@ -27,6 +29,11 @@ from bullterrier_image.recipe import (
     Svg,
 )
 
+
+def _region(kind: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
+    return lambda fields_: native.region(kind, fields_)
+
+
 DRIVE = {"by": "near", "start": 0, "end": 1}
 # Each piece, with how the core makes it from fields (the oracle, independent of the class) and what it needs at least.
 PIECES = {
@@ -36,7 +43,7 @@ PIECES = {
     "Line": (Line, lambda f: native.region("cuts", {"lines": [f]})["lines"][0], {}),
     "Curve": (Curve, lambda f: native.region("cuts", {"lines": [{"path": "M 0 0 L 1 1", **f}]})["lines"][0], {}),
     **{
-        cls.__name__: (cls, lambda f, kind=kind: native.region(kind, f), {})
+        cls.__name__: (cls, _region(kind), {})
         for kind, cls in {
             "grid": Grid,
             "shards": Shards,
