@@ -57,7 +57,7 @@ fn a_look_is_accepted_wherever_a_recipe_file_is() -> Outcome {
     let unknown = bt(&["render", &at(&root, "me.png"), "glitchy", "-o", &at(&root, "out2")]);
     assert_eq!(unknown.code, 1);
     assert!(
-        unknown.err.contains("no look or file \"glitchy\"") && unknown.err.contains("did you mean \"glitch\""),
+        unknown.err.contains("no look or file 'glitchy'") && unknown.err.contains("did you mean 'glitch'"),
         "{}",
         unknown.err
     );

@@ -97,8 +97,8 @@ fn an_unknown_look_names_the_closest_looks_and_lists_them_all() {
         .err()
         .map(|error| error.to_string())
         .unwrap_or_default();
-    assert!(refused.contains("no look \"crtt\""), "{refused}");
-    assert!(refused.contains("did you mean \"crt\"?"), "{refused}");
+    assert!(refused.contains("no look 'crtt'"), "{refused}");
+    assert!(refused.contains("did you mean 'crt'?"), "{refused}");
     assert!(
         refused.contains("the looks: ") && refused.contains("glitch"),
         "{refused}"
@@ -107,7 +107,7 @@ fn an_unknown_look_names_the_closest_looks_and_lists_them_all() {
         .err()
         .map(|error| error.to_string())
         .unwrap_or_default();
-    assert!(short.contains("\"crt\""), "a missing letter: {short}");
+    assert!(short.contains("'crt'"), "a missing letter: {short}");
     let far = Recipe::look("zzzzzzzz")
         .err()
         .map(|error| error.to_string())
@@ -135,7 +135,7 @@ fn a_name_is_a_look_and_anything_else_is_a_file_or_an_error_saying_both_were_tri
         .err()
         .map(|error| error.to_string())
         .unwrap_or_default();
-    assert!(nothing.contains("no look or file \"no/such/recipe.toml\""), "{nothing}");
+    assert!(nothing.contains("no look or file 'no/such/recipe.toml'"), "{nothing}");
     assert!(nothing.contains("the looks: "), "{nothing}");
     Ok(())
 }

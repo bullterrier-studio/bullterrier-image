@@ -39,8 +39,8 @@ mod _core {
 
     #[pymodule_export]
     use super::{
-        CoreError, apply, check, documentation, effect, effects, main, params, read_recipe, region_presets, register,
-        shipped_looks, shipped_presets, summary, unregister, vocabulary,
+        CoreError, apply, check, documentation, effect, effects, main, params, read_recipe, read_recipe_source,
+        region_presets, register, shipped_looks, shipped_presets, summary, unregister, vocabulary,
     };
 
     #[pymodule_export]
@@ -294,6 +294,22 @@ fn read_recipe<'py>(py: Python<'py>, text: &str, syntax: &str) -> PyResult<Bound
                 "a recipe is written in 'toml' or 'json', not {other:?}"
             )));
         }
+    }
+    .map_err(core_error)?;
+    from_json(py, &serde_json::to_value(&recipe).map_err(value_error)?)
+}
+
+/// The recipe a look's name or a recipe file holds, as `read_recipe` gives it, its name and its files (an svg, a picture, a
+/// lookup table) as the core makes them: `spec` is a file's path if `file` is true, else a look's name when it is exactly
+/// one, else a file's path. A recipe without a name takes its file's name without `.toml`.
+///
+/// `CoreError` of kind `recipe` starting with the file's name, or saying `no look or file`, the nearest looks and all of them.
+#[pyfunction]
+fn read_recipe_source<'py>(py: Python<'py>, spec: &str, file: bool) -> PyResult<Bound<'py, PyAny>> {
+    let recipe = if file {
+        Recipe::from_file(std::path::Path::new(spec))
+    } else {
+        Recipe::resolve(spec)
     }
     .map_err(core_error)?;
     from_json(py, &serde_json::to_value(&recipe).map_err(value_error)?)

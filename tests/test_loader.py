@@ -798,7 +798,7 @@ def test_a_path_is_always_a_file_never_a_look(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     ("name", "says"),
     [
-        pytest.param("glich", r"no look or file 'glich'.*did you mean load_recipe\(\"glitch\"\)", id="near a look"),
+        pytest.param("glich", r"no look or file 'glich'.*did you mean 'glitch'\?", id="near a look"),
         pytest.param("zzz", r"no look or file 'zzz'.*the looks: .*crt", id="near nothing: the looks listed"),
     ],
 )

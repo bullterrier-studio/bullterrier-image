@@ -5,6 +5,7 @@ use std::path::Path;
 use serde_json::Value;
 
 use super::Recipe;
+use crate::documentation::quoted;
 use crate::params::Kind;
 use crate::{Error, Presets};
 
@@ -12,12 +13,16 @@ impl Recipe {
     /// The look called `name` that ships with the crate: a recipe with a `description`, named `name`.
     ///
     /// # Errors
-    /// [`Error::Recipe`] saying `no look "name"`, which looks are closest (if any are) and all the looks, for any other
+    /// [`Error::Recipe`] saying `no look 'name'`, which looks are closest (if any are) and all the looks, for any other
     /// name.
     pub fn look(name: &str) -> Result<Self, Error> {
         let looks = crate::shipped::looks();
         let Some((_, text)) = looks.iter().find(|(known, _)| *known == name) else {
-            return Err(Error::Recipe(format!("no look {name:?}: {}", unknown_look(name))));
+            return Err(Error::Recipe(format!(
+                "no look {}: {}",
+                quoted(name),
+                unknown_look(name)
+            )));
         };
         let mut recipe = Self::from_toml(text)?;
         recipe.name = Some(name.to_owned());
@@ -51,7 +56,7 @@ impl Recipe {
     /// that path ([`from_file`](Self::from_file)).
     ///
     /// # Errors
-    /// [`Error::Recipe`] saying `no look or file "spec"`, the closest looks and all the looks if `spec` is neither;
+    /// [`Error::Recipe`] saying `no look or file 'spec'`, the closest looks and all the looks if `spec` is neither;
     /// what `from_file` refuses.
     pub fn resolve(spec: &str) -> Result<Self, Error> {
         if crate::shipped::looks().iter().any(|(known, _)| *known == spec) {
@@ -60,7 +65,8 @@ impl Recipe {
             Self::from_file(Path::new(spec))
         } else {
             Err(Error::Recipe(format!(
-                "no look or file {spec:?}: {}",
+                "no look or file {}: {}",
+                quoted(spec),
                 unknown_look(spec)
             )))
         }
@@ -155,7 +161,7 @@ fn unknown_look(name: &str) -> String {
     let hint = if near.is_empty() {
         String::new()
     } else {
-        let names: Vec<String> = near.iter().map(|known| format!("{known:?}")).collect();
+        let names: Vec<String> = near.iter().map(|known| quoted(known)).collect();
         format!("did you mean {}? ", names.join(" or "))
     };
     let all: Vec<&str> = looks.iter().map(|(known, _)| *known).collect();

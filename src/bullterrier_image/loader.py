@@ -108,7 +108,6 @@ Dependency direction: imports `core` (steps, framing, regions, registry, params,
 not know `bridge`.
 """
 
-import difflib
 from collections.abc import Mapping
 from os import PathLike
 from pathlib import Path
@@ -116,7 +115,7 @@ from pathlib import Path
 from bullterrier_image.errors import BullterrierImageError, ImageReadError, LutError, RecipeError
 
 from . import imageio
-from .core import looks, native, registry
+from .core import native, registry
 from .core.framing import Framing
 from .core.params import arrays_as_values, lut_fields, picture_fields
 from .core.regions import (
@@ -193,55 +192,35 @@ def with_files(effect: str, values: Mapping[str, object], folder: Path) -> dict[
     return arrays_as_values(model, resolved)
 
 
-def _text(path: Path) -> str:
-    """The text of the recipe file `path`: UTF-8, else a RecipeError naming the file."""
-    try:
-        return path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as error:
-        raise RecipeError(f"{path.name}: not UTF-8 text ({error.reason} at byte {error.start})") from None
-
-
 def load_recipe(path: str | Path) -> Recipe:
     """Read a recipe file, or a built-in look by name, and return the validated `Recipe`.
 
     path: a TOML file in the format above, or a `str` that is exactly the name of a built-in look ("crt"). The recipe
     takes the file's `name`, else the file's name without `.toml` ("my look.toml" gives "my look"), and its
-    `description`.
+    `description`. The core reads the file and finds the files it names (`Recipe::from_file`); this builds the model.
     Raises RecipeError (a ValueError; an unknown effect is an UnknownEffectError) for anything invalid, starting with
     the file's name, then the step and the offending key; OSError (FileNotFoundError...) if the file cannot be opened.
     """
-    shipped = looks.read()
-    text = None
-    if isinstance(path, str) and path in shipped:
-        text = shipped[path].text
-        path = f"{path}.toml"
-    elif isinstance(path, str) and not Path(path).exists():
-        near = ", ".join(f'load_recipe("{look}")' for look in difflib.get_close_matches(path, list(shipped), n=3))
-        hint = f"did you mean {near}? " if near else ""
-        raise RecipeError(f"no look or file {path!r}: {hint}the looks: {', '.join(shipped)}")
-    path = Path(path)
-    try:
-        read = native.read_recipe(_text(path) if text is None else text, "toml")
-    except RecipeError as error:
-        raise _located(error, path.name) from None
-    folder = path.parent
+    if not isinstance(path, str):
+        path.stat()  # a file that is not there is an OSError, as opening it would be
+    read = native.read_recipe_source(str(path), not isinstance(path, str))
+    named = Path(path).name if not isinstance(path, str) or Path(path).exists() else f"{path}.toml"
+    folder = Path(path).parent if not isinstance(path, str) or Path(path).exists() else Path()
     regions: dict[str, Kind] = {}
     for name, table in read.get("regions", {}).items():
         fields = dict(table)
         kind = fields.pop("kind")
-        if kind == "svg" and isinstance(fields.get("file"), str):
-            fields["file"] = str(folder / fields["file"])
         try:
             regions[name] = _KINDS[kind].parse(fields, f"region {name!r}")
         except RecipeError as error:
-            raise _located(error, path.name) from None
+            raise _located(error, named) from None
     try:
         frame = Framing(**read.get("frame", {}))
     except RecipeError as error:
-        raise _located(error, f"{path.name}: [frame]") from None
+        raise _located(error, f"{named}: [frame]") from None
     steps = []
     for i, entry in enumerate(read.get("steps", []), start=1):
-        where = f"{path.name}: step {i}"
+        where = f"{named}: step {i}"
         try:
             steps.append(_step(entry, folder))
         except (RecipeError, ImageReadError, LutError) as error:
@@ -249,14 +228,14 @@ def load_recipe(path: str | Path) -> Recipe:
     try:
         return Recipe(
             steps,
-            name=read.get("name", path.stem),
+            name=read.get("name"),
             description=read.get("description"),
             size=read.get("size"),
             frame=frame,
             regions=regions,
         )
     except RecipeError as error:
-        raise _located(error, path.name) from None
+        raise _located(error, named) from None
 
 
 def _step(entry: dict, folder: Path) -> Step | Each:
@@ -284,8 +263,11 @@ def _set(entry: dict, *keys: str) -> dict:
 
 def _effect_step(entry: dict, folder: Path) -> Step:
     """The `Step` of a step the core read, its picture and lookup table paths read."""
+    # the core made the files an effect it runs names into paths that stand on their own; those of an effect written in
+    # Python are as written, so they are found beside the recipe here
+    beside = Path() if registry.parameters(entry["effect"])._core_effect is not None else folder  # noqa: SLF001
     return Step(
         entry["effect"],
-        params=with_files(entry["effect"], entry.get("params", {}), folder),
+        params=with_files(entry["effect"], entry.get("params", {}), beside),
         **_set(entry, "mask", "opacity", "blend_mode", "preset", "partition", "name"),
     )
