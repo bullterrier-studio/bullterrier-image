@@ -685,6 +685,45 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what is planned is in the [effect
   far lower, and the Rust port of `dither` should bring it down) and 12 picture-sized buffers of memory (`tracemalloc`), with a known-bad effect
   for each limit; an effect that needs more is redesigned, or the budget is raised in its own reviewed commit. The FFT is single-threaded, so CPU time stays predictable when photos are
   rendered in parallel.
+- **E7 measurements against the proof of concept (2026-11-11, `main` at 192a259c).** Machine: Apple M4, 10 cores; other
+  sessions ran on it (load average 3 to 6 while measuring), so a figure is good to about 10 %. The PoC is the five-effect
+  benchmark that justified the port (separate local repo, built before; its binaries were run again for the "PoC" column,
+  same clip, same frames). The recipe is `radial_blur, halftone, vignette, [bloom,] grade` at the library defaults except
+  halftone `cell 14, feather 1`, bloom `radius 32` and a `grade` that changes the picture; 1080p.
+
+  | Measured | PoC (Rust, bench code) | Library now (`render` from Python) | Python library before the port |
+  |---|---|---|---|
+  | Batch video, 6 workers, no bloom, fps | 25.0 | 10.8 | 4.4 |
+  | Same, with bloom | 7.0 | 6.0 | (2.3x slower than the PoC) |
+  | Batch video, peak RSS of the process (no bloom / bloom) | 0.56 / 0.56 GB | 1.1 / 1.7 GB | 5.9 GB (whole tree) |
+  | Single thread, ms per 1080p frame: grade / vignette / halftone / radial_blur / bloom | 3.6 / 5.7 / 94 / 33 / 393 | 15.6 / 44 / 63 / 189 / 232 | (PoC was 23x / 7x / 1.8x / 14.5x / 0.8x faster) |
+  | Live (paced 30 fps, vignette + grade, 6 workers), latency p50 / p95 at 720p | 6.8 / 8.0 ms | 31 / 33 ms | 75 to 307 ms, up to 39 % dropped |
+  | Same at 1080p | 11.7 / 12.5 ms | 74 / 78 ms | |
+  | Frames dropped live | 0 | 0 (every 1080p frame later than 33 ms) | up to 39 % |
+  | Cold start: `import` plus the first `fx.grade()` / the first render | under 10 ms (binary) | 168 / 170 ms | 700 ms |
+  | `import bullterrier_image` alone (lazy) | | 15 ms (the interpreter is 13) | 250 ms |
+  | Banded render, 12 MP, 16 pixel steps, memory beyond the photo: whole / `band=256` / `band=64` | | 333 / 212 / 215 MB (a picture is 144 MB) | |
+
+  *What is better than before the port:* every figure against the Python library (throughput 2.4x, memory about 5x less, live
+  keeps every frame, cold start 4x faster); bloom and halftone are faster than the PoC's (bloom 232 against 393 ms single
+  thread; halftone 63 against 94 ms). *What is worse than the PoC, and why:* `grade` (4x), `vignette` (8x) and `radial_blur`
+  (5.8x) are slower per pixel. Causes found: the library's `vignette` computes in f64 with two `powf` per pixel for any
+  `roundness`, where the PoC special-cased the ellipse (one `sqrt`, f32); the library's `radial_blur` is the general sampler
+  (every interpolation and edge rule, f64 coordinates), where the PoC wrote bilinear-reflect with the column taps worked out
+  once. For `grade` the cause is **not found**: same arithmetic as the PoC; not the binding (the same time in a Rust program
+  calling `Photo::render`), not a fixed cost per render (`channel_mixer` takes 3.5 ms), not the colour-balance branch, not
+  the index arithmetic of `map_at`; it stays as an open question for a performance batch (kernel as written is a closure
+  over `[f32; 3]` per pixel with clamps, the PoC a flat loop). The throughput gap (10.8 against 25.0 fps) is these kernels
+  plus 7 ms a frame of numpy conversion (uint8 to float 3.1 ms, back 4.3 ms), which the PoC did in Rust; the memory gap is
+  Python's frames (a driver holds several float32 pictures per worker) against the PoC's in-place buffers.
+  *Method differences:* the PoC's workers are Rust threads with a reused frame and scratch; this driver is Python threads
+  (the GIL is released inside `render`), converting uint8 frames with numpy, with `render` allocating its result each call.
+  Memory is `ru_maxrss` of the driver process, the PoC's is `/usr/bin/time -l` of its binary; neither counts ffmpeg (the old
+  5.9 GB was measured across the process tree, so it is not directly comparable). Recipes with blurs do not band well:
+  8 steps with two Gaussian blurs took 3.5 s whole, 16 s at `band=256` and 54 s at `band=64`, with no memory gain (the
+  blur footprints at a 12 MP photo's scale exceed the band), so `band` is for pixel and small-footprint chains.
+  Not measured: peak memory at 4K per effect and the pool-size sweep of the original spike; there is no standalone Rust
+  binary yet (`crates/cli` is a library), so the cold start of the CLI is `python -m bullterrier_image` (113 ms).
 
 ## The Rust core
 
