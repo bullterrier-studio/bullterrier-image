@@ -1,0 +1,20 @@
+[package]
+name = "bullterrier-image-cli"
+description = "The command line of bullterrier-image: `bt-image`, as a library whose `main` the Python console script calls."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+bullterrier-image = { workspace = true, features = ["onnx"] }
+bullterrier-image-finders.workspace = true
+clap.workspace = true
+
+[lints]
+workspace = true

@@ -4,7 +4,7 @@
 # live here, except what a tool cannot read from this file: rust-toolchain.toml, rustfmt.toml, deny.toml.
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/derive", "crates/finders", "crates/python"]
+members = ["crates/cli", "crates/core", "crates/derive", "crates/finders", "crates/python"]
 
 [workspace.package]
 version = "0.0.0"  # never published on its own: the Python package's version (pyproject.toml) is the release's
@@ -19,6 +19,7 @@ bullterrier-image = { path = "crates/core" }
 bullterrier-image-finders = { path = "crates/finders" }
 bullterrier-image-derive = { path = "crates/derive" }
 # the files the core reads: pure-Rust decoders only (no C, no nasm); no encoders besides the ones these formats bring
+clap = { version = "4", default-features = false, features = ["std", "string", "derive", "help", "usage", "error-context", "suggestions"] }  # the command line (`crates/cli`)
 delaunator = { version = "=1.1.0", default-features = false }  # Delaunay triangulation, a hard algorithm; used only in `ops/triangles.rs`
 glob = "0.3"  # the photos of a project: globs relative to its file (`pipeline/project.rs`), dotfiles skipped as a shell does
 image = { version = "0.25", default-features = false, features = ["bmp", "gif", "jpeg", "png", "tiff", "webp"] }
