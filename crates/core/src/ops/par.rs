@@ -89,3 +89,26 @@ pub(crate) fn rows<T: Send>(out: &mut [T], row_len: usize, fill: impl Fn(usize, 
         });
     });
 }
+
+/// `fold(first, chunk)` for each chunk of `chunk_len` elements of `data` (the last may be shorter), in order, on the threads
+/// of the render's pool when it has one. The chunks are cut by the data and `chunk_len` alone, never by the number of
+/// threads, so a reduction of the results is the same at any thread count. `chunk_len` is at least 1.
+pub(crate) fn chunks<T: Sync, R: Send>(
+    data: &[T],
+    chunk_len: usize,
+    fold: impl Fn(usize, &[T]) -> R + Sync + Send,
+) -> Vec<R> {
+    POOL.with_borrow(|pool| match pool {
+        Some(pool) => pool.install(|| {
+            data.par_chunks(chunk_len)
+                .enumerate()
+                .map(|(chunk, part)| fold(chunk * chunk_len, part))
+                .collect()
+        }),
+        None => data
+            .chunks(chunk_len)
+            .enumerate()
+            .map(|(chunk, part)| fold(chunk * chunk_len, part))
+            .collect(),
+    })
+}

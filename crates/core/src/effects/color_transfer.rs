@@ -4,6 +4,7 @@ use serde::Deserialize;
 
 use crate::effect::{Category, Meta};
 use crate::ops::colorspace::{oklab_to_rgb, rgb_to_oklab};
+use crate::ops::par;
 use crate::params::{Params, PictureName};
 use crate::{Footprint, Image, Inputs, Picture};
 
@@ -59,38 +60,67 @@ struct Spread {
     deviation: [f64; 3],
 }
 
-/// The weighted spread of `pixels` (each an Oklab colour and a weight), or none if the weights add up to nothing.
-fn spread(pixels: impl Iterator<Item = ([f32; 3], f64)> + Clone) -> Option<Spread> {
-    let total: f64 = pixels.clone().map(|(_, weight)| weight).sum();
-    if total <= 0.0 {
-        return None;
-    }
-    let mut mean = [0.0; 3];
-    for (lab, weight) in pixels.clone() {
-        for (sum, level) in mean.iter_mut().zip(lab) {
-            *sum += weight * f64::from(level) / total;
+/// How many pixels a chunk of the spread holds: the unit the sums are cut into, whatever the thread count.
+const SPREAD_CHUNK: usize = 1 << 14; // constant: 16384 pixels, a few hundred microseconds of work, coarse for a pool
+
+/// The weight, mean and sum of squared deviations from the mean (per channel) of some pixels.
+struct Moments {
+    weight: f64,
+    mean: [f64; 3],
+    squares: [f64; 3],
+}
+
+/// The moments of `pixels` weighted by `alpha` (all 1 without it, `alpha` aligned with `pixels` from `first`), in one
+/// pass: sums taken about the first pixel's colour, so a large, nearly flat picture loses no digits to cancellation.
+fn moments(pixels: &[[f32; 3]], first: usize, alpha: Option<&[f32]>) -> Moments {
+    let origin = pixels.first().map_or([0.0; 3], |&pixel| rgb_to_oklab(pixel).map(f64::from));
+    let (mut weight, mut sum, mut squares) = (0.0, [0.0; 3], [0.0; 3]);
+    for (at, &pixel) in pixels.iter().enumerate() {
+        let w = alpha.map_or(1.0, |alpha| f64::from(alpha[first + at]));
+        weight += w;
+        for (channel, level) in rgb_to_oklab(pixel).into_iter().enumerate() {
+            let offset = f64::from(level) - origin[channel];
+            sum[channel] += w * offset;
+            squares[channel] += w * offset * offset;
         }
     }
-    let mut deviation = [0.0; 3];
-    for (lab, weight) in pixels {
-        for ((sum, level), centre) in deviation.iter_mut().zip(lab).zip(mean) {
-            *sum += weight * (f64::from(level) - centre).powi(2) / total;
-        }
+    let shift = |channel: usize| if weight > 0.0 { sum[channel] / weight } else { 0.0 };
+    Moments {
+        weight,
+        mean: std::array::from_fn(|channel| origin[channel] + shift(channel)),
+        squares: std::array::from_fn(|channel| squares[channel] - sum[channel] * shift(channel)),
     }
-    Some(Spread {
-        mean,
-        deviation: deviation.map(f64::sqrt),
+}
+
+/// The weighted spread of `pixels` (`alpha`, if any, weighs each), or none if the weights add up to nothing. The chunks
+/// are summed in order, so the result does not depend on the thread count.
+fn spread(pixels: &[[f32; 3]], alpha: Option<&[f32]>) -> Option<Spread> {
+    let parts = par::chunks(pixels, SPREAD_CHUNK, |first, part| moments(part, first, alpha));
+    let mut all = Moments {
+        weight: 0.0,
+        mean: [0.0; 3],
+        squares: [0.0; 3],
+    };
+    for part in parts.into_iter().filter(|part| part.weight > 0.0) {
+        // Chan's pairwise combination of two sets of moments
+        let weight = all.weight + part.weight;
+        for channel in 0..3 {
+            let gap = part.mean[channel] - all.mean[channel];
+            all.squares[channel] += part.squares[channel] + gap * gap * all.weight * part.weight / weight;
+            all.mean[channel] += gap * part.weight / weight;
+        }
+        all.weight = weight;
+    }
+    (all.weight > 0.0).then(|| Spread {
+        mean: all.mean,
+        deviation: all.squares.map(|squares| (squares / all.weight).max(0.0).sqrt()),
     })
 }
 
 /// The photo with the reference's colour mood; the photo itself without a reference.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    let reference = inputs.image("reference").and_then(|asset| {
-        let alpha = asset.alpha();
-        let pixels = asset.as_picture().pixels().iter().enumerate();
-        spread(pixels.map(|(at, &pixel)| (rgb_to_oklab(pixel), alpha.map_or(1.0, |alpha| f64::from(alpha[at])))))
-    });
-    let own = spread(picture.pixels().iter().map(|&pixel| (rgb_to_oklab(pixel), 1.0)));
+    let reference = inputs.image("reference").and_then(|asset| spread(asset.as_picture().pixels(), asset.alpha()));
+    let own = spread(picture.pixels(), None);
     let (Some(target), Some(own)) = (reference, own) else {
         return picture.map(|pixel| pixel);
     };
