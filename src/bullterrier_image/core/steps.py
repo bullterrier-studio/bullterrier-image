@@ -44,7 +44,6 @@ from .params import (
     arrays_as_values,
     bounds,
     cyclic_of,
-    field_name_fields,
     picture_fields,
     unit_of,
 )
@@ -457,34 +456,16 @@ def _as_drive(effect: str, name: str, value: Any) -> Any:
         raise RecipeError(f"effect {effect!r}: `{name}`: {error}") from None
 
 
-_ALONE = re.compile(r"^step 1: ")  # the place the core names in a recipe of one step
+_ALONE = re.compile(r"^step: ")  # the place the core names a step checked on its own
 
 
 def _check_alone(step: "Step") -> None:
-    """RecipeError (UnknownEffectError for an unknown effect) unless the core accepts `step` as a recipe of one step:
-    its effect, parameters, drives and `partition`. The regions a `mask`, a `partition` or a drive's `by` name are the
-    recipe's to check, so the step is put to the core with stand-ins for them: no mask, a declared grid for the
-    partition, `light` for each field parameter, and for each different `by` a different built-in selection."""
+    """RecipeError (UnknownEffectError for an unknown effect) unless the core accepts `step` on its own: its effect,
+    parameters, drives, opacity, name and `partition`. The regions it names are the recipe's to check."""
     with registry.holding() as hold:
-        entry = _entry(step, hold)
-    entry = cast("dict[str, Any]", entry)
-    entry.pop("mask", None)
-    document: dict[str, Any] = {"steps": [entry]}
-    if "partition" in entry:
-        entry["partition"], document["regions"] = "stand_in", {"stand_in": {"kind": "grid"}}
-    named = field_name_fields(registry.parameters(step.effect))  # the selections a field parameter names
-    stand_ins: dict[
-        str, str
-    ] = {}  # each field a drive varies by, as one of the built-in selections, a different one each
-    for name, value in entry.get("params", {}).items():
-        if name in named and not isinstance(value, dict):
-            entry["params"][name] = "light"
-        elif isinstance(value, dict) and "by" in value:
-            value["by"] = stand_ins.setdefault(
-                str(value["by"]), ("light", "depth", "subject", "background")[len(stand_ins) % 4]
-            )
+        entry = cast("dict[str, Any]", _entry(step, hold))
     try:
-        native.check_recipe(document)
+        native.check_step(entry)
     except RecipeError as error:
         raise RecipeError(_ALONE.sub("", str(error))) from None
 

@@ -9,6 +9,7 @@ use super::references::{self, Form};
 use super::{Drive, Each, Entry, Recipe, Regions, STEP_KEYS, Step, drive};
 use crate::effect::Input;
 use crate::params::Kind;
+use crate::params::Table;
 use crate::registry::Registry;
 use crate::{Error, Presets};
 
@@ -151,84 +152,16 @@ struct Rules<'a> {
 
 impl Rules<'_> {
     fn step(&mut self, step: &Step, place: &str) -> Result<(), Error> {
-        let effect = self.registry.effect(&step.effect)?;
-        self.layer(place, step.mask.as_deref(), step.opacity, step.name.as_deref())?;
-        let params = self.presets.under(step, place)?;
-        for key in Input::ALL.iter().map(|input| input.name()) {
-            if params.contains_key(key) {
-                return Err(Error::Recipe(format!(
-                    "{place}: `{key}` is supplied by the recipe itself and cannot be set"
-                )));
-            }
+        let shape = step_shape(self.registry, self.presets, step, place)?;
+        if let Some(mask) = &step.mask {
+            self.refer(place, "mask", mask, Some(Form::Selection))?;
         }
-        for key in STEP_KEYS {
-            if params.contains_key(*key) {
-                return Err(Error::Recipe(format!(
-                    "{place}: `{key}` is a key of the step, not a parameter of '{}': give it as the step's `{key}`",
-                    step.effect
-                )));
-            }
-        }
-        let drives = drive::in_params(&step.effect, &params, place)?;
-        if let Some(table) = effect.params() {
-            for (name, _) in &drives {
-                if let Some(field) = table.fields.iter().find(|field| field.name == name && !field.drivable) {
-                    let drivable: Vec<&str> = table
-                        .fields
-                        .iter()
-                        .filter(|field| field.drivable)
-                        .map(|f| f.name)
-                        .collect();
-                    let why = match field.kind {
-                        Kind::Int => " (a whole number)",
-                        Kind::Float => "",
-                        _ => " (not a number)",
-                    };
-                    return Err(Error::Recipe(format!(
-                        "{place}: effect '{}': `{name}` cannot be driven by a field{why}; its drivable parameters: {}",
-                        step.effect,
-                        if drivable.is_empty() {
-                            "none".to_owned()
-                        } else {
-                            drivable.join(", ")
-                        }
-                    )));
-                }
-            }
-            // the values between the ends of a drive lie between two values the parameter takes, so they take it too
-            let mut ends: Vec<fn(&Drive) -> f64> = vec![|drive| drive.start];
-            if !drives.is_empty() {
-                ends.push(|drive| drive.end);
-            }
-            for end in ends {
-                let mut values = params.clone();
-                for (name, drive) in &drives {
-                    values.insert(name.clone(), Value::from(end(drive)));
-                }
-                table.check(&step.effect, &values).map_err(|error| error.at(place))?;
-            }
-        }
-        match (effect.inputs().contains(&Input::Partition), &step.partition) {
-            (true, None) => {
-                return Err(Error::Recipe(format!(
-                    "{place}: effect '{}' draws along the borders of a partition: give `partition`, a region",
-                    step.effect
-                )));
-            }
-            (false, Some(_)) => {
-                return Err(Error::Recipe(format!(
-                    "{place}: effect '{}' takes no partition: remove `partition`",
-                    step.effect
-                )));
-            }
-            _ => {}
-        }
-        for (_, drive) in &drives {
+        for (_, drive) in &shape.drives {
             self.refer(place, "by", &drive.by, Some(Form::Selection))?;
         }
-        for field in effect.fields() {
+        for field in shape.effect.fields() {
             let name = field
-                .field_in(&params)
+                .field_in(&shape.params)
                 .map_err(|why| Error::Recipe(format!("{place}: {why}")))?;
             self.refer(place, &field.parameter, name, Some(Form::Selection))?;
         }
@@ -239,64 +172,17 @@ impl Rules<'_> {
     }
 
     fn each(&mut self, each: &Each, place: &str) -> Result<(), Error> {
-        self.layer(place, each.mask.as_deref(), each.opacity, each.name.as_deref())?;
-        if each.looks.is_empty() {
-            return Err(Error::Recipe(format!("{place}: an each step needs at least one look")));
-        }
-        if !(0.0..=24.0).contains(&each.feather) {
-            return Err(Error::Recipe(format!(
-                "{place}: `feather` must be from 0 to 24 px, got {}",
-                each.feather
-            )));
+        each_shape(each, place)?;
+        if let Some(mask) = &each.mask {
+            self.refer(place, "mask", mask, Some(Form::Selection))?;
         }
         self.refer(place, "each", &each.each, Some(Form::Partition))?;
         for (index, look) in each.looks.iter().enumerate() {
-            let Some(look) = look else { continue };
-            let place = format!("{place}, look {}", index + 1);
-            if look.name.is_some() {
-                return Err(Error::Recipe(format!(
-                    "{place}: a look takes no `name`: its numbers are addressed by place, `looks[{index}]`"
-                )));
+            if let Some(look) = look {
+                self.step(look, &format!("{place}, look {}", index + 1))?;
             }
-            self.step(look, &place)?;
         }
         Ok(())
-    }
-
-    /// What a step and an each step share: how the result is laid over the picture below.
-    fn layer(
-        &mut self,
-        place: &str,
-        mask: Option<&str>,
-        opacity: Option<f64>,
-        name: Option<&str>,
-    ) -> Result<(), Error> {
-        if let Some(opacity) = opacity
-            && !(0.0..=1.0).contains(&opacity)
-        {
-            return Err(Error::Recipe(format!(
-                "{place}: `opacity` must be from 0 to 1, got {opacity}"
-            )));
-        }
-        if let Some(name) = name {
-            let mut characters = name.chars();
-            let word = characters.next().is_some_and(|first| first.is_ascii_alphabetic())
-                && characters.all(|character| character.is_ascii_alphanumeric() || character == '_');
-            if !word {
-                return Err(Error::Recipe(format!(
-                    "{place}: `name` must be letters, digits and underscores, starting with a letter, got '{name}'"
-                )));
-            }
-            if ADDRESS_WORDS.contains(&name) {
-                return Err(Error::Recipe(format!(
-                    "{place}: `name` '{name}' is reserved: an address starts with `region`, `frame` or `each`"
-                )));
-            }
-        }
-        match mask {
-            Some(mask) => self.refer(place, "mask", mask, Some(Form::Selection)),
-            None => Ok(()),
-        }
     }
 
     /// `name`, what `key` of the step at `place` refers to, is a region of the `wanted` form (none: either), and is
@@ -309,6 +195,193 @@ impl Rules<'_> {
             key: key.to_owned(),
             name: name.to_owned(),
         });
+        Ok(())
+    }
+}
+
+/// The rules of how a result is laid that need nothing outside it: an `opacity` from 0 to 1 and a `name` that is a word an
+/// address cannot mistake.
+fn layer_shape(place: &str, opacity: Option<f64>, name: Option<&str>) -> Result<(), Error> {
+    if let Some(opacity) = opacity
+        && !(0.0..=1.0).contains(&opacity)
+    {
+        return Err(Error::Recipe(format!(
+            "{place}: `opacity` must be from 0 to 1, got {opacity}"
+        )));
+    }
+    if let Some(name) = name {
+        let mut characters = name.chars();
+        let word = characters.next().is_some_and(|first| first.is_ascii_alphabetic())
+            && characters.all(|character| character.is_ascii_alphanumeric() || character == '_');
+        if !word {
+            return Err(Error::Recipe(format!(
+                "{place}: `name` must be letters, digits and underscores, starting with a letter, got '{name}'"
+            )));
+        }
+        if ADDRESS_WORDS.contains(&name) {
+            return Err(Error::Recipe(format!(
+                "{place}: `name` '{name}' is reserved: an address starts with `region`, `frame` or `each`"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// What a step is by itself, once its own rules hold: its effect, its parameters (its preset's under them) and its drives.
+struct Shape {
+    effect: std::sync::Arc<dyn crate::Effect>,
+    params: serde_json::Map<String, Value>,
+    drives: Vec<(String, Drive)>,
+}
+
+/// The rules of a step that need nothing outside it (`place` leads each message): its effect is registered, its
+/// `opacity` and `name` are well formed, its parameters are the effect's (drives included, all varying by one field in
+/// one number of levels), and it has a `partition` exactly when its effect takes that input. What it names (`mask`,
+/// `partition`, a drive's `by`, a field) is not looked up: that is the recipe's to check.
+fn step_shape(registry: &Registry, presets: &Presets, step: &Step, place: &str) -> Result<Shape, Error> {
+    let effect = registry.effect(&step.effect)?;
+    layer_shape(place, step.opacity, step.name.as_deref())?;
+    let params = presets.under(step, place)?;
+    for key in Input::ALL.iter().map(|input| input.name()) {
+        if params.contains_key(key) {
+            return Err(Error::Recipe(format!(
+                "{place}: `{key}` is supplied by the recipe itself and cannot be set"
+            )));
+        }
+    }
+    for key in STEP_KEYS {
+        if params.contains_key(*key) {
+            return Err(Error::Recipe(format!(
+                "{place}: `{key}` is a key of the step, not a parameter of '{}': give it as the step's `{key}`",
+                step.effect
+            )));
+        }
+    }
+    let drives = drive::in_params(&step.effect, &params, place)?;
+    if let Some(table) = effect.params() {
+        check_drives(&table, &step.effect, &params, &drives, place)?;
+    }
+    match (effect.inputs().contains(&Input::Partition), &step.partition) {
+        (true, None) => {
+            return Err(Error::Recipe(format!(
+                "{place}: effect '{}' draws along the borders of a partition: give `partition`, a region",
+                step.effect
+            )));
+        }
+        (false, Some(_)) => {
+            return Err(Error::Recipe(format!(
+                "{place}: effect '{}' takes no partition: remove `partition`",
+                step.effect
+            )));
+        }
+        _ => {}
+    }
+    Ok(Shape { effect, params, drives })
+}
+
+/// The drives are of numbers the effect lets a field drive, and the values at their ends are values the parameters take.
+fn check_drives(
+    table: &Table,
+    effect: &str,
+    params: &serde_json::Map<String, Value>,
+    drives: &[(String, Drive)],
+    place: &str,
+) -> Result<(), Error> {
+    for (name, _) in drives {
+        if let Some(field) = table.fields.iter().find(|field| field.name == name && !field.drivable) {
+            let drivable: Vec<&str> = table
+                .fields
+                .iter()
+                .filter(|field| field.drivable)
+                .map(|f| f.name)
+                .collect();
+            let why = match field.kind {
+                Kind::Int => " (a whole number)",
+                Kind::Float => "",
+                _ => " (not a number)",
+            };
+            return Err(Error::Recipe(format!(
+                "{place}: effect '{effect}': `{name}` cannot be driven by a field{why}; its drivable parameters: {}",
+                if drivable.is_empty() {
+                    "none".to_owned()
+                } else {
+                    drivable.join(", ")
+                }
+            )));
+        }
+    }
+    // the values between the ends of a drive lie between two values the parameter takes, so they take it too
+    let mut ends: Vec<fn(&Drive) -> f64> = vec![|drive| drive.start];
+    if !drives.is_empty() {
+        ends.push(|drive| drive.end);
+    }
+    for end in ends {
+        let mut values = params.clone();
+        for (name, drive) in drives {
+            values.insert(name.clone(), Value::from(end(drive)));
+        }
+        table.check(effect, &values).map_err(|error| error.at(place))?;
+    }
+    Ok(())
+}
+
+impl Step {
+    /// This step if it follows the rules of a step on its own: its effect is registered, its parameters (with its
+    /// `preset`'s under them) are the effect's, its drives are of numbers a field may drive and vary by one field in one
+    /// number of levels, its `opacity` and `name` are well formed, and it has a `partition` exactly when its effect takes
+    /// that input. What it names (`mask`, `partition`, a drive's `by`, the field a parameter names) is not looked up:
+    /// those are rules of the [`Recipe`] it is put in ([`Recipe::checked`]). Messages are led by `step`.
+    ///
+    /// # Errors
+    /// [`Error::UnknownEffect`], [`Error::Invalid`] or [`Error::Recipe`] as [`Recipe::checked`] gives for a step.
+    pub fn check(&self, presets: &Presets) -> Result<(), Error> {
+        step_shape(crate::registry::registry(), presets, self, "step").map(|_| ())
+    }
+}
+
+/// The rules of an each step that need nothing outside it and none of its looks' own: well formed `opacity` and `name`,
+/// at least one look, a `feather` from 0 to 24 px, no look with a `name`.
+fn each_shape(each: &Each, place: &str) -> Result<(), Error> {
+    layer_shape(place, each.opacity, each.name.as_deref())?;
+    if each.looks.is_empty() {
+        return Err(Error::Recipe(format!("{place}: an each step needs at least one look")));
+    }
+    if !(0.0..=24.0).contains(&each.feather) {
+        return Err(Error::Recipe(format!(
+            "{place}: `feather` must be from 0 to 24 px, got {}",
+            each.feather
+        )));
+    }
+    for (index, look) in each.looks.iter().enumerate() {
+        if look.as_ref().is_some_and(|look| look.name.is_some()) {
+            return Err(Error::Recipe(format!(
+                "{place}, look {}: a look takes no `name`: its numbers are addressed by place, `looks[{index}]`",
+                index + 1
+            )));
+        }
+    }
+    Ok(())
+}
+
+impl Each {
+    /// This each step if it follows the rules of one on its own: well formed `opacity` and `name`, at least one look, a
+    /// `feather` from 0 to 24 px, no look with a `name`, and every look a [`Step::check`]ed step. The partition it goes
+    /// over and what a mask or a look names are not looked up: those are the [`Recipe`]'s. Messages are led by `each`.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] naming the rule, as [`Recipe::checked`] gives for an each step; what [`Step::check`] gives for a look.
+    pub fn check(&self, presets: &Presets) -> Result<(), Error> {
+        each_shape(self, "each")?;
+        for (index, look) in self.looks.iter().enumerate() {
+            if let Some(look) = look {
+                step_shape(
+                    crate::registry::registry(),
+                    presets,
+                    look,
+                    &format!("each, look {}", index + 1),
+                )?;
+            }
+        }
         Ok(())
     }
 }

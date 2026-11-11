@@ -330,12 +330,12 @@ def test_the_regions_of_a_file_are_read_in_the_order_it_declares_them(tmp_path):
 
 def test_a_python_dict_keeps_its_order_into_the_core_and_back():
     given: dict[str, Any] = {
-        "steps": [{"effect": "grade", "params": {"zebra": 1, "apple": 2}}],
+        "steps": [{"effect": "grade", "params": {"saturation": 1, "exposure": 2}}],
         "regions": {"zeta": {"kind": "given"}, "alpha": {"kind": "given"}},
     }
     read = _core.read_recipe(json.dumps(given), "json")
     assert list(read["regions"]) == ["zeta", "alpha"]
-    assert list(read["steps"][0]["params"]) == ["zebra", "apple"]
+    assert list(read["steps"][0]["params"]) == ["saturation", "exposure"]
     given["steps"][0]["mask"] = "nowhere"
     with pytest.raises(ValueError, match=r"valid selections: subject, background, depth, light, zeta, alpha"):
         _core.check_recipe(given)

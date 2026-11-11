@@ -167,6 +167,7 @@ mod shipped;
 mod slice_shift;
 mod spatial;
 mod starburst;
+mod step_check;
 mod stretch;
 mod svg;
 mod svg_drawing;
