@@ -2,9 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
-use bullterrier_image::documentation::unknown_effect;
 use bullterrier_image::pipeline::file_name;
-use bullterrier_image::{Entry, Error, Presets, Recipe, shipped};
+use bullterrier_image::{Error, Presets, Recipe, shipped};
 
 /// The recipes of `specs`, each a look's name, a recipe file, or a folder (its `.toml` files, by name), in order. Each is
 /// checked to be a valid recipe and to have a name its files can be called by, so nothing slow starts for a recipe that cannot
