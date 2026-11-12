@@ -2,7 +2,7 @@
 
 use super::assets::Assets;
 use super::regions::Evaluator;
-use super::step::{Laid, StepRun};
+use super::step::{Overlay, StepRun};
 use crate::ops::blur;
 use crate::ops::pieces::piece;
 use crate::ops::random::Rng;
@@ -19,7 +19,7 @@ pub(super) struct EachRun {
     seed: u32,
     /// How softly a look fades into the next across a border, in design pixels.
     feather: f64,
-    laid: Laid,
+    overlay: Overlay,
 }
 
 /// The look (an index into the looks, `looks` of them) of each of `pieces` pieces, piece 0 first.
@@ -68,7 +68,7 @@ impl EachRun {
             assign: each.assign,
             seed: each.seed,
             feather: each.feather,
-            laid: Laid::new(each.opacity.unwrap_or(1.0), each.blend_mode, each.mask.as_ref()),
+            overlay: Overlay::new(each.opacity.unwrap_or(1.0), each.blend_mode, each.mask.as_ref()),
         })
     }
 
@@ -118,7 +118,7 @@ impl EachRun {
         for pixel in &mut out {
             *pixel = pixel.map(|value| value.clamp(0.0, 1.0));
         }
-        self.laid
+        self.overlay
             .over(before, Image::from_pixels(height, width, out), regions, working, 0)
     }
 }

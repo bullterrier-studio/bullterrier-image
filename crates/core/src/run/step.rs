@@ -83,14 +83,14 @@ enum Runs {
 
 /// How the result of a step is laid over its input: by a blend mode, mixed in by an opacity and, where there is a `mask`,
 /// only as far as the mask says.
-pub(super) struct Laid {
+pub(super) struct Overlay {
     opacity: f64,
     blend_mode: BlendMode,
     /// The name of the region that limits it.
     mask: Option<String>,
 }
 
-impl Laid {
+impl Overlay {
     pub(super) fn new(opacity: f64, blend_mode: BlendMode, mask: Option<&String>) -> Self {
         Self {
             opacity,
@@ -147,7 +147,7 @@ pub(super) struct StepRun {
     luts: Vec<(String, Arc<Lut>)>,
     /// The picture parameters of the effect that name a picture, each with its picture.
     pictures: Vec<(String, Arc<Image>)>,
-    laid: Laid,
+    overlay: Overlay,
 }
 
 /// The parameters `effect` (called `name`) is run with for the values `given`: for an effect that describes its
@@ -270,7 +270,7 @@ impl StepRun {
         Ok(Self {
             luts,
             pictures,
-            laid: Laid::new(
+            overlay: Overlay::new(
                 step.opacity.unwrap_or_else(|| effect.opacity()),
                 step.blend_mode,
                 step.mask.as_ref(),
@@ -343,7 +343,7 @@ impl StepRun {
                 self.driven(before, &offered, &by, *top, levels)?
             }
         };
-        self.laid.over(before, after, regions, working, at)
+        self.overlay.over(before, after, regions, working, at)
     }
 
     /// The effect run on `before` for each level of the drive that some pixel is on or next to, and each pixel mixes the
