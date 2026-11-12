@@ -205,7 +205,7 @@ impl Options {
 /// [`Error::BackendUnavailable`] naming what is missing and the way to get it: the model file (where it is expected,
 /// where it comes from, and how to allow the download), the library (which variable or option names it), or why
 /// ONNX Runtime cannot use them.
-pub fn finder(model: &Model, options: &Options) -> Result<ModelFinder<Session>, Error> {
+pub fn finder(model: &Model, options: &Options) -> Result<ModelFinder, Error> {
     let file = model_file(model, options)?;
     let cache = match &options.cache {
         Some(folder) => folder.clone(),

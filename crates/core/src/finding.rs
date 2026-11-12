@@ -141,20 +141,20 @@ const SUBJECT_MEAN: f32 = 0.5; // constant: IS-Net's normalisation, v - 0.5 on 0
 /// A subject comes back with its edge cleaned ([`refine_edge`](crate::refine_edge), `shrink` 1.5 px and `feather` 1 px)
 /// and as [`Error::MapNotFound`] of kind subject when no pixel is at least half sure. A depth comes back scaled to
 /// 0..1, nearest 1 and farthest 0 (all 0 when the model tells nothing apart).
-pub struct ModelFinder<R> {
+pub struct ModelFinder {
     kind: ModelKind,
-    runner: R,
+    runner: Box<dyn Infer>,
     shrink: f64,
     feather: f64,
 }
 
-impl<R: Infer> ModelFinder<R> {
+impl ModelFinder {
     /// A finder for a model of `kind`, run by `runner`.
     #[must_use]
-    pub const fn new(kind: ModelKind, runner: R) -> Self {
+    pub fn new(kind: ModelKind, runner: impl Infer + 'static) -> Self {
         Self {
             kind,
-            runner,
+            runner: Box::new(runner),
             shrink: DEFAULT_EDGE.0,
             feather: DEFAULT_EDGE.1,
         }
@@ -190,7 +190,7 @@ impl<R: Infer> ModelFinder<R> {
     }
 }
 
-impl<R: Infer> ModelFinder<R> {
+impl ModelFinder {
     /// The model's answer for `input`, checked to be the `side` (rows, columns) it was asked about.
     fn answer(&self, input: &Tensor, side: (usize, usize)) -> Result<Tensor, Error> {
         let answer = self.runner.infer(input)?;
@@ -206,7 +206,7 @@ impl<R: Infer> ModelFinder<R> {
     }
 }
 
-impl<R: Infer> Finder for ModelFinder<R> {
+impl Finder for ModelFinder {
     fn find(&self, picture: &Picture<'_>) -> Result<Layer, Error> {
         let (height, width) = (picture.height(), picture.width());
         let (input, side) = match self.kind {
