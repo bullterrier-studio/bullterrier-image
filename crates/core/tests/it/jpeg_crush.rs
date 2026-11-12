@@ -14,7 +14,7 @@ fn run(params: &Params, height: usize, width: usize, values: &[f32], ratio: f64)
     let image = apply(
         Params::EFFECT,
         &Picture::new(height, width, values)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default().with_size_ratio(ratio),
     )?;
     Ok(image.into_values())

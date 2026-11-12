@@ -18,7 +18,7 @@ fn grid_of<P: EffectParams>(params: &P, height: usize, width: usize, greys: &[f3
     let image = apply(
         P::EFFECT,
         &Picture::new(height, width, &values)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default(),
     )?;
     Ok(image.into_values().chunks(3).map(|pixel| pixel[0]).collect())

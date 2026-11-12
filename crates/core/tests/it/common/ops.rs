@@ -91,7 +91,7 @@ impl Effect for Spy {
         crate::common::run::table_of_fields(&self.fields)
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         let (labels, pieces) = inputs
             .partition()
             .map_or_else(|| (Vec::new(), 0), |labels| (labels.values().to_vec(), labels.pieces()));
@@ -197,7 +197,7 @@ impl Effect for Level {
         Category::Utilities
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &serde_json::Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Ok(picture.map(|_| [self.level; 3]))
     }
 }

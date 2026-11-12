@@ -21,7 +21,7 @@ fn an_effect_runs_by_its_name_into_a_new_image_of_the_pictures_size() -> Result<
     let image = apply(
         "grade",
         &Picture::new(2, 3, &VALUES)?,
-        grade_params(),
+        &grade_params(),
         &Inputs::default(),
     )?;
     assert_eq!((image.height(), image.width()), (2, 3));
@@ -39,7 +39,7 @@ fn an_effect_runs_by_its_name_into_a_new_image_of_the_pictures_size() -> Result<
 #[test]
 fn the_declared_defaults_of_grade_leave_a_picture_as_it_is() -> Result<(), Error> {
     let defaults = Value::Object(grade::Params::default().values());
-    let out = apply("grade", &Picture::new(2, 3, &VALUES)?, defaults, &Inputs::default())?.into_values();
+    let out = apply("grade", &Picture::new(2, 3, &VALUES)?, &defaults, &Inputs::default())?.into_values();
     assert!(
         out.iter()
             .zip(VALUES)
@@ -55,7 +55,7 @@ fn an_unknown_effect_is_refused_by_name() -> Result<(), Error> {
     let result = apply(
         "no_such_effect",
         &Picture::new(1, 1, &values)?,
-        json!({}),
+        &json!({}),
         &Inputs::default(),
     );
     assert!(matches!(result, Err(Error::UnknownEffect(name)) if name == "no_such_effect"));
@@ -77,7 +77,7 @@ fn parameters_that_drift_from_the_effects_are_refused_naming_the_field() -> Resu
         (extra, "kelvin"),
         (json!({"temperature": "warm"}), "string"),
     ] {
-        let result = apply("grade", &picture, params, &Inputs::default());
+        let result = apply("grade", &picture, &params, &Inputs::default());
         assert!(
             matches!(&result, Err(error @ Error::Params { effect: "grade", .. }) if error.to_string().contains(field)),
             "{field}: {result:?}"

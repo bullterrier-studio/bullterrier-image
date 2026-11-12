@@ -67,7 +67,7 @@ impl Effect for Paint {
         &[Input::SizeRatio]
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.ratios
             .lock()
@@ -157,7 +157,7 @@ fn with_hard_borders_each_piece_is_exactly_its_looks_effect_and_a_none_look_leav
     let values: Vec<f32> = (0_u8..144).map(|index| f32::from(index) / 160.0).collect();
     let grade = json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
                        "vibrance": 0.0});
-    let graded = apply("grade", &Picture::new(4, 12, &values)?, grade, &Inputs::default())?.into_values();
+    let graded = apply("grade", &Picture::new(4, 12, &values)?, &grade, &Inputs::default())?.into_values();
     let look = Step::new("grade").param("exposure", 1.0).opacity(1.0);
     let recipe = recipe_of(2, each_of(vec![Some(look), None], 0.0));
     let out = render(&values, 4, 12, &recipe, Options::default())?;

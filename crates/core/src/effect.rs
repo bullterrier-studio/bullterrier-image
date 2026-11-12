@@ -210,7 +210,7 @@ pub trait Effect: Send + Sync {
     /// # Errors
     /// [`Error::Params`] if `params` miss one of the effect's parameters, have one it does not know, or one of the
     /// wrong type; [`Error::Foreign`] if an effect run elsewhere fails.
-    fn apply(&self, picture: &Picture<'_>, params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error>;
+    fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error>;
 }
 
 /// Run `effect` on `picture` with `params`, handing it the part of `offered` that it declares.
@@ -221,7 +221,7 @@ pub trait Effect: Send + Sync {
 pub(crate) fn run(
     effect: &dyn Effect,
     picture: &Picture<'_>,
-    params: serde_json::Value,
+    params: &Value,
     offered: &Inputs<'_>,
 ) -> Result<Image, Error> {
     let image = effect.apply(picture, params, &offered.declared_by(effect, picture)?)?;
@@ -287,8 +287,8 @@ impl<P: Declared> Native<P> {
 
 impl<P: DeserializeOwned> Native<P> {
     /// `params` as the effect's parameters.
-    fn read(&self, params: serde_json::Value) -> Result<P, Error> {
-        serde_json::from_value(params).map_err(|source| Error::Params {
+    fn read(&self, params: &Value) -> Result<P, Error> {
+        P::deserialize(params).map_err(|source| Error::Params {
             effect: self.name,
             source,
         })
@@ -321,10 +321,10 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
     }
 
     fn footprint(&self, params: &Value) -> Result<Footprint, Error> {
-        Ok((self.footprint)(&self.read(params.clone())?))
+        Ok((self.footprint)(&self.read(params)?))
     }
 
-    fn apply(&self, picture: &Picture<'_>, params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         Ok((self.render)(picture, &self.read(params)?, inputs))
     }
 }

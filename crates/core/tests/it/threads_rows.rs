@@ -68,7 +68,7 @@ impl Effect for Numbered {
         Category::Utilities
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &serde_json::Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         if let Some(inner) = &self.inner {
             // a render of one thread (the default), inside the render this effect is running in
             let values = vec![0.5; ROWS * WIDTH * 3];

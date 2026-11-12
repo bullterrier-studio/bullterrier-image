@@ -89,7 +89,7 @@ fn typed_params_run_to_the_same_image_as_the_same_values_given_as_json() -> Outc
     let typed = apply(
         "pattern",
         &picture,
-        Value::Object(Step::of(dots()).params),
+        &Value::Object(Step::of(dots()).params),
         &Inputs::default(),
     )?;
     let as_json = json!({
@@ -98,7 +98,7 @@ fn typed_params_run_to_the_same_image_as_the_same_values_given_as_json() -> Outc
     });
     let given = as_json.as_object().cloned().unwrap_or_default();
     let checked = pattern::Params::table().check("pattern", &given)?;
-    let by_json = apply("pattern", &picture, Value::Object(checked), &Inputs::default())?;
+    let by_json = apply("pattern", &picture, &Value::Object(checked), &Inputs::default())?;
     assert_eq!(typed, by_json);
     Ok(())
 }

@@ -1071,7 +1071,7 @@ fn render(
             inputs = inputs.with_image(field.name, &asset);
         }
     }
-    Ok(effect.apply(picture, Value::Object(params), &inputs)?.into_values())
+    Ok(effect.apply(picture, &Value::Object(params), &inputs)?.into_values())
 }
 
 fn differs(left: &[f32], right: &[f32]) -> bool {
@@ -1203,7 +1203,7 @@ impl Effect for Brighten {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        params: Value,
+        params: &Value,
         _inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         let gain = params["gain"].as_f64().unwrap_or(1.0);
@@ -1269,7 +1269,7 @@ impl Effect for Follow {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        params: Value,
+        params: &Value,
         inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         let layer = inputs.field("follow").map(Layer::values).unwrap_or_default();

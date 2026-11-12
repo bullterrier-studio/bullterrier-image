@@ -110,9 +110,9 @@ impl Effect for Double {
             .unwrap_or_else(|| crate::common::run::table_of_fields(&self.fields))
     }
 
-    fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         self.log.lock().unwrap_or_else(PoisonError::into_inner).push(Received {
-            params,
+            params: params.clone(),
             size_ratio: inputs.size_ratio(),
         });
         Ok(picture.map(|pixel| pixel))

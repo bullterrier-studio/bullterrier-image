@@ -194,7 +194,7 @@ fn run(
     let band = Picture::new(to - from, width, &picture[from * width * 3..to * width * 3])?;
     let table = effect(name)?.params();
     let completed = table.check(name, params.as_object().ok_or("not an object")?)?;
-    Ok(apply(name, &band, Value::Object(completed), &inputs)?.into_values())
+    Ok(apply(name, &band, &Value::Object(completed), &inputs)?.into_values())
 }
 
 /// The rows of margin `name` asks for with `params`; none if it says `Whole`.

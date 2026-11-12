@@ -60,7 +60,7 @@ impl Effect for Shower {
         }
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         match inputs.image("image") {
             Some(shown) => Image::new(picture.height(), picture.width(), shown.as_picture().values()),
             None => Image::new(picture.height(), picture.width(), picture.values()),
@@ -244,7 +244,7 @@ fn a_picture_offered_to_apply_reaches_the_effect_under_its_parameter() -> Result
     let picture = Picture::new(4, 6, &values)?;
     let grey = flat(0.5)?;
     let inputs = Inputs::default().with_image("image", &grey);
-    let made = apply(shower.name(), &picture, json!({"image": null}), &inputs)?;
+    let made = apply(shower.name(), &picture, &json!({"image": null}), &inputs)?;
     assert_close(&made.into_values(), &vec![0.5; 72], 1e-6, "apply with a picture");
     Ok(())
 }

@@ -16,7 +16,7 @@ fn graded(pixels: &[[f32; 3]], tint: f64, saturation: f64) -> Result<Vec<[f32; 3
     let image = apply(
         "grade",
         &Picture::new(1, pixels.len(), &values)?,
-        params,
+        &params,
         &Inputs::default(),
     )?;
     Ok(image

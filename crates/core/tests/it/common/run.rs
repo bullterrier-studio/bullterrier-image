@@ -111,7 +111,7 @@ impl Effect for Paint {
         }
     }
 
-    fn apply(&self, picture: &Picture<'_>, params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, params: &Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         let level = params["level"]
             .as_f64()
             .ok_or_else(|| Error::foreign(&self.name, "no level"))?;
@@ -205,7 +205,7 @@ impl Effect for Recorder {
         self.table.clone().unwrap_or_else(|| table_of_fields(&self.fields))
     }
 
-    fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         let fields = self
             .fields
             .iter()
@@ -218,7 +218,7 @@ impl Effect for Recorder {
             .collect();
         self.log.lock().unwrap_or_else(PoisonError::into_inner).push(Received {
             picture: picture.values().to_vec(),
-            params,
+            params: params.clone(),
             size_ratio: inputs.size_ratio(),
             place: inputs.place(picture),
             partition: inputs.partition().map(|labels| labels.values().to_vec()),
@@ -263,7 +263,7 @@ impl Effect for Counting {
         &[Input::Partition]
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(picture.map(|pixel| pixel))
     }
@@ -292,7 +292,7 @@ impl Effect for Shrinks {
         Category::Utilities
     }
 
-    fn apply(&self, _picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, _picture: &Picture<'_>, _params: &Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Image::new(1, 1, &[0.0; 3])
     }
 }

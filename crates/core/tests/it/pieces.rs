@@ -76,7 +76,7 @@ impl Effect for Spy {
         crate::common::run::table_of_fields(&self.fields)
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &serde_json::Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         self.log.lock().unwrap_or_else(PoisonError::into_inner).push(Seen {
             labels: inputs
                 .partition()

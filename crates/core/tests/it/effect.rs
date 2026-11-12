@@ -32,8 +32,8 @@ fn a_declared_partition_arrives_and_an_undeclared_one_is_absent() -> Outcome {
     let offered = Inputs::default().with_partition(&labels);
     let takes = Registered::new(Recorder::new(PARTITION, &[]))?;
     let ignores = Registered::new(Recorder::new(&[], &[]))?;
-    apply(takes.name(), &picture, json!({}), &offered)?;
-    apply(ignores.name(), &picture, json!({}), &offered)?;
+    apply(takes.name(), &picture, &json!({}), &offered)?;
+    apply(ignores.name(), &picture, &json!({}), &offered)?;
     assert_eq!(takes.received()[0].partition, Some(vec![0, 0, 1, 1, 2, 2]));
     assert_eq!(ignores.received()[0].partition, None);
     Ok(())
@@ -48,8 +48,8 @@ fn a_declared_field_arrives_under_its_parameter_name_and_an_undeclared_one_is_ab
         .with_field("light", &light);
     let takes_depth = Registered::new(Recorder::new(&[], &["depth"]))?;
     let takes_none = Registered::new(Recorder::new(&[], &[]))?;
-    apply(takes_depth.name(), &picture, json!({}), &offered)?;
-    apply(takes_none.name(), &picture, json!({}), &offered)?;
+    apply(takes_depth.name(), &picture, &json!({}), &offered)?;
+    apply(takes_none.name(), &picture, &json!({}), &offered)?;
     // exactly the declared one, under the parameter's name, with that map's values
     assert_eq!(
         takes_depth.received()[0].fields,
@@ -66,8 +66,8 @@ fn the_size_ratio_arrives_only_if_declared_else_the_effect_sees_one() -> Outcome
     let offered = Inputs::default().with_size_ratio(2.5);
     let takes = Registered::new(Recorder::new(RATIO, &[]))?;
     let ignores = Registered::new(Recorder::new(&[], &[]))?;
-    apply(takes.name(), &picture, json!({}), &offered)?;
-    apply(ignores.name(), &picture, json!({}), &offered)?;
+    apply(takes.name(), &picture, &json!({}), &offered)?;
+    apply(ignores.name(), &picture, &json!({}), &offered)?;
     assert!((takes.received()[0].size_ratio - 2.5).abs() < f64::EPSILON);
     assert!((ignores.received()[0].size_ratio - 1.0).abs() < f64::EPSILON);
     Ok(())
@@ -81,9 +81,9 @@ fn the_place_arrives_only_if_declared_else_the_canvas_is_the_picture_itself() ->
     let takes = Registered::new(Recorder::new(PLACE, &[]))?;
     let ignores = Registered::new(Recorder::new(&[], &[]))?;
     let unoffered = Registered::new(Recorder::new(PLACE, &[]))?;
-    apply(takes.name(), &picture, json!({}), &offered)?;
-    apply(ignores.name(), &picture, json!({}), &offered)?;
-    apply(unoffered.name(), &picture, json!({}), &Inputs::default())?;
+    apply(takes.name(), &picture, &json!({}), &offered)?;
+    apply(ignores.name(), &picture, &json!({}), &offered)?;
+    apply(unoffered.name(), &picture, &json!({}), &Inputs::default())?;
     assert_eq!(takes.received()[0].place, Place::new(10, 3, 4));
     assert_eq!(ignores.received()[0].place, Place::new(2, 3, 0));
     assert_eq!(unoffered.received()[0].place, Place::new(2, 3, 0));
@@ -101,7 +101,7 @@ fn a_place_that_does_not_hold_the_picture_refuses_the_run_naming_the_effect() ->
         (Place::new(5, 3, 4), "rows 4..6"),
         (Place::new(10, 4, 0), "canvas is 4 wide"),
     ] {
-        let result = apply(takes.name(), &picture, json!({}), &Inputs::default().with_place(place));
+        let result = apply(takes.name(), &picture, &json!({}), &Inputs::default().with_place(place));
         assert!(
             matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains(takes.name()) && error.to_string().contains(said)),
             "{place:?}: {result:?}"
@@ -109,7 +109,7 @@ fn a_place_that_does_not_hold_the_picture_refuses_the_run_naming_the_effect() ->
     }
     assert_eq!(takes.received().len(), 0);
     for place in [Place::new(5, 3, 3), Place::new(2, 3, 0)] {
-        apply(takes.name(), &picture, json!({}), &Inputs::default().with_place(place))?;
+        apply(takes.name(), &picture, &json!({}), &Inputs::default().with_place(place))?;
     }
     assert_eq!(takes.received().len(), 2);
     Ok(())
@@ -128,7 +128,7 @@ fn a_declared_input_that_is_not_on_offer_refuses_the_run_with_a_hint_for_its_kin
         (field.name(), "depth", "name a map or region in the step's `depth`"),
     ];
     for (name, input, hint) in rows {
-        let result = apply(name, &picture, json!({}), &Inputs::default());
+        let result = apply(name, &picture, &json!({}), &Inputs::default());
         assert!(
             matches!(&result, Err(error @ Error::Inputs(_)) if error.to_string().contains(input) && error.to_string().contains(hint)),
             "{input}: {result:?}"
@@ -148,7 +148,7 @@ fn a_partition_or_map_of_another_size_than_the_picture_refuses_the_run() -> Outc
     let result = apply(
         partition.name(),
         &picture,
-        json!({}),
+        &json!({}),
         &Inputs::default().with_partition(&small_labels),
     );
     assert!(
@@ -158,7 +158,7 @@ fn a_partition_or_map_of_another_size_than_the_picture_refuses_the_run() -> Outc
     let result = apply(
         field.name(),
         &picture,
-        json!({}),
+        &json!({}),
         &Inputs::default().with_field("depth", &small_layer),
     );
     assert!(

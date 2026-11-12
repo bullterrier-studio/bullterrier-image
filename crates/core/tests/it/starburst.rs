@@ -47,7 +47,7 @@ fn at_ratio(params: &Params, ratio: f64, height: usize, width: usize, picture: &
     let image = apply(
         Params::EFFECT,
         &Picture::new(height, width, picture)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default().with_size_ratio(ratio),
     )?;
     Ok(image.into_values())

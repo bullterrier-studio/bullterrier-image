@@ -157,7 +157,7 @@ fn run(
     if one.inputs().contains(&Input::Partition) {
         inputs = inputs.with_partition(&pieces);
     }
-    let image = one.apply(&Picture::new(height, width, values)?, Value::Object(params), &inputs)?;
+    let image = one.apply(&Picture::new(height, width, values)?, &Value::Object(params), &inputs)?;
     if (image.height(), image.width()) != (height, width) {
         return Err(format!("{} changed the shape of a {height} x {width} picture", one.name()).into());
     }
@@ -840,7 +840,7 @@ impl Effect for Probe {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        params: Value,
+        params: &Value,
         _inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         let seed = if self.fault == Fault::IgnoresSeed {

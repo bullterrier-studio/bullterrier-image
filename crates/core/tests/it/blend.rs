@@ -29,7 +29,7 @@ impl Effect for Replaces {
         Category::Utilities
     }
 
-    fn apply(&self, _picture: &Picture<'_>, _params: serde_json::Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, _picture: &Picture<'_>, _params: &serde_json::Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Image::new(self.height, self.width, &self.values)
     }
 }

@@ -95,7 +95,7 @@ pub use sheet::{Tile, contact_sheet};
 pub fn apply(
     effect: &str,
     picture: &Picture<'_>,
-    params: serde_json::Value,
+    params: &serde_json::Value,
     inputs: &Inputs<'_>,
 ) -> Result<Image, Error> {
     effect::run(&*registry::effect(effect)?, picture, params, inputs)

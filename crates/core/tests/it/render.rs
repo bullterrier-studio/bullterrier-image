@@ -37,9 +37,9 @@ fn a_recipe_renders_as_its_effects_run_in_order_with_their_defaults_filled_in() 
     // the picture is 12 / 480 of the design size: the 4 px cell of the step shrinks to 0.1 px and is held at its minimum, 3
     let grid = json!({"cell": 3, "gap": 0.15, "amount": 0.4, "keep_brightness": false});
     let offered = Inputs::default();
-    let first = apply("grade", &picture, grade(0.5, 1.0), &offered)?.into_values();
-    let second = apply("pixel_grid", &Picture::new(8, 12, &first)?, grid, &offered)?.into_values();
-    let third = apply("grade", &Picture::new(8, 12, &second)?, grade(0.0, 1.5), &offered)?;
+    let first = apply("grade", &picture, &grade(0.5, 1.0), &offered)?.into_values();
+    let second = apply("pixel_grid", &Picture::new(8, 12, &first)?, &grid, &offered)?.into_values();
+    let third = apply("grade", &Picture::new(8, 12, &second)?, &grade(0.0, 1.5), &offered)?;
 
     assert_eq!((rendered.height(), rendered.width()), (8, 12));
     assert_eq!(rendered.into_values(), third.into_values());
@@ -88,7 +88,7 @@ fn rendered_at(recipe: &Recipe, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> 
 }
 
 /// The effect `name` run with `params` written out on the picture `rendered_at` makes for `ratio`.
-fn applied(name: &str, params: serde_json::Value, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> {
+fn applied(name: &str, params: &serde_json::Value, ratio: f64) -> Result<Vec<f32>, Box<dyn Error>> {
     let (width, values) = scaled_values(ratio);
     Ok(apply(name, &Picture::new(20, width, &values)?, params, &Inputs::default())?.into_values())
 }
@@ -102,8 +102,8 @@ fn a_pattern_at_twice_the_size_is_the_pattern_with_twice_the_pixel_values() -> O
     };
     let recipe = Recipe::new([Step::new("pattern")]);
     // `cell` (default 32) and `feather` (default 1) are px; `thickness` and `radius` are fractions of the cell
-    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pattern", pattern(64.0, 2.0), 2.0)?);
-    assert_eq!(rendered_at(&recipe, 1.0)?, applied("pattern", pattern(32.0, 1.0), 1.0)?);
+    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pattern", &pattern(64.0, 2.0), 2.0)?);
+    assert_eq!(rendered_at(&recipe, 1.0)?, applied("pattern", &pattern(32.0, 1.0), 1.0)?);
     assert_ne!(rendered_at(&recipe, 2.0)?, rendered_at(&recipe, 1.0)?);
     Ok(())
 }
@@ -112,11 +112,11 @@ fn a_pattern_at_twice_the_size_is_the_pattern_with_twice_the_pixel_values() -> O
 fn a_whole_number_of_pixels_scales_rounded_and_never_below_its_minimum() -> Outcome {
     let grid = |cell: i32| json!({"cell": cell, "gap": 0.15, "amount": 0.4, "keep_brightness": false});
     let recipe = Recipe::new([Step::new("pixel_grid")]); // `cell` is 4 px, at least 3
-    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pixel_grid", grid(8), 2.0)?);
+    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pixel_grid", &grid(8), 2.0)?);
     // 4 x 0.5 = 2, below the minimum of 3
-    assert_eq!(rendered_at(&recipe, 0.5)?, applied("pixel_grid", grid(3), 0.5)?);
+    assert_eq!(rendered_at(&recipe, 0.5)?, applied("pixel_grid", &grid(3), 0.5)?);
     // 4 x 1.6 = 6.4 -> 6
-    assert_eq!(rendered_at(&recipe, 1.6)?, applied("pixel_grid", grid(6), 1.6)?);
+    assert_eq!(rendered_at(&recipe, 1.6)?, applied("pixel_grid", &grid(6), 1.6)?);
     Ok(())
 }
 
@@ -138,7 +138,7 @@ fn a_masked_step_changes_the_picture_only_where_the_mask_is_above_0() -> Outcome
     let graded = apply(
         "grade",
         &Picture::new(20, 30, &values)?,
-        json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
+        &json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
                "vibrance": 0.0}),
         &Inputs::default(),
     )?
@@ -165,7 +165,7 @@ fn a_parameter_driven_by_a_map_takes_its_start_where_the_map_is_0_and_its_end_wh
     let graded = |exposure: f64| {
         let params = json!({"temperature": 0.0, "tint": 0.0, "exposure": exposure, "contrast": 1.0, "pivot": 0.5,
                             "saturation": 1.0, "vibrance": 0.0});
-        apply("grade", &Picture::new(20, 30, &values)?, params, &Inputs::default()).map(Image::into_values)
+        apply("grade", &Picture::new(20, 30, &values)?, &params, &Inputs::default()).map(Image::into_values)
     };
     let (darker, brighter) = (graded(-1.0)?, graded(1.0)?);
     for (index, pixel) in rendered.chunks(3).enumerate() {
@@ -199,7 +199,7 @@ fn a_step_masked_by_the_background_changes_the_picture_only_where_a_finder_found
     let graded = apply(
         "grade",
         &Picture::new(20, 30, &values)?,
-        json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
+        &json!({"temperature": 0.0, "tint": 0.0, "exposure": 1.0, "contrast": 1.0, "pivot": 0.5, "saturation": 1.0,
                "vibrance": 0.0}),
         &Inputs::default(),
     )?

@@ -93,7 +93,7 @@ fn run(
         }
     }
     let picture = Picture::new(to - from, WIDTH, rows(picture, 3, from, to))?;
-    Ok(one.apply(&picture, Value::Object(params.clone()), &inputs)?)
+    Ok(one.apply(&picture, &Value::Object(params.clone()), &inputs)?)
 }
 
 /// The ways `one` says less than `Whole` and is wrong, with `params` as written; none if it is `Whole`.
@@ -207,7 +207,7 @@ impl Effect for Blur {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        _params: Value,
+        _params: &Value,
         _inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         let (height, width) = (picture.height(), picture.width());
@@ -248,7 +248,7 @@ impl Effect for Ruler {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        _params: Value,
+        _params: &Value,
         _inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         Ok(picture.map_at(|row, _, _| [f32::from(u16::try_from(row).unwrap_or(0)) / 255.0; 3]))
@@ -278,7 +278,7 @@ impl Effect for PlacedRuler {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        _params: Value,
+        _params: &Value,
         inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         let first = inputs.place(picture).first_row;
@@ -412,7 +412,7 @@ impl Effect for Claim {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        params: Value,
+        params: &Value,
         inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         self.inner.apply(picture, params, inputs)

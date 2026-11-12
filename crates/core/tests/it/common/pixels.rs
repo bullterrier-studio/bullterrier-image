@@ -10,7 +10,7 @@ pub(crate) fn run<P: EffectParams>(params: &P, pixels: &[[f32; 3]]) -> Result<Ve
     let image = apply(
         P::EFFECT,
         &Picture::new(1, pixels.len(), &values)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default(),
     )?;
     Ok(image
@@ -34,7 +34,7 @@ pub(crate) fn run_sized<P: EffectParams>(
     let image = apply(
         P::EFFECT,
         &Picture::new(height, width, &values)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default(),
     )?;
     Ok(image
@@ -56,7 +56,7 @@ pub(crate) fn run_picture<P: EffectParams>(
     let image = apply(
         P::EFFECT,
         &Picture::new(height, width, values)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default(),
     )?;
     Ok(image.into_values())
@@ -80,7 +80,7 @@ pub(crate) fn run_rows<P: EffectParams>(
     let image = apply(
         P::EFFECT,
         &Picture::new(to - from, width, band)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &offered,
     )?;
     Ok(image.into_values())
@@ -100,7 +100,7 @@ pub(crate) fn run_with_field<P: EffectParams>(
     let image = apply(
         P::EFFECT,
         &Picture::new(height, width, values)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default().with_field(parameter, &layer),
     )?;
     Ok(image.into_values())
@@ -115,7 +115,7 @@ pub(crate) fn run_with_partition<P: EffectParams>(
     let image = apply(
         P::EFFECT,
         &Picture::new(partition.height(), partition.width(), values)?,
-        Value::Object(params.values()),
+        &Value::Object(params.values()),
         &Inputs::default().with_partition(partition),
     )?;
     Ok(image.into_values())

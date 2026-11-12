@@ -60,7 +60,7 @@ impl Effect for Tablet {
         }
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         let table = inputs.lut("file");
         Ok(picture.map(|pixel| table.map_or(pixel, |table| table.lookup(pixel))))
     }
@@ -232,7 +232,7 @@ fn a_table_offered_to_apply_reaches_the_effect_under_its_parameter() -> Result<(
     let picture = Picture::new(4, 6, &values)?;
     let table = negative()?;
     let inputs = Inputs::default().with_lut("file", &table);
-    let made = apply(tablet.name(), &picture, json!({"file": null}), &inputs)?;
+    let made = apply(tablet.name(), &picture, &json!({"file": null}), &inputs)?;
     let expected: Vec<f32> = values.iter().map(|value| 1.0 - value).collect();
     assert_close(&made.into_values(), &expected, 1e-5, "apply with a table");
     Ok(())

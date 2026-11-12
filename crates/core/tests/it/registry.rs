@@ -62,7 +62,7 @@ fn a_registered_effect_runs_by_its_name_and_declares_what_it_says() -> Outcome {
     assert!((found.opacity() - 0.25).abs() < f64::EPSILON);
     assert_eq!(found.params().fields.len(), 1);
     let values = [0.0_f32; 12];
-    let image = found.apply(&Picture::new(2, 2, &values)?, json!({"level": 0.5}), &Inputs::default())?;
+    let image = found.apply(&Picture::new(2, 2, &values)?, &json!({"level": 0.5}), &Inputs::default())?;
     assert_eq!(image.into_values(), vec![0.5_f32; 12]);
     Ok(())
 }
@@ -74,7 +74,7 @@ fn a_failure_of_a_registered_effect_comes_back_naming_it() -> Outcome {
     let found = effect(&name);
     unregister(&name);
     let values = [0.0_f32; 3];
-    let result = found?.apply(&Picture::new(1, 1, &values)?, json!({}), &Inputs::default());
+    let result = found?.apply(&Picture::new(1, 1, &values)?, &json!({}), &Inputs::default());
     assert!(matches!(result, Err(Error::Foreign { effect, .. }) if effect == name));
     Ok(())
 }
@@ -123,7 +123,7 @@ impl Effect for AsksOnDrop {
         Category::Utilities
     }
 
-    fn apply(&self, picture: &Picture<'_>, _params: Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, _params: &Value, _inputs: &Inputs<'_>) -> Result<Image, Error> {
         Ok(picture.map(|pixel| pixel))
     }
 }

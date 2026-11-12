@@ -150,7 +150,7 @@ fn apply<'py>(
         inputs = inputs.with_image(parameter.as_str(), image);
     }
     let image = py
-        .detach(|| bullterrier_image::apply(effect, &picture, params, &inputs))
+        .detach(|| bullterrier_image::apply(effect, &picture, &params, &inputs))
         .map_err(core_error)?;
     let shape = [image.height(), image.width(), 3];
     PyArray1::from_vec(py, image.into_values()).reshape(shape)
@@ -590,9 +590,9 @@ impl Effect for PythonEffect {
         self.table.clone()
     }
 
-    fn apply(&self, picture: &Picture<'_>, params: Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
+    fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
         // `_core.apply` runs the core without the interpreter lock; the function needs it back
-        Python::attach(|py| self.call(py, picture, &params, inputs))
+        Python::attach(|py| self.call(py, picture, params, inputs))
             .map_err(|failure| Error::foreign(self.name.clone(), failure))
     }
 }

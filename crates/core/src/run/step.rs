@@ -334,7 +334,7 @@ impl StepRun {
             offered = offered.with_partition(pieces);
         }
         let after = match &self.runs {
-            Runs::One { scaled } => effect::run(&*self.effect, before, scaled.clone(), &offered)?,
+            Runs::One { scaled } => effect::run(&*self.effect, before, scaled, &offered)?,
             Runs::Driven { by, top, levels } => {
                 let by = rows_of(regions.selection(by, working)?, at, rows);
                 self.driven(before, &offered, &by, *top, levels)?
@@ -363,7 +363,7 @@ impl StepRun {
             if weights.iter().all(|&weight| weight <= 0.0) {
                 continue;
             }
-            let run = effect::run(&*self.effect, before, params.clone(), offered)?;
+            let run = effect::run(&*self.effect, before, params, offered)?;
             for ((out, pixel), weight) in mixed.iter_mut().zip(run.as_picture().pixels()).zip(&weights) {
                 *out = std::array::from_fn(|channel| out[channel] + weight * pixel[channel]);
             }

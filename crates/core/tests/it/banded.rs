@@ -533,7 +533,7 @@ impl Effect for Double {
     fn apply(
         &self,
         picture: &Picture<'_>,
-        _params: Value,
+        _params: &Value,
         inputs: &Inputs<'_>,
     ) -> Result<Image, bullterrier_image::Error> {
         let (height, width) = (picture.height(), picture.width());
