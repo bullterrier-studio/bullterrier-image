@@ -141,7 +141,7 @@ impl Recipe {
     /// # Errors
     /// What `checked` refuses.
     pub fn needs(&self, presets: &Presets) -> Result<Needs, Error> {
-        let uses = self.check_in(crate::registry::registry(), presets)?;
+        let uses = self.check_rules(presets)?;
         Ok(uses.needs(&self.regions, self.frame.needs_subject()))
     }
 }

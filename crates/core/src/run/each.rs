@@ -6,7 +6,6 @@ use super::step::{Overlay, StepRun};
 use crate::ops::blur;
 use crate::ops::pieces::piece;
 use crate::ops::random::Rng;
-use crate::registry::Registry;
 use crate::{Assign, Each, Error, Image, Picture, Presets};
 
 /// An `each` step ready to run.
@@ -36,7 +35,6 @@ fn assignment(assign: Assign, seed: u32, looks: usize, pieces: usize) -> Vec<usi
 impl EachRun {
     /// The each step `each` (at `place`, as `step 2`) with its looks resolved (at `step 2, look 1`).
     pub(super) fn new(
-        registry: &Registry,
         presets: &Presets,
         ratio: f64,
         assets: &mut Assets<'_>,
@@ -51,7 +49,6 @@ impl EachRun {
                 look.as_ref()
                     .map(|step| {
                         StepRun::new(
-                            registry,
                             presets,
                             ratio,
                             assets,

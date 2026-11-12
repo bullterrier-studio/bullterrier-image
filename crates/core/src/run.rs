@@ -35,7 +35,6 @@ use step::{Prepared, prepare};
 pub use trace::Stage;
 
 use crate::ops::par;
-use crate::registry::Registry;
 use crate::{Error, Image, Layer, Lut, Picture, Presets, Recipe};
 
 /// A picture a recipe is rendered on, with the maps of it that the recipe names (`subject`, `depth`, a region): handed in
@@ -166,19 +165,8 @@ impl<'a> Photo<'a> {
     /// [`Error::Foreign`] if an effect that runs elsewhere fails or returns a picture of another size, and [`Error::Lut`]
     /// for a lookup table a step names that is neither given to the photo nor a readable `.cube` file.
     pub fn render(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Image, Error> {
-        self.render_in(crate::registry::registry(), recipe, presets, options)
-    }
-
-    /// As [`render`](Self::render), with the effects of `registry`.
-    pub(crate) fn render_in(
-        &self,
-        registry: &Registry,
-        recipe: &Recipe,
-        presets: &Presets,
-        options: Options,
-    ) -> Result<Image, Error> {
         par::install(options.threads(), || {
-            let mut run = self.start(registry, recipe, presets, options)?;
+            let mut run = self.start(recipe, presets, options)?;
             match options.band() {
                 Some(rows) => run.advance_banded(rows.get())?,
                 None => while run.advance()?.is_some() {},
@@ -188,14 +176,8 @@ impl<'a> Photo<'a> {
     }
 
     /// `recipe` checked and every step of it prepared, with all the maps they use found: ready to run.
-    fn start(
-        &self,
-        registry: &Registry,
-        recipe: &Recipe,
-        presets: &Presets,
-        options: Options,
-    ) -> Result<Run<'a>, Error> {
-        let reach = recipe.check_in(registry, presets)?.reach(&recipe.regions);
+    fn start(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Run<'a>, Error> {
+        let reach = recipe.check_rules(presets)?.reach(&recipe.regions);
         regions::check_makeable(
             &recipe.regions,
             reach
@@ -225,14 +207,7 @@ impl<'a> Photo<'a> {
             .iter()
             .enumerate()
             .map(|(index, entry)| {
-                prepare(
-                    registry,
-                    presets,
-                    ratio,
-                    &mut assets,
-                    entry,
-                    &format!("step {}", index + 1),
-                )
+                prepare(presets, ratio, &mut assets, entry, &format!("step {}", index + 1))
             })
             .collect::<Result<Vec<_>, _>>()?;
         // every map the photo gives that the steps use is found now, so that none is missing when its step runs

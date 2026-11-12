@@ -10,7 +10,6 @@ use super::{Drive, Each, Entry, Recipe, Regions, STEP_KEYS, Step, drive};
 use crate::effect::Input;
 use crate::params::Kind;
 use crate::params::Table;
-use crate::registry::Registry;
 use crate::{Error, Presets};
 
 /// What an address of a step's numbers starts with besides a step's name: a step cannot be called so.
@@ -40,7 +39,7 @@ impl Recipe {
     /// the rule of its declaration (its `place` is the step, `step 2`, or the look of an each step, `step 2, look 1`),
     /// [`Error::Recipe`] for any other rule, naming the step the same way.
     pub fn checked(self, presets: &Presets) -> Result<Self, Error> {
-        self.check_in(crate::registry::registry(), presets)?;
+        self.check_rules(presets)?;
         Ok(self)
     }
 
@@ -59,8 +58,8 @@ impl Recipe {
         Ok(look)
     }
 
-    /// The rules of [`checked`](Self::checked) against `registry`, and the names of the regions the steps refer to.
-    pub(crate) fn check_in(&self, registry: &Registry, presets: &Presets) -> Result<Uses, Error> {
+    /// The rules of [`checked`](Self::checked), and the names of the regions the steps refer to.
+    pub(crate) fn check_rules(&self, presets: &Presets) -> Result<Uses, Error> {
         if self.steps.is_empty() {
             return Err(Error::Recipe("a recipe needs at least one step".to_owned()));
         }
@@ -73,7 +72,6 @@ impl Recipe {
         }
         references::check_regions(&self.regions)?;
         let mut rules = Rules {
-            registry,
             presets,
             regions: &self.regions,
             at: 0,
@@ -141,7 +139,6 @@ pub(super) fn outside(value: f64, min: f64, max: f64) -> Option<String> {
 
 /// What the rules of a recipe look things up in.
 struct Rules<'a> {
-    registry: &'a Registry,
     presets: &'a Presets,
     regions: &'a Regions,
     /// The step being checked, counting from 0.
@@ -152,7 +149,7 @@ struct Rules<'a> {
 
 impl Rules<'_> {
     fn step(&mut self, step: &Step, place: &str) -> Result<(), Error> {
-        let shape = step_shape(self.registry, self.presets, step, place)?;
+        let shape = step_shape(self.presets, step, place)?;
         if let Some(mask) = &step.mask {
             self.refer(place, "mask", mask, Some(Form::Selection))?;
         }
@@ -238,8 +235,8 @@ struct Shape {
 /// `opacity` and `name` are well formed, its parameters are the effect's (drives included, all varying by one field in
 /// one number of levels), and it has a `partition` exactly when its effect takes that input. What it names (`mask`,
 /// `partition`, a drive's `by`, a field) is not looked up: that is the recipe's to check.
-fn step_shape(registry: &Registry, presets: &Presets, step: &Step, place: &str) -> Result<Shape, Error> {
-    let effect = registry.effect(&step.effect)?;
+fn step_shape(presets: &Presets, step: &Step, place: &str) -> Result<Shape, Error> {
+    let effect = crate::registry::effect(&step.effect)?;
     layer_shape(place, step.opacity, step.name.as_deref())?;
     let params = presets.under(step, place)?;
     for key in Input::ALL.iter().map(|input| input.name()) {
@@ -333,7 +330,7 @@ impl Step {
     /// # Errors
     /// [`Error::UnknownEffect`], [`Error::Invalid`] or [`Error::Recipe`] as [`Recipe::checked`] gives for a step.
     pub fn check(&self, presets: &Presets) -> Result<(), Error> {
-        step_shape(crate::registry::registry(), presets, self, "step").map(|_| ())
+        step_shape(presets, self, "step").map(|_| ())
     }
 }
 
@@ -372,12 +369,7 @@ impl Each {
         each_shape(self, "each")?;
         for (index, look) in self.looks.iter().enumerate() {
             if let Some(look) = look {
-                step_shape(
-                    crate::registry::registry(),
-                    presets,
-                    look,
-                    &format!("each, look {}", index + 1),
-                )?;
+                step_shape(presets, look, &format!("each, look {}", index + 1))?;
             }
         }
         Ok(())

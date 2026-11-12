@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 use serde_json::{Map, Value};
 
 use crate::recipe::file::model_of;
-use crate::registry::Registry;
 use crate::{Error, Step};
 
 /// One preset: what it looks like in a sentence, and the parameters it sets.
@@ -42,18 +41,6 @@ impl Presets {
         Ok(presets)
     }
 
-    /// Add the presets of `effect`, replacing any added for it before. `table` has one table for each preset, named
-    /// as the preset is: its `description` (one sentence saying what the look is, not blank) and the effect's
-    /// parameters. For an effect the core describes the parameters are checked as a step's would be; for any other,
-    /// including one that is not registered yet, they are kept as given.
-    ///
-    /// # Errors
-    /// [`Error::Recipe`] if `table` is not a table of tables, a preset has no description, or its parameters break a
-    /// rule of the effect (the message names the preset).
-    pub fn add(&mut self, effect: &str, table: &Value) -> Result<(), Error> {
-        self.add_in(crate::registry::registry(), effect, table)
-    }
-
     /// As [`add`](Self::add), for the table that the TOML text `text` writes (one `[name]` table per preset):
     ///
     /// ```text
@@ -71,13 +58,21 @@ impl Presets {
         self.add(effect, &Value::Object(model_of(table)?))
     }
 
-    pub(crate) fn add_in(&mut self, registry: &Registry, effect: &str, table: &Value) -> Result<(), Error> {
+    /// Add the presets of `effect`, replacing any added for it before. `table` has one table for each preset, named
+    /// as the preset is: its `description` (one sentence saying what the look is, not blank) and the effect's
+    /// parameters. For an effect the core describes the parameters are checked as a step's would be; for any other,
+    /// including one that is not registered yet, they are kept as given.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] if `table` is not a table of tables, a preset has no description, or its parameters break a
+    /// rule of the effect (the message names the preset).
+    pub fn add(&mut self, effect: &str, table: &Value) -> Result<(), Error> {
         let Value::Object(written) = table else {
             return Err(Error::Recipe(format!(
                 "the presets of '{effect}' are a table with one table for each preset, got {table}"
             )));
         };
-        let described = registry.effect(effect).ok().map(|found| found.params());
+        let described = crate::registry::effect(effect).ok().map(|found| found.params());
         let mut presets = Vec::new();
         for (name, preset) in written {
             let owner = format!("preset '{name}' of '{effect}'");

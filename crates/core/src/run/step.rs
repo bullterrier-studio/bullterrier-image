@@ -12,13 +12,11 @@ use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
 use crate::params::Kind;
 use crate::recipe::drive;
-use crate::registry::Registry;
 use crate::{BlendMode, Entry, Error, Image, Inputs, Labels, Layer, Lut, Picture, Place, Presets, Step};
 
 /// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
 /// names, for an `each` step its looks the same.
 pub(super) fn prepare(
-    registry: &Registry,
     presets: &Presets,
     ratio: f64,
     assets: &mut Assets<'_>,
@@ -26,8 +24,8 @@ pub(super) fn prepare(
     place: &str,
 ) -> Result<Prepared, Error> {
     Ok(match entry {
-        Entry::Step(step) => Prepared::Step(StepRun::new(registry, presets, ratio, assets, step, place)?),
-        Entry::Each(each) => Prepared::Each(EachRun::new(registry, presets, ratio, assets, each, place)?),
+        Entry::Step(step) => Prepared::Step(StepRun::new(presets, ratio, assets, step, place)?),
+        Entry::Each(each) => Prepared::Each(EachRun::new(presets, ratio, assets, each, place)?),
     })
 }
 
@@ -227,14 +225,13 @@ fn pictures(
 impl StepRun {
     /// The step `step` (at `place`, as `step 2`) resolved.
     pub(super) fn new(
-        registry: &Registry,
         presets: &Presets,
         ratio: f64,
         assets: &mut Assets<'_>,
         step: &Step,
         place: &str,
     ) -> Result<Self, Error> {
-        let effect = registry.effect(&step.effect)?;
+        let effect = crate::registry::effect(&step.effect)?;
         let given = presets.under(step, place)?;
         let mut fields = Vec::new();
         for field in effect.fields() {

@@ -2,7 +2,6 @@
 
 use super::Photo;
 use crate::ops::par;
-use crate::registry::Registry;
 use crate::{Error, Image, Labels, Layer, Options, Presets, Recipe};
 
 /// One picture, or map, from inside a render.
@@ -65,19 +64,8 @@ impl Photo<'_> {
     /// # Errors
     /// As [`render`](Self::render).
     pub fn trace(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Vec<Stage>, Error> {
-        self.trace_in(crate::registry::registry(), recipe, presets, options)
-    }
-
-    /// As [`trace`](Self::trace), with the effects of `registry`.
-    pub(crate) fn trace_in(
-        &self,
-        registry: &Registry,
-        recipe: &Recipe,
-        presets: &Presets,
-        options: Options,
-    ) -> Result<Vec<Stage>, Error> {
         par::install(options.threads(), || {
-            let mut run = self.start(registry, recipe, presets, options)?;
+            let mut run = self.start(recipe, presets, options)?;
             let picture = run.working.picture();
             let mut stages = vec![Stage::Input(Image::new(
                 picture.height(),
