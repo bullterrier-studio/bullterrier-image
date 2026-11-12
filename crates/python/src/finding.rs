@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
+use bullterrier_image::finding::ModelKind;
 use bullterrier_image::finding::onnx::Options;
-use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image_finders::{
     Segmenter, depth_finder, depth_identity, inverse_depth, subject_finder, subject_identity,
 };
@@ -48,8 +48,9 @@ fn options(
 ///
 /// `CoreError` of kind `subject_not_found` if nothing stands out, `backend_unavailable` for what cannot run here (the
 /// message says what to do).
+// the defaults are literals, which `DEFAULT_EDGE` equals: pyo3 shows any other expression as `...` in the signature
 #[pyfunction]
-#[pyo3(signature = (rgb, *, segmenter=None, shrink=DEFAULT_EDGE.0, feather=DEFAULT_EDGE.1, library=None, model_file=None, cache=None, allow_download=false))]
+#[pyo3(signature = (rgb, *, segmenter=None, shrink=1.5, feather=1.0, library=None, model_file=None, cache=None, allow_download=false))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
