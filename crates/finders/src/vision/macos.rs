@@ -18,7 +18,7 @@ use objc2_core_video::{
 use objc2_foundation::{NSArray, NSData, NSDictionary, NSProcessInfo};
 use objc2_vision::{VNGenerateForegroundInstanceMaskRequest, VNImageRequestHandler};
 
-use bullterrier_image::finding::subject_matte;
+use bullterrier_image::finding::{DEFAULT_EDGE, subject_matte};
 use bullterrier_image::{Error, Finder, Layer, Picture};
 
 /// The first macOS with the foreground instance mask request.
@@ -54,8 +54,8 @@ impl Vision {
     pub fn new() -> Result<Self, Error> {
         require(NSProcessInfo::processInfo().operatingSystemVersion().majorVersion)?;
         Ok(Self {
-            shrink: 1.5,
-            feather: 1.0,
+            shrink: DEFAULT_EDGE.0,
+            feather: DEFAULT_EDGE.1,
         })
     }
 

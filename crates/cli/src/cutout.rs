@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use bullterrier_image::finding::ModelKind;
+use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image::finding::onnx::Options;
 use bullterrier_image::{Error, Image, Picture, read, refine_edge, write};
 use bullterrier_image_finders::subject_finder;
@@ -61,8 +61,8 @@ pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Err
         refine_edge(&matte, args.shrink.unwrap_or(0.0), args.feather.unwrap_or(0.0))
     } else {
         let edge = (
-            args.shrink.unwrap_or(finders::EDGE.0),
-            args.feather.unwrap_or(finders::EDGE.1),
+            args.shrink.unwrap_or(DEFAULT_EDGE.0),
+            args.feather.unwrap_or(DEFAULT_EDGE.1),
         );
         let finder = subject_finder(args.segmenter, &Options::from_env(ModelKind::Subject), edge)?;
         finder.find(&photo.as_picture())?

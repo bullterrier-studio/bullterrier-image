@@ -3,13 +3,10 @@
 use std::sync::Arc;
 
 use bullterrier_image::Error;
-use bullterrier_image::finding::ModelKind;
+use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image::finding::onnx::Options;
 use bullterrier_image::pipeline::Found;
 use bullterrier_image_finders::{Segmenter, depth_finder, depth_identity, subject_finder, subject_identity};
-
-/// How far a subject's cut edge is pulled in and softened, px: the defaults of the subject finder.
-pub(crate) const EDGE: (f64, f64) = (1.5, 1.0); // constant: the edge clean-up `subject_matte` has always applied
 
 /// The built-in finder of the map `name` (`subject`, or `depth`), with the `segmenter` for the subject; none for any
 /// other name (a region's map is not found by a model).
@@ -18,7 +15,7 @@ pub(crate) fn found(name: &str, segmenter: Option<Segmenter>) -> Result<Option<F
         "subject" => {
             let options = Options::from_env(ModelKind::Subject);
             Ok(Some(Found {
-                finder: Arc::from(subject_finder(segmenter, &options, EDGE)?),
+                finder: Arc::from(subject_finder(segmenter, &options, DEFAULT_EDGE)?),
                 identity: subject_identity(segmenter, &options)?,
             }))
         }

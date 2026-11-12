@@ -116,8 +116,7 @@ pub trait Infer: Send + Sync {
 }
 
 /// The strength of the edge clean-up of a subject: pulled in by 1.5 px, blurred by 1 px, for a 1000-1600 px photo.
-const SHRINK: f64 = 1.5; // constant: the default `shrink` of `subject_matte`, tuned by eye on 1000-1600 px photos
-const FEATHER: f64 = 1.0; // constant: the default `feather` of `subject_matte`
+pub const DEFAULT_EDGE: (f64, f64) = (1.5, 1.0); // constant: the default `shrink` and `feather` of a subject, tuned by eye on 1000-1600 px photos
 /// A pixel is the subject's when the model is at least this sure: the even split of a probability.
 const SURE: f32 = 0.5; // constant: half, the even split of a probability
 
@@ -156,8 +155,8 @@ impl<R: Infer> ModelFinder<R> {
         Self {
             kind,
             runner,
-            shrink: SHRINK,
-            feather: FEATHER,
+            shrink: DEFAULT_EDGE.0,
+            feather: DEFAULT_EDGE.1,
         }
     }
 
@@ -182,7 +181,7 @@ impl<R: Infer> ModelFinder<R> {
     }
 
     /// This finder with the edge clean-up of a subject set to `shrink` and `feather` px ([`refine_edge`](crate::refine_edge)):
-    /// the defaults are 1.5 and 1, for a photo of 1000 to 1600 px. A depth is not cleaned.
+    /// the defaults are [`DEFAULT_EDGE`], for a photo of 1000 to 1600 px. A depth is not cleaned.
     #[must_use]
     pub const fn with_edge(mut self, shrink: f64, feather: f64) -> Self {
         self.shrink = shrink;
@@ -278,7 +277,7 @@ fn stretched(values: &[f32], from: (usize, usize), to: (usize, usize)) -> Vec<f3
 
 /// The matte of a photo of `to` (rows, columns) from a subject model's answer: `probability` (0..1, row after row) at the
 /// model's own size `from`. It is stretched to the photo, its edge cleaned ([`refine_edge`](crate::refine_edge), `shrink`
-/// `shrink` and `feather` px; 1.5 and 1 are the defaults) and, if no pixel is at least half sure, the picture has no
+/// `shrink` and `feather` px; [`DEFAULT_EDGE`] is the default) and, if no pixel is at least half sure, the picture has no
 /// subject. This is what
 /// [`ModelFinder`] does with a [`ModelKind::Subject`] answer, for a backend that is not a [`ModelFinder`].
 ///

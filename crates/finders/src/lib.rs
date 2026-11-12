@@ -71,7 +71,7 @@ impl Segmenter {
 
 /// The subject finder: `segmenter`, else the one `BT_IMAGE_SEGMENTER` names, else [`Segmenter::default_here`]. The
 /// portable model is found as `onnx` says. A subject's edge is cleaned by `shrink` and `feather` px
-/// ([`refine_edge`](bullterrier_image::refine_edge)): 1.5 and 1 are the defaults.
+/// ([`refine_edge`](bullterrier_image::refine_edge)): [`DEFAULT_EDGE`](bullterrier_image::finding::DEFAULT_EDGE) is the default.
 ///
 /// # Errors
 /// [`Error::BackendUnavailable`] naming the fix: an unknown segmenter name, Apple Vision asked for where it cannot run
