@@ -331,8 +331,8 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
 
 #[cfg(test)]
 mod tests {
-    //! A `Native` effect lists the field parameters its `Params` declares. No effect of the core has one yet, and a
-    //! `Native` is the core's own, so this is the one place it can be made.
+    //! A `Native` effect lists the field parameters its `Params` declares; a probe declares two, so the test needs no
+    //! effect of the core.
 
     use serde::Deserialize;
 
