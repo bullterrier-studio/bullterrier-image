@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
-use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image::finding::onnx::Options;
+use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image_finders::{
     Segmenter, depth_finder, depth_identity, inverse_depth, subject_finder, subject_identity,
 };

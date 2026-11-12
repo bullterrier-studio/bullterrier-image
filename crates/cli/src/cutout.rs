@@ -2,8 +2,8 @@
 
 use std::path::PathBuf;
 
-use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image::finding::onnx::Options;
+use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image::{Error, Image, Picture, read, refine_edge, write};
 use bullterrier_image_finders::subject_finder;
 use clap::Args as ClapArgs;

@@ -47,15 +47,7 @@ impl EachRun {
             .enumerate()
             .map(|(index, look)| {
                 look.as_ref()
-                    .map(|step| {
-                        StepRun::new(
-                            presets,
-                            ratio,
-                            assets,
-                            step,
-                            &format!("{place}, look {}", index + 1),
-                        )
-                    })
+                    .map(|step| StepRun::new(presets, ratio, assets, step, &format!("{place}, look {}", index + 1)))
                     .transpose()
             })
             .collect::<Result<_, _>>()?;

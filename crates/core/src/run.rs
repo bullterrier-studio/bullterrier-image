@@ -206,9 +206,7 @@ impl<'a> Photo<'a> {
             .steps
             .iter()
             .enumerate()
-            .map(|(index, entry)| {
-                prepare(presets, ratio, &mut assets, entry, &format!("step {}", index + 1))
-            })
+            .map(|(index, entry)| prepare(presets, ratio, &mut assets, entry, &format!("step {}", index + 1)))
             .collect::<Result<Vec<_>, _>>()?;
         // every map the photo gives that the steps use is found now, so that none is missing when its step runs
         let mut held = BTreeMap::new();

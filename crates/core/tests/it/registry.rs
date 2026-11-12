@@ -62,7 +62,11 @@ fn a_registered_effect_runs_by_its_name_and_declares_what_it_says() -> Outcome {
     assert!((found.opacity() - 0.25).abs() < f64::EPSILON);
     assert_eq!(found.params().fields.len(), 1);
     let values = [0.0_f32; 12];
-    let image = found.apply(&Picture::new(2, 2, &values)?, &json!({"level": 0.5}), &Inputs::default())?;
+    let image = found.apply(
+        &Picture::new(2, 2, &values)?,
+        &json!({"level": 0.5}),
+        &Inputs::default(),
+    )?;
     assert_eq!(image.into_values(), vec![0.5_f32; 12]);
     Ok(())
 }

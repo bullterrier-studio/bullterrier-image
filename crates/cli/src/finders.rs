@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use bullterrier_image::Error;
-use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image::finding::onnx::Options;
+use bullterrier_image::finding::{DEFAULT_EDGE, ModelKind};
 use bullterrier_image::pipeline::Found;
 use bullterrier_image_finders::{Segmenter, depth_finder, depth_identity, subject_finder, subject_identity};
 

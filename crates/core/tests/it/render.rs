@@ -102,8 +102,14 @@ fn a_pattern_at_twice_the_size_is_the_pattern_with_twice_the_pixel_values() -> O
     };
     let recipe = Recipe::new([Step::new("pattern")]);
     // `cell` (default 32) and `feather` (default 1) are px; `thickness` and `radius` are fractions of the cell
-    assert_eq!(rendered_at(&recipe, 2.0)?, applied("pattern", &pattern(64.0, 2.0), 2.0)?);
-    assert_eq!(rendered_at(&recipe, 1.0)?, applied("pattern", &pattern(32.0, 1.0), 1.0)?);
+    assert_eq!(
+        rendered_at(&recipe, 2.0)?,
+        applied("pattern", &pattern(64.0, 2.0), 2.0)?
+    );
+    assert_eq!(
+        rendered_at(&recipe, 1.0)?,
+        applied("pattern", &pattern(32.0, 1.0), 1.0)?
+    );
     assert_ne!(rendered_at(&recipe, 2.0)?, rendered_at(&recipe, 1.0)?);
     Ok(())
 }
