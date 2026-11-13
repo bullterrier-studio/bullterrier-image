@@ -7,8 +7,8 @@ use crate::Error;
 
 /// The format versions this release reads; a file without `format` is the first. Format 2 added regions and the step
 /// keys `each`, `looks` and `partition`; format 3 added a parameter driven by a field (a table with `by`), the step key
-/// `name` and the region kinds in [`KINDS_NEW_IN_3`]. A file of an earlier format may not use what a later one added,
-/// so its meaning never changes.
+/// `name` and the region kinds of `KINDS_NEW_IN_3` in this module. A file of an earlier format may not use what a later
+/// one added, so its meaning never changes.
 pub const FORMATS: [i64; 3] = [1, 2, 3];
 
 /// The keys of a file, each as it is written (a table or a list of tables in brackets), in the order the error for an
