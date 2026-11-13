@@ -66,6 +66,12 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   one below what the recipe needs. The regions, `Framing` and `Drive` are frozen dataclasses of keyword fields too;
   the core checks each when it is made; `help(Grid)` lists their fields, with unit and
   range.
+- **A region as a map.** `region_map(photo, recipe, name, *, maps=None, finders=None, size=None)` returns the region
+  `name` (`subject`, `background`, `depth`, `light`, or a declared selection such as `ColorRange`, `Band`, `Combine`) as a
+  float32 `(h, w)` array in 0..1, what a step that masks by it is given, at the size `render` works at (the recipe's
+  frame, then `size`, else the recipe's, else the photo's own). A step need not use the region. Only the maps the region is
+  made from are needed (found by the default finders only then); no step runs. A partition or an unknown name is a
+  `RecipeError` listing the selections and the nearest. Example: [`examples/python_api.py`](../examples/python_api.py).
 - **Shapes.** `Path.rect(x, y, w, h)` and `Path.ellipse(cx, cy, rx, ry)` are `Path` regions (`samples=` as for `Path`) for the
   common shapes: `regions={"box": Path.rect(0.1, 0.2, 0.5, 0.3)}`. All numbers are shares of the frame (0 to 1 across and down),
   so an ellipse is a circle only in a square frame (in a 3:2 frame, `Path.ellipse(0.5, 0.5, 0.2, 0.3)` is a circle). A size

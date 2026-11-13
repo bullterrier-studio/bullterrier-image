@@ -8,7 +8,9 @@ machinery for when a look is easier to write as code than as a recipe file.
 
 from pathlib import Path
 
-from bullterrier_image import Project, Recipe, fx, imageio, run, trace
+import numpy as np
+
+from bullterrier_image import Band, Project, Recipe, fx, imageio, region_map, run, trace
 
 HERE = Path(__file__).parent
 PHOTO = HERE / "photos" / "bullterrier.jpeg"
@@ -28,6 +30,9 @@ TOXIC_NEON = Recipe(
     size=1024,
 )
 
+# A region is a map you can ask for, used by a step or not: how much each pixel is chosen, float32 (h, w) in 0..1.
+BRIGHTS = Recipe([fx.grade()], regions={"brights": Band(of="light", low=0.7, high=1.0, feather=0.1)})
+
 
 def main(output: Path = HERE / "output" / "python-api") -> None:
     """Show every step of the look on the demo photo, then run it through the pipeline; everything goes in `output`."""
@@ -40,6 +45,11 @@ def main(output: Path = HERE / "output" / "python-api") -> None:
     (output / "steps").mkdir(parents=True, exist_ok=True)
     for number, stage in enumerate(stages):  # `bt-image steps` also lays them all out on one sheet
         imageio.save(stage.image, output / "steps" / f"{number:02d}.{'png' if stage.image.shape[2] == 4 else 'jpg'}")
+
+    # One region of a look as an array, at the size a render of it works at (here 480 px), and what it chooses.
+    brights = region_map(photo, BRIGHTS, "brights", size=480)
+    imageio.save(np.repeat(brights[..., None], 3, axis=2), output / "brights.jpg")
+    print(f"  region 'brights': {brights.shape}, {brights.mean():.0%} of the picture chosen")
 
     # Or run the look through the whole pipeline, like a recipe file: cached, checked, exported, with a report.
     items = run(Project(photos=(PHOTO,), recipes=(TOXIC_NEON,), output=output / "pipeline", formats=("jpg",)))

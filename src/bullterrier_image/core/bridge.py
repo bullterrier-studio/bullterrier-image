@@ -98,19 +98,41 @@ def trace(
     return _each(native.trace, rgb, [recipe], maps, finders, size, threads, None)[0]
 
 
-def maps_needed(recipe: Recipe) -> frozenset[str]:
+def region_map(
+    rgb: np.ndarray,
+    recipe: Recipe,
+    name: str,
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Any] | None = None,
+    size: int | None = None,
+) -> np.ndarray:
+    """The map of the region `name` of `recipe` on the photo `rgb`, as the core makes it: float32 (h, w) in 0..1 at the
+    size a render works at. `maps`, `finders` and `size` as for `render`; only the maps the region needs are found (see
+    `maps_needed`), and no step runs. RecipeError for a `name` that is a partition or no region, listing the selections
+    there are and the nearest."""
+
+    def run(rgb: np.ndarray, document: dict[str, Any], *, luts: Any, pictures: Any, threads: int, **keys: Any) -> Any:
+        """The core's `region_map`: no step runs, so no lookup table, picture or thread is wanted."""
+        return native.region_map(rgb, document, name, **keys)
+
+    return _each(run, rgb, [recipe], maps, finders, size, 1, None, region=name)[0]
+
+
+def maps_needed(recipe: Recipe, region: str | None = None) -> frozenset[str]:
     """The names of the maps of the photo that rendering `recipe` must be given or find: `subject` when the frame crops
     around it or keeps only it, or a region a step uses (a mask, a field, a drive's `by`) is made from it; `depth`
     likewise; and the name of every `Given` region a step uses. A region that is declared and not used needs nothing,
-    and `light` is made from the picture. A `Subject` region with `per` needs a finder, not a map (`needs_finder`)."""
-    return frozenset(_needs(recipe)["maps"])
+    and `light` is made from the picture. A `Subject` region with `per` needs a finder, not a map (`needs_finder`).
+    With `region`, a selection, what `region_map` of it needs instead: its own maps, whatever the steps use."""
+    return frozenset(_needs(recipe, region)["maps"])
 
 
-def needs_finder(recipe: Recipe) -> bool:
-    """True if a region a step of `recipe` uses finds the subject piece by piece: rendering needs a `subject` finder
-    whatever else it is given, because it is asked about parts of the working picture, which no map of the whole photo
-    answers."""
-    return bool(_needs(recipe)["finds_pieces"])
+def needs_finder(recipe: Recipe, region: str | None = None) -> bool:
+    """True if a region a step of `recipe` uses (with `region`, that region) finds the subject piece by piece: rendering
+    needs a `subject` finder whatever else it is given, because it is asked about parts of the working picture, which no
+    map of the whole photo answers."""
+    return bool(_needs(recipe, region)["finds_pieces"])
 
 
 def known_maps(recipe: Recipe) -> list[str]:
@@ -120,9 +142,9 @@ def known_maps(recipe: Recipe) -> list[str]:
         return native.known_maps(recipe_dict(recipe, hold))
 
 
-def _needs(recipe: Recipe) -> dict[str, Any]:
+def _needs(recipe: Recipe, region: str | None) -> dict[str, Any]:
     with registry.holding() as hold:
-        return native.needs(recipe_dict(recipe, hold))
+        return native.needs(recipe_dict(recipe, hold), region=region)
 
 
 def _each(
@@ -134,15 +156,17 @@ def _each(
     size: int | None,
     threads: int,
     band: int | None,
+    region: str | None = None,
 ) -> list[Any]:
-    """`run` (the core's `render` or `trace`) on `rgb` for each recipe, once the maps they all need are in hand: each
-    the one handed in, else found once by its finder, and held to the rules of a map (`check_map`). Each recipe is given
-    the maps it knows, and the subject finder only if it finds pieces."""
+    """`run` (the core's `render`, `trace` or `region_map`) on `rgb` for each recipe, once the maps they all need are in
+    hand: each the one handed in, else found once by its finder, and held to the rules of a map (`check_map`). Each
+    recipe is given the maps it knows, and the subject finder only if it finds pieces. With `region`, what is needed is
+    what that region of each recipe needs."""
     rgb = as_image(rgb)
     maps, finders = dict(maps or {}), dict(finders or {})
     with registry.holding() as hold:
         documents = [recipe_dict(recipe, hold) for recipe in recipes]
-        wants = [native.needs(document) for document in documents]
+        wants = [native.needs(document, region=region) for document in documents]
         knowns = [native.known_maps(document) for document in documents]
         _refuse_unknown(maps, finders, {name for known in knowns for name in known})
         found = {name: check_map(name, layer, rgb) for name, layer in maps.items()}

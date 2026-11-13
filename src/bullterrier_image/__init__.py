@@ -81,6 +81,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
         Svg,
         load_recipe,
         looks,
+        region_map,
         render,
         render_all,
         trace,
@@ -106,8 +107,8 @@ _HOMES = {
     ".recipe": (
         "RECIPE_FORMATS", "Band", "Bands", "ColorRange", "Combine", "Components", "Cuts", "Curve", "Drive", "Each",
         "Edge", "Finder", "Framing", "Given", "Grid", "Line", "LinearGradient", "Parameter", "Path", "Pick",
-        "RadialGradient", "Recipe", "Shards", "Stage", "Step", "Subject", "Svg", "load_recipe", "looks", "render",
-        "render_all", "trace",
+        "RadialGradient", "Recipe", "Shards", "Stage", "Step", "Subject", "Svg", "load_recipe", "looks", "region_map",
+        "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -196,6 +197,7 @@ __all__ = [
     "looks",
     "palette",
     "recipe",
+    "region_map",
     "render",
     "render_all",
     "run",

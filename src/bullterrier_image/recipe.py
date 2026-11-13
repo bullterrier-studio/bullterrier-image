@@ -83,6 +83,7 @@ __all__ = [
     "Svg",
     "load_recipe",
     "looks",
+    "region_map",
     "render",
     "render_all",
     "trace",
@@ -196,6 +197,36 @@ def trace(
     return [_stage(recipe, photo, *stage) for stage in stages]
 
 
+def region_map(
+    rgb: np.ndarray,
+    recipe: Recipe | Step,
+    name: str,
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
+) -> np.ndarray:
+    """The map of one region of `recipe` on the photo `rgb`: how much each pixel is chosen by it, a float32 (h, w) array
+    in 0..1 at the size a render of the recipe works at (framed, then scaled to `size`, else `recipe.size`, else the
+    photo's own). It is what a step that masks by the region (or takes it as a field) is given, whether or not a step
+    does. No step runs, and the recipe's `transparent` cut is not made.
+
+    name: `subject`, `background`, `depth`, `light`, or a region the recipe declares that is a selection (`Path`,
+    `Pick`, `Subject`, `Band`, `Combine`, `ColorRange`, `LinearGradient`, `RadialGradient`, `Given`). A partition
+    (`Grid`, `Shards`, `Cuts`, `Svg`, `Bands`, `Components`) is a RecipeError that says so; make a selection of some of
+    its pieces with `Pick(of=name, pieces=[...])`. A name that is neither is a RecipeError listing the selections there
+    are and the nearest.
+
+    rgb, recipe, maps, finders, size: as for `render`, but only the maps `name` is made from are needed, handed in or
+    found (a `finders` entry or the default finder, built only then), and the subject if the framing crops around it;
+    the maps the steps use are not. The same errors, so a `Given` region with no map is a MapNotFoundError.
+    """
+    recipe = _one_recipe(recipe)
+    return bridge.region_map(
+        rgb, recipe, name, maps=maps, finders=_finders([recipe], maps, finders, region=name), size=size
+    )
+
+
 def render_all(
     rgb: np.ndarray,
     recipes: Sequence[Recipe],
@@ -278,15 +309,19 @@ def _recipes(recipes: object) -> list[Recipe]:
 
 
 def _finders(
-    recipes: list[Recipe], maps: Mapping[str, np.ndarray] | None, finders: Mapping[str, Finder] | None
+    recipes: list[Recipe],
+    maps: Mapping[str, np.ndarray] | None,
+    finders: Mapping[str, Finder] | None,
+    region: str | None = None,
 ) -> dict[str, Finder]:
     """`finders` with the default finder of the subject and of the depth added when none is named and one of `recipes`
     will ask for it: the subject when a recipe needs it and no `subject` map is given, or finds it piece by piece; the
-    depth when a recipe needs it and no `depth` map is given. Each default is built only then, once per call."""
+    depth when a recipe needs it and no `depth` map is given. Each default is built only then, once per call. With
+    `region`, "needs" is what that region of the recipe needs, not its steps."""
     maps, bound = maps or {}, dict(finders or {})
     for name in FOUND_MAPS:
-        asks = name not in maps and any(name in maps_needed(recipe) for recipe in recipes)
-        asks = asks or (name == "subject" and any(needs_finder(recipe) for recipe in recipes))
+        asks = name not in maps and any(name in maps_needed(recipe, region) for recipe in recipes)
+        asks = asks or (name == "subject" and any(needs_finder(recipe, region) for recipe in recipes))
         if name not in bound and asks:
             bound[name] = default_finder(name)
     return bound

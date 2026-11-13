@@ -77,6 +77,7 @@ file), `path` (inside a closed SVG path), `pick` (some pieces of a partition), `
   `shards`, `cuts`, `svg`, `bands`, `components`.
 - **Selection**: values 0..1: `path`, `pick`, `subject`, `given`, `band`, `combine`, `color_range`, gradients, built-in `subject`,
   `background`, `depth`, `light`.
+- A selection as an array, whether or not a step uses it: `region_map(photo, recipe, "windows")` ([python-api.md](python-api.md)).
 - `fit = "subject"` lays a kind over the subject instead of whole picture. `edge = { style = "torn", amount = 4.8, scale = 24 }` tears its borders (`amount`, `scale` in design px like any px value).
 - A step uses regions by name: `mask` limits to a selection; `each` + `looks` gives every piece its own look (each look
   rendered once over whole picture: cost = number of looks, not pieces); `partition` names the partition `seams` draws

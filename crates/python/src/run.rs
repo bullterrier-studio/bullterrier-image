@@ -150,15 +150,25 @@ pub(crate) fn recipe_format(recipe: &Bound<'_, PyDict>) -> PyResult<i64> {
 /// each piece of a partition, so the photo needs a `subject` finder (a map of the whole photo does not do). `presets` as
 /// for `render`: a preset can set the field a step works from.
 ///
+/// With `region`, the name of a selection, what `region_map` of it asks instead: the maps that region is made from and, for a
+/// frame that crops around the subject, the subject; the steps ask nothing. `CoreError` naming the valid selections and the
+/// nearest if `region` is none.
+///
 /// `CoreError` for whatever makes the recipe invalid, as `check_recipe`.
 #[pyfunction]
-#[pyo3(signature = (recipe, *, presets=None))]
+#[pyo3(signature = (recipe, *, region=None, presets=None))]
 pub(crate) fn needs<'py>(
     py: Python<'py>,
     recipe: &Bound<'py, PyDict>,
+    region: Option<&str>,
     presets: Option<&Bound<'py, PyDict>>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let needs = recipe_of(recipe)?.needs(&presets_of(presets)?).map_err(core_error)?;
+    let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
+    let needs = match region {
+        Some(name) => recipe.region_needs(&presets, name),
+        None => recipe.needs(&presets),
+    }
+    .map_err(core_error)?;
     from_json(py, &json!({"maps": needs.maps, "finds_pieces": needs.finds_pieces}))
 }
 
@@ -252,6 +262,36 @@ pub(crate) fn trace<'py>(
         .map(|stage| stage_of(py, stage))
         .collect::<PyResult<Vec<_>>>()?;
     PyList::new(py, shown)
+}
+
+/// The map of the region `name` of `recipe` on `rgb`, a float32 `(height, width)` array in 0..1 at the size a render of the
+/// recipe works at (`size`, else the recipe's, else the framed photo's own): how much each pixel is chosen. `name` is
+/// `subject`, `background`, `depth`, `light` or a declared region that is a selection, used by a step or not. `maps` and
+/// `finders` as for `render`, but only the maps `needs(recipe, region=name)` lists are used; no step runs.
+///
+/// `CoreError` as for `render`, and of kind `recipe` for a `name` that is a partition or no region, naming the selections
+/// there are and the nearest.
+#[pyfunction]
+#[pyo3(signature = (rgb, recipe, name, *, maps=None, finders=None, presets=None, size=None))]
+pub(crate) fn region_map<'py>(
+    py: Python<'py>,
+    rgb: &Bound<'py, PyAny>,
+    recipe: &Bound<'py, PyDict>,
+    name: &str,
+    maps: Option<&Bound<'py, PyDict>>,
+    finders: Option<&Bound<'py, PyDict>>,
+    presets: Option<&Bound<'py, PyDict>>,
+    size: Option<Count<SIZE>>,
+) -> PyResult<Bound<'py, PyArray2<f32>>> {
+    let readonly = photo_array(rgb)?;
+    let picture = picture_of(&readonly)?;
+    let photo = photo_with(Photo::new(picture), maps, finders, None, None)?;
+    let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
+    let options = options_of(size, Count(1), None)?;
+    let layer = py
+        .detach(|| photo.region_map(&recipe, &presets, options, name))
+        .map_err(core_error)?;
+    PyArray1::from_slice(py, layer.values()).reshape([layer.height(), layer.width()])
 }
 
 /// `rgb` (a float32 `(height, width, 3)` array) dimmed, with a white line along every border between the pieces of

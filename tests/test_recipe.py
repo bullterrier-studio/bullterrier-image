@@ -17,6 +17,7 @@ from bullterrier_image import (
     fx,
     imageio,
     load_recipe,
+    region_map,
     render,
     render_all,
     trace,
@@ -32,7 +33,7 @@ from bullterrier_image.errors import BackendUnavailableError, RecipeError
 from bullterrier_image.finding.depth import depth_map
 from bullterrier_image.finding.subject import subject_matte
 from bullterrier_image.imageio import resize
-from bullterrier_image.recipe import Band, Grid, Subject
+from bullterrier_image.recipe import Band, ColorRange, Combine, Grid, LinearGradient, Subject
 
 EXAMPLE_PHOTO = Path(__file__).parent.parent / "examples" / "photos" / "bullterrier.jpeg"
 
@@ -360,6 +361,70 @@ def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
     np.testing.assert_array_equal(facade.render(photo, DEEP), expected)
     np.testing.assert_array_equal(facade.trace(photo, DEEP)[-1].image, expected)
     np.testing.assert_array_equal(facade.render_all(photo, [DEEP])[0], expected)
+
+
+# --- the map of one region -----------------------------------------------------------------------------------------
+
+# the steps use only the subject; the regions are what a caller may ask for, used or not
+SCENE = Recipe(
+    [fx.gradient(colors=["#000000"], mask="background")],
+    name="scene",
+    regions={
+        "down": LinearGradient(angle=90),
+        "reddish": ColorRange(target="#c04040", tolerance=0.3, feather=0.1),
+        "near": Band(of="depth", low=0.5, high=1.0, feather=0),
+        "lit": Combine(of=["down", "reddish"]),
+        "panes": Grid(columns=2),
+    },
+)
+
+
+def test_a_region_map_is_the_float_map_trace_shows_for_the_region_at_the_size_of_the_render(photo, subject):
+    used = Recipe([fx.grade(exposure=0.1, mask="lit")], regions=SCENE.regions, size=48)
+    for size in (None, 64):
+        (shown,) = [s for s in trace(photo, used, size=size) if s.label.startswith("region 'lit'")]
+        found = region_map(photo, used, "lit", size=size)
+        assert found.dtype == np.float32
+        assert found.shape == render(photo, used, size=size).shape[:2]
+        np.testing.assert_array_equal(found, shown.image[..., 0])
+    assert region_map(photo, used, "lit").shape == (36, 48)  # the recipe's size, as for render
+
+
+def test_a_region_map_needs_the_maps_of_the_region_not_of_the_steps(photo, subject, monkeypatch):
+    monkeypatch.setenv("BT_IMAGE_SEGMENTER", "nonsense")  # the default finder of the subject is built only when asked
+    assert region_map(photo, SCENE, "down").shape == photo.shape[:2]  # the steps use the subject, `down` does not
+    with pytest.raises(BackendUnavailableError, match="vision, onnx"):
+        region_map(photo, SCENE, "background")
+    np.testing.assert_allclose(region_map(photo, SCENE, "background", maps={"subject": subject}), 1 - subject)
+    ramp = np.tile(np.linspace(0, 1, 128, dtype=np.float32), (96, 1))
+    near = region_map(photo, SCENE, "near", maps={"depth": ramp})  # no step uses the depth
+    np.testing.assert_array_equal(near, (ramp >= 0.5).astype(np.float32))
+    with pytest.raises(BackendUnavailableError, match="BT_IMAGE_DEPTH_MODEL"):
+        region_map(photo, SCENE, "near")
+    found = region_map(photo, SCENE, "near", finders={"depth": Finder("stand-in", lambda rgb: ramp)})
+    np.testing.assert_array_equal(found, near)
+
+
+@pytest.mark.parametrize(
+    ("name", "complaint"),
+    [
+        pytest.param("reddsh", r"'reddsh'.*did you mean 'reddish'.*subject.*lit", id="a misspelt name"),
+        pytest.param("panes", r"'panes'.*a partition.*needs a selection", id="a partition"),
+    ],
+)
+def test_a_region_map_refuses_a_name_that_is_no_selection_listing_the_ones_there_are(photo, name, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        region_map(photo, SCENE, name)
+
+
+def test_a_region_map_is_asked_like_a_render(photo, subject):
+    np.testing.assert_array_equal(
+        region_map(photo, fx.grade(), "light"), region_map(photo, Recipe([fx.grade()]), "light")
+    )
+    with pytest.raises(RecipeError, match="the photo comes first"):
+        region_map(SCENE, photo, "down")  # type: ignore[arg-type]  # the point of the test
+    with pytest.raises(RecipeError, match="`maps` names 'moon'"):
+        region_map(photo, SCENE, "down", maps={"moon": subject})
 
 
 # --- the built-in looks --------------------------------------------------------------------------------------------
