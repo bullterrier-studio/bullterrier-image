@@ -646,7 +646,8 @@ def test_regions_and_each_steps_need_format_2_and_a_format_1_file_says_so(tmp_pa
 
 # the kinds, in the order the error for a bad one lists them
 ALL_KINDS = (
-    "grid, shards, cuts, path, svg, pick, subject, band, bands, combine, linear_gradient, radial_gradient, given"
+    "grid, shards, cuts, path, svg, pick, subject, band, bands, components, combine, "
+    "linear_gradient, radial_gradient, given"
 )
 REGION_MISTAKES = {
     "a kind that does not exist": (

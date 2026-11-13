@@ -18,6 +18,7 @@ mod color_transfer;
 mod colour;
 mod colour_mix;
 mod compare;
+mod components;
 mod cutout;
 mod cutout_by_hand;
 mod cuts;

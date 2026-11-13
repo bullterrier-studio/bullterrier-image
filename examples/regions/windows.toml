@@ -1,0 +1,42 @@
+# A synthesised facade: the recipe paints a wall and draws nine windows seen at an angle (a closed path of nine tilted
+# panes, plus three specks of dirt), so no photo shows through. `components` makes each window its own piece (the specks
+# are under `min_area` and join the wall), and `each` gives every window a look. Needs recipe format 3.
+format = 3
+name = "windows"
+size = 480
+
+[[step]]
+effect = "gradient"
+colors = ["#2b2623", "#4a3b35"]
+angle = 90
+
+[region.panes]                 # a selection: the inside of every subpath
+kind = "path"
+d = "M 0.12 0.145 L 0.32 0.095 L 0.32 0.265 L 0.12 0.315 Z M 0.4 0.12 L 0.6 0.12 L 0.6 0.29 L 0.4 0.29 Z M 0.68 0.095 L 0.88 0.145 L 0.88 0.315 L 0.68 0.265 Z M 0.12 0.44 L 0.32 0.39 L 0.32 0.56 L 0.12 0.61 Z M 0.4 0.415 L 0.6 0.415 L 0.6 0.585 L 0.4 0.585 Z M 0.68 0.39 L 0.88 0.44 L 0.88 0.61 L 0.68 0.56 Z M 0.12 0.735 L 0.32 0.685 L 0.32 0.855 L 0.12 0.905 Z M 0.4 0.71 L 0.6 0.71 L 0.6 0.88 L 0.4 0.88 Z M 0.68 0.685 L 0.88 0.735 L 0.88 0.905 L 0.68 0.855 Z M 0.05 0.05 h 0.004 v 0.004 h -0.004 Z M 0.95 0.5 h 0.004 v 0.004 h -0.004 Z M 0.5 0.97 h 0.004 v 0.004 h -0.004 Z"
+
+[region.windows]
+kind = "components"
+of = "panes"
+min_area = 0.002               # a share of the frame: the specks are far under it, a window is about 0.03
+
+[[step]]
+each = "windows"
+feather = 0
+looks = [
+    "none",                                                                        # 0 the wall, as painted
+    { effect = "gradient", colors = ["#ffe9a8", "#ff9f43"] },                      # 1 to 9: the windows, in reading
+    { effect = "gradient", colors = ["#0b1d3a", "#2a5a96"] },                      #   order of each one's first pixel
+    { effect = "gradient", colors = ["#ffe9a8", "#ff9f43"] },
+    { effect = "gradient", colors = ["#0b1d3a", "#2a5a96"] },
+    { effect = "gradient", colors = ["#7ad9c4", "#1f7a74"] },
+    { effect = "gradient", colors = ["#ffe9a8", "#ff9f43"] },
+    { effect = "gradient", colors = ["#0b1d3a", "#2a5a96"] },
+    { effect = "gradient", colors = ["#7ad9c4", "#1f7a74"] },
+    { effect = "gradient", colors = ["#ffe9a8", "#ff9f43"] },
+]
+
+[[step]]
+effect = "seams"
+partition = "windows"
+width = 1.5
+color = "#15100e"

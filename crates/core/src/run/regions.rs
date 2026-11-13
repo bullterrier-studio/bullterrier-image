@@ -13,8 +13,10 @@ use std::sync::Arc;
 
 use super::{Stage, laid};
 use crate::ops::svg::Ids;
-use crate::ops::{bands, cast, gradient, pieces};
-use crate::region::{Band, Bands, Combine, CombineOp, LinearGradient, Pick, Piece, RadialGradient, Subject};
+use crate::ops::{bands, cast, components, gradient, length, pieces};
+use crate::region::{
+    Band, Bands, Combine, CombineOp, Components, LinearGradient, Pick, Piece, RadialGradient, Subject,
+};
 use crate::{Error, ErrorKind, Finder, Labels, Layer, Picture, Region, Regions};
 
 /// A region once made.
@@ -236,6 +238,9 @@ impl Evaluator {
             Some(Region::Bands(Bands { of, count })) => {
                 partition(bands::partition(self.selected(of)?.values(), *count))
             }
+            Some(Region::Components(spec)) => {
+                partition(connected(name, spec, self.selected(&spec.of)?.values(), width)?)
+            }
             Some(Region::Combine(Combine { op, of })) => {
                 // selections lie in 0..1, so the value that leaves the others as they are is 1 for the product and the
                 // minimum, 0 for the maximum
@@ -322,6 +327,26 @@ impl Evaluator {
             }
         }
     }
+}
+
+/// The pieces and their number that the region `name` (`spec`) makes of the selection `values`, `width` wide: the
+/// connected pieces from `threshold` up and over `min_area`, the rest one more.
+///
+/// # Errors
+/// [`Error::Recipe`] naming the region, `max_pieces` and the number of pieces found, if there are more than it allows.
+fn connected(name: &str, spec: &Components, values: &[f32], width: usize) -> Result<(Vec<i32>, usize), Error> {
+    let cut = cast::single(spec.threshold);
+    let inside: Vec<bool> = values.iter().map(|&value| value >= cut).collect();
+    let smallest = spec.min_area * length::float(inside.len());
+    let (kinds, found) = components::label(&inside, width, |area| length::float(area) >= smallest);
+    if found > spec.max_pieces as usize {
+        return Err(Error::Recipe(format!(
+            "region '{name}': `of` '{}' has {found} pieces, more than `max_pieces` {}: raise `max_pieces` or `min_area`",
+            spec.of, spec.max_pieces
+        )));
+    }
+    // kind 0 is the rest, then the pieces from 1
+    Ok(pieces::renumber(found + 1, kinds.into_iter()))
 }
 
 /// The refusal of the region `name`, a `Pick` of the partition `of` that has no piece for the `id`.

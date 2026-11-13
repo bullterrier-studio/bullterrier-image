@@ -13,3 +13,4 @@ Each picture is its recipe in [`examples/regions/`](../../../examples/regions/) 
 | ![svg](svg.jpg) | [svg](../../../examples/regions/svg.toml) | Shapes from an SVG file are the pieces; outside them stays as it was |
 | ![tear](tear.jpg) | [tear](../../../examples/regions/tear.toml) | A ragged tear: cyanotype on one side, a solid dark band along it |
 | ![torn](torn.jpg) | [torn](../../../examples/regions/torn.toml) | The dog torn into scraps, a look each, a solid cream band along every tear |
+| ![windows](windows.jpg) | [windows](../../../examples/regions/windows.toml) | A synthesised facade: each window is a connected piece of one selection and gets a look |

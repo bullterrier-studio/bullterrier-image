@@ -2,14 +2,14 @@
 //! equal in declaration order, in JSON and in a TOML file, and what is not a region of a known kind is refused naming it.
 
 use bullterrier_image::region::{
-    Band, Bands, Combine, CombineOp, Curve, Cut, Cuts, Edge, EdgeStyle, Given, Grid, Line, LinearGradient, Path, Pick,
-    Piece, RadialGradient, Region, Regions, Shards, Shares, Subject, Svg,
+    Band, Bands, Combine, CombineOp, Components, Curve, Cut, Cuts, Edge, EdgeStyle, Given, Grid, Line, LinearGradient,
+    Path, Pick, Piece, RadialGradient, Region, Regions, Shards, Shares, Subject, Svg,
 };
 use bullterrier_image::{Recipe, Step};
 use serde_json::{Value, json};
 
 /// The kinds a region is written by, in the order of the documentation.
-const KINDS: [&str; 13] = [
+const KINDS: [&str; 14] = [
     "grid",
     "shards",
     "cuts",
@@ -19,6 +19,7 @@ const KINDS: [&str; 13] = [
     "subject",
     "band",
     "bands",
+    "components",
     "combine",
     "linear_gradient",
     "radial_gradient",
@@ -72,6 +73,10 @@ fn a_kind_alone_is_read_as_the_defaults_and_written_with_every_field_that_is_set
         ("subject", json!({"per": null, "context": 0.25, "threshold": 0.9})),
         ("band", json!({"of": "", "low": 0.5, "high": 1.0, "feather": 0.1})),
         ("bands", json!({"of": "", "count": 3})),
+        (
+            "components",
+            json!({"of": "", "threshold": 0.5, "min_area": 0.001, "max_pieces": 1000}),
+        ),
         ("combine", json!({"op": "multiply", "of": ["", ""]})),
         ("linear_gradient", json!({"angle": 270.0})),
         ("radial_gradient", json!({"x": 0.5, "y": 0.5, "radius": 0.5})),
@@ -206,6 +211,16 @@ fn every_kind() -> Vec<(&'static str, Region)> {
             .into(),
         ),
         (
+            "windows",
+            Components {
+                of: "near".to_owned(),
+                threshold: 0.625,
+                min_area: 0.015_625,
+                max_pieces: 64,
+            }
+            .into(),
+        ),
+        (
             "both",
             Combine {
                 op: CombineOp::Max,
@@ -249,6 +264,7 @@ fn regions_of_every_kind_with_every_field_set_are_written_and_read_back_equal_in
             "found",
             "near",
             "layers",
+            "windows",
             "both",
             "ramp",
             "spot"
@@ -325,6 +341,13 @@ feather = 0.5
 kind = "bands"
 of = "depth"
 count = 5
+
+[region.windows]
+kind = "components"
+of = "near"
+threshold = 0.625
+min_area = 0.015625
+max_pieces = 64
 
 [region.both]
 kind = "combine"

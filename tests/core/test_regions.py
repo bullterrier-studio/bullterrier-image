@@ -16,6 +16,7 @@ from bullterrier_image.recipe import (
     Band,
     Bands,
     Combine,
+    Components,
     Curve,
     Cuts,
     Edge,
@@ -44,6 +45,7 @@ BAD_VALUES = {
     "context past 1": (Subject, {"context": 1.5}, "context"),
     "low above high": (Band, {"low": 0.6, "high": 0.3}, r"low.*0\.6.*high.*0\.3"),
     "a band count named by its kind as a recipe writes it": (Bands, {"count": 0}, "^region .bands.: .*count"),
+    "no piece allowed in components": (Components, {"max_pieces": 0}, "^region .components.: .*max_pieces"),
     "a combination named by its kind as a recipe writes it": (Combine, {"op": "xor"}, "^region .combine.: .*op"),
     "a gradient named by its kind as a recipe writes it": (
         LinearGradient,
@@ -113,6 +115,7 @@ def test_a_preset_sets_the_fields_and_a_field_given_beside_it_wins():
         Svg,
         Band,
         Bands,
+        Components,
         Combine,
         LinearGradient,
         RadialGradient,

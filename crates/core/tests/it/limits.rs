@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use bullterrier_image::region::{
-    Bands, Curve, Cuts, Edge, EdgeStyle, Grid, Line, Path, Pick, Region, Shards, Shares, Svg,
+    Bands, Components, Curve, Cuts, Edge, EdgeStyle, Grid, Line, Path, Pick, Region, Shards, Shares, Svg,
 };
 use bullterrier_image::{Each, Entry, Error, ErrorKind, Image, Layer, Options, Photo, Picture, Presets, Recipe, Step};
 
@@ -255,6 +255,25 @@ fn rows() -> Vec<Row> {
             }
             .into(),
             says: &["`count` must be <= 100", "101"],
+        },
+        Row {
+            field: "max_pieces",
+            size: (24, 64),
+            most: Some(
+                Components {
+                    of: "subject".to_owned(),
+                    max_pieces: 10_000,
+                    ..Components::default()
+                }
+                .into(),
+            ),
+            past: Components {
+                of: "subject".to_owned(),
+                max_pieces: 10_001,
+                ..Components::default()
+            }
+            .into(),
+            says: &["`max_pieces` must be <= 10000", "10001"],
         },
         Row {
             field: "max_shapes",
@@ -888,6 +907,7 @@ const COSTLESS: &[(&str, &str)] = &[
     ("focus", "an exponent on a distance"),
     ("context", "a share of a piece's own size, within the picture"),
     ("threshold", "a comparison"),
+    ("min_area", "a comparison"),
     ("low", "a comparison"),
     ("high", "a comparison"),
     ("feather", "a comparison"),

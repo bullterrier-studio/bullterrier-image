@@ -25,7 +25,7 @@ fn region(kind: &str, fields: &Value) -> Region {
     table["kind"] = json!(kind);
     let existing = match kind {
         "pick" => json!("p"),
-        "band" | "bands" => json!("depth"),
+        "band" | "bands" | "components" => json!("depth"),
         "combine" => json!(["subject", "depth"]),
         _ => Value::Null,
     };
@@ -403,6 +403,37 @@ fn rows() -> Vec<(&'static str, Value, Option<&'static str>)> {
         ("bands", json!({"count": 100}), None),
         ("bands", json!({"count": 0}), Some("`count` must be >= 1, got 0")),
         ("bands", json!({"count": 101}), Some("`count` must be <= 100, got 101")),
+        // components: a threshold and a share of the frame from 0 to 1, 1 to 10000 pieces
+        (
+            "components",
+            json!({"threshold": 0, "min_area": 0, "max_pieces": 1}),
+            None,
+        ),
+        (
+            "components",
+            json!({"threshold": 1, "min_area": 1, "max_pieces": 10_000}),
+            None,
+        ),
+        (
+            "components",
+            json!({"threshold": 1.5}),
+            Some("`threshold` must be <= 1, got 1.5"),
+        ),
+        (
+            "components",
+            json!({"min_area": -0.5}),
+            Some("`min_area` must be >= 0, got -0.5"),
+        ),
+        (
+            "components",
+            json!({"max_pieces": 0}),
+            Some("`max_pieces` must be >= 1, got 0"),
+        ),
+        (
+            "components",
+            json!({"max_pieces": 10_001}),
+            Some("`max_pieces` must be <= 10000, got 10001"),
+        ),
         ("combine", json!({"of": ["subject", "depth"]}), None),
         ("combine", json!({"of": ["subject", "depth", "light"]}), None),
         (

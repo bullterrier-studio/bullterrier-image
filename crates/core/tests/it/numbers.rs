@@ -1,7 +1,7 @@
 //! The numbers of a recipe by address (`Recipe::numbers`, `number`, `with_value`): what a sweep varies. Expected values
 //! are worked out by hand from the recipe and the ranges the effects, regions and frame document.
 
-use bullterrier_image::region::{Band, Bands, LinearGradient, RadialGradient, Shards, Subject, Svg};
+use bullterrier_image::region::{Band, Bands, Components, LinearGradient, RadialGradient, Shards, Subject, Svg};
 use bullterrier_image::{Drive, Each, Entry, Error, Frame, Home, Presets, Recipe, Region, Step};
 use serde_json::{Value, json};
 
@@ -267,21 +267,14 @@ fn scalars(region: &Region) -> Result<Vec<String>, serde_json::Error> {
 
 #[test]
 fn every_number_of_a_region_kind_or_the_frame_has_a_row_unless_it_is_listed_as_not_a_number_to_sweep() -> Outcome {
-    let kinds: [Region; 6] = [
+    let all: [Region; 8] = [
         Shards::default().into(),
         Svg::default().into(),
         Subject::default().into(),
         Band::default().into(),
         Bands::default().into(),
+        Components::default().into(),
         LinearGradient::default().into(),
-    ];
-    let all: [Region; 7] = [
-        kinds[0].clone(),
-        kinds[1].clone(),
-        kinds[2].clone(),
-        kinds[3].clone(),
-        kinds[4].clone(),
-        kinds[5].clone(),
         RadialGradient::default().into(),
     ];
     for region in all {
@@ -325,6 +318,13 @@ fn a_rows_range_is_the_range_the_check_holds_the_number_to() -> Outcome {
             Bands {
                 of: "subject".to_owned(),
                 ..Bands::default()
+            },
+        )
+        .with_region(
+            "w",
+            Components {
+                of: "subject".to_owned(),
+                ..Components::default()
             },
         )
         .with_region("g", LinearGradient::default())
@@ -604,12 +604,13 @@ fn the_convention_check_flags_what_breaks_it_and_passes_what_keeps_it() {
 
 #[test]
 fn every_direction_rotation_and_length_of_a_region_or_the_frame_keeps_the_convention() -> Outcome {
-    let regions: [(&str, Region); 7] = [
+    let regions: [(&str, Region); 8] = [
         ("shards", Shards::default().into()),
         ("svg", Svg::default().into()),
         ("subject", Subject::default().into()),
         ("band", Band::default().into()),
         ("bands", Bands::default().into()),
+        ("components", Components::default().into()),
         ("linear_gradient", LinearGradient::default().into()),
         ("radial_gradient", RadialGradient::default().into()),
     ];

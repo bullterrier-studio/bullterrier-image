@@ -209,6 +209,32 @@ pub(crate) const REGION_ROWS: &[(&str, &[Row])] = &[
         )],
     ),
     (
+        "components",
+        &[
+            real(
+                "threshold",
+                "fraction",
+                0.0,
+                1.0,
+                "The value (0 to 1) from which a pixel of the selection is in a piece. Raising it keeps only what the selection is surer of; lowering it takes in more of a soft edge.",
+            ),
+            real(
+                "min_area",
+                "fraction",
+                0.0,
+                1.0,
+                "The smallest piece kept, as a share of the frame's area (0 to 1): a smaller one joins the rest. Raising it drops specks; 0 keeps every piece, down to a single pixel.",
+            ),
+            whole(
+                "max_pieces",
+                "count",
+                1.0,
+                10_000.0,
+                "The most pieces the selection may have after the small ones are dropped (1 to 10000); more is refused. Raising it allows a busier picture.",
+            ),
+        ],
+    ),
+    (
         "linear_gradient",
         &[turn(
             "angle",

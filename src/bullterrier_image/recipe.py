@@ -1,17 +1,16 @@
 """Recipes: the one public place to import everything about them from.
 
 A recipe is an ordered list of effects (written in Python or in a small TOML file) that is run on a photo, and the
-regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Combine`, `LinearGradient`,
-`RadialGradient`, `Given`) its steps name: `mask` limits a step to one, `Each` gives each piece of one its own look. The
-machinery lives in `bullterrier_image.core` (`steps`, and `bridge`, which runs a recipe in the Rust core) and
-`bullterrier_image.loader`; this module re-exports its public names and binds what the core leaves open: how the
-subject and the depth are found. When a recipe will ask for the subject (it needs the subject and no `subject` map is
-given, or it finds the subject piece by piece) and `finders` has no `subject`, `render`, `trace` and `render_all` find
-it with `bullterrier_image.finding.subject.subject_finder()`; when a recipe needs depth and neither a `depth` map nor a
-`depth` finder is given, with `bullterrier_image.finding.depth.depth_finder()`. Each is built only then, so a recipe
-that needs neither never depends on the model settings. Any other map (a `Given` region's) is handed in by name in
-`maps`.
-"""
+regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Components`, `Combine`,
+`LinearGradient`, `RadialGradient`, `Given`) its steps name: `mask` limits a step to one, `Each` gives each piece of
+one its own look. The machinery lives in `bullterrier_image.core` (`steps`, and `bridge`, which runs a recipe in the
+Rust core) and `bullterrier_image.loader`; this module re-exports its public names and binds what the core leaves open:
+how the subject and the depth are found. When a recipe will ask for the subject (it needs the subject and no `subject`
+map is given, or it finds the subject piece by piece) and `finders` has no `subject`, `render`, `trace` and
+`render_all` find it with `bullterrier_image.finding.subject.subject_finder()`; when a recipe needs depth and neither a
+`depth` map nor a `depth` finder is given, with `bullterrier_image.finding.depth.depth_finder()`. Each is built only
+then, so a recipe that needs neither never depends on the model settings. Any other map (a `Given` region's) is handed
+in by name in `maps`."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -30,6 +29,7 @@ from .core.regions import (
     Band,
     Bands,
     Combine,
+    Components,
     Curve,
     Cuts,
     Edge,
@@ -54,6 +54,7 @@ __all__ = [
     "Band",
     "Bands",
     "Combine",
+    "Components",
     "Curve",
     "Cuts",
     "Drive",

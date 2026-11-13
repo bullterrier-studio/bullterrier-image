@@ -1,6 +1,6 @@
 //! The regions of a recipe: named selections and partitions of the picture the steps can aim at.
 //!
-//! A [`Region`] is one of thirteen kinds, each a struct of typed, documented fields with Python's defaults; [`Regions`]
+//! A [`Region`] is one of fourteen kinds, each a struct of typed, documented fields with Python's defaults; [`Regions`]
 //! keeps a recipe's regions by name in the order they were declared. They are read from a recipe's `regions` (a
 //! `[region.NAME]` table in a file, with a `kind` key naming the kind) and written back with every field, a field left
 //! unset (`fit`, `preset`, `per`) left out and a count of shares (`columns = 3`) written as the list of shares. Reading
@@ -29,7 +29,9 @@ use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
-pub use derived::{Band, Bands, Combine, CombineOp, Given, LinearGradient, Pick, Piece, RadialGradient, Subject};
+pub use derived::{
+    Band, Bands, Combine, CombineOp, Components, Given, LinearGradient, Pick, Piece, RadialGradient, Subject,
+};
 pub use laid::{Curve, Cut, Cuts, Edge, EdgeStyle, Grid, Line, Path, Shards, Shares, Svg};
 
 use super::built_in::{BuiltIn, Origin};
@@ -60,6 +62,8 @@ pub enum Region {
     Band(Band),
     /// Equal ranges of a selection's scale: a partition.
     Bands(Bands),
+    /// The connected pieces of a selection: a partition.
+    Components(Components),
     /// Selections put together: a selection.
     Combine(Combine),
     /// A value rising across the picture: a selection.
@@ -71,7 +75,7 @@ pub enum Region {
 }
 
 /// The kinds, as a recipe file writes them. [`Region`]'s variants spell the same names in snake case.
-const KINDS: [&str; 13] = [
+const KINDS: [&str; 14] = [
     "grid",
     "shards",
     "cuts",
@@ -81,6 +85,7 @@ const KINDS: [&str; 13] = [
     "subject",
     "band",
     "bands",
+    "components",
     "combine",
     "linear_gradient",
     "radial_gradient",
@@ -108,6 +113,7 @@ regions_from!(
     Subject,
     Band,
     Bands,
+    Components,
     Combine,
     LinearGradient,
     RadialGradient,
@@ -118,7 +124,9 @@ impl Region {
     /// What this region is: a partition into pieces, or a selection of pixels.
     pub(crate) fn form(&self) -> Form {
         match self {
-            Self::Grid(_) | Self::Shards(_) | Self::Cuts(_) | Self::Svg(_) | Self::Bands(_) => Form::Partition,
+            Self::Grid(_) | Self::Shards(_) | Self::Cuts(_) | Self::Svg(_) | Self::Bands(_) | Self::Components(_) => {
+                Form::Partition
+            }
             Self::Path(_)
             | Self::Pick(_)
             | Self::Subject(_)
@@ -131,7 +139,7 @@ impl Region {
     }
 
     /// The regions this one is made from, each as (the field that names it, its name, the form it must have): the one
-    /// a kind is laid over (`fit`), the one a `Pick` picks from, the ones a `Band`, `Bands` or `Combine` is cut or put
+    /// a kind is laid over (`fit`), the one a `Pick` picks from, the ones a `Band`, `Bands`, `Components` or `Combine` is cut or put
     /// together from, the one a `Subject` is found in each piece of.
     pub(crate) fn refers_to(&self) -> Vec<(&'static str, &str, Form)> {
         fn laid(fit: Option<&String>) -> Vec<(&'static str, &str, Form)> {
@@ -151,7 +159,9 @@ impl Region {
                 .iter()
                 .map(|per| ("per", per.as_str(), Form::Partition))
                 .collect(),
-            Self::Band(Band { of, .. }) | Self::Bands(Bands { of, .. }) => vec![("of", of.as_str(), Form::Selection)],
+            Self::Band(Band { of, .. }) | Self::Bands(Bands { of, .. }) | Self::Components(Components { of, .. }) => {
+                vec![("of", of.as_str(), Form::Selection)]
+            }
             Self::Combine(combine) => combine
                 .of
                 .iter()
@@ -195,6 +205,7 @@ impl<'de> Deserialize<'de> for Region {
             "subject" => read(table).map(Self::Subject),
             "band" => read(table).map(Self::Band),
             "bands" => read(table).map(Self::Bands),
+            "components" => read(table).map(Self::Components),
             "combine" => read(table).map(Self::Combine),
             "linear_gradient" => read(table).map(Self::LinearGradient),
             "radial_gradient" => read(table).map(Self::RadialGradient),

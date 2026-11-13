@@ -1,5 +1,5 @@
 """The declared regions of a recipe: which pixels of a picture a step is about, as a partition (`Grid`, `Shards`,
-`Cuts`, `Svg`, `Bands`) or a selection (`Path`, `Pick`, `Subject`, `Band`, `Combine`, `LinearGradient`,
+`Cuts`, `Svg`, `Bands`, `Components`) or a selection (`Path`, `Pick`, `Subject`, `Band`, `Combine`, `LinearGradient`,
 `RadialGradient`, `Given`); `Edge` bends the borders of the kinds with `fit`.
 
 The kinds are pieces (see `pieces`): frozen dataclasses made by the core's answer, every field with a default and its
@@ -28,6 +28,7 @@ __all__ = [
     "Band",
     "Bands",
     "Combine",
+    "Components",
     "Curve",
     "Cuts",
     "Edge",
@@ -559,6 +560,50 @@ class Bands(_Piece):
     )
 
 
+@piece(_region("components"))
+@dataclass(frozen=True, kw_only=True)
+class Components(_Piece):
+    """A partition into the connected pieces of a selection: the windows of a facade, the letters of a sign."""
+
+    of: str = field(
+        default="",
+        metadata={
+            "doc": (
+                "The name of the selection whose pieces are found, which must be set (see `Band.of`). "
+                "Pixels where it is below `threshold`, and those of pieces dropped as too small, make "
+                "one more piece, numbered like any by its first pixel."
+            )
+        },
+    )
+    threshold: float = field(
+        default=0.5,
+        metadata={
+            "doc": (
+                "The value (0 to 1) from which a pixel of the selection is in a piece. Raising it keeps "
+                "only what the selection is surer of; lowering it takes in more of a soft edge."
+            )
+        },
+    )
+    min_area: float = field(
+        default=0.001,
+        metadata={
+            "doc": (
+                "The smallest piece kept, as a share of the frame's area (0 to 1): a smaller one joins "
+                "the rest. Raising it drops specks; 0 keeps every piece, down to a single pixel."
+            )
+        },
+    )
+    max_pieces: int = field(
+        default=1000,
+        metadata={
+            "doc": (
+                "The most pieces the selection may have after the small ones are dropped (1 to 10000); "
+                "more is refused. Raising it allows a busier picture."
+            )
+        },
+    )
+
+
 @piece(_region("combine"))
 @dataclass(frozen=True, kw_only=True)
 class Combine(_Piece):
@@ -657,6 +702,7 @@ Kind = (
     | Subject
     | Band
     | Bands
+    | Components
     | Combine
     | LinearGradient
     | RadialGradient

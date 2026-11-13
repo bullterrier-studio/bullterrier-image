@@ -387,6 +387,8 @@ ignore_names = [
     "register_again",  # `tests/conftest.py` puts the real effects back after emptying the registry
     "parse",  # `Step.parse`, `Each.parse` and `Recipe.parse` make one from a dict (docs/python-api.md)
     "count",  # a field of `Bands` and `Shards`, written to the core by `plain`
+    "min_area",  # fields of `Components`, written to the core by `plain`
+    "max_pieces",
     "write_stages",  # `examples/python_api.py` saves the stages of a trace with it
     "rect",  # `Path.rect` and `Path.ellipse`: public constructors of a region (docs/python-api.md)
     "ellipse",

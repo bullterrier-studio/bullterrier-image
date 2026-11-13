@@ -539,6 +539,7 @@ PYTHON_KINDS: dict[str, Any] = {
     "subject": regions.Subject,
     "band": regions.Band,
     "bands": regions.Bands,
+    "components": regions.Components,
     "combine": regions.Combine,
     "linear_gradient": regions.LinearGradient,
     "radial_gradient": regions.RadialGradient,
@@ -638,6 +639,14 @@ REGION_ROWS = [
     # bands, combine
     ("1 band", "bands", {"of": "depth", "count": 1}, True),
     ("no band", "bands", {"of": "depth", "count": 0}, False),
+    (
+        "components, widest limits",
+        "components",
+        {"of": "depth", "threshold": 1, "min_area": 1, "max_pieces": 10000},
+        True,
+    ),
+    ("components, no piece allowed", "components", {"of": "depth", "max_pieces": 0}, False),
+    ("components, threshold above", "components", {"of": "depth", "threshold": 1.5}, False),
     ("combine of two", "combine", {"of": ["subject", "depth"]}, True),
     ("combine of three, max", "combine", {"op": "max", "of": ["subject", "depth", "light"]}, True),
     ("combine of one", "combine", {"of": ["subject"]}, False),
@@ -699,6 +708,7 @@ def test_the_core_has_the_kinds_python_has():
         "pick": {"of": "p"},
         "band": {"of": "depth"},
         "bands": {"of": "depth"},
+        "components": {"of": "depth"},
         "combine": {"of": ["subject", "depth"]},
     }
     refused = [kind for kind in PYTHON_KINDS if not core_accepts_region(kind, names.get(kind, {}))]

@@ -65,10 +65,10 @@ Gradient screened over photo = ordinary step with `blend_mode`. `blend` effect i
 `[region.NAME]` declares one by `kind`. `format = 2`: `grid` (columns and rows, equal or in shares), `shards` (irregular pieces
 like glass or stone; presets `glass`, `torn`, `stone`, `mosaic`), `cuts` (straight and curved lines), `svg` (shapes of an SVG
 file), `path` (inside a closed SVG path), `pick` (some pieces of a partition), `subject`, `given` map. `format = 3` adds
-`band`, `bands`, `combine`, `linear_gradient`, `radial_gradient`.
+`band`, `bands`, `components`, `combine`, `linear_gradient`, `radial_gradient`.
 
 - **Partition**: every pixel in one piece, numbered from 0 in reading order (`bt-image steps` draws them numbered): `grid`,
-  `shards`, `cuts`, `svg`, `bands`.
+  `shards`, `cuts`, `svg`, `bands`, `components`.
 - **Selection**: values 0..1: `path`, `pick`, `subject`, `given`, `band`, `combine`, gradients, built-in `subject`,
   `background`, `depth`, `light`.
 - `fit = "subject"` lays a kind over the subject instead of whole picture. `edge = { style = "torn", amount = 4.8, scale = 24 }` tears its borders (`amount`, `scale` in design px like any px value).
@@ -139,6 +139,13 @@ the picture along `angle` (clockwise from right: 90 rises downward), 0 at one ed
 from centre (`x`, `y`, shares) to 1 at `radius`, share of shorter side. Band of gradient = tilt-shift zone or vignette ring; band
 of light = shadows or highlights; subject combined with shadows = shadows on subject.
 
+`components` = partition into connected pieces (4-connected: shared edge, not corner) of the selection `of`, pixels at or above
+`threshold`: windows of a facade, letters of a sign, lit lamps. Numbered in reading order of each piece's first pixel; pieces
+under `min_area` (share of the frame) dropped; more than `max_pieces` after that = error naming limit and count. Everything
+outside a kept piece is one more piece (as for `svg`), numbered like any by its first pixel. `pick`, `each` + `looks` and
+`mask` work on it as on any partition. Not axis-aligned: a tilted facade works
+([`windows`](gallery/regions/README.md), a drawn facade).
+
 Version 2 of the file format named depth kinds `depth` and `depth_bands`. Now `band` and `bands` with `of = "depth"` (`far` is
 `low`, `near` is `high`); old file says so. Finished examples: [`examples/regions/`](../examples/regions/)
 ([pictures](gallery/regions/README.md)), [`examples/fields/`](../examples/fields/) ([pictures](gallery/fields/README.md)).
@@ -146,7 +153,7 @@ Version 2 of the file format named depth kinds `depth` and `depth_bands`. Now `b
 ### A look per piece
 
 Recipe says *where* via regions: `grid`, `shards` (broken glass, stone), `cuts`, `svg`, `path`, `pick`, `subject`, `given` map,
-and (`format = 3`) `band`, `bands`, `combine`, gradients. `mask` limits a step to a selection; `each` + `looks` gives every
+and (`format = 3`) `band`, `bands`, `components`, `combine`, gradients. `mask` limits a step to a selection; `each` + `looks` gives every
 piece of a partition its own look:
 
 ```toml

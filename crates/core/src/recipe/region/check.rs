@@ -125,6 +125,11 @@ impl Region {
                 Ok(())
             }
             Self::Bands(bands) => at.within("count", bands.count, 1, 100),
+            Self::Components(components) => {
+                at.within("threshold", components.threshold, 0, 1)?;
+                at.within("min_area", components.min_area, 0, 1)?;
+                at.within("max_pieces", components.max_pieces, 1, 10_000) // MOST_PIECES, as a u32
+            }
             Self::Combine(combine) => at.count("of", combine.of.len(), 2, MOST_COMBINED),
             Self::LinearGradient(gradient) => at.finite("angle", gradient.angle),
             Self::RadialGradient(gradient) => {

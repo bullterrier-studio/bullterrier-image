@@ -1171,6 +1171,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   share with its reference named: `radial_gradient.radius` (the shorter side, as `swirl` and `pinch_bulge`),
   `Shards.jitter` (the lattice spacing), `Band.feather` (the field's range), `Framing` `margin` (the subject's box),
   `pad_*` and `corner_radius` (the shorter side).
+- **`components` is a partition of a selection, 4-connected, with the rest as one more piece.** Windows, letters and lamps
+  are the connected pieces of a selection a recipe already makes (`path`, `band`, a `given` map), so the kind reads a
+  selection, as `bands` does, and `pick`, `each` and `mask` work on it unchanged. 4-connected: pieces that touch only at a
+  corner stay apart. Pixels outside every kept piece cannot belong to no piece (`Labels` gives every pixel one), so they
+  are one more piece numbered by its first pixel, as `svg`'s outside area is. `min_area` is a share of the frame, so a
+  look has one meaning at every resolution; `max_pieces` (1 to 10000, as a `Pick`) refuses a speckled selection by
+  count after the small ones are dropped. The labelling is an iterative flood fill in `ops/components.rs`, 40 lines: no
+  crate (`imageproc` has one, but is an imaging library with picture types of its own, for a single function).
 - **A field is a selection read for its values; `band`, `bands` and `combine` cut and join fields, `light` and two
   gradients make them.** A selection is already a float map 0..1, so no second concept is declared: a field is whatever
   selection a region's `of` names, built in (`depth`, `light`, `subject`) or the recipe's own. `band` (a selection)
@@ -1340,7 +1348,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   fails on any `include_*!` that leaves its crate.
 - **Every user value that drives allocation or work has a maximum, and a test at it and one past it** (`crates/core/tests/it/limits.rs`):
   `Shards.count` 500, `Cuts.lines` 32, `Path.samples` 16, `Edge.octaves` 8, `Edge.scale` 480, `Edge.amount` 48, `Grid` shares
-  1000 and 10000 pieces, `Bands.count` 100, a `Pick` 10000 pieces, `Svg.max_shapes` 100000, `Svg.max_kilobytes` 100000,
+  1000 and 10000 pieces, `Bands.count` 100, `Components.max_pieces` 10000, a `Pick` 10000 pieces, `Svg.max_shapes` 100000, `Svg.max_kilobytes` 100000,
   nodes 2^21, visited elements 2^22, nesting 64, chords 1024, coordinates 10^7 px, corners 2^20, crossings 2^28, painted pixels 2^30. The new regions
   hold a bend (8 bytes a pixel) and a raster (4) beside the picture, at any size of photo: the pixel limit applies to `size`
   only, and no cap is added now.

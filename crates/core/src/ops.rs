@@ -10,6 +10,7 @@ pub(crate) mod chroma;
 pub(crate) mod cluster;
 pub(crate) mod color;
 pub(crate) mod colorspace;
+pub(crate) mod components;
 pub(crate) mod convolve;
 pub(crate) mod cutout;
 pub(crate) mod cuts;

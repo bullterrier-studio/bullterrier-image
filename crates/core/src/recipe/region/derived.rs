@@ -1,5 +1,5 @@
 //! The region kinds made from other regions or from the picture: [`Pick`], [`Subject`], [`Band`], [`Bands`],
-//! [`Combine`], [`LinearGradient`], [`RadialGradient`] and [`Given`].
+//! [`Components`], [`Combine`], [`LinearGradient`], [`RadialGradient`] and [`Given`].
 
 use std::fmt;
 
@@ -160,6 +160,37 @@ impl Default for Bands {
         Self {
             of: String::new(),
             count: 3,
+        }
+    }
+}
+
+/// A partition into the connected pieces of a selection: the windows of a facade, the letters of a sign. Pixels where the
+/// selection is below `threshold`, and those of pieces dropped for being small, make one more piece, numbered like any by
+/// its first pixel.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Components {
+    /// The name of the selection whose pieces are found, which must be set (see `Band.of`).
+    pub of: String,
+    /// The value, 0 to 1, from which a pixel of the selection is in a piece. Raising it keeps only what the selection is
+    /// surer of; lowering it takes in more of a soft edge.
+    pub threshold: f64,
+    /// The smallest piece kept, as a share of the frame's area, 0 to 1: a smaller one joins the rest. Raising it drops
+    /// specks; 0 keeps every piece, down to a single pixel.
+    pub min_area: f64,
+    /// The most pieces the selection may have after the small ones are dropped, 1 to 10000; more is refused. Raising it
+    /// allows a busier picture and costs a piece's share of work for each.
+    pub max_pieces: u32,
+}
+
+impl Default for Components {
+    /// The pieces of nothing: `of` must be set.
+    fn default() -> Self {
+        Self {
+            of: String::new(),
+            threshold: 0.5,
+            min_area: 0.001,
+            max_pieces: 1000,
         }
     }
 }
