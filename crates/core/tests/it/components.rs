@@ -67,6 +67,17 @@ fn pieces_touching_only_at_a_corner_are_two_pieces_and_a_tilted_bar_is_one() -> 
         drawn_pieces(&tilted, components(0.0))?,
         "001111/100111/110011/111001/111100"
     );
+    // and the other way round: a labeller that joins only one diagonal passes the drawings above, not these
+    let corner_the_other_way = ["..##", "..##", "##..", "##.."];
+    assert_eq!(
+        drawn_pieces(&corner_the_other_way, components(0.0))?,
+        "0011/0011/2200/2200"
+    );
+    let tilted_the_other_way = ["....##", "...##.", "..##..", ".##...", "##...."];
+    assert_eq!(
+        drawn_pieces(&tilted_the_other_way, components(0.0))?,
+        "000011/000110/001100/011000/110000"
+    );
     Ok(())
 }
 
