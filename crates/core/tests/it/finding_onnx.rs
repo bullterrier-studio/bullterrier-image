@@ -274,3 +274,36 @@ fn a_graph_file_whose_weights_file_is_not_the_catalogues_is_as_good_as_absent() 
     );
     Ok(())
 }
+
+#[test]
+fn a_model_with_a_weights_file_not_in_the_cache_names_each_url_with_its_own_target() -> Outcome {
+    let cache = folder("sam2-absent")?;
+    let refused = sam2::finder(
+        &Options::new().with_cache(&cache),
+        Prompts::new(
+            vec![Point {
+                x: 0.5,
+                y: 0.5,
+                positive: true,
+            }],
+            None,
+        )?,
+    );
+    let Err(Error::BackendUnavailable(message)) = refused else {
+        return Err("no refusal".into());
+    };
+    let target = |suffix: &str| {
+        cache
+            .join(format!("{}{suffix}", SAM2_ENCODER.name))
+            .display()
+            .to_string()
+    };
+    let data = SAM2_ENCODER.data.ok_or("the encoder has weights")?;
+    for pair in [
+        format!("{} as {}", SAM2_ENCODER.url, target(".onnx")),
+        format!("{} as {}", data.url, target(".onnx_data")),
+    ] {
+        assert!(message.contains(&pair), "{pair}: {message}");
+    }
+    Ok(())
+}

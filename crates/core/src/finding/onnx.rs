@@ -299,19 +299,23 @@ pub(super) fn cached_file(model: &Model, options: &Options) -> Result<PathBuf, E
         return Ok(file);
     }
     if !options.allow_download {
-        let (megabytes, also) = match &model.data {
-            Some(data) => (
-                (model.size + data.size) / 1_000_000,
-                format!(" and {} as {}", data.url, data_file(&file).display()),
-            ),
-            None => (model.size / 1_000_000, String::new()),
-        };
+        let mut files = vec![(model.url, file.clone())];
+        let mut bytes = model.size;
+        if let Some(data) = &model.data {
+            files.push((data.url, data_file(&file)));
+            bytes += data.size;
+        }
+        let by_hand: Vec<String> = files
+            .iter()
+            .map(|(url, target)| format!("{url} as {}", target.display()))
+            .collect();
         return Err(Error::BackendUnavailable(format!(
-            "the {} model ({megabytes} MB) is not in {}: allow downloading it (BT_IMAGE_ALLOW_DOWNLOAD=1, or the option of \
-             the call), or download {}{also} by hand and save it as that file, or point to a local copy",
+            "the {} model ({} MB) is not in {}: allow downloading it (BT_IMAGE_ALLOW_DOWNLOAD=1, or the option of the \
+             call), or download {} by hand, or point to a local copy",
             model.name,
+            bytes / 1_000_000,
             cache.display(),
-            model.url
+            by_hand.join(" and ")
         )));
     }
     download_model(model, &file)?;
