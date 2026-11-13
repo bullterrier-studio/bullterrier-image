@@ -269,6 +269,10 @@ def test_the_identity_of_sam2_holds_the_prompts_so_another_click_is_another_find
         "extra click": subject_finder("sam2", points=[(0.25, 0.75, True), (0.5, 0.5, True)]),
         "box": subject_finder("sam2", points=[(0.25, 0.75, True)], box=(0.0, 0.0, 1.0, 1.0)),
     }
+    box = subject_finder("sam2", points=[(0.5, 0.5, True)], box=(0.1, 0.2, 0.6, 0.7)).identity
+    assert subject_finder("sam2", points=[(0.5, 0.5, True)], box=(0.1, 0.2, 0.6, 0.7)).identity == box
+    for moved in [(0.11, 0.2, 0.6, 0.7), (0.1, 0.21, 0.6, 0.7), (0.1, 0.2, 0.61, 0.7), (0.1, 0.2, 0.6, 0.71)]:
+        assert subject_finder("sam2", points=[(0.5, 0.5, True)], box=moved).identity != box, moved
     for what, finder in others.items():
         assert finder.identity != base, what
     assert len({finder.identity for finder in others.values()}) == len(others)

@@ -359,3 +359,19 @@ fn prompts_with_other_clicks_a_label_or_a_box_have_another_identity_and_equal_on
     }
     Ok(())
 }
+
+#[test]
+fn a_box_has_the_identity_of_its_values_not_of_its_presence() -> Result<(), Error> {
+    let identity = |edges| Prompts::new(vec![point(0.5, 0.5, true)], Some(edges)).map(|prompts| prompts.identity());
+    let base = identity([0.1, 0.2, 0.6, 0.7])?;
+    assert_eq!(base, identity([0.1, 0.2, 0.6, 0.7])?);
+    for (what, moved) in [
+        ("left", [0.11, 0.2, 0.6, 0.7]),
+        ("top", [0.1, 0.21, 0.6, 0.7]),
+        ("right", [0.1, 0.2, 0.61, 0.7]),
+        ("bottom", [0.1, 0.2, 0.6, 0.71]),
+    ] {
+        assert_ne!(base, identity(moved)?, "{what}");
+    }
+    Ok(())
+}
