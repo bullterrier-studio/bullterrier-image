@@ -1379,6 +1379,15 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
 - The plan and the deferred list of regions (each item with the need that would justify it) are in
   `.superpowers/plans/regions.md`.
 
+- **A recipe dict states its format; a region is asked for as a map (2026-11-13).** `Recipe.to_dict()` writes the *lowest*
+  recipe-file format that can write the recipe, not the newest: a file's format gates what it may use so that its meaning
+  never changes, and a recipe that needs nothing new then stays readable by every release that reads format 1. The core's
+  `Recipe::format` is that rule; the file reader is its oracle in the tests (the same text is read at the format it names and
+  refused one below). `Recipe::from_json` reads an optional `format` first, so a consumer that stores a recipe as JSON (scene) can
+  tell the format and gets a refusal naming it. `region_map` makes one region by the runner's own `begin` (frame, size, maps,
+  evaluator), prepares no step and plans no cut, so it needs the region's maps and the crop's subject, not the steps'; an
+  unused region works, and a partition is refused (it has no 0..1 map; `Pick` makes a selection of some of its pieces).
+
 ## Testing and gates
 
 The template's decisions (platforms, the core's test binary, the memory cap, the three tiers) are in `template-decisions.md`.
