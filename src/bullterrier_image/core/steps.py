@@ -606,14 +606,17 @@ class Recipe:
     @classmethod
     def from_dict(cls, written: Mapping[str, Any]) -> "Recipe":
         """The recipe that `to_dict` (or a recipe file read into data) writes: `steps` (a dict is a `Step`, or an
-        `Each` when it has `each`), and optionally `name`, `description`, `size`, `frame` (a dict of the `Framing`'s
-        fields) and `regions` (a dict by name, each with its `kind`). RecipeError for a key it does not know."""
-        known = {"steps", "name", "description", "size", "frame", "regions"}
+        `Each` when it has `each`), and optionally `format`, `name`, `description`, `size`, `frame` (a dict of the
+        `Framing`'s fields) and `regions` (a dict by name, each with its `kind`). RecipeError for a key it does not
+        know, for a `format` that is not one of `RECIPE_FORMATS` (read before anything else, naming it), and for one
+        below the lowest format that can write the recipe."""
+        known = {"format", "steps", "name", "description", "size", "frame", "regions"}
         if unknown := sorted(set(written) - known):
             raise RecipeError(f"a recipe written as a dict has the keys {', '.join(sorted(known))}, not {unknown}")
+        declared = native.read_format(written["format"]) if "format" in written else None
         steps = [_step_from_dict(step) if isinstance(step, Mapping) else step for step in written.get("steps", ())]
         frame = written.get("frame")
-        return cls(
+        recipe = cls(
             steps,
             name=written.get("name"),
             description=written.get("description"),
@@ -621,11 +624,15 @@ class Recipe:
             frame=Framing(**frame) if isinstance(frame, Mapping) else frame,
             regions={name: _region_from_dict(name, region) for name, region in written.get("regions", {}).items()},
         )
+        if declared is not None:
+            native.check_recipe({"format": declared, **recipe._document()})  # the core refuses a format that is too low
+        return recipe
 
     def to_dict(self) -> dict[str, Any]:
-        """The recipe as the plain data a recipe file writes (`from_dict` reads it back): a key is there when it is
-        set, every region has its `kind`. A `Picture` or `Lut` parameter stays the object."""
-        return recipe_dict(self, _kept)
+        """The recipe as the plain data a recipe file writes (`from_dict` reads it back): `format` first, the lowest
+        recipe-file format that can write it (one of `RECIPE_FORMATS`), then a key when it is set, every region with its
+        `kind`. A `Picture` or `Lut` parameter stays the object."""
+        return {"format": native.recipe_format(self._document()), **recipe_dict(self, _kept)}
 
     def replace(self, **changes: Any) -> "Recipe":
         """A copy with `changes`: any of the fields `Recipe` takes (`steps`, `name`, `description`, `size`, `frame`,

@@ -9,6 +9,7 @@ from typing import Any, Protocol, final
 import numpy as np
 
 __all__ = [
+    "RECIPE_FORMATS",
     "CoreError",
     "Lut",
     "apply",
@@ -40,10 +41,12 @@ __all__ = [
     "parse_color",
     "project_maps",
     "read",
+    "read_format",
     "read_map",
     "read_project",
     "read_recipe",
     "read_recipe_source",
+    "recipe_format",
     "refine_edge",
     "region",
     "region_presets",
@@ -64,6 +67,8 @@ __all__ = [
 
 class CoreError(ValueError):
     kind: str
+
+RECIPE_FORMATS: list[int]
 
 class _Finder(Protocol):
     def find(self, rgb: np.ndarray) -> np.ndarray | None: ...
@@ -107,6 +112,8 @@ def known_maps(recipe: dict[str, Any]) -> list[str]: ...
 def numbers(recipe: dict[str, Any]) -> list[dict[str, Any]]: ...
 def locate(recipe: dict[str, Any], address: str) -> dict[str, Any]: ...
 def needs(recipe: dict[str, Any], *, presets: Mapping[str, str] | None = None) -> dict[str, Any]: ...
+def read_format(declared: object) -> int: ...
+def recipe_format(recipe: dict[str, Any]) -> int: ...
 def params(effect: str) -> dict[str, Any]: ...
 def schema(effect: str) -> dict[str, Any]: ...
 def effect(effect: str) -> dict[str, Any]: ...

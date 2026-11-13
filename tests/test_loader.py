@@ -2,6 +2,7 @@
 keys) is a `RecipeError` that starts with the file's name."""
 
 import re
+from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
@@ -15,6 +16,7 @@ from bullterrier_image.core.steps import Each, Recipe, Step, drives, runs
 from bullterrier_image.errors import ImageReadError, RecipeError, UnknownEffectError
 from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (
+    RECIPE_FORMATS,
     Band,
     Bands,
     Curve,
@@ -71,6 +73,12 @@ def test_a_recipe_without_a_format_or_with_format_1_2_or_3_loads(tmp_path):
     assert load_recipe(_write(tmp_path, "format = 1\nname = 'b'\n" + STEP, "b.toml")).name == "b"
     assert load_recipe(_write(tmp_path, "format = 2\nname = 'c'\n" + STEP, "c.toml")).name == "c"
     assert load_recipe(_write(tmp_path, "format = 3\nname = 'd'\n" + STEP, "d.toml")).name == "d"
+
+
+@pytest.mark.parametrize("declared", range(-1, 6))
+def test_a_file_declares_exactly_the_formats_the_package_says_it_reads(tmp_path, declared):
+    with nullcontext() if declared in RECIPE_FORMATS else pytest.raises(RecipeError, match=r"`format`"):
+        load_recipe(_write(tmp_path, f"format = {declared}\n" + STEP))
 
 
 @pytest.mark.parametrize(

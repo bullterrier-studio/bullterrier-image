@@ -33,6 +33,7 @@ mod _core {
     /// Put the exception where `import` finds it again, so pickling it (to send it between processes) works.
     #[pymodule_init]
     fn init(module: &Bound<'_, PyModule>) -> PyResult<()> {
+        module.add("RECIPE_FORMATS", bullterrier_image::RECIPE_FORMATS.to_vec())?;
         module
             .py()
             .get_type::<super::CoreError>()
@@ -68,8 +69,8 @@ mod _core {
 
     #[pymodule_export]
     use super::run::{
-        check_recipe, check_step, known_maps, locate, map_problem, needs, number_pieces, numbers, refine_edge, render,
-        trace,
+        check_recipe, check_step, known_maps, locate, map_problem, needs, number_pieces, numbers, read_format,
+        recipe_format, refine_edge, render, trace,
     };
 }
 

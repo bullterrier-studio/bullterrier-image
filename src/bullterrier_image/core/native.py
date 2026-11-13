@@ -72,6 +72,7 @@ def entry[**P, R](function: Callable[P, R]) -> Callable[P, R]:
     return wrapped
 
 
+RECIPE_FORMATS = tuple(_core.RECIPE_FORMATS)  # the recipe-file formats this release reads, from the core's one list
 effects = entry(_core.effects)
 params = entry(_core.params)
 schema = entry(_core.schema)
@@ -112,6 +113,8 @@ subject_finder_identity = entry(_core.subject_finder_identity)
 depth_finder_identity = entry(_core.depth_finder_identity)
 kept_onnx_runtime = entry(_core.kept_onnx_runtime)
 needs = entry(_core.needs)
+read_format = entry(_core.read_format)
+recipe_format = entry(_core.recipe_format)
 known_maps = entry(_core.known_maps)
 numbers = entry(_core.numbers)
 number_pieces = entry(_core.number_pieces)

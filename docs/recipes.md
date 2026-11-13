@@ -46,6 +46,12 @@ Values in `px` are design pixels: pixels on a picture whose long side is 480, wh
 big the output is (its longest side in px); absent (the default, also for a Python `Recipe`: `size=None`), the picture renders
 at the photo's own size, and a 4000 px photo multiplies every px value by 4000/480.
 
+**Format.** `format` (a whole number, optional; none means 1) is the recipe format of the file; this release reads
+`bullterrier_image.RECIPE_FORMATS`, `(1, 2, 3)`, and a file may not use what a later format added (format 2: regions, `each`,
+`looks`, `partition`; format 3: drives, step `name`, the region kinds listed under Regions). `Recipe.to_dict()` writes the lowest
+format that can write the recipe, first in the dict, and `Recipe.from_dict` refuses a `format` it does not read or one below
+what its recipe needs.
+
 **Step keys.** Every step takes same four keys besides `effect` and its parameters. Runner applies them after any effect: each
 step is a layer over picture below, as in image editor. Result combined by blend mode, mixed by opacity, only where mask says.
 

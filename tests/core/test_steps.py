@@ -865,6 +865,53 @@ def test_a_recipe_written_to_a_dict_is_read_back_into_an_equal_recipe():
     assert Recipe.from_dict(recipe.to_dict()) == recipe
 
 
+# What `to_dict` writes as the `format` of a recipe: the lowest recipe-file format that can write it.
+FORMAT_OF = {
+    "one step": (Recipe([fx.grade()], name="look", size=64, frame=Framing(aspect=1.0)), 1),
+    "a region": (Recipe([fx.grade()], regions={"p": Grid(columns=2)}), 2),
+    "an each step": (Recipe([Each("p", looks=[fx.grade()])], regions={"p": Grid(columns=2)}), 2),
+    "a step by its partition": (Recipe([fx.seams(partition="p")], regions={"p": Grid(columns=2)}), 2),
+    "a step name": (Recipe([fx.grade(name="warm")]), 3),
+    "a drive": (Recipe([fx.bloom(radius=Drive(by="light", start=1, end=10))]), 3),
+    "a region new in format 3": (Recipe([fx.grade()], regions={"d": Band(of="depth")}), 3),
+}
+
+
+@pytest.mark.parametrize(("recipe", "lowest"), FORMAT_OF.values(), ids=FORMAT_OF.keys())
+def test_a_recipe_written_to_a_dict_says_the_lowest_format_that_writes_it_first(recipe, lowest):
+    written = recipe.to_dict()
+    assert (next(iter(written)), written["format"]) == ("format", lowest)
+    assert Recipe.from_dict(written) == recipe
+    assert json.loads(json.dumps(written)) == written
+
+
+BELOW = Recipe([fx.grade(name="warm")], regions={"p": Grid(columns=2)})
+NEWER = {"format": 4, "steps": [{"effect": "grade", "a_key_of_format_4": 1}]}
+
+
+@pytest.mark.parametrize(
+    ("written", "complaint"),
+    [
+        pytest.param({**BELOW.to_dict(), "format": 2}, r"`format` 2.*needs format 3", id="below what the recipe needs"),
+        pytest.param({"format": 4, "steps": [{"effect": "grade"}]}, r"`format` 4.*reads format 1, 2, 3", id="newer"),
+        pytest.param(NEWER, r"`format` 4", id="newer, with a key this release lacks: the format is named"),
+        pytest.param({"format": 0, "steps": [{"effect": "grade"}]}, r"`format` 0", id="zero"),
+        pytest.param({"format": "3", "steps": [{"effect": "grade"}]}, r"`format` \"3\"", id="text"),
+        pytest.param({"format": 3.0, "steps": [{"effect": "grade"}]}, r"`format` 3\.0", id="a decimal"),
+        pytest.param({"format": True, "steps": [{"effect": "grade"}]}, r"`format` true", id="a bool"),
+        pytest.param({"format": None, "steps": [{"effect": "grade"}]}, r"`format` null", id="none"),
+    ],
+)
+def test_a_recipe_dict_whose_format_this_release_does_not_read_or_the_recipe_outgrows_is_refused(written, complaint):
+    with pytest.raises(RecipeError, match=complaint):
+        Recipe.from_dict(written)
+
+
+def test_a_recipe_dict_may_declare_a_format_above_what_it_needs_or_none():
+    steps = [{"effect": "grade"}]
+    assert Recipe.from_dict({"format": 3, "steps": steps}) == Recipe.from_dict({"steps": steps}) == Recipe([fx.grade()])
+
+
 REGION_KINDS = {
     "grid": Grid(columns=2, rows=3),
     "shards": Shards(count=5, seed=2),

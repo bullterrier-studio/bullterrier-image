@@ -24,6 +24,7 @@ from .core import looks as shipped_looks
 from .core.bridge import maps_needed, needs_finder
 from .core.finder import Finder
 from .core.framing import Framing
+from .core.native import RECIPE_FORMATS
 from .core.pieces import Drive
 from .core.regions import (
     FOUND_MAPS,
@@ -53,6 +54,7 @@ from .finding.depth import depth_finder
 from .loader import load_recipe
 
 __all__ = [
+    "RECIPE_FORMATS",
     "Band",
     "Bands",
     "ColorRange",

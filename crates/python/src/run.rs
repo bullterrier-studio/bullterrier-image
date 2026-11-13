@@ -127,6 +127,21 @@ pub(crate) fn check_step(step: &Bound<'_, PyDict>, presets: Option<&Bound<'_, Py
     .map_err(core_error)
 }
 
+/// The format of a recipe file `declared` writes (any Python value: the dict's `format`), which must be one this release
+/// reads. `CoreError` of kind `recipe` naming the value and the formats read for anything else, a decimal, text and a bool
+/// among them.
+#[pyfunction]
+pub(crate) fn read_format(declared: &Bound<'_, PyAny>) -> PyResult<i64> {
+    Recipe::read_format(&to_json(declared)?).map_err(core_error)
+}
+
+/// The lowest format of a recipe file that can write `recipe` (a dict, as for `render`): 1, 2 or 3. Nothing else is
+/// checked.
+#[pyfunction]
+pub(crate) fn recipe_format(recipe: &Bound<'_, PyDict>) -> PyResult<i64> {
+    Ok(recipe_of(recipe)?.format())
+}
+
 /// What rendering `recipe` (a dict, as for `render`) asks of the photo: `{"maps": [str], "finds_pieces": bool}`. `maps`
 /// are the names the photo must be handed or find a map under (sorted): `subject` for the built-in `subject` and
 /// `background`, a `subject` region found without `per` and a frame that crops around it or cuts by it, `depth`, and the

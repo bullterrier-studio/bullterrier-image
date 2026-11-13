@@ -60,7 +60,10 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
 - **Reading values.** `step.describe(width=56)` is the short label `trace` shows (an `Each` has one too, and
   `drive.describe()`); `drive.values()` lists the values a `Drive` takes at its levels. `Step`, `Each` and `Recipe` are
   frozen dataclasses; `to_dict()` writes one as the plain data a recipe file holds and `Class.from_dict(data)` reads it back
-  (a `RecipeError` naming the key). The regions, `Framing` and `Drive` are frozen dataclasses of keyword fields too;
+  (a `RecipeError` naming the key). A recipe's dict starts with `format`: the lowest recipe-file format that can write
+  it (1, 2 or 3; see [recipes.md](recipes.md)). `RECIPE_FORMATS`, `(1, 2, 3)`, lists the formats this release reads;
+  `Recipe.from_dict` refuses another `format` (the one found and those read are named) before it reads the rest, and
+  one below what the recipe needs. The regions, `Framing` and `Drive` are frozen dataclasses of keyword fields too;
   the core checks each when it is made; `help(Grid)` lists their fields, with unit and
   range.
 - **Shapes.** `Path.rect(x, y, w, h)` and `Path.ellipse(cx, cy, rx, ry)` are `Path` regions (`samples=` as for `Path`) for the
