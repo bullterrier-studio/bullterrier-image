@@ -175,9 +175,46 @@ impl<'a> Photo<'a> {
         })?
     }
 
+    /// The map of the region `name` of `recipe`: how much each pixel of the working picture is chosen by it, a number from 0
+    /// to 1, as a step that names the region (`mask`, a field) is given it. `name` is `subject`, `background`, `depth`,
+    /// `light` or a region the recipe declares that is a selection, whether or not a step uses it.
+    ///
+    /// The working picture is the one [`render`](Self::render) works on: the photo as the recipe's `frame` frames it, at
+    /// the size `options` ask for, else the recipe's `size`, else its own. No step runs and no cut of the finished
+    /// picture is made; the recipe is checked as for a render. Only the maps `name` is made from (and the subject, if the
+    /// frame crops around it) are needed, see [`Recipe::region_needs`].
+    ///
+    /// # Errors
+    /// Whatever [`Recipe::checked`] refuses the recipe for, [`Error::Recipe`] if `name` is no selection (it is a
+    /// partition, or no region), naming the selections there are and the closest, and [`Error::MapNotFound`] for a map
+    /// the region is made from that the photo has neither of nor a finder for.
+    pub fn region_map(&self, recipe: &Recipe, presets: &Presets, options: Options, name: &str) -> Result<Layer, Error> {
+        par::install(options.threads(), || {
+            let mut run = self.begin(recipe, presets, options, Some(name))?;
+            let picture = run.working.picture();
+            Ok(Layer::clone(run.regions.selection(name, &picture)?.as_ref()))
+        })?
+    }
+
     /// `recipe` checked and every step of it prepared, with all the maps they use found: ready to run.
     fn start(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Run<'a>, Error> {
-        let reach = recipe.check_rules(presets)?.reach(&recipe.regions);
+        self.begin(recipe, presets, options, None)
+    }
+
+    /// [`start`](Self::start), or, for `only` a selection, the run that is only the regions that selection is made from:
+    /// no step prepared and no cut planned, and the subject found only if the crop of the frame needs it.
+    fn begin(
+        &self,
+        recipe: &Recipe,
+        presets: &Presets,
+        options: Options,
+        only: Option<&str>,
+    ) -> Result<Run<'a>, Error> {
+        let uses = recipe.check_rules(presets)?;
+        let reach = match only {
+            Some(name) => recipe.reach_of_selection(name)?,
+            None => uses.reach(&recipe.regions),
+        };
         regions::check_makeable(
             &recipe.regions,
             reach
@@ -186,7 +223,11 @@ impl<'a> Photo<'a> {
             self.finders.contains_key("subject"),
         )?;
         // the subject the frame needs (a crop around it, a cut by it), found before anything is made
-        let needs_subject = recipe.frame.needs_subject();
+        let needs_subject = if only.is_some() {
+            recipe.frame.crops_by_subject()
+        } else {
+            recipe.frame.needs_subject()
+        };
         let given_subject = needs_subject
             .then(|| maps::stored(self, recipe, "subject", "`frame`"))
             .transpose()?;
@@ -200,14 +241,18 @@ impl<'a> Photo<'a> {
         let maps = Maps::new(self, recipe, &working)?;
         // as the working picture has it, which a trace shows like a map a step uses
         let framed_subject = needs_subject.then(|| maps.get("subject", "`frame`")).transpose()?;
-        let cut = Cut::plan(&recipe.frame, &working, framed_subject.clone())?;
         let mut assets = Assets::new(&self.luts, &self.pictures);
-        let steps = recipe
-            .steps
-            .iter()
-            .enumerate()
-            .map(|(index, entry)| prepare(presets, ratio, &mut assets, entry, &format!("step {}", index + 1)))
-            .collect::<Result<Vec<_>, _>>()?;
+        let (cut, steps) = if only.is_some() {
+            (None, Vec::new())
+        } else {
+            let steps = recipe
+                .steps
+                .iter()
+                .enumerate()
+                .map(|(index, entry)| prepare(presets, ratio, &mut assets, entry, &format!("step {}", index + 1)))
+                .collect::<Result<Vec<_>, _>>()?;
+            (Cut::plan(&recipe.frame, &working, framed_subject.clone())?, steps)
+        };
         // every map the photo gives that the steps use is found now, so that none is missing when its step runs
         let mut held = BTreeMap::new();
         for reached in reach.iter().filter(|reached| maps.gives(&reached.name)) {

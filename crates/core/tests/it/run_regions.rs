@@ -430,6 +430,248 @@ fn an_svg_region_without_a_file_refuses_the_render_naming_the_region_when_a_step
     Ok(())
 }
 
+/// A recipe of one `paint` step that masks nothing and declares `declared`, whose region `name` is asked for on `photo`.
+fn region_map(photo: &Photo<'_>, declared: &Value, name: &str, options: Options) -> Result<Layer, Error> {
+    let rig = rig()?;
+    let mut recipe = Recipe::new([rig.paint()]);
+    recipe.regions = regions(declared.clone());
+    photo.region_map(&recipe, &Presets::new(), options, name)
+}
+
+/// The photo of 2 x 3 grey pixels of brightness 0.1 to 0.6, with a depth and a subject map of their own.
+fn varied(pixels: &mut Vec<f32>) -> Result<Photo<'_>, Error> {
+    *pixels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+        .iter()
+        .flat_map(|grey| [*grey; 3])
+        .collect();
+    grey(
+        2,
+        3,
+        pixels,
+        &[
+            ("depth", vec![0.0, 0.25, 0.5, 0.75, 1.0, 0.5]),
+            ("subject", vec![1.0, 0.5, 0.5, 0.25, 0.0, 0.75]),
+        ],
+    )
+}
+
+#[test]
+fn a_region_map_is_the_selection_a_step_is_given_by_that_region() -> Outcome {
+    let declared = json!({
+        "g": {"kind": "linear_gradient", "angle": 30.0},
+        "r": {"kind": "radial_gradient", "x": 0.25, "radius": 0.8},
+        "near": {"kind": "band", "of": "depth", "low": 0.5, "high": 1.0, "feather": 0.25},
+        "nearer": {"kind": "band", "of": "near", "low": 0.5, "high": 1.0, "feather": 0.0},
+        "both": {"kind": "combine", "op": "min", "of": ["nearer", "subject", "g"]},
+        "me": {"kind": "subject"},
+    });
+    let given = [
+        ("depth", vec![0.0, 0.25, 0.5, 0.75, 1.0, 0.5]),
+        ("subject", vec![1.0, 0.5, 0.5, 0.25, 0.0, 0.75]),
+    ];
+    let mut pixels = Vec::new();
+    let photo = varied(&mut pixels)?;
+    for name in ["g", "r", "near", "nearer", "both", "me", "subject", "depth"] {
+        let map = region_map(&photo, &declared, name, Options::default())?;
+        assert_eq!((map.height(), map.width()), (2, 3), "{name}");
+        assert_eq!(map.values(), made(2, 3, &declared, name, &given)?, "{name}");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_built_in_background_and_light_are_regions_too() -> Outcome {
+    let mut pixels = Vec::new();
+    let photo = varied(&mut pixels)?;
+    let background = region_map(&photo, &json!({}), "background", Options::default())?;
+    assert_close(
+        background.values(),
+        &[0.0, 0.5, 0.5, 0.75, 1.0, 0.25],
+        1e-6,
+        "1 - the subject",
+    );
+    // grey pixels: the Rec. 709 brightness of a grey is the grey
+    let light = region_map(&photo, &json!({}), "light", Options::default())?;
+    assert_close(light.values(), &[0.1, 0.2, 0.3, 0.4, 0.5, 0.6], 1e-5, "light");
+    Ok(())
+}
+
+#[test]
+fn a_region_map_is_made_for_the_working_picture_framed_and_sized_as_a_render_has_it() -> Outcome {
+    let declared = json!({"star": {"kind": "given"}, "g": {"kind": "linear_gradient", "angle": 20.0}});
+    let rig = rig()?;
+    let pixels = vec![0.5; 4 * 6 * 3];
+    let star: Vec<f32> = (0..24).map(|index| f32::from(u8::from(index % 6 < 2))).collect();
+    let photo = grey(4, 6, &pixels, &[("star", star)])?;
+    let framed = |frame: Frame, size: Option<u32>| {
+        let mut recipe = rig.asking(&["g", "star"], &declared);
+        recipe.frame = frame;
+        recipe.size = size;
+        recipe
+    };
+    for (what, frame, recipe_size, size) in [
+        ("as it is", Frame::default(), None, None),
+        (
+            "flipped",
+            Frame {
+                flip: Flip::X,
+                ..Frame::default()
+            },
+            None,
+            None,
+        ),
+        (
+            "cropped square",
+            Frame {
+                aspect: Some(1.0),
+                ..Frame::default()
+            },
+            None,
+            None,
+        ),
+        ("sized by the call", Frame::default(), None, Some(12)),
+        ("sized by the recipe", Frame::default(), Some(9), None),
+        ("sized by the call over the recipe", Frame::default(), Some(9), Some(12)),
+    ] {
+        let recipe = framed(frame, recipe_size);
+        let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
+        rig.recorder.clear();
+        render(&photo, &recipe, options)?;
+        let (gradient, given) = (rig.seen().remove(0), rig.seen().remove(1));
+        for (name, seen) in [("g", gradient), ("star", given)] {
+            let map = photo.region_map(&recipe, &Presets::new(), options, name)?;
+            assert_eq!(map.values(), seen, "{what}: {name}");
+            assert_eq!(map.height() * map.width(), map.values().len(), "{what}: {name}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_region_map_asks_for_the_maps_of_the_region_not_of_the_steps() -> Outcome {
+    let rig = rig()?;
+    let pixels = vec![0.5; 2 * 3 * 3];
+    let (subject, depth) = (Arc::new(Finds::flat(0.25)), Arc::new(Finds::flat(0.75)));
+    let photo = Photo::new(Picture::new(2, 3, &pixels)?)
+        .with_finder("subject", subject.clone())
+        .with_finder("depth", depth.clone());
+    // the steps use the subject; the regions are a gradient (no map), a band of the depth and the subject itself
+    let mut recipe = Recipe::new([rig.paint().mask("subject")]);
+    recipe.regions = regions(json!({
+        "g": {"kind": "linear_gradient"}, "d": {"kind": "band", "of": "depth", "low": 0.5, "high": 1.0},
+    }));
+    let ask = |name: &str| photo.region_map(&recipe, &Presets::new(), Options::default(), name);
+    ask("g")?;
+    assert_eq!((subject.calls(), depth.calls()), (0, 0));
+    assert_eq!(ask("d")?.values(), [1.0; 6]);
+    assert_eq!((subject.calls(), depth.calls()), (0, 1));
+    ask("subject")?;
+    assert_eq!((subject.calls(), depth.calls()), (1, 1));
+    Ok(())
+}
+
+#[test]
+fn what_a_region_map_needs_is_what_its_region_and_the_crop_of_the_frame_need() -> Outcome {
+    let rig = rig()?;
+    let declared = json!({
+        "g": {"kind": "linear_gradient"},
+        "d": {"kind": "band", "of": "depth"},
+        "star": {"kind": "given"},
+        "windows": {"kind": "combine", "of": ["d", "subject"]},
+        "p": {"kind": "grid"},
+        "each": {"kind": "subject", "per": "p"},
+    });
+    let mut recipe = Recipe::new([rig.paint().mask("subject")]);
+    recipe.regions = regions(declared);
+    let needs = |recipe: &Recipe, name: &str| recipe.region_needs(&Presets::new(), name);
+    // (the region, the maps it needs, whether it finds the subject in each piece)
+    for (name, maps, pieces) in [
+        ("g", vec![], false),
+        ("d", vec!["depth"], false),
+        ("star", vec!["star"], false),
+        ("windows", vec!["depth", "subject"], false),
+        ("background", vec!["subject"], false),
+        ("light", vec![], false),
+        ("each", vec![], true),
+    ] {
+        let asked = needs(&recipe, name)?;
+        assert_eq!(
+            asked.maps.iter().map(String::as_str).collect::<Vec<_>>(),
+            maps,
+            "{name}"
+        );
+        assert_eq!(asked.finds_pieces, pieces, "{name}");
+    }
+    // a crop around the subject needs it for any region; a cut by it is not made by a region map
+    recipe.frame = Frame {
+        aspect: Some(1.0),
+        anchor: bullterrier_image::frame::Anchor::Subject,
+        ..Frame::default()
+    };
+    assert_eq!(needs(&recipe, "g")?.maps.iter().collect::<Vec<_>>(), ["subject"]);
+    recipe.frame = Frame {
+        transparent: bullterrier_image::frame::Transparent::Background,
+        ..Frame::default()
+    };
+    assert!(needs(&recipe, "g")?.maps.is_empty());
+    let pixels = vec![0.5; 2 * 3 * 3];
+    let photo = grey(2, 3, &pixels, &[])?;
+    let map = photo.region_map(&recipe, &Presets::new(), Options::default(), "light")?;
+    assert_eq!(map.values().len(), 6);
+    Ok(())
+}
+
+#[test]
+fn a_region_map_refuses_a_name_that_is_no_selection_listing_the_ones_there_are() -> Outcome {
+    let declared =
+        json!({"windows": {"kind": "linear_gradient"}, "panes": {"kind": "grid"}, "star": {"kind": "given"}});
+    let mut pixels = Vec::new();
+    let photo = varied(&mut pixels)?;
+    for (what, name, kind, words) in [
+        (
+            "a typo",
+            "windws",
+            ErrorKind::Recipe,
+            vec![
+                "'windws'",
+                "did you mean 'windows'",
+                "subject",
+                "background",
+                "depth",
+                "light",
+                "windows",
+            ],
+        ),
+        (
+            "a partition",
+            "panes",
+            ErrorKind::Recipe,
+            vec!["'panes'", "partition", "selection", "windows"],
+        ),
+        (
+            "a given map nobody handed in",
+            "star",
+            ErrorKind::MapNotFound,
+            vec!["star"],
+        ),
+    ] {
+        let result = region_map(&photo, &declared, name, Options::default());
+        assert!(
+            matches!(&result, Err(error) if error.kind() == kind && words.iter().all(|word| error.to_string().contains(word))),
+            "{what}: {result:?}"
+        );
+    }
+    // a recipe that is none is refused as it is for a render
+    let mut recipe = Recipe::new([Step::new("no_such_effect_anywhere")]);
+    recipe.regions = regions(declared);
+    let result = photo.region_map(&recipe, &Presets::new(), Options::default(), "windows");
+    assert!(
+        matches!(&result, Err(error) if error.kind() == ErrorKind::UnknownEffect),
+        "{result:?}"
+    );
+    Ok(())
+}
+
 proptest! {
     #[test]
     fn every_selection_a_region_makes_lies_within_0_and_1_whatever_its_numbers(

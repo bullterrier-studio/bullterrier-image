@@ -168,7 +168,14 @@ impl Frame {
     /// (`transparent` `Background`). The one place that says so; the runner finds the subject for a frame that does.
     #[must_use]
     pub fn needs_subject(&self) -> bool {
-        self.anchor == Anchor::Subject || self.transparent == Transparent::Background
+        self.crops_by_subject() || self.transparent == Transparent::Background
+    }
+
+    /// Whether the picture the steps work on is cropped around the subject (`anchor` `Subject`): the part of
+    /// [`needs_subject`](Self::needs_subject) that comes before the steps.
+    #[must_use]
+    pub(crate) fn crops_by_subject(&self) -> bool {
+        self.anchor == Anchor::Subject
     }
 
     /// The frame the JSON object `value` writes, every number checked, or what is wrong, naming the field.

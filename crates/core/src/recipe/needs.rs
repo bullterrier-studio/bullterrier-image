@@ -3,6 +3,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use super::built_in::{BuiltIn, Origin};
+use super::references::{Form, refer};
 use super::region::Subject;
 use super::{Recipe, Region, Regions};
 use crate::{Error, Presets};
@@ -52,6 +53,20 @@ pub(crate) struct Reach {
 }
 
 impl Uses {
+    /// The one use of the selection `name` (a built-in region or a declared selection) by a request for its map.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] if `name` is no selection of `regions`, naming the ones there are and the closest.
+    fn of_selection(regions: &Regions, name: &str) -> Result<Self, Error> {
+        refer(regions, "region_map", "name", name, Some(Form::Selection))?;
+        Ok(Self(vec![Use {
+            step: 0,
+            place: "the request".to_owned(),
+            key: "name".to_owned(),
+            name: name.to_owned(),
+        }]))
+    }
+
     /// Every region these uses reach, in the order they are first reached, each once, and the last step that needs it.
     ///
     /// One walk that visits a region once however many steps and paths lead to it and keeps no call stack. A region is
@@ -119,6 +134,14 @@ impl Uses {
 }
 
 impl Recipe {
+    /// The regions a request for the map of the selection `name` reaches, as a render reaches those its steps use.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] if `name` is no selection of the recipe, naming the ones there are and the closest.
+    pub(crate) fn reach_of_selection(&self, name: &str) -> Result<Vec<Reach>, Error> {
+        Ok(Uses::of_selection(&self.regions, name)?.reach(&self.regions))
+    }
+
     /// The names a photo can be handed a map or a finder under for this recipe: `subject`, `depth`, then each `Given`
     /// region in the order it was declared. A photo given anything else is refused when it renders. Pure: nothing is
     /// checked.
@@ -143,5 +166,16 @@ impl Recipe {
     pub fn needs(&self, presets: &Presets) -> Result<Needs, Error> {
         let uses = self.check_rules(presets)?;
         Ok(uses.needs(&self.regions, self.frame.needs_subject()))
+    }
+
+    /// What [`Photo::region_map`](crate::Photo::region_map) of the selection `name` asks of the photo: the maps the
+    /// region is made from and, if the frame crops around the subject, the subject. The steps use nothing here, and a
+    /// cut of the finished picture by the subject is not made.
+    ///
+    /// # Errors
+    /// What [`needs`](Self::needs) refuses, and [`Error::Recipe`] if `name` is no selection of the recipe.
+    pub fn region_needs(&self, presets: &Presets, name: &str) -> Result<Needs, Error> {
+        self.check_rules(presets)?;
+        Ok(Uses::of_selection(&self.regions, name)?.needs(&self.regions, self.frame.crops_by_subject()))
     }
 }
