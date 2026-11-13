@@ -550,6 +550,23 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   *Reason:* the matte's shape keeps the engine testable without a model and lets a phone's own depth map or a better model
   replace the default without touching an effect. *Consequence:* framing transforms the depth map with the photo; depth is
   found at most once per photo and cached like the matte, under the finder's identity.
+- **Prompted subject: SAM 2 Hiera Large, clicks travel with the finder.** `sam2` is a third segmenter, chosen like the
+  others and never a default; it finds what clicks (positive or negative, shares of the photo) and one box point at, and is
+  refused naming `points` without them. *Model:* SAM 2.1 Hiera Large from the `onnx-community` export (encoder and decoder,
+  each with an external weights file that must sit beside it under its own name), pinned by size and SHA-256 and fetched like
+  the other models; the export states no licence, the SAM 2.1 weights and code are Apache-2.0 (recorded, not gating). *Size,
+  measured here* (ONNX Runtime 1.23.2, CPU, Apple silicon, 24 GB): a find on a 384 x 512 picture takes 6.3 to 6.7 s (encoder
+  and decoder, session already loaded; loading and hashing the 910 MB takes 2.1 s) and the process peaks at 2.6 GB, inside
+  the 4000 MB cap, so Large is the one entry; base_plus and tiny share the interface and are not catalogued. *Quality:* one
+  click inside a disc on noise gives an intersection over union of 0.997 against the disc; on the example photo one click cuts
+  the dog (ears, collar, paws) and one on the lantern cuts the lantern, but a negative click on the dog's own head does not
+  remove it (the best-scored candidate stays the whole dog). *Where the prompts live:* in the finder, not in the recipe or the
+  `subject` region: a click belongs to one photo and a look is for many, and a region with `per` asks the finder for crops,
+  where shares of the photo mean something else. So no global concept was added; `subject_finder`'s identity holds the
+  prompts exactly (floats written round-trip), which is what `run` remembers finds by. *Seam:* `Segment`, the runtime's
+  stand-in point (several inputs, i64 labels), beside `Infer`, which takes one tensor. *Consequence:* a stretch of logits
+  (not of probabilities) keeps the edge where the model puts it; the stretch helper clamps to 0..1, so logits are scaled
+  to 0..1 around it, as inverse depth is.
 
 ## Determinism
 

@@ -317,7 +317,7 @@ A look is added to `examples/recipes/` by the batch that builds its last missing
 Each item is built only when video or scene needs it.
 
 - **Subject matte (R6 extras).** Matte refinement as a post-process of the subject matte (the guided filter is the primitive),
-  choosing one instance among several (several people, pick one), and an AI upscaler as a model kind in the model catalogue.
+  and an AI upscaler as a model kind in the model catalogue.
 - **Effects, in this order of value.** `distance_field`; glass, then emboss and bevel (new rows); `stipple`; `engraving`;
   `crosshatch`; `dissolve`; `color_transfer` (the picture parameter kind may already unblock it: check); `denoise`.
 - **Input depth (a watch item).** A 16-bit input is read as sRGB. Colour management beyond sRGB (CMYK, ICC output) is not

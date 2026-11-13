@@ -131,6 +131,11 @@ threshold = 0.9          # keep only pixels the finder is surer of than this: it
 `bt-image run` remembers what finder found per cell (finder, photo, cell pixels): repeat run asks model nothing. A `subject`
 map you hand in does not stand in for the finder here (a cell is a part of the picture).
 
+**Clicks.** What the subject is can be said by clicking: `--segmenter sam2 --point X,Y [--avoid X,Y] [--box L,T,R,B]`
+(Python: `subject_finder("sam2", points=[(x, y, positive)], box=...)`), shares of the photo. They are a property of one
+photo, not of a look, so a recipe holds none: the region is still the built-in `subject`, and the finder is told what to
+find. See [subject and depth](subject-and-depth.md).
+
 **Field kinds.** `band` = selection: pixels where field of `of` lies `low` to `high`, fading out linearly over `feather` beyond
 both (shares of field's 0..1 scale; `low` above `high` = error). `bands` = partition into `count` equal ranges, numbered
 **highest first** (only exception to reading order): piece 0 = nearest of depth, brightest of light; empty range dropped,

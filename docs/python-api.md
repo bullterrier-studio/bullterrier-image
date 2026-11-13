@@ -121,6 +121,15 @@ Angle in degrees whose value and value 360 further give the same picture (direct
 `(cyclic)` in the docs: range = one turn, any real accepted, same direction inside it (270 on -180..180 is -90). Other angles
 (elevation, lean) keep range and refuse outside.
 
+## Pointing at a subject
+
+`subject_matte(rgb, segmenter="sam2", points=[(x, y, positive), ...], box=(left, top, right, bottom))` and
+`subject_finder("sam2", points=..., box=...)` (a `Finder` for `render(..., finders={"subject": ...})`) find what the clicks
+and box point at: shares of the picture, from 0 to 1, `positive=False` for a click on what to leave out. With neither it is a
+`ValueError` naming `points`, as is a share outside 0 to 1, more than 64 clicks, a box with no area, or clicks given to
+another segmenter. The `Finder`'s identity holds the prompts, so a moved click is a new find. See
+[subject and depth](subject-and-depth.md).
+
 ## Writing a plugin
 
 Effects can live in own package. Write against `bullterrier_image.plugin`:
