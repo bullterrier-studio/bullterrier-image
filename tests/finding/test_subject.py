@@ -5,6 +5,7 @@ conftest), whose answer follows from the documented model contract, so the expec
 Apple Vision runs for real where it exists (macOS). Expected values for `refine_edge` are worked out by hand: erosion
 by a disc on axis-aligned shapes, and the normal distribution for a blurred straight edge."""
 
+import functools
 import sys
 from pathlib import Path
 
@@ -276,6 +277,17 @@ def test_the_identity_of_sam2_holds_the_prompts_so_another_click_is_another_find
     for what, finder in others.items():
         assert finder.identity != base, what
     assert len({finder.identity for finder in others.values()}) == len(others)
+
+
+def test_a_list_the_caller_changes_later_changes_neither_the_identity_nor_what_the_finder_will_ask(echo_red):
+    clicks = [(0.25, 0.75, True)]
+    finder = subject_finder("sam2", points=clicks)
+    identity = finder.identity
+    clicks[:] = [(0.02, 0.02, True)]
+    assert finder.identity == identity
+    # asking would run the real model, so look at what the finder holds to ask with (a `functools.partial`)
+    assert isinstance(finder.find, functools.partial)
+    assert finder.find.keywords["points"] == ((0.25, 0.75, True),)
 
 
 # --- refine_edge: its rows are the core's (crates/core/tests/it/matte.rs); here only the facade ---------------------

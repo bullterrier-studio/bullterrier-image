@@ -88,6 +88,7 @@ def subject_finder(
     model. Raises BackendUnavailableError for an unknown segmenter name (naming the choices) or a backend that cannot
     run here, naming what to do.
     """
+    points = tuple(points)  # a copy: the caller's list may change later, and the identity must keep naming the answers
     identity = native.subject_finder_identity(segmenter=segmenter, points=points, box=box)
     chosen = identity.split(":", 1)[0]  # "onnx", "sam2" or "vision": what the identity was made for
     return Finder(identity, functools.partial(subject_matte, segmenter=chosen, points=points, box=box))
