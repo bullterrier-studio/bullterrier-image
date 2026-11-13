@@ -9,7 +9,7 @@ use crate::Error;
 /// keys `each`, `looks` and `partition`; format 3 added a parameter driven by a field (a table with `by`), the step key
 /// `name` and the region kinds in [`KINDS_NEW_IN_3`]. A file of an earlier format may not use what a later one added,
 /// so its meaning never changes.
-const FORMATS: [i64; 3] = [1, 2, 3];
+pub const FORMATS: [i64; 3] = [1, 2, 3];
 
 /// The keys of a file, each as it is written (a table or a list of tables in brackets), in the order the error for an
 /// unknown one lists them.
@@ -48,6 +48,53 @@ const KINDS_REPLACED_IN_3: [(&str, &str); 2] = [
 ];
 
 impl Recipe {
+    /// The format version `declared` writes, which must be one this release reads ([`FORMATS`]).
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] naming `declared` and the formats read: a whole number is a version, a decimal (`3.0`), text and a
+    /// bool are not.
+    pub fn read_format(declared: &Value) -> Result<i64, Error> {
+        declared
+            .as_i64()
+            .filter(|version| FORMATS.contains(version))
+            .ok_or_else(|| {
+                let read: Vec<String> = FORMATS.iter().map(ToString::to_string).collect();
+                Error::Recipe(format!(
+                    "`format` {declared} is not one this release reads; it reads format {}",
+                    read.join(", ")
+                ))
+            })
+    }
+
+    /// The lowest format a file of this recipe could declare: 3 if it has a `name` on a step, a drive (a parameter with
+    /// `by`) or a region of a kind new in format 3; else 2 if it has a region, an `each` step or a `partition`; else 1.
+    /// The rule of the file reader (`from_toml`), which refuses what a lower format lacks; a test holds the two together.
+    #[must_use]
+    pub fn format(&self) -> i64 {
+        let drives = |step: &Step| step.params.values().any(|value| value.get("by").is_some());
+        let looks = |each: &Each| each.looks.iter().flatten().any(drives);
+        let three = self
+            .regions
+            .iter()
+            .any(|(_, region)| KINDS_NEW_IN_3.contains(&region.kind()))
+            || self.steps.iter().any(|entry| match entry {
+                Entry::Step(step) => step.name.is_some() || drives(step),
+                Entry::Each(each) => each.name.is_some() || looks(each),
+            });
+        let two = !self.regions.is_empty()
+            || self.steps.iter().any(|entry| match entry {
+                Entry::Step(step) => step.partition.is_some(),
+                Entry::Each(_) => true,
+            });
+        if three {
+            3
+        } else if two {
+            2
+        } else {
+            1
+        }
+    }
+
     /// The recipe the TOML text `text` writes. Only the file is read: its shape and the rules of its format version
     /// (see below), not the rules of a look (see `Recipe::checked`).
     ///
@@ -205,20 +252,7 @@ fn value_of(value: toml::Value, path: &mut String, key: &str) -> Result<Value, E
 
 /// The format version a file declares: the first when it declares none.
 fn format_of(file: &Map<String, Value>) -> Result<i64, Error> {
-    let Some(declared) = file.get("format") else {
-        return Ok(FORMATS[0]);
-    };
-    // an integer only: `3.0` and `true` are not versions
-    declared
-        .as_i64()
-        .filter(|version| FORMATS.contains(version))
-        .ok_or_else(|| {
-            let read: Vec<String> = FORMATS.iter().map(ToString::to_string).collect();
-            Error::Recipe(format!(
-                "`format` {declared} is not one this release reads; it reads format {}",
-                read.join(", ")
-            ))
-        })
+    file.get("format").map_or(Ok(FORMATS[0]), Recipe::read_format)
 }
 
 /// The `[region.NAME]` tables as regions, in the order the file declares them, once each is a table of a kind this

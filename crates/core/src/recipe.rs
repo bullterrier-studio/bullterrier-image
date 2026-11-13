@@ -361,17 +361,34 @@ impl Recipe {
         self
     }
 
-    /// The recipe the JSON object `text` writes, in the form `serde_json` writes a recipe in. Only the shape is read:
-    /// see `Recipe::checked` for the rules.
+    /// The recipe the JSON object `text` writes, in the form `serde_json` writes a recipe in, which may also declare
+    /// the `format` of a recipe file it is written in (see [`RECIPE_FORMATS`](crate::RECIPE_FORMATS)). Only the shape is
+    /// read: see `Recipe::checked` for the rules.
     ///
     /// # Errors
     /// [`Error::Recipe`] if the text is not JSON or not the shape of a recipe: an unknown, mistyped or twice-written
-    /// key is named.
+    /// key is named; a `format` this release does not read (before anything else is read, as a newer release's recipe
+    /// may write keys this one lacks); a `format` below the lowest the recipe needs (see [`format`](Self::format)).
     pub fn from_json(text: &str) -> Result<Self, Error> {
         serde_json::from_str::<Unique>(text).map_err(|error| Error::Recipe(format!("not a recipe: {error}")))?;
-        let mut deserializer = serde_json::Deserializer::from_str(text);
-        serde_path_to_error::deserialize(&mut deserializer)
-            .map_err(|error| Error::Recipe(format!("not a recipe: {}", describe(&error, None))))
+        let mut document: Value =
+            serde_json::from_str(text).map_err(|error| Error::Recipe(format!("not a recipe: {error}")))?;
+        let declared = match document
+            .as_object_mut()
+            .and_then(|written| written.shift_remove("format"))
+        {
+            Some(declared) => Some(Self::read_format(&declared)?),
+            None => None,
+        };
+        let recipe: Self = serde_path_to_error::deserialize(&document)
+            .map_err(|error| Error::Recipe(format!("not a recipe: {}", describe(&error, None))))?;
+        match declared {
+            Some(declared) if declared < recipe.format() => Err(Error::Recipe(format!(
+                "`format` {declared} is below the lowest this recipe can be written in: it needs format {}",
+                recipe.format()
+            ))),
+            _ => Ok(recipe),
+        }
     }
 }
 

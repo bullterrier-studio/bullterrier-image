@@ -3,7 +3,7 @@
 
 use serde_json::{Value, json};
 
-use bullterrier_image::{Error, Recipe};
+use bullterrier_image::{Error, RECIPE_FORMATS, Recipe};
 
 fn read(text: &str) -> Result<Recipe, Error> {
     Recipe::from_toml(text)
@@ -432,4 +432,74 @@ fn the_features_of_each_format_read_in_the_format_that_has_them() {
         let result = read(&text);
         assert!(result.is_ok(), "{what}: {result:?}");
     }
+}
+
+/// The file reader is the oracle for the format a recipe needs: the recipe a text reads says the lowest format at which
+/// the same text is read, and the one below it refuses the text.
+#[test]
+fn a_recipe_says_the_lowest_format_a_file_of_it_would_declare() {
+    let step = "[[step]]\neffect = \"a\"\n";
+    let region = |kind: &str| format!("[region.p]\nkind = \"{kind}\"\n{step}");
+    let each = |look: &str| {
+        format!("[region.p]\nkind = \"grid\"\n[[step]]\neach = \"p\"\nlooks = [{{ effect = \"a\"{look} }}]\n")
+    };
+    let rows: Vec<(String, i64, String)> = [
+        ("one step", 1, step.to_owned()),
+        (
+            "every key a first format has",
+            1,
+            "name = \"x\"\ndescription = \"y\"\nsize = 9\n[frame]\naspect = 1\n[[step]]\neffect = \"a\"\nmask = \"subject\"\n\
+             opacity = 0.5\nblend_mode = \"screen\"\nk = 1\n"
+                .to_owned(),
+        ),
+        ("a grid", 2, region("grid")),
+        ("a subject region", 2, region("subject")),
+        ("an each step", 2, each("")),
+        ("a partition key", 2, "[[step]]\neffect = \"a\"\npartition = \"p\"\n".to_owned()),
+        ("a drive", 3, "[[step]]\neffect = \"a\"\ncell = { by = \"depth\", start = 1, end = 2 }\n".to_owned()),
+        ("a drive in a look", 3, each(", cell = { by = \"depth\", start = 1, end = 2 }")),
+        ("a name on a look, which nothing addresses", 2, each(", name = \"x\"")),
+        ("a step name", 3, "[[step]]\neffect = \"a\"\nname = \"x\"\n".to_owned()),
+        (
+            "an each step's name",
+            3,
+            "[region.p]\nkind = \"grid\"\n[[step]]\neach = \"p\"\nname = \"x\"\nlooks = [{ effect = \"a\" }]\n".to_owned(),
+        ),
+    ]
+    .into_iter()
+    .map(|(what, lowest, body)| (what.to_owned(), lowest, body))
+    .chain(
+        [
+            "given",
+            "band",
+            "bands",
+            "components",
+            "combine",
+            "color_range",
+            "linear_gradient",
+            "radial_gradient",
+        ]
+        .map(|kind| (format!("a {kind} region"), 3, region(kind))),
+    )
+    .collect();
+    for (what, lowest, body) in rows {
+        let at = |format: i64| read(&format!("format = {format}\n{body}"));
+        let recipe = at(3);
+        assert_eq!(
+            recipe.as_ref().map(Recipe::format).ok(),
+            Some(lowest),
+            "{what}: {recipe:?}"
+        );
+        assert!(at(lowest).is_ok(), "{what} is read in format {lowest}");
+        if lowest > 1 {
+            assert!(at(lowest - 1).is_err(), "{what} is refused in format {}", lowest - 1);
+        }
+    }
+}
+
+#[test]
+fn the_formats_a_release_reads_are_the_ones_a_file_may_declare() {
+    let read_at = |format: i64| read(&format!("format = {format}\n[[step]]\neffect = \"a\"\n")).is_ok();
+    let read_formats: Vec<i64> = (-1..=6).filter(|format| read_at(*format)).collect();
+    assert_eq!(read_formats, RECIPE_FORMATS);
 }

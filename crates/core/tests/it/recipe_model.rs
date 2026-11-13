@@ -169,7 +169,7 @@ fn a_key_that_is_not_the_models_is_refused_by_name() {
             json!({"steps": [{"effect": "bloom", "radius": 12}]}),
             "radius",
         ),
-        ("an unknown recipe key", json!({"steps": [], "format": 3}), "format"),
+        ("an unknown recipe key", json!({"steps": [], "formats": 3}), "formats"),
         (
             "an unknown key of an each step",
             json!({"steps": [{"each": "p", "looks": [], "count": 2}]}),
@@ -334,4 +334,92 @@ fn the_blend_modes_are_the_librarys_seven_in_recipe_order() {
         let read: Result<BlendMode, _> = serde_json::from_value(json!(mode.name()));
         assert_eq!(read.ok(), Some(*mode));
     }
+}
+
+#[test]
+fn a_recipe_in_json_may_declare_the_format_it_is_written_in_and_is_held_to_it() {
+    let plain = json!([{"effect": "a"}]);
+    let panes = json!({"p": {"kind": "grid"}});
+    let named = json!([{"effect": "a", "name": "x"}]);
+    let driven = json!([{"each": "p", "looks": [{"effect": "a", "params": {"cell": {"by": "depth"}}}]}]);
+    // a declaration a recipe fits is read and leaves no trace in the recipe
+    for (what, document) in [
+        ("format 1, plain", json!({"format": 1, "steps": plain})),
+        ("format 3, plain", json!({"format": 3, "steps": plain})),
+        (
+            "format 2, regions",
+            json!({"format": 2, "steps": plain, "regions": panes}),
+        ),
+        ("format 3, a name", json!({"format": 3, "steps": named})),
+    ] {
+        let read = read(&document);
+        let without = read.as_ref().ok().and_then(|recipe| serde_json::to_value(recipe).ok());
+        assert!(
+            without.is_some_and(|written| written.get("format").is_none()),
+            "{what}: {read:?}"
+        );
+    }
+    // a declaration below what the recipe needs, or one this release does not read, is refused naming the format
+    for (what, document, words) in [
+        (
+            "regions in format 1",
+            json!({"format": 1, "steps": plain, "regions": panes}),
+            vec!["`format` 1", "needs format 2"],
+        ),
+        (
+            "a name in format 2",
+            json!({"format": 2, "steps": named}),
+            vec!["`format` 2", "needs format 3"],
+        ),
+        (
+            "a drive in a look in format 2",
+            json!({"format": 2, "steps": driven, "regions": panes}),
+            vec!["`format` 2", "needs format 3"],
+        ),
+        (
+            "format 4",
+            json!({"format": 4, "steps": plain}),
+            vec!["`format` 4", "reads format 1, 2, 3"],
+        ),
+        (
+            "format 0",
+            json!({"format": 0, "steps": plain}),
+            vec!["`format` 0", "reads format 1, 2, 3"],
+        ),
+        (
+            "format as text",
+            json!({"format": "3", "steps": plain}),
+            vec!["`format` \"3\"", "reads format 1, 2, 3"],
+        ),
+        (
+            "format as a decimal",
+            json!({"format": 3.0, "steps": plain}),
+            vec!["`format` 3.0", "reads format 1, 2, 3"],
+        ),
+        (
+            "format as a bool",
+            json!({"format": true, "steps": plain}),
+            vec!["`format` true", "reads format 1, 2, 3"],
+        ),
+        (
+            "format as null",
+            json!({"format": null, "steps": plain}),
+            vec!["`format` null", "reads format 1, 2, 3"],
+        ),
+        // the format is read before the rest, as a newer release's recipe may use keys this one does not know
+        (
+            "a newer recipe",
+            json!({"format": 4, "steps": [{"effect": "a", "key_of_format_4": 1}]}),
+            vec!["`format` 4"],
+        ),
+    ] {
+        let result = read(&document);
+        assert!(
+            matches!(&result, Err(Error::Recipe(message)) if words.iter().all(|word| message.contains(word))),
+            "{what}: {result:?}"
+        );
+    }
+    // the same number the file reader's `format` key takes, read once
+    assert_eq!(Recipe::read_format(&json!(2)).ok(), Some(2));
+    assert!(Recipe::read_format(&json!(4)).is_err());
 }

@@ -75,6 +75,7 @@ pub use ops::sample::Interpolation;
 pub use palette::palette;
 pub use picture::{Image, Picture};
 pub use presets::{Preset, Presets};
+pub use recipe::file::FORMATS as RECIPE_FORMATS;
 pub use recipe::region::presets::region_presets;
 pub use recipe::{
     Assign, BlendMode, Drive, Each, Entry, Frame, Home, Located, Needs, Number, Recipe, Region, Regions, STEP_KEYS,

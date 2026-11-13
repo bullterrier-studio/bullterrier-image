@@ -126,6 +126,27 @@ regions_from!(
 );
 
 impl Region {
+    /// The name of this region's kind, as a recipe file writes it in `kind`.
+    pub(crate) const fn kind(&self) -> &'static str {
+        match self {
+            Self::Grid(_) => "grid",
+            Self::Shards(_) => "shards",
+            Self::Cuts(_) => "cuts",
+            Self::Path(_) => "path",
+            Self::Svg(_) => "svg",
+            Self::Pick(_) => "pick",
+            Self::Subject(_) => "subject",
+            Self::Band(_) => "band",
+            Self::Bands(_) => "bands",
+            Self::Components(_) => "components",
+            Self::Combine(_) => "combine",
+            Self::ColorRange(_) => "color_range",
+            Self::LinearGradient(_) => "linear_gradient",
+            Self::RadialGradient(_) => "radial_gradient",
+            Self::Given(_) => "given",
+        }
+    }
+
     /// What this region is: a partition into pieces, or a selection of pixels.
     pub(crate) fn form(&self) -> Form {
         match self {
