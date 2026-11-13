@@ -54,7 +54,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     from .recipe import (
         Band,
         Bands,
-        Colour,
+        ColorRange,
         Combine,
         Components,
         Curve,
@@ -103,7 +103,7 @@ _HOMES = {
     ".imageio": ("palette",),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Band", "Bands", "Colour", "Combine", "Components", "Cuts", "Curve", "Drive", "Each", "Edge", "Finder",
+        "Band", "Bands", "ColorRange", "Combine", "Components", "Cuts", "Curve", "Drive", "Each", "Edge", "Finder",
         "Framing", "Given", "Grid", "Line", "LinearGradient", "Parameter", "Path", "Pick", "RadialGradient", "Recipe",
         "Shards", "Stage", "Step", "Subject", "Svg", "load_recipe", "looks", "render", "render_all", "trace",
     ),
@@ -144,7 +144,7 @@ __all__ = [
     "Band",
     "Bands",
     "BullterrierImageError",
-    "Colour",
+    "ColorRange",
     "Combine",
     "Components",
     "Curve",

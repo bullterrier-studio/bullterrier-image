@@ -1,5 +1,5 @@
 //! The region kinds made from other regions or from the picture: [`Pick`], [`Subject`], [`Band`], [`Bands`],
-//! [`Components`], [`Combine`], [`Colour`], [`LinearGradient`], [`RadialGradient`] and [`Given`].
+//! [`Components`], [`Combine`], [`ColorRange`], [`LinearGradient`], [`RadialGradient`] and [`Given`].
 
 use std::fmt;
 
@@ -239,7 +239,7 @@ impl Default for Combine {
 /// read from the photo as framed and sized, before any step, as `light` is.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Colour {
+pub struct ColorRange {
     /// The colour looked for: `'#rrggbb'`, `'#rgb'` or three numbers from 0 to 1 (sRGB).
     #[serde(deserialize_with = "target")]
     pub target: Color,
@@ -252,7 +252,7 @@ pub struct Colour {
     pub feather: f64,
 }
 
-impl Default for Colour {
+impl Default for ColorRange {
     /// Black, within 0.1, falling off over 0.05 more.
     fn default() -> Self {
         Self {

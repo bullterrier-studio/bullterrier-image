@@ -67,8 +67,8 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   common shapes: `regions={"box": Path.rect(0.1, 0.2, 0.5, 0.3)}`. All numbers are shares of the frame (0 to 1 across and down),
   so an ellipse is a circle only in a square frame (in a 3:2 frame, `Path.ellipse(0.5, 0.5, 0.2, 0.3)` is a circle). A size
   that is not above 0 is a `RecipeError` naming it.
-- **Colour.** `Colour(target="#8a3b2e", tolerance=0.1, feather=0.05)` selects the pixels near a colour (Oklab distance; read
-  from the photo before any step): `regions={"brick": Colour(...), "glass": Band(of="brick", low=0, high=0.3)}`.
+- **ColorRange.** `ColorRange(target="#8a3b2e", tolerance=0.1, feather=0.05)` selects the pixels near a colour (Oklab distance; read
+  from the photo before any step): `regions={"brick": ColorRange(...), "glass": Band(of="brick", low=0, high=0.3)}`.
 - **What ships.** `bullterrier_image.looks()`: `{name: description}`, each loads with `load_recipe(name)`.
   `fx.<effect>.presets`: `{preset: {parameter: value}}`, used as `fx.<effect>(preset=...)`. A misspelt parameter or
   look name gets the nearest ones.

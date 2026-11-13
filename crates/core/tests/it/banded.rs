@@ -17,7 +17,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use bullterrier_image::frame::{Fit, Resample};
-use bullterrier_image::region::{Bands, Colour};
+use bullterrier_image::region::{Bands, ColorRange};
 use bullterrier_image::{
     Category, Each, Effect, Entry, Footprint, Frame, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets,
     Recipe, Step, effect, effects,
@@ -403,7 +403,7 @@ fn a_mask_by_the_nearness_to_a_colour_is_the_same_banded() -> Outcome {
     let at = ((HEIGHT / 2) * WIDTH + WIDTH / 2) * 3;
     let recipe = Recipe::new([Entry::from(blur(3.0).mask("near")), Entry::from(grade().mask("near"))]).with_region(
         "near",
-        Colour {
+        ColorRange {
             target: bullterrier_image::params::Color([values[at], values[at + 1], values[at + 2]]),
             tolerance: 0.3,
             feather: 0.2,

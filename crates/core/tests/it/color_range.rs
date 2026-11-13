@@ -1,9 +1,9 @@
-//! `colour` regions: how near each pixel of the photo is to a target colour, seen as the selection an effect is handed.
+//! `color_range` regions: how near each pixel of the photo is to a target colour, seen as the selection an effect is handed.
 //! Pictures are synthesised from known colours. The oracles are hand computations: the published Oklab of the sRGB
 //! primaries (Ottosson, to four places) and the lightness of a grey (the cube root of its linear level, its a and b being 0).
 
 use bullterrier_image::params::Color;
-use bullterrier_image::region::Colour;
+use bullterrier_image::region::ColorRange;
 use bullterrier_image::{Error, Input, Options, Photo, Picture, Presets, Recipe, Region, Step};
 use proptest::prelude::*;
 use serde_json::{Value, json};
@@ -17,9 +17,9 @@ const RED: [f32; 3] = [1.0, 0.0, 0.0];
 const GREEN: [f32; 3] = [0.0, 1.0, 0.0];
 const BLUE: [f32; 3] = [0.0, 0.0, 1.0];
 
-/// The region `colour` with the target and the two distances.
-fn colour(target: [f32; 3], tolerance: f64, feather: f64) -> Value {
-    json!({"kind": "colour", "target": target, "tolerance": tolerance, "feather": feather})
+/// The region `color_range` with the target and the two distances.
+fn color_range(target: [f32; 3], tolerance: f64, feather: f64) -> Value {
+    json!({"kind": "color_range", "target": target, "tolerance": tolerance, "feather": feather})
 }
 
 /// The selection the region `declared` makes of the photo of `pixels`, `width` wide, after the steps `before`.
@@ -74,7 +74,7 @@ fn the_selection_is_1_at_the_target_and_falls_to_0_over_the_feather_by_oklab_dis
         (WHITE, RED, 0.3, 0.1, 0.0, "beyond tolerance and feather"),
     ];
     for (target, pixel, tolerance, feather, expected, why) in rows {
-        let got = selection(&[pixel], 1, &colour(target, tolerance, feather), &[])?;
+        let got = selection(&[pixel], 1, &color_range(target, tolerance, feather), &[])?;
         assert!((got[0] - expected).abs() < 2e-3, "{why}: {} not {expected}", got[0]);
     }
     Ok(())
@@ -85,7 +85,7 @@ fn a_grey_ramp_against_white_follows_the_lightness_and_never_rises_as_the_grey_d
     let levels: Vec<f32> = (0..=255_u8).map(|byte| f32::from(byte) / 255.0).collect();
     let pixels: Vec<[f32; 3]> = levels.iter().map(|&level| [level; 3]).collect();
     let (tolerance, feather) = (0.1, 0.3);
-    let got = selection(&pixels, 256, &colour(WHITE, tolerance, feather), &[])?;
+    let got = selection(&pixels, 256, &color_range(WHITE, tolerance, feather), &[])?;
     for (&level, &value) in levels.iter().zip(&got) {
         let distance = 1.0 - grey_lightness(f64::from(level));
         let expected = (1.0 - (distance - tolerance) / feather).clamp(0.0, 1.0);
@@ -115,7 +115,7 @@ fn a_tolerance_of_0_with_no_feather_chooses_only_the_exact_colour() -> Outcome {
         [0.5, 0.25, 0.75 + one_step],
         target,
     ];
-    let got = selection(&pixels, 5, &colour(target, 0.0, 0.0), &[])?;
+    let got = selection(&pixels, 5, &color_range(target, 0.0, 0.0), &[])?;
     assert_eq!(got, [1.0, 0.0, 0.0, 0.0, 1.0]);
     Ok(())
 }
@@ -123,9 +123,9 @@ fn a_tolerance_of_0_with_no_feather_chooses_only_the_exact_colour() -> Outcome {
 #[test]
 fn a_target_built_in_code_with_a_channel_outside_0_to_1_or_not_a_number_is_refused_naming_region_field_and_value() {
     let refusal = |target: [f32; 3]| {
-        let region = Region::from(Colour {
+        let region = Region::from(ColorRange {
             target: Color(target),
-            ..Colour::default()
+            ..ColorRange::default()
         });
         region.check_shape("brick").err().map(|error| error.to_string())
     };
@@ -147,7 +147,7 @@ fn a_target_built_in_code_with_a_channel_outside_0_to_1_or_not_a_number_is_refus
 fn the_region_reads_the_photo_as_framed_and_sized_not_what_the_steps_before_it_painted() -> Outcome {
     let paint = Registered::new(Paint::new())?;
     let pixels = [RED, GREEN, WHITE, RED];
-    let declared = colour(RED, 0.1, 0.05);
+    let declared = color_range(RED, 0.1, 0.05);
     let plain = selection(&pixels, 2, &declared, &[])?;
     assert_eq!(plain, [1.0, 0.0, 0.0, 1.0]);
     // a step that paints the whole picture grey leaves what the region chooses where it was
@@ -170,8 +170,8 @@ proptest! {
         let mut pixels = pixels;
         pixels.push(pixels[0]);
         pixels.push(target);
-        let narrow = selection(&pixels, 8, &colour(target, tolerance, feather), &[])?;
-        let wide = selection(&pixels, 8, &colour(target, tolerance + more, feather), &[])?;
+        let narrow = selection(&pixels, 8, &color_range(target, tolerance, feather), &[])?;
+        let wide = selection(&pixels, 8, &color_range(target, tolerance + more, feather), &[])?;
         prop_assert!(narrow.iter().all(|value| (0.0..=1.0).contains(value)), "{:?}", narrow);
         prop_assert_eq!(narrow[0].to_bits(), narrow[6].to_bits(), "the same pixel, two values");
         prop_assert_eq!(narrow[7].to_bits(), 1.0_f32.to_bits(), "the target is not chosen fully");
@@ -290,17 +290,19 @@ fn panes_found(labels: &[i32]) -> usize {
 }
 
 #[test]
-fn the_panes_of_a_brick_facade_are_each_a_piece_by_colour_though_light_cannot_tell_them_from_the_wall() -> Outcome {
+fn the_panes_of_a_brick_facade_are_each_a_piece_by_color_range_though_light_cannot_tell_them_from_the_wall() -> Outcome
+{
     // the premise: some panes are brighter than the brick, some darker and one as bright, so no band of light fits them
     let wall = brightness(BRICK);
     assert!(PANES.iter().filter(|&&pane| brightness(pane) > wall + 0.05).count() >= 3);
     assert!(PANES.iter().filter(|&&pane| brightness(pane) < wall - 0.05).count() >= 2);
     assert!(PANES.iter().any(|&pane| (brightness(pane) - wall).abs() < 0.01));
 
-    let brick = json!({"brick": {"kind": "colour", "target": BRICK.map(level), "tolerance": 0.1, "feather": 0.05}});
+    let brick =
+        json!({"brick": {"kind": "color_range", "target": BRICK.map(level), "tolerance": 0.1, "feather": 0.05}});
     // every pane is far from the brick in Oklab, so what is near it is the wall and what is not is the panes
-    let by_colour = json!({"kind": "band", "of": "brick", "low": 0.0, "high": 0.3});
-    let (labels, pieces) = pieces_of(by_colour, brick)?;
+    let by_color_range = json!({"kind": "band", "of": "brick", "low": 0.0, "high": 0.3});
+    let (labels, pieces) = pieces_of(by_color_range, brick)?;
     assert_eq!(panes_found(&labels), PANES.len(), "each pane is a piece of its own");
     assert_eq!(pieces, PANES.len() + 1, "the panes and the wall");
 

@@ -65,11 +65,11 @@ Gradient screened over photo = ordinary step with `blend_mode`. `blend` effect i
 `[region.NAME]` declares one by `kind`. `format = 2`: `grid` (columns and rows, equal or in shares), `shards` (irregular pieces
 like glass or stone; presets `glass`, `torn`, `stone`, `mosaic`), `cuts` (straight and curved lines), `svg` (shapes of an SVG
 file), `path` (inside a closed SVG path), `pick` (some pieces of a partition), `subject`, `given` map. `format = 3` adds
-`band`, `bands`, `components`, `combine`, `colour`, `linear_gradient`, `radial_gradient`.
+`band`, `bands`, `components`, `combine`, `color_range`, `linear_gradient`, `radial_gradient`.
 
 - **Partition**: every pixel in one piece, numbered from 0 in reading order (`bt-image steps` draws them numbered): `grid`,
   `shards`, `cuts`, `svg`, `bands`, `components`.
-- **Selection**: values 0..1: `path`, `pick`, `subject`, `given`, `band`, `combine`, `colour`, gradients, built-in `subject`,
+- **Selection**: values 0..1: `path`, `pick`, `subject`, `given`, `band`, `combine`, `color_range`, gradients, built-in `subject`,
   `background`, `depth`, `light`.
 - `fit = "subject"` lays a kind over the subject instead of whole picture. `edge = { style = "torn", amount = 4.8, scale = 24 }` tears its borders (`amount`, `scale` in design px like any px value).
 - A step uses regions by name: `mask` limits to a selection; `each` + `looks` gives every piece its own look (each look
@@ -151,7 +151,7 @@ outside a kept piece is one more piece (as for `svg`), numbered like any by its 
 `mask` work on it as on any partition. Not axis-aligned: a tilted facade works
 ([`windows`](gallery/regions/README.md), a drawn facade).
 
-`colour` = selection of pixels near a colour (Photoshop's Color Range): 1 within `tolerance` of `target` (`'#rrggbb'`,
+`color_range` = selection of pixels near a colour (Photoshop's Color Range): 1 within `tolerance` of `target` (`'#rrggbb'`,
 `'#rgb'` or three numbers 0..1), falling linearly to 0 over `feather` more. Distance = Euclidean in Oklab (0 to 1; black to
 white is 1; similar shades of one colour about 0.1 apart). Reads the photo as framed and sized, before any step (as `light`
 does), so a step that repaints the picture does not move it. Feed it to `band` (`low = 0`, `high = 0.3` = not that colour),
@@ -165,7 +165,7 @@ Version 2 of the file format named depth kinds `depth` and `depth_bands`. Now `b
 ### A look per piece
 
 Recipe says *where* via regions: `grid`, `shards` (broken glass, stone), `cuts`, `svg`, `path`, `pick`, `subject`, `given` map,
-and (`format = 3`) `band`, `bands`, `components`, `combine`, `colour`, gradients. `mask` limits a step to a selection; `each` + `looks` gives every
+and (`format = 3`) `band`, `bands`, `components`, `combine`, `color_range`, gradients. `mask` limits a step to a selection; `each` + `looks` gives every
 piece of a partition its own look:
 
 ```toml

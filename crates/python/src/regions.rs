@@ -21,7 +21,7 @@ fn object(fields: &Bound<'_, PyDict>) -> PyResult<Map<String, Value>> {
 }
 
 /// A region of the kind `kind` (`grid`, `shards`, `cuts`, `path`, `svg`, `pick`, `subject`, `band`, `bands`, `components`,
-/// `combine`, `colour`, `linear_gradient`, `radial_gradient` or `given`) with the fields `fields` (a dict; each has a default): the dict of
+/// `combine`, `color_range`, `linear_gradient`, `radial_gradient` or `given`) with the fields `fields` (a dict; each has a default): the dict of
 /// every field of that kind with its value, a count of shares as the list, a nested `edge` as its dict.
 ///
 /// `CoreError` (a `ValueError`) naming the region and the field, for a field the kind lacks, a value of another kind

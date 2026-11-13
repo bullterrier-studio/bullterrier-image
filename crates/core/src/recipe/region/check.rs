@@ -131,12 +131,12 @@ impl Region {
                 at.within("max_pieces", components.max_pieces, 1, 10_000) // MOST_PIECES, as a u32
             }
             Self::Combine(combine) => at.count("of", combine.of.len(), 2, MOST_COMBINED),
-            Self::Colour(colour) => {
-                for (channel, level) in colour.target.0.iter().enumerate() {
+            Self::ColorRange(range) => {
+                for (channel, level) in range.target.0.iter().enumerate() {
                     at.within(&format!("target[{channel}]"), *level, 0, 1)?;
                 }
-                at.within("tolerance", colour.tolerance, 0, 1)?;
-                at.within("feather", colour.feather, 0, 1)
+                at.within("tolerance", range.tolerance, 0, 1)?;
+                at.within("feather", range.feather, 0, 1)
             }
             Self::LinearGradient(gradient) => at.finite("angle", gradient.angle),
             Self::RadialGradient(gradient) => {

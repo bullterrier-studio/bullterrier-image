@@ -30,7 +30,7 @@ const KINDS_NEW_IN_3: [&str; 8] = [
     "bands",
     "components",
     "combine",
-    "colour",
+    "color_range",
     "linear_gradient",
     "radial_gradient",
 ];
@@ -75,7 +75,7 @@ impl Recipe {
     ///
     /// Format 2 adds regions and the step keys `each`, `looks` and `partition`; format 3 a parameter that is a table
     /// with `by` (a drive), the step key `name` and the region kinds `given`, `band`, `bands`, `components`, `combine`,
-    /// `colour`, `linear_gradient` and `radial_gradient`. A file may not use what a later format added, and the kinds `depth`
+    /// `color_range`, `linear_gradient` and `radial_gradient`. A file may not use what a later format added, and the kinds `depth`
     /// and `depth_bands` are gone in all. A whole number stays whole and a decimal stays decimal.
     ///
     /// # Errors

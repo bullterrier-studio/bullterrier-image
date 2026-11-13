@@ -30,7 +30,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 pub use derived::{
-    Band, Bands, Colour, Combine, CombineOp, Components, Given, LinearGradient, Pick, Piece, RadialGradient, Subject,
+    Band, Bands, ColorRange, Combine, CombineOp, Components, Given, LinearGradient, Pick, Piece, RadialGradient,
+    Subject,
 };
 pub use laid::{Curve, Cut, Cuts, Edge, EdgeStyle, Grid, Line, Path, Shards, Shares, Svg};
 
@@ -67,7 +68,7 @@ pub enum Region {
     /// Selections put together: a selection.
     Combine(Combine),
     /// Where the picture is near a colour: a selection.
-    Colour(Colour),
+    ColorRange(ColorRange),
     /// A value rising across the picture: a selection.
     LinearGradient(LinearGradient),
     /// A value rising from a point: a selection.
@@ -89,7 +90,7 @@ const KINDS: [&str; 15] = [
     "bands",
     "components",
     "combine",
-    "colour",
+    "color_range",
     "linear_gradient",
     "radial_gradient",
     "given",
@@ -118,7 +119,7 @@ regions_from!(
     Bands,
     Components,
     Combine,
-    Colour,
+    ColorRange,
     LinearGradient,
     RadialGradient,
     Given
@@ -136,7 +137,7 @@ impl Region {
             | Self::Subject(_)
             | Self::Band(_)
             | Self::Combine(_)
-            | Self::Colour(_)
+            | Self::ColorRange(_)
             | Self::LinearGradient(_)
             | Self::RadialGradient(_)
             | Self::Given(_) => Form::Selection,
@@ -172,7 +173,7 @@ impl Region {
                 .iter()
                 .map(|of| ("of", of.as_str(), Form::Selection))
                 .collect(),
-            Self::Colour(_) | Self::LinearGradient(_) | Self::RadialGradient(_) | Self::Given(_) => Vec::new(),
+            Self::ColorRange(_) | Self::LinearGradient(_) | Self::RadialGradient(_) | Self::Given(_) => Vec::new(),
         }
     }
 }
@@ -212,7 +213,7 @@ impl<'de> Deserialize<'de> for Region {
             "bands" => read(table).map(Self::Bands),
             "components" => read(table).map(Self::Components),
             "combine" => read(table).map(Self::Combine),
-            "colour" => read(table).map(Self::Colour),
+            "color_range" => read(table).map(Self::ColorRange),
             "linear_gradient" => read(table).map(Self::LinearGradient),
             "radial_gradient" => read(table).map(Self::RadialGradient),
             "given" => read(table).map(Self::Given),

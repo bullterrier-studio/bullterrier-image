@@ -12,7 +12,7 @@ from bullterrier_image.core.pieces import Drive, plain
 from bullterrier_image.recipe import (
     Band,
     Bands,
-    Colour,
+    ColorRange,
     Combine,
     Components,
     Curve,
@@ -58,7 +58,7 @@ PIECES = {
             "bands": Bands,
             "components": Components,
             "combine": Combine,
-            "colour": Colour,
+            "color_range": ColorRange,
             "linear_gradient": LinearGradient,
             "radial_gradient": RadialGradient,
             "given": Given,

@@ -235,7 +235,7 @@ pub(crate) const REGION_ROWS: &[(&str, &[Row])] = &[
         ],
     ),
     (
-        "colour",
+        "color_range",
         &[
             real(
                 "tolerance",

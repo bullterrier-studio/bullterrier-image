@@ -3,7 +3,7 @@
 
 use bullterrier_image::params::Color;
 use bullterrier_image::region::{
-    Band, Bands, Colour, Combine, CombineOp, Components, Curve, Cut, Cuts, Edge, EdgeStyle, Given, Grid, Line,
+    Band, Bands, ColorRange, Combine, CombineOp, Components, Curve, Cut, Cuts, Edge, EdgeStyle, Given, Grid, Line,
     LinearGradient, Path, Pick, Piece, RadialGradient, Region, Regions, Shards, Shares, Subject, Svg,
 };
 use bullterrier_image::{Recipe, Step};
@@ -22,7 +22,7 @@ const KINDS: [&str; 15] = [
     "bands",
     "components",
     "combine",
-    "colour",
+    "color_range",
     "linear_gradient",
     "radial_gradient",
     "given",
@@ -81,7 +81,7 @@ fn a_kind_alone_is_read_as_the_defaults_and_written_with_every_field_that_is_set
         ),
         ("combine", json!({"op": "multiply", "of": ["", ""]})),
         (
-            "colour",
+            "color_range",
             json!({"target": [0.0, 0.0, 0.0], "tolerance": 0.1, "feather": 0.05}),
         ),
         ("linear_gradient", json!({"angle": 270.0})),
@@ -236,7 +236,7 @@ fn every_kind() -> Vec<(&'static str, Region)> {
         ),
         (
             "brick",
-            Colour {
+            ColorRange {
                 target: Color([0.25, 0.5, 0.75]),
                 tolerance: 0.125,
                 feather: 0.0625,
@@ -371,7 +371,7 @@ op = "max"
 of = ["near", "subject", "light"]
 
 [region.brick]
-kind = "colour"
+kind = "color_range"
 target = [0.25, 0.5, 0.75]
 tolerance = 0.125
 feather = 0.0625
@@ -399,8 +399,8 @@ effect = "grade"
 
 #[test]
 fn a_colour_target_is_read_from_hex_in_either_length_or_from_three_numbers() {
-    let target = |written: Value| match read(&json!({"kind": "colour", "target": written})) {
-        Ok(Region::Colour(colour)) => Some(colour.target),
+    let target = |written: Value| match read(&json!({"kind": "color_range", "target": written})) {
+        Ok(Region::ColorRange(range)) => Some(range.target),
         _ => None,
     };
     assert_eq!(target(json!("#ff0000")), Some(Color([1.0, 0.0, 0.0])));

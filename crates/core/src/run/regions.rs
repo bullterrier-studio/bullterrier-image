@@ -15,7 +15,7 @@ use super::{Stage, laid};
 use crate::ops::svg::Ids;
 use crate::ops::{bands, cast, color, components, gradient, length, pieces};
 use crate::region::{
-    Band, Bands, Colour, Combine, CombineOp, Components, LinearGradient, Pick, Piece, RadialGradient, Subject,
+    Band, Bands, ColorRange, Combine, CombineOp, Components, LinearGradient, Pick, Piece, RadialGradient, Subject,
 };
 use crate::{Error, ErrorKind, Finder, Labels, Layer, Picture, Region, Regions};
 
@@ -248,7 +248,7 @@ impl Evaluator {
                     .collect::<Result<Vec<_>, _>>()?;
                 selection(combined(*op, height * width, &layers))
             }
-            Some(Region::Colour(spec)) => selection(near(spec, picture)),
+            Some(Region::ColorRange(spec)) => selection(near(spec, picture)),
             Some(Region::LinearGradient(LinearGradient { angle })) => {
                 selection(gradient::linear((height, width), 0..height, *angle))
             }
@@ -341,7 +341,7 @@ fn combined(op: CombineOp, len: usize, layers: &[Arc<Layer>]) -> Vec<f32> {
 
 /// How near each pixel of `picture`, the working picture as `light` reads it, is to the colour of `spec`: 1 within its
 /// `tolerance` of the target, falling to 0 over its `feather`.
-fn near(spec: &Colour, picture: &Picture<'_>) -> Vec<f32> {
+fn near(spec: &ColorRange, picture: &Picture<'_>) -> Vec<f32> {
     let distance = color::oklab_distance(picture.pixels(), spec.target.0);
     bands::band(&distance, 0.0, spec.tolerance, spec.feather)
 }

@@ -1,5 +1,5 @@
 """The declared regions of a recipe: which pixels of a picture a step is about, as a partition (`Grid`, `Shards`,
-`Cuts`, `Svg`, `Bands`, `Components`) or a selection (`Path`, `Pick`, `Subject`, `Band`, `Combine`, `Colour`,
+`Cuts`, `Svg`, `Bands`, `Components`) or a selection (`Path`, `Pick`, `Subject`, `Band`, `Combine`, `ColorRange`,
 `LinearGradient`, `RadialGradient`, `Given`); `Edge` bends the borders of the kinds with `fit`.
 
 The kinds are pieces (see `pieces`): frozen dataclasses made by the core's answer, every field with a default and its
@@ -28,7 +28,7 @@ __all__ = [
     "FOUND_MAPS",
     "Band",
     "Bands",
-    "Colour",
+    "ColorRange",
     "Combine",
     "Components",
     "Curve",
@@ -632,9 +632,9 @@ class Combine(_Piece):
     )
 
 
-@piece(_region("colour"))
+@piece(_region("color_range"))
 @dataclass(frozen=True, kw_only=True)
-class Colour(_Piece):
+class ColorRange(_Piece):
     """A selection of the pixels near a colour: 1 within `tolerance` of `target`, falling to 0 over `feather` beyond.
     The distance is Euclidean in Oklab, where equal distances look about equally different and black to white is 1.
     It is read from the photo as framed and sized, before any step, as `light` is."""
@@ -739,7 +739,7 @@ Kind = (
     | Bands
     | Components
     | Combine
-    | Colour
+    | ColorRange
     | LinearGradient
     | RadialGradient
     | Given

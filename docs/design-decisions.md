@@ -1196,7 +1196,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   look has one meaning at every resolution; `max_pieces` (1 to 10000, as a `Pick`) refuses a speckled selection by
   count after the small ones are dropped. The labelling is an iterative flood fill in `ops/components.rs`, 40 lines: no
   crate (`imageproc` has one, but is an imaging library with picture types of its own, for a single function).
-- **`colour` is a selection by Oklab distance, read from the photo, not from a step.** A band of `light` cannot cut what
+- **`color_range` is a selection by Oklab distance, read from the photo, not from a step.** A band of `light` cannot cut what
   differs from its surround by hue (panes darker and brighter than a brick wall); a colour range can, and with `band` and
   `components` finds windows, signs or foliage. The distance is Euclidean in Oklab (`ops::colorspace`, already the repo's
   perceptual space), so `tolerance` and `feather` mean one thing at any hue and are shares of the black-to-white distance

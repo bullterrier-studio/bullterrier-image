@@ -2,7 +2,7 @@
 //! are worked out by hand from the recipe and the ranges the effects, regions and frame document.
 
 use bullterrier_image::region::{
-    Band, Bands, Colour, Components, LinearGradient, RadialGradient, Shards, Subject, Svg,
+    Band, Bands, ColorRange, Components, LinearGradient, RadialGradient, Shards, Subject, Svg,
 };
 use bullterrier_image::{Drive, Each, Entry, Error, Frame, Home, Presets, Recipe, Region, Step};
 use serde_json::{Value, json};
@@ -276,7 +276,7 @@ fn every_number_of_a_region_kind_or_the_frame_has_a_row_unless_it_is_listed_as_n
         Band::default().into(),
         Bands::default().into(),
         Components::default().into(),
-        Colour::default().into(),
+        ColorRange::default().into(),
         LinearGradient::default().into(),
         RadialGradient::default().into(),
     ];
@@ -330,7 +330,7 @@ fn a_rows_range_is_the_range_the_check_holds_the_number_to() -> Outcome {
                 ..Components::default()
             },
         )
-        .with_region("k", Colour::default())
+        .with_region("k", ColorRange::default())
         .with_region("g", LinearGradient::default())
         .with_region("d", RadialGradient::default());
     let presets = Presets::new();
@@ -448,7 +448,7 @@ const LENGTHS_AS_SHARES: &[(&str, &str)] = &[
     ("region.radial_gradient.radius", "the picture's shorter side"),
     ("region.band.feather", "the field's range of values"),
     (
-        "region.colour.feather",
+        "region.color_range.feather",
         "the Oklab distance from black to white, beyond the tolerance",
     ),
     ("frame.margin", "the longer side of the subject's box"),
@@ -619,7 +619,7 @@ fn every_direction_rotation_and_length_of_a_region_or_the_frame_keeps_the_conven
         ("band", Band::default().into()),
         ("bands", Bands::default().into()),
         ("components", Components::default().into()),
-        ("colour", Colour::default().into()),
+        ("color_range", ColorRange::default().into()),
         ("linear_gradient", LinearGradient::default().into()),
         ("radial_gradient", RadialGradient::default().into()),
     ];
