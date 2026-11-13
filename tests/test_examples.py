@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bullterrier_image import Finder, Recipe, Step, gallery, load_project, load_recipe, render
+from bullterrier_image import Finder, Recipe, Step, gallery, imageio, load_project, load_recipe, render
 from bullterrier_image.core import registry
 from bullterrier_image.core.bridge import maps_needed
 from bullterrier_image.core.steps import runs
@@ -140,3 +140,19 @@ def test_the_readme_links_to_the_effects_page_and_every_picture_it_shows_exists(
     assert links, "the README links to no local file, so the link check checks nothing"
     for path in links:
         assert (EXAMPLES.parent / path).exists(), f"README links to {path}, which does not exist"
+
+
+def test_the_panes_example_gives_each_pane_of_its_facade_a_look_and_leaves_the_brick_alone():
+    facade = imageio.load(EXAMPLES / "assets" / "facade.png")
+    out = render(facade, load_recipe(EXAMPLES / "regions" / "panes.toml"))
+    assert out.shape == facade.shape
+    # the facade is 480 x 360: eight panes of 82 x 120 px, the first at (40, 30), then every 112 columns and 160 rows
+    for number in range(8):
+        top, left = 40 + 160 * (number // 4), 30 + 112 * (number % 4)
+        centre = (top + 60, left + 41)
+        assert np.abs(out[centre] - facade[centre]).max() > 0.05, f"pane {number} was not restyled"
+    wall = np.ones(facade.shape[:2], bool)
+    for number in range(8):
+        top, left = 40 + 160 * (number // 4), 30 + 112 * (number % 4)
+        wall[top - 4 : top + 124, left - 4 : left + 86] = False  # the panes and a margin for the seams drawn on them
+    np.testing.assert_array_equal(out[wall], facade[wall])

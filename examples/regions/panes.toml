@@ -1,0 +1,45 @@
+# Panes found by colour. Run it on examples/assets/facade.png (a synthesised brick wall and eight blue-grey panes, some
+# brighter than the brick, some darker, one as bright; how it is made: examples/README.md). A band of `light` cannot
+# cut them all, so `colour` marks what is near the brick, `band` takes what is not, `components` makes each pane its
+# own piece and `each` gives it a look. `colour` reads the photo before any step, so the wall must be the photo. Needs
+# recipe format 3.
+format = 3
+name = "panes"
+size = 480
+
+[region.brick]                 # 1 where the picture is within 0.1 of the brick's colour in Oklab, 0 beyond 0.15
+kind = "colour"
+target = "#8a3b2e"
+tolerance = 0.1
+feather = 0.05
+
+[region.glass]                 # what is far from the brick: 0 to 0.3 of that selection
+kind = "band"
+of = "brick"
+low = 0
+high = 0.3
+
+[region.panes]
+kind = "components"
+of = "glass"
+
+[[step]]
+each = "panes"
+feather = 0
+looks = [
+    "none",                                                                        # 0 the wall, as photographed
+    { effect = "gradient", colors = ["#ffe9a8", "#ff9f43"] },                      # 1 to 8: the panes, in reading
+    { effect = "gradient", colors = ["#0b1d3a", "#2a5a96"] },                      #   order of each one's first pixel
+    { effect = "gradient", colors = ["#7ad9c4", "#1f7a74"] },
+    { effect = "gradient", colors = ["#ffe9a8", "#ff9f43"] },
+    { effect = "gradient", colors = ["#0b1d3a", "#2a5a96"] },
+    { effect = "gradient", colors = ["#7ad9c4", "#1f7a74"] },
+    { effect = "gradient", colors = ["#ffe9a8", "#ff9f43"] },
+    { effect = "gradient", colors = ["#0b1d3a", "#2a5a96"] },
+]
+
+[[step]]
+effect = "seams"
+partition = "panes"
+width = 1.5
+color = "#15100e"
