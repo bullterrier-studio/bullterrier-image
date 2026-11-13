@@ -224,6 +224,56 @@ def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it
     assert not missing.exists()  # pointing at a local file never downloads
 
 
+# --- sam2: finds what is pointed at; the model runs in the core's full-tier tests (tests/it/finding_onnx.rs) ----
+
+
+def test_sam2_without_a_click_or_a_box_is_refused_naming_points(echo_red):
+    with pytest.raises(ValueError, match="points"):
+        subject_matte(ramp(), segmenter="sam2")
+    with pytest.raises(ValueError, match="points"):
+        subject_finder("sam2")
+
+
+@pytest.mark.parametrize(
+    ("points", "box", "named", "value"),
+    [
+        pytest.param([(1.5, 0.5, True)], None, "points[0].x", "1.5", id="a-click-past-the-right-edge"),
+        pytest.param(
+            [(0.5, 0.5, True), (0.5, -0.1, False)], None, "points[1].y", "-0.1", id="a-click-above-the-picture"
+        ),
+        pytest.param([], (0.6, 0.1, 0.4, 0.9), "box", "left < right", id="a-box-with-no-width"),
+        pytest.param([(0.5, 0.5, True)] * 65, None, "points", "65", id="more-clicks-than-the-most"),
+    ],
+)
+def test_prompts_that_break_a_rule_are_refused_naming_the_field_and_the_value(echo_red, points, box, named, value):
+    with pytest.raises(ValueError, match=r"points|box") as caught:
+        subject_matte(ramp(), segmenter="sam2", points=points, box=box)
+    assert named in str(caught.value)
+    assert value in str(caught.value)
+
+
+def test_clicks_given_to_another_segmenter_are_refused_naming_points(echo_red):
+    with pytest.raises(ValueError, match="points") as caught:
+        subject_matte(ramp(), segmenter="onnx", points=[(0.5, 0.5, True)])
+    assert "sam2" in str(caught.value)
+
+
+def test_the_identity_of_sam2_holds_the_prompts_so_another_click_is_another_find(echo_red):
+    base = subject_finder("sam2", points=[(0.25, 0.75, True)]).identity
+    assert base.startswith("sam2:sha256 ")
+    assert subject_finder("sam2", points=[(0.25, 0.75, True)]).identity == base  # the same prompts, the same identity
+    others = {
+        "x": subject_finder("sam2", points=[(0.26, 0.75, True)]),
+        "y": subject_finder("sam2", points=[(0.25, 0.76, True)]),
+        "label": subject_finder("sam2", points=[(0.25, 0.75, False)]),
+        "extra click": subject_finder("sam2", points=[(0.25, 0.75, True), (0.5, 0.5, True)]),
+        "box": subject_finder("sam2", points=[(0.25, 0.75, True)], box=(0.0, 0.0, 1.0, 1.0)),
+    }
+    for what, finder in others.items():
+        assert finder.identity != base, what
+    assert len({finder.identity for finder in others.values()}) == len(others)
+
+
 # --- refine_edge: its rows are the core's (crates/core/tests/it/matte.rs); here only the facade ---------------------
 
 

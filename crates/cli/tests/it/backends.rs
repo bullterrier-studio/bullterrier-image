@@ -26,6 +26,12 @@ fn models_lists_each_model_with_where_it_comes_from_and_whether_it_is_installed(
     );
     assert!(
         ran.out
+            .contains("  sam2.1-hiera-large/vision_encoder: prompted model, 890 MB, not installed\n"),
+        "{}",
+        ran.out
+    );
+    assert!(
+        ran.out
             .contains("    sha256: 60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a\n")
     );
     assert!(ran.out.contains("    url: https://github.com/danielgatis/rembg/"));
@@ -66,6 +72,14 @@ fn install_asks_what_it_will_download_and_where_and_downloads_nothing_unless_tol
             .contains("and the depth-anything-v2-small model (100 MB)"),
         "{}",
         with_depth.err
+    );
+    let with_prompted = bt_answering(&["install", "onnx", "--prompted", "--cache", &dir], "no\n");
+    assert!(
+        with_prompted
+            .err
+            .contains("and the sam2.1-hiera-large/vision_encoder model (890 MB) and the sam2.1-hiera-large/prompt_encoder_mask_decoder model (22 MB) into "),
+        "{}",
+        with_prompted.err
     );
     Ok(())
 }

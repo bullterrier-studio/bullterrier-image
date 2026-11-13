@@ -121,6 +121,8 @@ def find_subject(
     model_file: str | os.PathLike[str] | None = None,
     cache: str | os.PathLike[str] | None = None,
     allow_download: bool = False,
+    points: Sequence[tuple[float, float, bool]] = ...,
+    box: tuple[float, float, float, float] | None = None,
 ) -> np.ndarray: ...
 def find_depth(
     rgb: np.ndarray,
@@ -143,6 +145,8 @@ def subject_finder_identity(
     segmenter: str | None = None,
     library: str | os.PathLike[str] | None = None,
     model_file: str | os.PathLike[str] | None = None,
+    points: Sequence[tuple[float, float, bool]] = ...,
+    box: tuple[float, float, float, float] | None = None,
 ) -> str: ...
 def depth_finder_identity(
     *, library: str | os.PathLike[str] | None = None, model_file: str | os.PathLike[str] | None = None

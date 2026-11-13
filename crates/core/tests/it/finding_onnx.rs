@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use bullterrier_image::finding::onnx::{Options, finder};
 use bullterrier_image::finding::prompted::{Point, Prompts};
-use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET, ModelKind, sam2};
+use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET, ModelKind, SAM2_ENCODER, sam2};
 use bullterrier_image::{Error, Finder};
 
 use crate::common::Outcome;
@@ -241,5 +241,36 @@ fn the_real_sam_2_cuts_what_is_clicked_the_dog_or_the_lantern_of_the_same_photo(
     let lantern = find(click(0.26, 0.14))?;
     assert!(at(&lantern, 26, 14) > 0.9, "the lantern");
     assert!(at(&lantern, 52, 60) < 0.1, "the dog is not");
+    Ok(())
+}
+
+#[test]
+#[ignore = "full: needs the SAM 2 encoder's graph file in the cache folder (1.3 MB)"]
+fn a_graph_file_whose_weights_file_is_not_the_catalogues_is_as_good_as_absent() -> Outcome {
+    let kept = bullterrier_image::finding::onnx::cache_dir()?.join(format!("{}.onnx", SAM2_ENCODER.name));
+    let cache = folder("weights")?;
+    let encoder = cache.join(format!("{}.onnx", SAM2_ENCODER.name));
+    std::fs::create_dir_all(encoder.parent().ok_or("folder")?)?;
+    std::fs::copy(&kept, &encoder)?;
+    std::fs::write(
+        cache.join(format!("{}.onnx_data", SAM2_ENCODER.name)),
+        b"not the weights",
+    )?;
+    let refused = sam2::finder(
+        &Options::new().with_cache(&cache),
+        Prompts::new(
+            vec![Point {
+                x: 0.5,
+                y: 0.5,
+                positive: true,
+            }],
+            None,
+        )?,
+    );
+    assert!(
+        matches!(&refused, Err(Error::BackendUnavailable(message)) if message.contains("is not in") && message.contains("onnx_data")),
+        "{:?}",
+        refused.err()
+    );
     Ok(())
 }
