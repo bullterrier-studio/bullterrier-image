@@ -28,27 +28,32 @@ impl Session {
     /// [`Error::BackendUnavailable`] naming the file if the library cannot be loaded or ONNX Runtime cannot use the model
     /// file (it is not an ONNX model).
     pub fn open(library: &Path, file: &Path) -> Result<Self, Error> {
-        let unavailable = |error: &dyn std::fmt::Display| {
-            Error::BackendUnavailable(format!(
-                "onnxruntime ({}) cannot use the model file {}: {error}",
-                library.display(),
-                file.display()
-            ))
-        };
-        let environment = environment(library).map_err(|error| unavailable(&error))?;
-        let session = OrtSession::builder(environment)
-            .and_then(|mut builder| builder.commit_from_file(file))
-            .map_err(|error| unavailable(&error))?;
+        let session = open_session(library, file)?;
         let input = session
             .inputs()
             .first()
             .map(|input| input.name().to_owned())
-            .ok_or_else(|| unavailable(&"the model has no input"))?;
+            .ok_or_else(|| Error::BackendUnavailable(format!("the model {} has no input", file.display())))?;
         Ok(Self {
             inner: Mutex::new(session),
             input,
         })
     }
+}
+
+/// The model in `file` loaded by the ONNX Runtime library at `library`, on the CPU.
+pub(super) fn open_session(library: &Path, file: &Path) -> Result<OrtSession, Error> {
+    let unavailable = |error: &dyn std::fmt::Display| {
+        Error::BackendUnavailable(format!(
+            "onnxruntime ({}) cannot use the model file {}: {error}",
+            library.display(),
+            file.display()
+        ))
+    };
+    let environment = environment(library).map_err(|error| unavailable(&error))?;
+    OrtSession::builder(environment)
+        .and_then(|mut builder| builder.commit_from_file(file))
+        .map_err(|error| unavailable(&error))
 }
 
 /// The one ONNX Runtime environment of this process, made on first use from `library`: ONNX Runtime allows no second, so
@@ -120,17 +125,18 @@ impl Options {
 
     /// The options the environment asks for: `BT_IMAGE_ONNX_LIB` (the library file), `BT_IMAGE_ALLOW_DOWNLOAD` (`1`,
     /// `true` or `yes`), and for a subject model `BT_IMAGE_SUBJECT_MODEL`, for a depth model `BT_IMAGE_DEPTH_MODEL` (a
-    /// local copy of the model, used as it is and never downloaded).
+    /// local copy of the model, used as it is and never downloaded). A prompted model has no such variable: it is two files.
     #[must_use]
     pub fn from_env(kind: ModelKind) -> Self {
         let var = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
         let model = match kind {
-            ModelKind::Subject => "BT_IMAGE_SUBJECT_MODEL",
-            ModelKind::Depth => "BT_IMAGE_DEPTH_MODEL",
+            ModelKind::Subject => Some("BT_IMAGE_SUBJECT_MODEL"),
+            ModelKind::Depth => Some("BT_IMAGE_DEPTH_MODEL"),
+            ModelKind::Prompted => None,
         };
         Self {
-            model_file: var(model).map(PathBuf::from),
-            model_variable: var(model).map(|_| model),
+            model_file: model.and_then(var).map(PathBuf::from),
+            model_variable: model.filter(|name| var(name).is_some()),
             cache: None,
             library: var("BT_IMAGE_ONNX_LIB").map(PathBuf::from),
             allow_download: var("BT_IMAGE_ALLOW_DOWNLOAD").is_some_and(|value| {
@@ -138,6 +144,11 @@ impl Options {
                 matches!(value.as_str(), "1" | "true" | "yes")
             }),
         }
+    }
+
+    /// The folder models and the library are kept in: the one these options name, else [`cache_dir`].
+    pub(super) fn cache_folder(&self) -> Result<PathBuf, Error> {
+        self.cache.clone().map_or_else(cache_dir, Ok)
     }
 
     /// The local copy of the model these options name, if any.
@@ -265,7 +276,7 @@ pub fn local_model<'a>(model: &Model, options: &'a Options) -> Result<Option<&'a
 
 /// The file of `model`: the local copy named by `options`, else the one in the cache folder, downloaded if it is not
 /// there and `options` allow.
-fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
+pub(super) fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
     if let Some(local) = local_model(model, options)? {
         return Ok(local.to_path_buf());
     }
@@ -287,8 +298,27 @@ fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
             model.url
         )));
     }
-    download::fetch(model.url, model.sha256, model.size, &file)?;
+    download_model(model, &file)?;
     Ok(file)
+}
+
+/// The file of `model` at `file`, and its weights file beside it if it has one, downloaded and verified (see
+/// [`download::fetch`]); what is there and verifies is kept.
+///
+/// # Errors
+/// As [`download::fetch`].
+pub fn download_model(model: &Model, file: &Path) -> Result<(), Error> {
+    if let Some(data) = &model.data {
+        download::fetch(data.url, data.sha256, data.size, &data_file(file))?;
+    }
+    download::fetch(model.url, model.sha256, model.size, file)
+}
+
+/// Where the weights of the model in `file` are kept: beside it, with `_data` added to its name.
+fn data_file(file: &Path) -> PathBuf {
+    let mut name = file.as_os_str().to_owned();
+    name.push("_data");
+    PathBuf::from(name)
 }
 
 /// The SHA-256 of the file at `path`, as 64 lowercase hex digits.
@@ -312,15 +342,25 @@ pub fn sha256_of(path: &Path) -> Result<String, Error> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
-/// Whether the file at `path` is `model`: its size and SHA-256 are the catalogue's.
+/// Whether the file at `path` is `model`: its size and SHA-256 are the catalogue's, and so are those of its weights file
+/// beside it, if it has one.
 ///
 /// # Errors
 /// [`Error::BackendUnavailable`] naming the file if it cannot be read.
 pub fn is_model(model: &Model, path: &Path) -> Result<bool, Error> {
-    let size = std::fs::metadata(path)
-        .map_err(|error| Error::BackendUnavailable(format!("cannot read the model file {}: {error}", path.display())))?
-        .len();
-    Ok(size == model.size && sha256_of(path)? == model.sha256)
+    let is_file = |path: &Path, size: u64, sha256: &str| -> Result<bool, Error> {
+        let found = std::fs::metadata(path)
+            .map_err(|error| {
+                Error::BackendUnavailable(format!("cannot read the model file {}: {error}", path.display()))
+            })?
+            .len();
+        Ok(found == size && sha256_of(path)? == sha256)
+    };
+    let data = match &model.data {
+        Some(data) => is_file(&data_file(path), data.size, data.sha256)?,
+        None => true,
+    };
+    Ok(data && is_file(path, model.size, model.sha256)?)
 }
 
 /// The folder downloaded files are kept in, by the platform's convention: macOS `~/Library/Caches/bt-image`, Windows

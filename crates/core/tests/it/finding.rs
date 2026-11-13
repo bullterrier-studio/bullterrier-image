@@ -51,7 +51,11 @@ fn the_catalogue_names_each_model_once_with_its_checksum_and_size() {
         assert_eq!(model.sha256.len(), 64, "{}", model.name);
         assert!(model.sha256.chars().all(|c| c.is_ascii_hexdigit()), "{}", model.name);
         assert!(model.url.starts_with("https://"), "{}", model.name);
-        assert!(model.size > 1_000_000, "{}", model.name);
+        assert!(
+            model.size + model.data.map_or(0, |data| data.size) > 1_000_000,
+            "{}",
+            model.name
+        );
         assert!(
             all[index + 1..].iter().all(|other| other.name != model.name),
             "{} twice",

@@ -49,6 +49,7 @@ mod finding;
 mod finding_download;
 #[cfg(feature = "onnx")]
 mod finding_onnx;
+mod finding_prompted;
 #[cfg(feature = "onnx")]
 mod finding_runtime;
 mod flow_lines;

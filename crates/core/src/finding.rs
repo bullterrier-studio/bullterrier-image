@@ -6,8 +6,11 @@
 pub mod download;
 #[cfg(feature = "onnx")]
 pub mod onnx;
+pub mod prompted;
 #[cfg(feature = "onnx")]
 pub mod runtime;
+#[cfg(feature = "onnx")]
+pub mod sam2;
 
 use crate::ops::length::{float, whole};
 use crate::ops::resample::{Filter, Resize};
@@ -24,6 +27,10 @@ pub enum ModelKind {
     /// (a long strip is scaled down until its long side is at most 1092 px, which bounds the memory), answering relative
     /// inverse depth, larger nearer, in no fixed unit.
     Depth,
+    /// A promptable segmentation model (SAM 2): the photo as a 1024 x 1024 square and the clicks or box that say what is
+    /// wanted ([`PromptedFinder`](prompted::PromptedFinder)). It runs as two models, an encoder and a decoder, each its own
+    /// catalogue entry.
+    Prompted,
 }
 
 /// A model the package knows how to run: where it comes from, and the checksum its file must have.
@@ -40,6 +47,21 @@ pub struct Model {
     pub size: u64,
     /// What the model finds.
     pub kind: ModelKind,
+    /// The weights, when the file holds the graph only: ONNX Runtime reads them from a file beside it, called as the model's
+    /// file with `_data` added (`<name>.onnx_data`).
+    pub data: Option<ModelData>,
+}
+
+/// The weights file of a [`Model`] whose graph is too large for one file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ModelData {
+    /// Where the file is downloaded from.
+    pub url: &'static str,
+    /// The SHA-256 of the file, as 64 lowercase hex digits.
+    pub sha256: &'static str,
+    /// The size of the file in bytes.
+    pub size: u64,
 }
 
 /// IS-Net (general use), the salient-object model of Qin et al. (ECCV 2022, Apache-2.0), in the ONNX export that the rembg
@@ -50,6 +72,7 @@ pub const IS_NET: Model = Model {
     sha256: "60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a",
     size: 178_648_008,
     kind: ModelKind::Subject,
+    data: None,
 };
 
 /// Depth Anything V2 Small (Yang et al., `NeurIPS` 2024, Apache-2.0), in the fp32 ONNX export of the `onnx-community`, pinned
@@ -60,12 +83,44 @@ pub const DEPTH_ANYTHING_V2_SMALL: Model = Model {
     sha256: "afb6a5c28f3b6bf1618c6e43f02073ef9dfdc70e937502d51603e57b0a1df10c",
     size: 99_060_839,
     kind: ModelKind::Depth,
+    data: None,
+};
+
+/// SAM 2.1 Hiera Large (Ravi et al., Meta 2024), the encoder half of the promptable segmentation model: the photo to image
+/// embeddings. The ONNX export is the `onnx-community`'s. Licence: Apache-2.0 for the SAM 2.1 weights and code
+/// (`facebookresearch/sam2`); the export states none.
+pub const SAM2_ENCODER: Model = Model {
+    name: "sam2.1-hiera-large/vision_encoder",
+    url: "https://huggingface.co/onnx-community/sam2.1-hiera-large-ONNX/resolve/main/onnx/vision_encoder.onnx",
+    sha256: "ad3a8161c6bd6d8beea811300c60e20d626035feaa3c19622ace27b22e25bec8",
+    size: 1_350_487,
+    kind: ModelKind::Prompted,
+    data: Some(ModelData {
+        url: "https://huggingface.co/onnx-community/sam2.1-hiera-large-ONNX/resolve/main/onnx/vision_encoder.onnx_data",
+        sha256: "88c501a65b6aaeac99b65a275f3f559727404283930d107d499fda8714ba7e5a",
+        size: 888_587_456,
+    }),
+};
+
+/// SAM 2.1 Hiera Large, the decoder half: the image embeddings and the prompts to candidate masks. Same source and licence
+/// as [`SAM2_ENCODER`].
+pub const SAM2_DECODER: Model = Model {
+    name: "sam2.1-hiera-large/prompt_encoder_mask_decoder",
+    url: "https://huggingface.co/onnx-community/sam2.1-hiera-large-ONNX/resolve/main/onnx/prompt_encoder_mask_decoder.onnx",
+    sha256: "a21b3b09f6e5f5838d630d92a150914ca58f8f58b603b8f53fc32b03da982203",
+    size: 213_114,
+    kind: ModelKind::Prompted,
+    data: Some(ModelData {
+        url: "https://huggingface.co/onnx-community/sam2.1-hiera-large-ONNX/resolve/main/onnx/prompt_encoder_mask_decoder.onnx_data",
+        sha256: "bfdcd4f7ee04298a82fe1aaf1bd7b8edf544d36901e1a886f01892fb915bd63c",
+        size: 20_958_208,
+    }),
 };
 
 /// The models the package knows.
 #[must_use]
 pub fn models() -> &'static [Model] {
-    &[IS_NET, DEPTH_ANYTHING_V2_SMALL]
+    &[IS_NET, DEPTH_ANYTHING_V2_SMALL, SAM2_ENCODER, SAM2_DECODER]
 }
 
 /// A tensor of `f32`: the shape of a model's input or answer and its values, row-major.
@@ -121,7 +176,7 @@ pub const DEFAULT_EDGE: (f64, f64) = (1.5, 1.0); // constant: the default `shrin
 const SURE: f32 = 0.5; // constant: half, the even split of a probability
 
 /// The square a subject model takes, px.
-const SUBJECT_SIDE: usize = 1024; // constant: the input size IS-Net was trained at
+const SUBJECT_SIDE: usize = 1024; // constant: the input size IS-Net and SAM 2 were trained at
 /// The short side a depth model takes, px, and the patch its sides are a whole number of.
 const DEPTH_SHORT_SIDE: f64 = 518.0; // constant: Depth Anything's trained input size (37 patches of 14 px)
 const DEPTH_PATCH: f64 = 14.0; // constant: the ViT-S/14 encoder's patch size
@@ -212,13 +267,19 @@ impl Finder for ModelFinder {
         let (input, side) = match self.kind {
             ModelKind::Subject => (subject_input(picture), (SUBJECT_SIDE, SUBJECT_SIDE)),
             ModelKind::Depth => depth_input(picture),
+            ModelKind::Prompted => return Err(not_prompted()),
         };
         let answer = self.answer(&input, side)?;
         match self.kind {
             ModelKind::Subject => subject_map(&answer.values, side, (height, width), (self.shrink, self.feather)),
             ModelKind::Depth => depth_map(&answer.values, side, (height, width)),
+            ModelKind::Prompted => Err(not_prompted()),
         }
     }
+}
+
+fn not_prompted() -> Error {
+    Error::BackendUnavailable("a prompted model needs clicks: it is run by a PromptedFinder".to_owned())
 }
 
 /// `picture` resized to `to` (rows, columns) by `filter`, as planar channels (`3 x rows x columns`), each value `v`

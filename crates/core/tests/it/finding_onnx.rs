@@ -4,10 +4,12 @@
 use std::path::{Path, PathBuf};
 
 use bullterrier_image::finding::onnx::{Options, finder};
-use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET, ModelKind};
+use bullterrier_image::finding::prompted::{Point, Prompts};
+use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET, ModelKind, sam2};
 use bullterrier_image::{Error, Finder};
 
 use crate::common::Outcome;
+use crate::common::numbers::float;
 
 fn folder(name: &str) -> Result<PathBuf, std::io::Error> {
     let path = std::env::temp_dir().join(format!("bt-image-onnx-{name}-{}", std::process::id()));
@@ -161,5 +163,83 @@ fn the_real_models_run_on_a_banner_within_the_memory_cap() -> Outcome {
         subject.is_ok() || matches!(subject, Err(Error::MapNotFound { .. })),
         "{subject:?}"
     );
+    Ok(())
+}
+
+/// A 384 x 512 picture of noise with a brighter disc of radius 100 px at row 190, column 300, and the disc as a mask.
+fn disc_on_noise() -> (Vec<f32>, Vec<bool>) {
+    let (height, width) = (384_usize, 512_usize);
+    let mut state = 12_345_u32; // a fixed seed: the same picture on every run
+    let mut noise = move || {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        f32::from(u8::try_from(state >> 24).unwrap_or(0)) / 255.0
+    };
+    let mut values = Vec::with_capacity(height * width * 3);
+    let mut inside = Vec::with_capacity(height * width);
+    for row in 0..height {
+        for column in 0..width {
+            let (above, left) = (float(row) - 190.0, float(column) - 300.0);
+            let in_disc = above * above + left * left <= 100.0 * 100.0;
+            let level = if in_disc {
+                0.75 + 0.2 * noise()
+            } else {
+                0.1 + 0.4 * noise()
+            };
+            values.extend([level; 3]);
+            inside.push(in_disc);
+        }
+    }
+    (values, inside)
+}
+
+#[test]
+#[ignore = "full: runs the real SAM 2 model (peak about 3 GB, alone): needs it in the cache folder and BT_IMAGE_ONNX_LIB"]
+fn the_real_sam_2_cuts_a_disc_out_of_noise_by_one_click_inside_it() -> Outcome {
+    let (values, inside) = disc_on_noise();
+    let picture = bullterrier_image::Picture::new(384, 512, &values)?;
+    let options = Options::from_env(ModelKind::Prompted).with_library(library()?);
+    let click = Point {
+        x: 300.0 / 512.0,
+        y: 190.0 / 384.0,
+        positive: true,
+    };
+    let found = sam2::finder(&options, Prompts::new(vec![click], None)?)?
+        .with_edge(0.0, 0.0)
+        .find(&picture)?;
+    let (mut both, mut either) = (0_usize, 0_usize);
+    for (&sure, &disc) in found.values().iter().zip(&inside) {
+        both += usize::from(sure > 0.5 && disc);
+        either += usize::from(sure > 0.5 || disc);
+    }
+    let overlap = float(both) / float(either);
+    // measured 0.997 with the large model
+    assert!(overlap > 0.99, "intersection over union {overlap}");
+    Ok(())
+}
+
+#[test]
+#[ignore = "full: runs the real SAM 2 model twice (peak about 3 GB, alone): needs it in the cache folder and BT_IMAGE_ONNX_LIB"]
+fn the_real_sam_2_cuts_what_is_clicked_the_dog_or_the_lantern_of_the_same_photo() -> Outcome {
+    let image = photo(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/photos/bullterrier.jpeg"))?;
+    let picture = image.as_picture();
+    let width = picture.width();
+    let options = Options::from_env(ModelKind::Prompted).with_library(library()?);
+    let click = |x, y| Point { x, y, positive: true };
+    let find = |point| -> Result<bullterrier_image::Layer, Error> {
+        sam2::finder(&options, Prompts::new(vec![point], None)?)?.find(&picture)
+    };
+    // a place as a percentage across and down the photo
+    let at = |layer: &bullterrier_image::Layer, across: usize, down: usize| {
+        layer.values()[picture.height() * down / 100 * width + width * across / 100]
+    };
+    let dog = find(click(0.52, 0.60))?;
+    assert!(
+        at(&dog, 52, 60) > 0.9 && at(&dog, 50, 30) > 0.9,
+        "the chest and the head are the dog"
+    );
+    assert!(at(&dog, 26, 14) < 0.1, "the lantern is not");
+    let lantern = find(click(0.26, 0.14))?;
+    assert!(at(&lantern, 26, 14) > 0.9, "the lantern");
+    assert!(at(&lantern, 52, 60) < 0.1, "the dog is not");
     Ok(())
 }
