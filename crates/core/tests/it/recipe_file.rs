@@ -455,6 +455,11 @@ fn a_recipe_says_the_lowest_format_a_file_of_it_would_declare() {
         ("a grid", 2, region("grid")),
         ("a subject region", 2, region("subject")),
         ("an each step", 2, each("")),
+        (
+            "an each step of a region nobody declared",
+            2,
+            "[[step]]\neach = \"p\"\nlooks = [{ effect = \"a\" }]\n".to_owned(),
+        ),
         ("a partition key", 2, "[[step]]\neffect = \"a\"\npartition = \"p\"\n".to_owned()),
         ("a drive", 3, "[[step]]\neffect = \"a\"\ncell = { by = \"depth\", start = 1, end = 2 }\n".to_owned()),
         ("a drive in a look", 3, each(", cell = { by = \"depth\", start = 1, end = 2 }")),
