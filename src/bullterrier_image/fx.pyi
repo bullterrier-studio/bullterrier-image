@@ -2374,8 +2374,8 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     ...
 
 @_effect
-def outline(*, field: str = 'subject', width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A coloured stroke of `width` px around a shape (the subject by default), with an optional soft halo of `glow` px.  The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft the stroke lies behind it. The edge is antialiased over one pixel.
+def outline(*, field: str = 'subject', width: float = 6.0, color: str | list[float] | tuple[float, float, float] = '#ffffff', color_end: str | list[float] | tuple[float, float, float] | None = None, angle: float = 0.0, position: Literal['outside', 'inside', 'center'] = 'outside', glow: float = 0.0, field_threshold: float = 0.5, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """A coloured stroke of `width` px around a shape (the subject by default), with an optional soft halo of `glow` px.  The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly as they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft the stroke lies behind it. The edge is antialiased over one pixel. With `color_end` the stroke and halo run from `color` to `color_end` across the whole picture, not the shape's box.
 
 Parameters
 ----------
@@ -2387,7 +2387,16 @@ width : number, px, 0 to 200, default 6.0
     Thickness of the stroke in px at the recipe's size; raising it thickens the line. 0
     = no stroke.
 color : colour, default '#ffffff'
-    The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1. With
+    `color_end` it is the colour at the start of the gradient.
+color_end : colour or none, default None
+    The colour at the end of a gradient from `color` that runs across the whole picture
+    along `angle`, so the stroke and halo change colour with their place in the frame.
+    Unset = the single colour `color`.
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    The direction the colours run from `color` to `color_end`, clockwise on screen from
+    the right: 0 = left to right, 90 = top to bottom. Used only while `color_end` is
+    set.
 position : one of 'outside', 'inside', 'center', default 'outside'
     Which side of the shape's edge the stroke lies on: 'outside' (around the shape,
     whose own pixels stay untouched), 'inside' (painted over the shape's rim) or

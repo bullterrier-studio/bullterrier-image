@@ -4,8 +4,9 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::distance::signed;
+use crate::ops::gradient;
 use crate::params::{Choice, Color, FieldName, Params};
 use crate::{Image, Inputs, Picture};
 
@@ -13,11 +14,11 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Subject,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// Radius: a pixel is touched only within the stroke and its halo of the edge (`width + glow`), plus the one-pixel
-/// antialiasing ramp.
+/// antialiasing ramp. The colour pair reads only the pixel's place on the canvas.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(f64::from(params.width + params.glow) + 1.0) // constant: the antialiasing ramp's px
 }
@@ -37,7 +38,8 @@ pub enum Position {
 ///
 /// The stroke follows the shape's edge on the side `position` says; 'outside' leaves the shape's own pixels exactly as
 /// they are, like a sticker's border, and a big `glow` with a thin stroke makes an aura. Where the shape is soft the
-/// stroke lies behind it. The edge is antialiased over one pixel.
+/// stroke lies behind it. The edge is antialiased over one pixel. With `color_end` the stroke and halo run from `color`
+/// to `color_end` across the whole picture, not the shape's box.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
@@ -48,9 +50,18 @@ pub struct Params {
     /// Thickness of the stroke in px at the recipe's size; raising it thickens the line. 0 = no stroke.
     #[param(default = 6.0, unit = px, min = 0, max = 200)]
     pub width: f32,
-    /// The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1.
+    /// The colour of the stroke and of its halo: '#rrggbb', '#rgb' or [r, g, b] 0..1. With `color_end` it is the colour
+    /// at the start of the gradient.
     #[param(default = "#ffffff")]
     pub color: Color,
+    /// The colour at the end of a gradient from `color` that runs across the whole picture along `angle`, so the stroke
+    /// and halo change colour with their place in the frame. Unset = the single colour `color`.
+    #[param()]
+    pub color_end: Option<Color>,
+    /// The direction the colours run from `color` to `color_end`, clockwise on screen from the right: 0 = left to right,
+    /// 90 = top to bottom. Used only while `color_end` is set.
+    #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)]
+    pub angle: f32,
     /// Which side of the shape's edge the stroke lies on: 'outside' (around the shape, whose own pixels stay
     /// untouched), 'inside' (painted over the shape's rim) or 'center' (half of `width` on each side).
     #[param(default = Outside)]
@@ -84,10 +95,23 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     };
     let reach_out = params.width * outer_share;
     let reach_in = params.width - reach_out;
-    let (glow, tint) = (params.glow, params.color.0);
+    let glow = params.glow;
+    // the share along the gradient of each pixel, on the canvas the picture lies on
+    let place = inputs.place(picture);
+    let along = params.color_end.map(|end| {
+        let rows = place.first_row..place.first_row + height;
+        let run = gradient::linear((place.canvas_height, place.canvas_width), rows, f64::from(params.angle));
+        (end.0, run)
+    });
     picture.map_at(|row, column, pixel| {
         let at = row * width + column;
         let distance = signed[at];
+        let tint = match &along {
+            Some((end, run)) => {
+                [0, 1, 2].map(|channel| params.color.0[channel] + (end[channel] - params.color.0[channel]) * run[at])
+            }
+            None => params.color.0,
+        };
         // full coverage up to the reach, then a one-pixel ramp down to nothing
         let alpha = if distance > 0.0 {
             let stroke = (reach_out - distance + 1.0).clamp(0.0, 1.0);

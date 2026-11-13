@@ -4,6 +4,7 @@
 
 use bullterrier_image::Error;
 use bullterrier_image::effects::outline::{self, Position};
+use bullterrier_image::params::Color;
 
 use crate::common::compare::assert_close;
 use crate::common::pixels::run_with_field;
@@ -134,6 +135,70 @@ fn a_field_with_no_edge_leaves_the_picture_as_it_is() -> Result<(), Error> {
         let field = vec![level; SIZE * SIZE];
         let row = middle_row(&params(6.0, Position::Center, 30.0), &field)?;
         assert!(row.iter().all(|cover| *cover == 0.0), "a field of {level}: {row:?}");
+    }
+    Ok(())
+}
+
+/// The outline of a square across the whole picture, black stroke to white `color_end`, 3 px wide: the stroke is full
+/// strength on the 3 columns (rows) beside the square, so there the picture holds the gradient's own value.
+fn gradient_params(angle: f32) -> outline::Params {
+    outline::Params {
+        width: 3.0,
+        color: Color([0.0; 3]),
+        color_end: Some(Color([1.0; 3])),
+        angle,
+        ..Default::default()
+    }
+}
+
+fn red_channel(params: &outline::Params, column: usize, row: usize) -> Result<f32, Error> {
+    let out = run_with_field(params, "field", &square(1.0), SIZE, SIZE, &vec![GREY; SIZE * SIZE * 3])?;
+    Ok(out[(row * SIZE + column) * 3])
+}
+
+#[test]
+fn the_stroke_runs_from_color_to_color_end_across_the_picture_not_the_shape() -> Result<(), Error> {
+    // linear gradient over the 21 x 21 picture: at a pixel centre (c + 0.5, r + 0.5) the share along the angle is
+    // (c + 0.5) / 21 at 0 degrees, (r + 0.5) / 21 at 90, and the reverse at 180 and 270
+    #[expect(clippy::cast_precision_loss, reason = "a pixel index of a small picture")]
+    let share = |index: usize| (index as f32 + 0.5) / SIZE as f32;
+    for (angle, column, row, wanted) in [
+        (0.0, 4, 10, share(4)),
+        (0.0, 16, 10, share(16)),
+        (90.0, 10, 4, share(4)),
+        (90.0, 10, 16, share(16)),
+        (180.0, 4, 10, 1.0 - share(4)),
+        (270.0, 10, 16, 1.0 - share(16)),
+    ] {
+        let value = red_channel(&gradient_params(angle), column, row)?;
+        assert!(
+            (value - wanted).abs() < 1e-6,
+            "angle {angle}, ({column}, {row}): {value} for {wanted}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_color_end_equal_to_color_gives_the_single_colour_picture_whatever_the_angle() -> Result<(), Error> {
+    // the picture without `color_end` is the one the stroke and halo of `color` alone make; a pair of one colour is it
+    let base = outline::Params {
+        width: 3.0,
+        glow: 5.0,
+        color: Color([0.9, 0.3, 0.1]),
+        ..Default::default()
+    };
+    let field = square(1.0);
+    let pixels = vec![GREY; SIZE * SIZE * 3];
+    let single = run_with_field(&base, "field", &field, SIZE, SIZE, &pixels)?;
+    for angle in [0.0, 33.0, 180.0] {
+        let pair = outline::Params {
+            color_end: Some(base.color),
+            angle,
+            ..base.clone()
+        };
+        let same = run_with_field(&pair, "field", &field, SIZE, SIZE, &pixels)?;
+        assert!(same == single, "angle {angle}");
     }
     Ok(())
 }

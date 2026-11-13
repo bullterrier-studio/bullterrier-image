@@ -335,6 +335,16 @@ fn blur(sigma: f64) -> Step {
 }
 
 #[test]
+fn an_outline_with_a_colour_pair_at_a_slant_is_the_same_banded() -> Outcome {
+    let recipe = Recipe::new([Step::new("outline")
+        .param("width", 4.0)
+        .param("glow", 6.0)
+        .param("color_end", "#2040ff")
+        .param("angle", 30.0)]);
+    assert_same(&varied(HEIGHT, WIDTH), &recipe, Options::default(), &BANDS)
+}
+
+#[test]
 fn a_run_of_steps_that_each_have_a_margin_is_the_same_banded() -> Outcome {
     let recipe = Recipe::new([
         grade(),

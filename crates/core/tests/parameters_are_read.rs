@@ -98,6 +98,12 @@ fn conditional() -> Vec<Conditional> {
             field: "reflect",
             with: vec![("repeat", json!(2))],
         },
+        // the direction of the colour pair matters only while there is an end colour
+        Conditional {
+            effect: "outline",
+            field: "angle",
+            with: vec![("color_end", json!("#000000"))],
+        },
         // a slid strip reaches beyond the edge only when it starts nearer the edge than it slides
         Conditional {
             effect: "lenticular",

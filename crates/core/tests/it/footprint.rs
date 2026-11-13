@@ -336,6 +336,10 @@ fn combinations() -> Vec<(&'static str, Value)> {
         ("outline", json!({"width": 30, "glow": 12})),
         ("outline", json!({"width": 0, "glow": 30})),
         ("outline", json!({"width": 30, "glow": 0})),
+        (
+            "outline",
+            json!({"width": 30, "glow": 12, "color_end": "#2040ff", "angle": 30}),
+        ),
         ("outline", json!({"width": 200, "glow": 200})), // clamped to the whole picture
         ("defringe", json!({"width": 4, "amount": 1, "field_threshold": 0.1})),
         ("defringe", json!({"width": 1, "amount": 1})),
