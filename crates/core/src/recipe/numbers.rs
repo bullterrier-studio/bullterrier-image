@@ -242,7 +242,7 @@ pub(crate) const REGION_ROWS: &[(&str, &[Row])] = &[
                 "fraction",
                 0.0,
                 1.0,
-                "How far from `target` a pixel may be and still be chosen fully (0 to 1), as a share of the Oklab distance from black to white. Raising it takes in more shades of the colour; 0 chooses only the exact colour.",
+                "How far from `target` a pixel may be and still be chosen fully (0 to 1), as a share of the Oklab distance from black to white. Raising it takes in more shades of the colour; With `feather` 0, 0 chooses only the exact colour; with a feather, nearby shades are still partly chosen.",
             ),
             real(
                 "feather",

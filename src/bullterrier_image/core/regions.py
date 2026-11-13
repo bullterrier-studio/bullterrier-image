@@ -648,8 +648,9 @@ class Colour(_Piece):
         metadata={
             "doc": (
                 "How far from `target` a pixel may be and still be chosen fully (0 to 1), as a share of the "
-                "Oklab distance from black to white. Raising it takes in more shades of the colour; 0 chooses "
-                "only the exact colour."
+                "Oklab distance from black to white. Raising it takes in more shades of the colour; with "
+                "`feather` 0, 0 chooses only the exact colour, and with a feather nearby shades are still "
+                "partly chosen."
             )
         },
     )

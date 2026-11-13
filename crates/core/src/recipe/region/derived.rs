@@ -244,8 +244,8 @@ pub struct Colour {
     #[serde(deserialize_with = "target")]
     pub target: Color,
     /// How far from `target` a pixel may be and still be chosen fully, 0 to 1, as a distance in Oklab (black to white is
-    /// 1; two similar shades of one colour are about 0.1 apart). Raising it takes in more shades; 0 chooses only the
-    /// exact colour.
+    /// 1; two similar shades of one colour are about 0.1 apart). Raising it takes in more shades; with `feather` 0, 0
+    /// chooses only the exact colour, and with a feather nearby shades are still partly chosen.
     pub tolerance: f64,
     /// The extra distance beyond `tolerance` over which the selection falls linearly from 1 to 0, 0 to 1, in the same
     /// distance. Raising it softens the edge; 0 cuts hard.
