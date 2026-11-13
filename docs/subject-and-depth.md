@@ -8,7 +8,6 @@ Models, backends, your own finders and maps. Basics are in the [README](../READM
 |---|---|---|
 | `vision`: Apple Vision subject segmentation | macOS | Default on macOS. Built in: no download, Neural Engine. Cleaner cut than the portable model. |
 | `onnx`: [IS-Net](https://github.com/xuebinqin/DIS) (general use, Apache-2.0) on ONNX Runtime | macOS, Linux, Windows | Default off macOS. People, pets, objects. Few seconds per photo on laptop CPU. Softer at fine details. |
-
 | `sam2`: [SAM 2.1 Hiera Large](https://github.com/facebookresearch/sam2) (Apache-2.0 weights and code) on ONNX Runtime | macOS, Linux, Windows | Never a default. Finds what you click, not what stands out: a building, one of three people, a lantern. Needs `points` or a `box`. About 6 s per photo and 2.6 GB on a laptop CPU. |
 
 Portable model (178 MB) not in package. First cut-out off macOS (or with `--segmenter onnx`) that needs it downloads it once into cache folder
