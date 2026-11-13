@@ -30,7 +30,8 @@ pub(crate) struct Args {
     /// Also save the picture after every step of every recipe.
     #[arg(long)]
     steps: bool,
-    /// What finds the subject: vision (Apple Vision, macOS only) or onnx (a portable model, downloaded on first use);
+    /// What finds the subject: vision (Apple Vision, macOS only), onnx (a portable model, downloaded on first use) or sam2
+    /// (finds what clicks point at; `run` takes none, so it is refused here);
     /// default: `BT_IMAGE_SEGMENTER`, else vision on macOS and onnx elsewhere. A segmenter named here is checked at once,
     /// even for a look that needs no subject.
     #[arg(long, value_parser = finders::segmenter)]

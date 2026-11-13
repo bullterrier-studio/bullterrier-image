@@ -21,7 +21,8 @@ background (0), at the picture's own size; `subject_finder()` is the same as a `
   find takes seconds on a laptop CPU and about 2.6 GB of memory.
 
 The backend is chosen once, by, in order: the `segmenter` argument; the `BT_IMAGE_SEGMENTER` environment variable
-(`onnx` or `vision`); otherwise by what the platform has, never by trying one and falling back. The work is the core's.
+(`onnx`, `sam2` or `vision`); otherwise by what the platform has, never by trying one and falling back. The work is
+the core's.
 
 No model at all is needed when the caller already has the subject's matte: every renderer takes it as
 `maps={"subject": ...}` (load a black-and-white or transparent PNG with `imageio.load_map`, or pass
