@@ -1,15 +1,16 @@
 //! Regions in a recipe, through the public API alone: every kind is read from its defaults, written and read back
 //! equal in declaration order, in JSON and in a TOML file, and what is not a region of a known kind is refused naming it.
 
+use bullterrier_image::params::Color;
 use bullterrier_image::region::{
-    Band, Bands, Combine, CombineOp, Components, Curve, Cut, Cuts, Edge, EdgeStyle, Given, Grid, Line, LinearGradient,
-    Path, Pick, Piece, RadialGradient, Region, Regions, Shards, Shares, Subject, Svg,
+    Band, Bands, Colour, Combine, CombineOp, Components, Curve, Cut, Cuts, Edge, EdgeStyle, Given, Grid, Line,
+    LinearGradient, Path, Pick, Piece, RadialGradient, Region, Regions, Shards, Shares, Subject, Svg,
 };
 use bullterrier_image::{Recipe, Step};
 use serde_json::{Value, json};
 
 /// The kinds a region is written by, in the order of the documentation.
-const KINDS: [&str; 14] = [
+const KINDS: [&str; 15] = [
     "grid",
     "shards",
     "cuts",
@@ -21,6 +22,7 @@ const KINDS: [&str; 14] = [
     "bands",
     "components",
     "combine",
+    "colour",
     "linear_gradient",
     "radial_gradient",
     "given",
@@ -78,6 +80,10 @@ fn a_kind_alone_is_read_as_the_defaults_and_written_with_every_field_that_is_set
             json!({"of": "", "threshold": 0.5, "min_area": 0.001, "max_pieces": 1000}),
         ),
         ("combine", json!({"op": "multiply", "of": ["", ""]})),
+        (
+            "colour",
+            json!({"target": [0.0, 0.0, 0.0], "tolerance": 0.1, "feather": 0.05}),
+        ),
         ("linear_gradient", json!({"angle": 270.0})),
         ("radial_gradient", json!({"x": 0.5, "y": 0.5, "radius": 0.5})),
         ("given", json!({})),
@@ -228,6 +234,15 @@ fn every_kind() -> Vec<(&'static str, Region)> {
             }
             .into(),
         ),
+        (
+            "brick",
+            Colour {
+                target: Color([0.25, 0.5, 0.75]),
+                tolerance: 0.125,
+                feather: 0.0625,
+            }
+            .into(),
+        ),
         ("ramp", LinearGradient { angle: 725.0 }.into()),
         (
             "spot",
@@ -266,6 +281,7 @@ fn regions_of_every_kind_with_every_field_set_are_written_and_read_back_equal_in
             "layers",
             "windows",
             "both",
+            "brick",
             "ramp",
             "spot"
         ]
@@ -354,6 +370,12 @@ kind = "combine"
 op = "max"
 of = ["near", "subject", "light"]
 
+[region.brick]
+kind = "colour"
+target = [0.25, 0.5, 0.75]
+tolerance = 0.125
+feather = 0.0625
+
 [region.ramp]
 kind = "linear_gradient"
 angle = 725
@@ -373,6 +395,17 @@ effect = "grade"
         expected.insert(name, region);
     }
     assert_eq!(read.ok(), Some(expected));
+}
+
+#[test]
+fn a_colour_target_is_read_from_hex_in_either_length_or_from_three_numbers() {
+    let target = |written: Value| match read(&json!({"kind": "colour", "target": written})) {
+        Ok(Region::Colour(colour)) => Some(colour.target),
+        _ => None,
+    };
+    assert_eq!(target(json!("#ff0000")), Some(Color([1.0, 0.0, 0.0])));
+    assert_eq!(target(json!("#0F0")), Some(Color([0.0, 1.0, 0.0])));
+    assert_eq!(target(json!([0.0, 0.0, 1.0])), Some(Color([0.0, 0.0, 1.0])));
 }
 
 #[test]

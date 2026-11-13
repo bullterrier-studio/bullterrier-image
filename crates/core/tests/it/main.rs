@@ -17,6 +17,7 @@ mod chromatic_aberration;
 mod color_transfer;
 mod colour;
 mod colour_mix;
+mod colour_region;
 mod compare;
 mod components;
 mod cutout;

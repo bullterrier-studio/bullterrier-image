@@ -13,9 +13,9 @@ use std::sync::Arc;
 
 use super::{Stage, laid};
 use crate::ops::svg::Ids;
-use crate::ops::{bands, cast, components, gradient, length, pieces};
+use crate::ops::{bands, cast, color, components, gradient, length, pieces};
 use crate::region::{
-    Band, Bands, Combine, CombineOp, Components, LinearGradient, Pick, Piece, RadialGradient, Subject,
+    Band, Bands, Colour, Combine, CombineOp, Components, LinearGradient, Pick, Piece, RadialGradient, Subject,
 };
 use crate::{Error, ErrorKind, Finder, Labels, Layer, Picture, Region, Regions};
 
@@ -242,24 +242,13 @@ impl Evaluator {
                 partition(connected(name, spec, self.selected(&spec.of)?.values(), width)?)
             }
             Some(Region::Combine(Combine { op, of })) => {
-                // selections lie in 0..1, so the value that leaves the others as they are is 1 for the product and the
-                // minimum, 0 for the maximum
-                let none = match op {
-                    CombineOp::Multiply | CombineOp::Min => 1.0,
-                    CombineOp::Max => 0.0,
-                };
-                let mut combined = vec![none; height * width];
-                for other in of {
-                    for (value, other) in combined.iter_mut().zip(self.selected(other)?.values()) {
-                        *value = match op {
-                            CombineOp::Multiply => *value * other,
-                            CombineOp::Min => value.min(*other),
-                            CombineOp::Max => value.max(*other),
-                        };
-                    }
-                }
-                selection(combined)
+                let layers = of
+                    .iter()
+                    .map(|other| self.selected(other))
+                    .collect::<Result<Vec<_>, _>>()?;
+                selection(combined(*op, height * width, &layers))
             }
+            Some(Region::Colour(spec)) => selection(near(spec, picture)),
             Some(Region::LinearGradient(LinearGradient { angle })) => {
                 selection(gradient::linear((height, width), 0..height, *angle))
             }
@@ -327,6 +316,34 @@ impl Evaluator {
             }
         }
     }
+}
+
+/// The selections `layers`, each of `len` values, put together by `op`.
+fn combined(op: CombineOp, len: usize, layers: &[Arc<Layer>]) -> Vec<f32> {
+    // selections lie in 0..1, so the value that leaves the others as they are is 1 for the product and the minimum, 0 for
+    // the maximum
+    let none = match op {
+        CombineOp::Multiply | CombineOp::Min => 1.0,
+        CombineOp::Max => 0.0,
+    };
+    let mut combined = vec![none; len];
+    for other in layers {
+        for (value, other) in combined.iter_mut().zip(other.values()) {
+            *value = match op {
+                CombineOp::Multiply => *value * other,
+                CombineOp::Min => value.min(*other),
+                CombineOp::Max => value.max(*other),
+            };
+        }
+    }
+    combined
+}
+
+/// How near each pixel of `picture`, the working picture as `light` reads it, is to the colour of `spec`: 1 within its
+/// `tolerance` of the target, falling to 0 over its `feather`.
+fn near(spec: &Colour, picture: &Picture<'_>) -> Vec<f32> {
+    let distance = color::oklab_distance(picture.pixels(), spec.target.0);
+    bands::band(&distance, 0.0, spec.tolerance, spec.feather)
 }
 
 /// The pieces and their number that the region `name` (`spec`) makes of the selection `values`, `width` wide: the

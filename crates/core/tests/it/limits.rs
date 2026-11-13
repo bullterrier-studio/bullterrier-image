@@ -908,6 +908,7 @@ const COSTLESS: &[(&str, &str)] = &[
     ("context", "a share of a piece's own size, within the picture"),
     ("threshold", "a comparison"),
     ("min_area", "a comparison"),
+    ("tolerance", "a comparison"),
     ("low", "a comparison"),
     ("high", "a comparison"),
     ("feather", "a comparison"),

@@ -1,10 +1,14 @@
 //! The region kinds made from other regions or from the picture: [`Pick`], [`Subject`], [`Band`], [`Bands`],
-//! [`Components`], [`Combine`], [`LinearGradient`], [`RadialGradient`] and [`Given`].
+//! [`Components`], [`Combine`], [`Colour`], [`LinearGradient`], [`RadialGradient`] and [`Given`].
 
 use std::fmt;
 
-use serde::de::Visitor;
+use serde::de::{Error as _, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
+
+use crate::Constraint;
+use crate::params::Color;
 
 /// One piece a [`Pick`] chooses.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -228,6 +232,41 @@ impl Default for Combine {
             of: vec![String::new(); 2],
         }
     }
+}
+
+/// A selection of the pixels near a colour: 1 within `tolerance` of `target`, falling to 0 over `feather` beyond. The
+/// distance is Euclidean in Oklab, where equal distances look about equally different and black to white is 1. It is
+/// read from the photo as framed and sized, before any step, as `light` is.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Colour {
+    /// The colour looked for: `'#rrggbb'`, `'#rgb'` or three numbers from 0 to 1 (sRGB).
+    #[serde(deserialize_with = "target")]
+    pub target: Color,
+    /// How far from `target` a pixel may be and still be chosen fully, 0 to 1, as a distance in Oklab (black to white is
+    /// 1; two similar shades of one colour are about 0.1 apart). Raising it takes in more shades; 0 chooses only the
+    /// exact colour.
+    pub tolerance: f64,
+    /// The extra distance beyond `tolerance` over which the selection falls linearly from 1 to 0, 0 to 1, in the same
+    /// distance. Raising it softens the edge; 0 cuts hard.
+    pub feather: f64,
+}
+
+impl Default for Colour {
+    /// Black, within 0.1, falling off over 0.05 more.
+    fn default() -> Self {
+        Self {
+            target: Color::default(),
+            tolerance: 0.1,
+            feather: 0.05,
+        }
+    }
+}
+
+/// A `target` as a person writes it, refused naming the field and the value.
+fn target<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Color, D::Error> {
+    let value = Value::deserialize(deserializer)?;
+    Color::parse(&value).ok_or_else(|| D::Error::custom(format!("`target` {}, got {value}", Constraint::Colour)))
 }
 
 /// A selection that rises evenly across the picture in one direction: 0 at one edge, 1 at the opposite one.

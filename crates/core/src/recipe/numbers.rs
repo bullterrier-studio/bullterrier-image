@@ -235,6 +235,25 @@ pub(crate) const REGION_ROWS: &[(&str, &[Row])] = &[
         ],
     ),
     (
+        "colour",
+        &[
+            real(
+                "tolerance",
+                "fraction",
+                0.0,
+                1.0,
+                "How far from `target` a pixel may be and still be chosen fully (0 to 1), as a share of the Oklab distance from black to white. Raising it takes in more shades of the colour; 0 chooses only the exact colour.",
+            ),
+            real(
+                "feather",
+                "fraction",
+                0.0,
+                1.0,
+                "The extra distance beyond `tolerance` over which the selection falls linearly from 1 to 0 (0 to 1), in the same distance. Raising it softens the edge; 0 cuts hard.",
+            ),
+        ],
+    ),
+    (
         "linear_gradient",
         &[turn(
             "angle",

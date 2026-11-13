@@ -446,6 +446,47 @@ fn rows() -> Vec<(&'static str, Value, Option<&'static str>)> {
             json!({"of": []}),
             Some("`of` needs at least 2 entries, got 0"),
         ),
+        // colour: a target of three channels 0..1 (or hex), a tolerance and a feather from 0 to 1
+        (
+            "colour",
+            json!({"target": [0, 0.5, 1], "tolerance": 0, "feather": 0}),
+            None,
+        ),
+        (
+            "colour",
+            json!({"target": "#ff8000", "tolerance": 1, "feather": 1}),
+            None,
+        ),
+        (
+            "colour",
+            json!({"tolerance": -0.1}),
+            Some("`tolerance` must be >= 0, got -0.1"),
+        ),
+        (
+            "colour",
+            json!({"tolerance": 1.5}),
+            Some("`tolerance` must be <= 1, got 1.5"),
+        ),
+        (
+            "colour",
+            json!({"feather": -0.1}),
+            Some("`feather` must be >= 0, got -0.1"),
+        ),
+        (
+            "colour",
+            json!({"feather": 1.5}),
+            Some("`feather` must be <= 1, got 1.5"),
+        ),
+        (
+            "colour",
+            json!({"target": [0, 0.5, 1.5]}),
+            Some("`target` must be '#rrggbb', '#rgb' or three numbers from 0 to 1, got [0,0.5,1.5]"),
+        ),
+        (
+            "colour",
+            json!({"target": "#12"}),
+            Some("`target` must be '#rrggbb', '#rgb' or three numbers from 0 to 1, got \"#12\""),
+        ),
         // gradients
         ("linear_gradient", json!({"angle": 0}), None),
         ("linear_gradient", json!({"angle": 360}), None),

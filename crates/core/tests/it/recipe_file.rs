@@ -198,6 +198,11 @@ fn bad() -> Vec<(&'static str, &'static str, &'static str)> {
             "`kind` 'band' needs `format = 3`",
         ),
         (
+            "format 2 has no colour region",
+            "format = 2\n[region.p]\nkind = \"colour\"\n[[step]]\neffect = \"a\"\n",
+            "`kind` 'colour' needs `format = 3`",
+        ),
+        (
             "format 2 has no given region",
             "format = 2\n[region.p]\nkind = \"given\"\n[[step]]\neffect = \"a\"\n",
             "needs `format = 3`",
@@ -419,6 +424,10 @@ fn the_features_of_each_format_read_in_the_format_that_has_them() {
         ("a step name in format 3", format!("format = 3\n{named}")),
         ("a band region in format 3", format!("format = 3\n{}", region("band"))),
         ("a given region in format 3", format!("format = 3\n{}", region("given"))),
+        (
+            "a colour region in format 3",
+            format!("format = 3\n{}", region("colour")),
+        ),
     ] {
         let result = read(&text);
         assert!(result.is_ok(), "{what}: {result:?}");
