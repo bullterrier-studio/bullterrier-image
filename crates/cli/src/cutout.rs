@@ -28,17 +28,21 @@ pub(crate) struct Args {
     /// its transparency, or a black-and-white mask, white = subject); cutout takes no other map.
     #[arg(long = "map", value_name = "NAME=PICTURE", value_parser = crate::photo::spec)]
     maps: Vec<(String, PathBuf)>,
-    /// What finds the subject: vision (Apple Vision, macOS only) or onnx (a portable model, downloaded on first use);
+    /// What finds the subject: vision (Apple Vision, macOS only), onnx (a portable model, downloaded on first use) or sam2
+    /// (finds what `--point` and `--box` point at, no guess; downloaded on first use);
     /// default: `BT_IMAGE_SEGMENTER`, else vision on macOS and onnx elsewhere.
     #[arg(long, value_parser = finders::segmenter)]
     segmenter: Option<bullterrier_image_finders::Segmenter>,
+    #[command(flatten)]
+    clicks: finders::Clicks,
 }
 
 pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Error> {
     let photo = read(&args.photo)?.over_white();
     let given = Maps {
-        maps: args.maps.clone(),
+        files: args.maps.clone(),
         segmenter: args.segmenter,
+        clicks: finders::Clicks::default(),
     };
     let mut maps = read_maps(&given)?;
     if let Some(other) = maps.keys().find(|name| *name != "subject") {
@@ -64,7 +68,12 @@ pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Err
             args.shrink.unwrap_or(DEFAULT_EDGE.0),
             args.feather.unwrap_or(DEFAULT_EDGE.1),
         );
-        let finder = subject_finder(args.segmenter, &Options::from_env(ModelKind::Subject), edge)?;
+        let finder = subject_finder(
+            args.segmenter,
+            &Options::from_env(ModelKind::Subject),
+            edge,
+            args.clicks.prompts()?.as_ref(),
+        )?;
         finder.find(&photo.as_picture())?
     };
     let colour = photo.as_picture();

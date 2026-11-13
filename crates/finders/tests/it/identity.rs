@@ -2,7 +2,8 @@
 
 use bullterrier_image::Error;
 use bullterrier_image::finding::onnx::Options;
-use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET};
+use bullterrier_image::finding::prompted::{Point, Prompts};
+use bullterrier_image::finding::{DEPTH_ANYTHING_V2_SMALL, IS_NET, SAM2_DECODER, SAM2_ENCODER};
 use bullterrier_image_finders::{Segmenter, depth_identity, subject_identity};
 
 type Outcome = Result<(), Box<dyn std::error::Error>>;
@@ -48,7 +49,7 @@ fn model_part(sha256: &str) -> String {
 fn the_standard_models_have_the_identity_of_their_catalogued_checksum_and_the_runtime_without_being_downloaded()
 -> Outcome {
     let options = Options::new().with_library(library()?);
-    let subject = subject_identity(Some(Segmenter::Onnx), &options)?;
+    let subject = subject_identity(Some(Segmenter::Onnx), &options, None)?;
     let depth = depth_identity(&options)?;
     assert!(subject.starts_with(&model_part(IS_NET.sha256)), "{subject}");
     assert!(
@@ -76,6 +77,7 @@ fn a_local_model_has_the_identity_of_its_content_not_of_its_place() -> Outcome {
         subject_identity(
             Some(Segmenter::Onnx),
             &Options::new().with_library(&library).with_model_file(path),
+            None,
         )
     };
     assert!(identity(&one)?.starts_with(&model_part(ABC)));
@@ -105,7 +107,7 @@ fn a_local_model_that_is_no_file_is_refused_naming_it() {
 #[cfg(target_os = "macos")]
 #[test]
 fn on_macos_the_identity_of_apple_vision_names_the_macos_version_and_is_no_portable_models() -> Outcome {
-    let vision = subject_identity(Some(Segmenter::Vision), &Options::new())?;
+    let vision = subject_identity(Some(Segmenter::Vision), &Options::new(), None)?;
     assert!(
         vision.starts_with("vision:macOS 1") || vision.starts_with("vision:macOS 2"),
         "{vision}"
@@ -117,9 +119,45 @@ fn on_macos_the_identity_of_apple_vision_names_the_macos_version_and_is_no_porta
 #[cfg(not(target_os = "macos"))]
 #[test]
 fn off_macos_the_identity_of_apple_vision_is_refused_like_its_use() {
-    let refused = subject_identity(Some(Segmenter::Vision), &Options::new());
+    let refused = subject_identity(Some(Segmenter::Vision), &Options::new(), None);
     assert!(
         matches!(&refused, Err(Error::BackendUnavailable(message)) if message.contains("macOS only")),
         "{refused:?}"
     );
+}
+
+#[test]
+#[ignore = "full: needs the ONNX Runtime library file in BT_IMAGE_ONNX_LIB"]
+fn the_identity_of_sam_2_holds_all_four_checksums_and_the_prompts_exactly() -> Outcome {
+    let options = Options::new().with_library(library()?);
+    let identity = |points: Vec<(f64, f64, bool)>| -> Result<String, Error> {
+        let points = points
+            .into_iter()
+            .map(|(x, y, positive)| Point { x, y, positive })
+            .collect();
+        subject_identity(Some(Segmenter::Sam2), &options, Some(&Prompts::new(points, None)?))
+    };
+    let base = identity(vec![(0.25, 0.75, true)])?;
+    for model in [SAM2_ENCODER, SAM2_DECODER] {
+        let data = model.data.map(|data| data.sha256).unwrap_or_default();
+        assert!(
+            base.contains(model.sha256) && base.contains(data),
+            "{} in {base}",
+            model.name
+        );
+    }
+    assert!(base.starts_with("sam2:sha256 "), "{base}");
+    assert_eq!(
+        base,
+        identity(vec![(0.25, 0.75, true)])?,
+        "the same prompts, the same identity"
+    );
+    assert_ne!(base, identity(vec![(0.25, 0.7, true)])?, "another place");
+    assert_ne!(base, identity(vec![(0.25, 0.75, false)])?, "another label");
+    assert_ne!(
+        base,
+        identity(vec![(0.25, 0.75, true), (0.5, 0.5, true)])?,
+        "another click"
+    );
+    Ok(())
 }

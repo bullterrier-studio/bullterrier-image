@@ -49,7 +49,7 @@ pub(crate) fn command(args: &Args, console: &mut Console<'_>) -> Result<i32, Err
     }
     let mut given = Given::default();
     for name in wanted {
-        if let Some(found) = finders::found(&name, args.segmenter)? {
+        if let Some(found) = finders::found(&name, args.segmenter, None)? {
             given.finders.insert(name, found);
         }
     }

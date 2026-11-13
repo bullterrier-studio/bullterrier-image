@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use bullterrier_image::finding::ModelKind;
 use bullterrier_image::finding::onnx::Options;
+use bullterrier_image::finding::prompted::{Point, Prompts};
 use bullterrier_image_finders::{
     Segmenter, depth_finder, depth_identity, inverse_depth, subject_finder, subject_identity,
 };
@@ -38,19 +39,33 @@ fn options(
     options
 }
 
+/// The prompts of `points` (x, y, positive) and `bounding_box`, none when neither is given.
+fn prompts(points: Vec<(f64, f64, bool)>, bounding_box: Option<[f64; 4]>) -> PyResult<Option<Prompts>> {
+    if points.is_empty() && bounding_box.is_none() {
+        return Ok(None);
+    }
+    let points = points
+        .into_iter()
+        .map(|(x, y, positive)| Point { x, y, positive })
+        .collect();
+    Prompts::new(points, bounding_box).map(Some).map_err(core_error)
+}
+
 /// The matte of the main subject of `rgb` (a float32 `(height, width, 3)` array), the photo's size, float32 0..1.
 ///
 /// `segmenter` is `"vision"` or `"onnx"`; none leaves the choice to `BT_IMAGE_SEGMENTER`, then to the platform (Apple
 /// Vision on macOS 14 and later, the portable model elsewhere). `shrink` and `feather` (px) clean the edge. `library` is
 /// the ONNX Runtime library file to use when `BT_IMAGE_ONNX_LIB` names none; `model_file` a local copy of the model (else
 /// `BT_IMAGE_SUBJECT_MODEL`, else the cache folder `cache`, default the platform's); `allow_download` (or
-/// `BT_IMAGE_ALLOW_DOWNLOAD=1`) lets the model be downloaded when it is not there.
+/// `BT_IMAGE_ALLOW_DOWNLOAD=1`) lets the model be downloaded when it is not there. `points` (x, y, positive: shares of the
+/// photo and whether it is on what is wanted) and `box` (left, top, right, bottom) are for the `"sam2"` segmenter, which
+/// needs them and finds what they point at; no other takes them.
 ///
 /// `CoreError` of kind `subject_not_found` if nothing stands out, `backend_unavailable` for what cannot run here (the
 /// message says what to do).
 // the defaults are literals, which `DEFAULT_EDGE` equals: pyo3 shows any other expression as `...` in the signature
 #[pyfunction]
-#[pyo3(signature = (rgb, *, segmenter=None, shrink=1.5, feather=1.0, library=None, model_file=None, cache=None, allow_download=false))]
+#[pyo3(signature = (rgb, *, segmenter=None, shrink=1.5, feather=1.0, library=None, model_file=None, cache=None, allow_download=false, points=Vec::new(), r#box=None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -65,13 +80,16 @@ pub(crate) fn find_subject<'py>(
     model_file: Option<PathBuf>,
     cache: Option<PathBuf>,
     allow_download: bool,
+    points: Vec<(f64, f64, bool)>,
+    r#box: Option<[f64; 4]>,
 ) -> PyResult<Bound<'py, PyArray2<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let segmenter = segmenter.map(Segmenter::named).transpose().map_err(core_error)?;
+    let prompts = prompts(points, r#box)?;
     let onnx = options(ModelKind::Subject, library, model_file, cache, allow_download);
     let matte = py
-        .detach(|| subject_finder(segmenter, &onnx, (shrink, feather))?.find(&picture))
+        .detach(|| subject_finder(segmenter, &onnx, (shrink, feather), prompts.as_ref())?.find(&picture))
         .map_err(core_error)?;
     PyArray1::from_slice(py, matte.values()).reshape([matte.height(), matte.width()])
 }
@@ -138,20 +156,22 @@ pub(crate) fn kept_onnx_runtime(cache: Option<PathBuf>) -> PyResult<PathBuf> {
 /// (`onnx:sha256 ...`; the catalogue's for the standard model, else of the local `model_file` or
 /// `BT_IMAGE_SUBJECT_MODEL`) and the release of the ONNX Runtime library that runs it (`library` is as for `find_subject`), or
 /// the macOS version for Apple Vision (`vision:macOS ...`). `segmenter` is as for
-/// `find_subject`.
+/// `find_subject`; `points` and `box` are as there (for `"sam2"` the identity holds them exactly, `sam2:sha256 ...`).
 ///
 /// `CoreError` of kind `backend_unavailable` for an unknown segmenter, Vision where it cannot run, or a model file that
 /// is not a file.
 #[pyfunction]
-#[pyo3(signature = (*, segmenter=None, library=None, model_file=None))]
+#[pyo3(signature = (*, segmenter=None, library=None, model_file=None, points=Vec::new(), r#box=None))]
 pub(crate) fn subject_finder_identity(
     segmenter: Option<&str>,
     library: Option<PathBuf>,
     model_file: Option<PathBuf>,
+    points: Vec<(f64, f64, bool)>,
+    r#box: Option<[f64; 4]>,
 ) -> PyResult<String> {
     let segmenter = segmenter.map(Segmenter::named).transpose().map_err(core_error)?;
     let onnx = options(ModelKind::Subject, library, model_file, None, false);
-    subject_identity(segmenter, &onnx).map_err(core_error)
+    subject_identity(segmenter, &onnx, prompts(points, r#box)?.as_ref()).map_err(core_error)
 }
 
 /// What the answers of the depth finder depend on, as text: `onnx:sha256 ` and the SHA-256 of the model (the catalogue's

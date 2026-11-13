@@ -30,12 +30,15 @@ pub(crate) struct Maps {
     /// a `given` region of the recipe (a picture with transparency gives its alpha, any other its brightness); repeat
     /// for each map.
     #[arg(long = "map", value_name = "NAME=PICTURE", value_parser = spec)]
-    pub(crate) maps: Vec<(String, PathBuf)>,
-    /// What finds the subject: vision (Apple Vision, macOS only) or onnx (a portable model, downloaded on first use);
+    pub(crate) files: Vec<(String, PathBuf)>,
+    /// What finds the subject: vision (Apple Vision, macOS only), onnx (a portable model, downloaded on first use) or sam2
+    /// (finds what `--point` and `--box` point at, no guess; downloaded on first use);
     /// default: `BT_IMAGE_SEGMENTER`, else vision on macOS and onnx elsewhere. A segmenter named here is checked at once,
     /// even for a look that needs no subject.
     #[arg(long, value_parser = finders::segmenter)]
     pub(crate) segmenter: Option<Segmenter>,
+    #[command(flatten)]
+    pub(crate) clicks: finders::Clicks,
 }
 
 /// A clap value parser: `NAME=PICTURE`.
@@ -75,8 +78,9 @@ pub(crate) fn each<T>(
     if given.segmenter.is_some() {
         wanted.insert("subject".to_owned());
     }
+    let prompts = given.clicks.prompts()?;
     for name in wanted {
-        if let Some(found) = finders::found(&name, given.segmenter)? {
+        if let Some(found) = finders::found(&name, given.segmenter, prompts.as_ref())? {
             finders.insert(name, found.finder);
         }
     }
@@ -110,7 +114,7 @@ pub(crate) fn each<T>(
 /// [`Error::Recipe`] for a name given twice; whatever reading a map refuses.
 pub(crate) fn read_maps(given: &Maps) -> Result<BTreeMap<String, Layer>, Error> {
     let mut maps = BTreeMap::new();
-    for (name, path) in &given.maps {
+    for (name, path) in &given.files {
         if maps.insert(name.clone(), read_map(path)?).is_some() {
             return Err(Error::Recipe(format!("--map {name} is given twice")));
         }

@@ -3,9 +3,9 @@
 use std::path::PathBuf;
 
 use bullterrier_image::Error;
-use bullterrier_image::finding::onnx::{Options, cache_dir, is_model};
+use bullterrier_image::finding::onnx::{self, Options, cache_dir, is_model};
 use bullterrier_image::finding::runtime::{self, VERSION};
-use bullterrier_image::finding::{Model, ModelKind, download, models};
+use bullterrier_image::finding::{Model, ModelKind, models};
 use bullterrier_image_finders::{Segmenter, Vision};
 use clap::{Args as ClapArgs, ValueEnum};
 
@@ -19,6 +19,7 @@ enum Target {
 }
 
 #[derive(ClapArgs)]
+#[expect(clippy::struct_excessive_bools, reason = "the flags of the command line")]
 pub(crate) struct InstallArgs {
     /// What to install.
     #[arg(value_enum)]
@@ -26,6 +27,9 @@ pub(crate) struct InstallArgs {
     /// Also the depth model.
     #[arg(long, conflicts_with = "runtime_only")]
     depth: bool,
+    /// Also the SAM 2 models (about 910 MB), which find what `--point` and `--box` point at (`--segmenter sam2`).
+    #[arg(long, conflicts_with = "runtime_only")]
+    prompted: bool,
     /// Only the ONNX Runtime library, no model.
     #[arg(long)]
     runtime_only: bool,
@@ -55,7 +59,8 @@ fn file_of(model: &Model, cache: &std::path::Path) -> PathBuf {
 fn kind_name(kind: ModelKind) -> &'static str {
     match kind {
         ModelKind::Subject => "subject",
-        _ => "depth",
+        ModelKind::Depth => "depth",
+        _ => "prompted",
     }
 }
 
@@ -84,13 +89,13 @@ pub(crate) fn models_command(args: &CacheArgs, console: &mut Console<'_>) -> Res
             "  {}: {} model, {} MB, {}",
             model.name,
             kind_name(model.kind),
-            megabytes(model.size),
+            megabytes(model.size + model.data.map_or(0, |data| data.size)),
             standing(model, &cache)
         ))?;
         console.result(&format!("    url: {}", model.url))?;
         console.result(&format!("    sha256: {}", model.sha256))?;
     }
-    console.result("\n`bt-image install onnx` downloads the ONNX Runtime library and the subject model (add --depth for the depth model).")?;
+    console.result("\n`bt-image install onnx` downloads the ONNX Runtime library and the subject model (add --depth for the depth model, --prompted for the SAM 2 models).")?;
     Ok(0)
 }
 
@@ -101,7 +106,14 @@ pub(crate) fn install_command(args: &InstallArgs, console: &mut Console<'_>) -> 
     let library = runtime::path(&cache, release);
     let wanted: Vec<&Model> = models()
         .iter()
-        .filter(|model| !args.runtime_only && (model.kind == ModelKind::Subject || args.depth))
+        .filter(|model| {
+            !args.runtime_only
+                && match model.kind {
+                    ModelKind::Subject => true,
+                    ModelKind::Depth => args.depth,
+                    _ => args.prompted,
+                }
+        })
         .filter(|model| standing(model, &cache) != "installed")
         .collect();
     let library_needed = !library.is_file();
@@ -113,11 +125,13 @@ pub(crate) fn install_command(args: &InstallArgs, console: &mut Console<'_>) -> 
     if library_needed {
         plan.push(format!("ONNX Runtime {VERSION} ({} MB)", megabytes(release.size)));
     }
-    plan.extend(
-        wanted
-            .iter()
-            .map(|model| format!("the {} model ({} MB)", model.name, megabytes(model.size))),
-    );
+    plan.extend(wanted.iter().map(|model| {
+        format!(
+            "the {} model ({} MB)",
+            model.name,
+            megabytes(model.size + model.data.map_or(0, |data| data.size))
+        )
+    }));
     let question = format!("download {} into {}?", plan.join(" and "), cache.display());
     if !args.yes && !console.confirm(&question)? {
         console.problem("nothing downloaded")?;
@@ -131,7 +145,7 @@ pub(crate) fn install_command(args: &InstallArgs, console: &mut Console<'_>) -> 
     for model in wanted {
         let file = file_of(model, &cache);
         console.progress(&format!("downloading the {} model from {}...", model.name, model.url))?;
-        download::fetch(model.url, model.sha256, model.size, &file)?;
+        onnx::download_model(model, &file)?;
         console.result(&format!("{}: {}", model.name, file.display()))?;
     }
     Ok(0)
@@ -141,9 +155,9 @@ pub(crate) fn doctor_command(args: &CacheArgs, console: &mut Console<'_>) -> Res
     let cache = cache_of(args.cache.as_ref())?;
     console.result(&format!("cache folder: {}", cache.display()))?;
     let chosen = Segmenter::from_env()?.unwrap_or_else(Segmenter::default_here);
-    let name = if chosen == Segmenter::Vision { "vision" } else { "onnx" };
     console.result(&format!(
-        "subject finder in use: {name} (BT_IMAGE_SEGMENTER or this platform's choice)"
+        "subject finder in use: {} (BT_IMAGE_SEGMENTER or this platform's choice)",
+        chosen.name()
     ))?;
     let vision = match Vision::new() {
         Ok(_) => "works".to_owned(),
@@ -161,9 +175,15 @@ pub(crate) fn doctor_command(args: &CacheArgs, console: &mut Console<'_>) -> Res
     };
     console.result(&format!("ONNX Runtime {VERSION}: {library}"))?;
     let mut onnx_ready = library.starts_with("works");
+    // the models the subject finder in use runs: SAM 2's two, or IS-Net
+    let in_use = if chosen == Segmenter::Sam2 {
+        ModelKind::Prompted
+    } else {
+        ModelKind::Subject
+    };
     for model in models() {
         let stands = standing(model, &cache);
-        onnx_ready = onnx_ready && (model.kind != ModelKind::Subject || stands == "installed");
+        onnx_ready = onnx_ready && (model.kind != in_use || stands == "installed");
         console.result(&format!("{} model ({}): {stands}", model.name, kind_name(model.kind)))?;
     }
     let works = if chosen == Segmenter::Vision {
@@ -178,7 +198,15 @@ pub(crate) fn doctor_command(args: &CacheArgs, console: &mut Console<'_>) -> Res
         console.problem("the subject finder in use (Apple Vision) does not work: see above; BT_IMAGE_SEGMENTER=onnx uses the portable model")?;
         Ok(1)
     } else {
-        console.problem("the subject finder in use (onnx) does not work: run `bt-image install onnx`")?;
+        let install = if chosen == Segmenter::Sam2 {
+            "bt-image install onnx --prompted"
+        } else {
+            "bt-image install onnx"
+        };
+        console.problem(&format!(
+            "the subject finder in use ({}) does not work: run `{install}`",
+            chosen.name()
+        ))?;
         Ok(1)
     }
 }

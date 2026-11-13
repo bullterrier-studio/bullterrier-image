@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use ort::session::Session as OrtSession;
 use ort::value::Tensor as OrtTensor;
 
-use super::onnx::{Options, model_file, open_session};
+use super::onnx::{Options, cached_file, open_session};
 use super::prompted::{Answer, PromptedFinder, Prompts, Query, Segment};
 use super::{SAM2_DECODER, SAM2_ENCODER, Tensor};
 use crate::Error;
@@ -25,16 +25,16 @@ struct Sam2 {
 ///
 /// # Errors
 /// [`Error::BackendUnavailable`] as [`onnx::finder`](super::onnx::finder) says, and for a local model file in `options`: SAM 2
-/// is two files, kept in the cache folder only.
+/// is two files, kept in the cache folder only (`BT_IMAGE_SUBJECT_MODEL` is for IS-Net and is not read).
 pub fn finder(options: &Options, prompts: Prompts) -> Result<PromptedFinder, Error> {
-    if let Some(local) = options.model_file() {
+    if let Some(local) = options.explicit_model_file() {
         return Err(Error::BackendUnavailable(format!(
             "SAM 2 is two model files and takes no local copy ({}): keep them in the cache folder",
             local.display()
         )));
     }
-    let encoder = model_file(&SAM2_ENCODER, options)?;
-    let decoder = model_file(&SAM2_DECODER, options)?;
+    let encoder = cached_file(&SAM2_ENCODER, options)?;
+    let decoder = cached_file(&SAM2_DECODER, options)?;
     let library = super::runtime::library(options, &options.cache_folder()?)?;
     let session = Sam2 {
         encoder: Mutex::new(open_session(&library, &encoder)?),

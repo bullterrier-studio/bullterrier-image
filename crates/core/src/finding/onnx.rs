@@ -151,6 +151,11 @@ impl Options {
         self.cache.clone().map_or_else(cache_dir, Ok)
     }
 
+    /// The local copy a caller named with [`with_model_file`](Self::with_model_file), not one an environment variable named.
+    pub(super) fn explicit_model_file(&self) -> Option<&Path> {
+        self.model_file().filter(|_| self.model_variable.is_none())
+    }
+
     /// The local copy of the model these options name, if any.
     #[must_use]
     pub fn model_file(&self) -> Option<&Path> {
@@ -276,10 +281,15 @@ pub fn local_model<'a>(model: &Model, options: &'a Options) -> Result<Option<&'a
 
 /// The file of `model`: the local copy named by `options`, else the one in the cache folder, downloaded if it is not
 /// there and `options` allow.
-pub(super) fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
+fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
     if let Some(local) = local_model(model, options)? {
         return Ok(local.to_path_buf());
     }
+    cached_file(model, options)
+}
+
+/// The file of `model` in the cache folder, downloaded if it is not there and `options` allow.
+pub(super) fn cached_file(model: &Model, options: &Options) -> Result<PathBuf, Error> {
     let cache = match &options.cache {
         Some(folder) => folder.clone(),
         None => cache_dir()?,
@@ -289,11 +299,17 @@ pub(super) fn model_file(model: &Model, options: &Options) -> Result<PathBuf, Er
         return Ok(file);
     }
     if !options.allow_download {
+        let (megabytes, also) = match &model.data {
+            Some(data) => (
+                (model.size + data.size) / 1_000_000,
+                format!(" and {} as {}", data.url, data_file(&file).display()),
+            ),
+            None => (model.size / 1_000_000, String::new()),
+        };
         return Err(Error::BackendUnavailable(format!(
-            "the {} model ({} MB) is not in {}: allow downloading it (BT_IMAGE_ALLOW_DOWNLOAD=1, or the option of the \
-             call), or download {} by hand and save it as that file, or point to a local copy",
+            "the {} model ({megabytes} MB) is not in {}: allow downloading it (BT_IMAGE_ALLOW_DOWNLOAD=1, or the option of \
+             the call), or download {}{also} by hand and save it as that file, or point to a local copy",
             model.name,
-            model.size / 1_000_000,
             cache.display(),
             model.url
         )));
