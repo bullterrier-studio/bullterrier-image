@@ -273,6 +273,10 @@ pub(crate) fn trace<'py>(
 /// there are and the nearest.
 #[pyfunction]
 #[pyo3(signature = (rgb, recipe, name, *, maps=None, finders=None, presets=None, size=None))]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the arguments are the Python function's keywords"
+)]
 pub(crate) fn region_map<'py>(
     py: Python<'py>,
     rgb: &Bound<'py, PyAny>,
