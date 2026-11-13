@@ -42,7 +42,7 @@ the result is laid over its input by `ops/blend` (blend mode, opacity, mask), an
 profile converted to sRGB), `read_map`, `write` and `write_with_quality` (png, jpg, webp; only the sRGB profile
 embedded); a fixed pixel limit and a decoder memory cap; `ErrorKind::ImageRead`, `ImageWrite` and `BackendUnavailable`.
 `imageio.py` calls them through `core/native.py` and keeps what is Python's (composite over white, array checks). `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
-for every binding). **Regions:** `Recipe.regions` is an ordered `Regions` of the 13 typed kinds in `bullterrier_image::region`
+for every binding). **Regions:** `Recipe.regions` is an ordered `Regions` of the 15 typed kinds in `bullterrier_image::region`
 (`Region`, `kind` required; ranges in `Region::check`); `Recipe::needs(&Presets) -> Needs { maps, finds_pieces }` and
 `Recipe::known_maps()` say what a photo must be given or find. Maps are found before step 1; every other region is made the first
 time a step asks (`run/regions.rs`, `Evaluator`) and dropped after the last step that needs it. `each` is `run/each.rs`

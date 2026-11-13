@@ -1196,6 +1196,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   look has one meaning at every resolution; `max_pieces` (1 to 10000, as a `Pick`) refuses a speckled selection by
   count after the small ones are dropped. The labelling is an iterative flood fill in `ops/components.rs`, 40 lines: no
   crate (`imageproc` has one, but is an imaging library with picture types of its own, for a single function).
+- **`colour` is a selection by Oklab distance, read from the photo, not from a step.** A band of `light` cannot cut what
+  differs from its surround by hue (panes darker and brighter than a brick wall); a colour range can, and with `band` and
+  `components` finds windows, signs or foliage. The distance is Euclidean in Oklab (`ops::colorspace`, already the repo's
+  perceptual space), so `tolerance` and `feather` mean one thing at any hue and are shares of the black-to-white distance
+  (1). The ramp is `bands::band` over the distances (low 0, high `tolerance`), not a second feather. It reads the working
+  picture before any step, as `light` does, so like every region it is made once for the whole picture and bands
+  identically. `target` takes a frame fill's forms (`'#rrggbb'`, `'#rgb'`, three numbers). Default `target` is black, not
+  "must be set": black is a colour, and Python's `fill` defaults to it too.
 - **A field is a selection read for its values; `band`, `bands` and `combine` cut and join fields, `light` and two
   gradients make them.** A selection is already a float map 0..1, so no second concept is declared: a field is whatever
   selection a region's `of` names, built in (`depth`, `light`, `subject`) or the recipe's own. `band` (a selection)
@@ -1210,8 +1218,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   "depth"`, `"depth_bands"`) are `band` and `bands` with `of = "depth"` (`far` is `low`, `near` is `high`; the same
   values give the same pixels), recipe format 3 adds the new kinds and a file of format 2 that uses them, or still uses
   the old ones, is refused saying what to write; `light` is a built-in region name, so none may be declared with it.
-  Left out until a recipe needs them: edges, saturation and colour distance as fields, `1 - x`, and a feathered gradient
-  shape.
+  Left out until a recipe needs them: edges and saturation as fields, `1 - x`, and a feathered gradient shape.
 - **Every number has an address: `Recipe.parameters()` lists them, `Recipe.with_values()` sets them.** An address is
   `<step>.<number>`, `<step>.<number>.start|end|levels` for a driven number, `<step>.opacity`, `each.looks[0].<number>`
   for a look, `region.<name>.<number>` and `frame.<number>`; a step is its optional `name`, else its effect (`each` for an
