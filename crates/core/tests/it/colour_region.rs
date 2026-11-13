@@ -2,7 +2,9 @@
 //! Pictures are synthesised from known colours. The oracles are hand computations: the published Oklab of the sRGB
 //! primaries (Ottosson, to four places) and the lightness of a grey (the cube root of its linear level, its a and b being 0).
 
-use bullterrier_image::{Error, Input, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::params::Color;
+use bullterrier_image::region::Colour;
+use bullterrier_image::{Error, Input, Options, Photo, Picture, Presets, Recipe, Region, Step};
 use proptest::prelude::*;
 use serde_json::{Value, json};
 
@@ -116,6 +118,29 @@ fn a_tolerance_of_0_with_no_feather_chooses_only_the_exact_colour() -> Outcome {
     let got = selection(&pixels, 5, &colour(target, 0.0, 0.0), &[])?;
     assert_eq!(got, [1.0, 0.0, 0.0, 0.0, 1.0]);
     Ok(())
+}
+
+#[test]
+fn a_target_built_in_code_with_a_channel_outside_0_to_1_or_not_a_number_is_refused_naming_region_field_and_value() {
+    let refusal = |target: [f32; 3]| {
+        let region = Region::from(Colour {
+            target: Color(target),
+            ..Colour::default()
+        });
+        region.check_shape("brick").err().map(|error| error.to_string())
+    };
+    for (target, field, value) in [
+        ([1.5, 0.0, 0.0], "`target[0]` must be <= 1", "got 1.5"),
+        ([0.0, -0.25, 0.0], "`target[1]` must be >= 0", "got -0.25"),
+        ([0.0, 0.0, f32::NAN], "`target[2]` must be a finite number", "got NaN"),
+    ] {
+        let said = refusal(target).unwrap_or_default();
+        assert!(
+            ["region 'brick'", field, value].iter().all(|part| said.contains(part)),
+            "{target:?}: {said:?}"
+        );
+    }
+    assert_eq!(refusal([0.0, 0.5, 1.0]), None, "the edges of the range are colours");
 }
 
 #[test]
