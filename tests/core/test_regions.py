@@ -15,6 +15,7 @@ from bullterrier_image.core.steps import Recipe, Step
 from bullterrier_image.recipe import (
     Band,
     Bands,
+    Colour,
     Combine,
     Components,
     Curve,
@@ -46,6 +47,8 @@ BAD_VALUES = {
     "low above high": (Band, {"low": 0.6, "high": 0.3}, r"low.*0\.6.*high.*0\.3"),
     "a band count named by its kind as a recipe writes it": (Bands, {"count": 0}, "^region .bands.: .*count"),
     "no piece allowed in components": (Components, {"max_pieces": 0}, "^region .components.: .*max_pieces"),
+    "a tolerance past 1": (Colour, {"tolerance": 1.5}, r"^region .colour.: .*tolerance.*1\.5"),
+    "a target that is no colour": (Colour, {"target": "#12"}, r"^region .colour.: .*target.*#12"),
     "a combination named by its kind as a recipe writes it": (Combine, {"op": "xor"}, "^region .combine.: .*op"),
     "a gradient named by its kind as a recipe writes it": (
         LinearGradient,
@@ -117,6 +120,7 @@ def test_a_preset_sets_the_fields_and_a_field_given_beside_it_wins():
         Bands,
         Components,
         Combine,
+        Colour,
         LinearGradient,
         RadialGradient,
     ],

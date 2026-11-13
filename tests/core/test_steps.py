@@ -26,6 +26,7 @@ from bullterrier_image.loader import load_recipe
 from bullterrier_image.recipe import (
     Band,
     Bands,
+    Colour,
     Cuts,
     Each,
     Edge,
@@ -872,6 +873,7 @@ REGION_KINDS = {
     "subject": Subject(threshold=0.3),
     "band": Band(of="depth", low=0.2),
     "bands": Bands(of="depth", count=3),
+    "colour": Colour(target="#8a3b2e", tolerance=0.2),
     "linear_gradient": LinearGradient(angle=30),
     "radial_gradient": RadialGradient(radius=0.7),
 }

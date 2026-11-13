@@ -45,17 +45,18 @@ Regions (format 2). A `[region.NAME]` table declares a region by its `kind`: `gr
 (`count`, `jitter`, `impact`, `focus`, `seed`, `preset`), `cuts` (`lines`: tables `{x, y, angle}` or `{path}`), `path`
 (`d`), `svg` (`file`, relative to the recipe file), `pick` (`of`, `pieces`: numbers or svg ids), `subject` (`per`,
 `context`, `threshold`) and, from format 3, `band` (`of`, `low`, `high`, `feather`), `bands` (`of`, `count`),
-`components` (`of`, `threshold`, `min_area`, `max_pieces`), `combine` (`op`, `of`), `linear_gradient` (`angle`),
-`radial_gradient` (`x`, `y`, `radius`) and `given` (no fields); they are the fields of `Grid`, `Shards`, `Cuts`,
-`Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Components`, `Combine`, `LinearGradient`, `RadialGradient` and
-`Given`. `fit` lays a grid, shards, cuts, path or svg over a selection and `edge` is a table (`style`, `amount` and
-`scale` in px, `seed`) that tears the borders. A *partition* (a grid, shards, cuts, svg or bands) cuts the picture into
-numbered pieces, a *selection* (a `path`, a `pick`, a `subject`, a `band`, a `combine`, a gradient, a `given` map or
-the built-in `subject`, `background`, `depth` and `light`) chooses pixels; a `subject` with `per` finds the subject
-inside each piece of a partition. `band`, `bands` and `combine` are made of another selection named by `of`, read for
-its values: the built-in `depth` (1 = nearest), `light` (the picture's brightness) or any other (bands are numbered
-highest first). Steps name regions: `mask` (a selection) limits a step to it, and `partition` names the partition an
-effect such as `seams` draws. A step with `each` (a partition) and `looks` gives every piece its own look:
+`components` (`of`, `threshold`, `min_area`, `max_pieces`), `combine` (`op`, `of`), `colour` (`target`, `tolerance`,
+`feather`), `linear_gradient` (`angle`), `radial_gradient` (`x`, `y`, `radius`) and `given` (no fields); they are the
+fields of `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Components`, `Combine`,
+`Colour`, `LinearGradient`, `RadialGradient` and `Given`. `fit` lays a grid, shards, cuts, path or svg over a selection
+and `edge` is a table (`style`, `amount` and `scale` in px, `seed`) that tears the borders. A *partition* (a grid,
+shards, cuts, svg or bands) cuts the picture into numbered pieces, a *selection* (a `path`, a `pick`, a `subject`, a
+`band`, a `combine`, a `colour`, a gradient, a `given` map or the built-in `subject`, `background`, `depth` and `light`)
+chooses pixels; a `subject` with `per` finds the subject inside each piece of a partition. `band`, `bands` and `combine`
+are made of another selection named by `of`, read for its values: the built-in `depth` (1 = nearest), `light` (the
+picture's brightness) or any other (bands are numbered highest first). Steps name regions: `mask` (a selection) limits a
+step to it, and `partition` names the partition an effect such as `seams` draws. A step with `each` (a partition) and
+`looks` gives every piece its own look:
 
     [[step]]
     each = "panes"                 # a partition
@@ -65,8 +66,8 @@ effect such as `seams` draws. A step with `each` (a partition) and `looks` gives
     mask = "subject"               # as on any step; `opacity` and `blend_mode` apply to the blended looks
 
 Regions and `each` steps need `format = 2`; a file without `format`, or with `format = 1`, may not use them. The region
-kinds `given` (a map handed in at render time), `band`, `bands`, `components`, `combine`, `linear_gradient` and
-`radial_gradient` need `format = 3`.
+kinds `given` (a map handed in at render time), `band`, `bands`, `components`, `combine`, `colour`, `linear_gradient`
+and `radial_gradient` need `format = 3`.
 
 A number an effect declares drivable (its documentation says "(drivable)") may be a table instead of a value, which
 varies it across the picture by a field (format 3): `radius = { by = "near", start = 0, end = 30 }` is 0 where the field

@@ -1,10 +1,10 @@
 """Recipes: the one public place to import everything about them from.
 
 A recipe is an ordered list of effects (written in Python or in a small TOML file) that is run on a photo, and the
-regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Components`, `Combine`,
-`LinearGradient`, `RadialGradient`, `Given`) its steps name: `mask` limits a step to one, `Each` gives each piece of
-one its own look. The machinery lives in `bullterrier_image.core` (`steps`, and `bridge`, which runs a recipe in the
-Rust core) and `bullterrier_image.loader`; this module re-exports its public names and binds what the core leaves open:
+regions (`Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Components`, `Combine`, `Colour`,
+`LinearGradient`, `RadialGradient`, `Given`) its steps name: `mask` limits a step to one, `Each` gives each piece of one
+its own look. The machinery lives in `bullterrier_image.core` (`steps`, and `bridge`, which runs a recipe in the Rust
+core) and `bullterrier_image.loader`; this module re-exports its public names and binds what the core leaves open:
 how the subject and the depth are found. When a recipe will ask for the subject (it needs the subject and no `subject`
 map is given, or it finds the subject piece by piece) and `finders` has no `subject`, `render`, `trace` and
 `render_all` find it with `bullterrier_image.finding.subject.subject_finder()`; when a recipe needs depth and neither a
@@ -28,6 +28,7 @@ from .core.regions import (
     FOUND_MAPS,
     Band,
     Bands,
+    Colour,
     Combine,
     Components,
     Curve,
@@ -53,6 +54,7 @@ from .loader import load_recipe
 __all__ = [
     "Band",
     "Bands",
+    "Colour",
     "Combine",
     "Components",
     "Curve",

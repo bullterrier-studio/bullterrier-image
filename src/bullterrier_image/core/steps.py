@@ -527,9 +527,9 @@ class Recipe:
         file name of it.
     description: what the look looks like, in a sentence, or None.
     regions: the regions the steps can name besides the built-in `subject`, `background`, `depth` and `light`: a name
-        for each `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Components`,
-        `Combine`, `LinearGradient`, `RadialGradient` or `Given` (see `bullterrier_image.core.regions`). They are
-        checked here, and made for each picture only when a step uses them.
+        for each `Grid`, `Shards`, `Cuts`, `Path`, `Svg`, `Pick`, `Subject`, `Band`, `Bands`, `Components`, `Combine`,
+        `Colour`, `LinearGradient`, `RadialGradient` or `Given` (see `bullterrier_image.core.regions`). They are checked
+        here, and made for each picture only when a step uses them.
     size: longest side of the working image in px, 1 or more (at most 67,108,864 pixels); None (the default) keeps
         the photo's own size. The photo
         is framed first (flip, turn, crop, borders) and then scaled. It only sets how big the result is: the recipe's

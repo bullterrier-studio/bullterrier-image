@@ -54,6 +54,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     from .recipe import (
         Band,
         Bands,
+        Colour,
         Combine,
         Components,
         Curve,
@@ -102,9 +103,9 @@ _HOMES = {
     ".imageio": ("palette",),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
-        "Band", "Bands", "Combine", "Components", "Cuts", "Curve", "Drive", "Each", "Edge", "Finder", "Framing",
-        "Given", "Grid", "Line", "LinearGradient", "Parameter", "Path", "Pick", "RadialGradient", "Recipe", "Shards",
-        "Stage", "Step", "Subject", "Svg", "load_recipe", "looks", "render", "render_all", "trace",
+        "Band", "Bands", "Colour", "Combine", "Components", "Cuts", "Curve", "Drive", "Each", "Edge", "Finder",
+        "Framing", "Given", "Grid", "Line", "LinearGradient", "Parameter", "Path", "Pick", "RadialGradient", "Recipe",
+        "Shards", "Stage", "Step", "Subject", "Svg", "load_recipe", "looks", "render", "render_all", "trace",
     ),
 }  # fmt: skip
 _HOME = {name: module for module, names in _HOMES.items() for name in names}
@@ -143,6 +144,7 @@ __all__ = [
     "Band",
     "Bands",
     "BullterrierImageError",
+    "Colour",
     "Combine",
     "Components",
     "Curve",
