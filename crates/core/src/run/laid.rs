@@ -4,7 +4,6 @@
 use std::fs::File;
 use std::io::Read;
 
-use super::size;
 use crate::ops::cuts::{self, Cut as Laid};
 use crate::ops::noise::{self, Tear};
 use crate::ops::outlines::{self, Frame, Limits};
@@ -24,13 +23,12 @@ pub(super) struct Bend {
 
 impl Bend {
     /// The bend of `edge` over `picture`, none if the edge is straight or tears by nothing. The edge's px are design px, so
-    /// they are scaled by the picture's size, and its noise is laid on the frame: the same tear at any size.
-    pub(super) fn of(edge: &Edge, picture: &Picture<'_>) -> Option<Self> {
+    /// they are scaled by `ratio`, the working pixels per design pixel, and its noise is laid on the frame: the same tear at any size.
+    pub(super) fn of(edge: &Edge, picture: &Picture<'_>, ratio: f64) -> Option<Self> {
         if edge.style == EdgeStyle::Straight || edge.amount == 0.0 {
             return None;
         }
         let (height, width) = (picture.height(), picture.width());
-        let ratio = size::ratio_of(picture);
         let long_side = length::float(height.max(width));
         let tear = Tear {
             scale_share: edge.scale * ratio / long_side,
@@ -91,9 +89,10 @@ pub(super) fn grid(
     spec: &Grid,
     fit: Option<&Layer>,
     picture: &Picture<'_>,
+    ratio: f64,
 ) -> Result<(Vec<i32>, usize), Error> {
     let frame = frame(name, spec.fit.as_deref(), fit, picture)?;
-    let bend = Bend::of(&spec.edge, picture);
+    let bend = Bend::of(&spec.edge, picture, ratio);
     Ok(grid::grid(
         picture.height(),
         picture.width(),
@@ -110,14 +109,20 @@ pub(super) fn grid(
 /// # Errors
 /// As [`frame`]; [`Error::Recipe`] naming the region if the path data cannot be drawn (see [`outlines::path`]) or would
 /// take too long to fill.
-pub(super) fn path(name: &str, spec: &Path, fit: Option<&Layer>, picture: &Picture<'_>) -> Result<Vec<f32>, Error> {
+pub(super) fn path(
+    name: &str,
+    spec: &Path,
+    fit: Option<&Layer>,
+    picture: &Picture<'_>,
+    ratio: f64,
+) -> Result<Vec<f32>, Error> {
     let (height, width) = (picture.height(), picture.width());
     let bounds = frame(name, spec.fit.as_deref(), fit, picture)?;
     let limits = Limits::STANDARD;
     let shape = outlines::path(&spec.d, in_px(bounds), &limits).map_err(|said| refuse(name, &said))?;
     let covered = raster::coverage(height, width, &shape, spec.samples as usize, limits.crossings)
         .map_err(|said| refuse(name, &said))?;
-    Ok(match Bend::of(&spec.edge, picture) {
+    Ok(match Bend::of(&spec.edge, picture, ratio) {
         None => covered,
         Some(bend) => raster::read_bent(&covered, height, width, bend.shifts()),
     })
@@ -134,6 +139,7 @@ pub(super) fn cuts(
     spec: &Cuts,
     fit: Option<&Layer>,
     picture: &Picture<'_>,
+    ratio: f64,
 ) -> Result<(Vec<i32>, usize), Error> {
     let frame = in_px(frame(name, spec.fit.as_deref(), fit, picture)?);
     let limits = Limits::STANDARD;
@@ -150,7 +156,7 @@ pub(super) fn cuts(
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|said| refuse(name, &said))?;
-    let bend = Bend::of(&spec.edge, picture);
+    let bend = Bend::of(&spec.edge, picture, ratio);
     cuts::pieces(
         picture.height(),
         picture.width(),
@@ -173,6 +179,7 @@ pub(super) fn shards(
     spec: &Shards,
     fit: Option<&Layer>,
     picture: &Picture<'_>,
+    ratio: f64,
 ) -> Result<(Vec<i32>, usize), Error> {
     let frame = in_px(frame(name, spec.fit.as_deref(), fit, picture)?);
     let honeycomb = Honeycomb {
@@ -184,7 +191,7 @@ pub(super) fn shards(
     };
     let (height, width) = (picture.height(), picture.width());
     let seeds = sites::sites(&honeycomb, frame, fit.map(Layer::values), height, width);
-    let bend = Bend::of(&spec.edge, picture);
+    let bend = Bend::of(&spec.edge, picture, ratio);
     Ok(nearest::cells(height, width, &seeds, bend.as_ref().map(Bend::shifts)))
 }
 
@@ -212,7 +219,13 @@ fn read_limited(file: &str, max_kilobytes: u32) -> Result<Vec<u8>, String> {
 /// # Errors
 /// As [`frame`]; [`Error::Recipe`] naming the region and the file (its name only) if there is no `file`, it cannot be read, or
 /// the drawing is refused (see [`svg::read`]) or would take too long to paint.
-pub(super) fn svg(name: &str, spec: &Svg, fit: Option<&Layer>, picture: &Picture<'_>) -> Result<Pieces, Error> {
+pub(super) fn svg(
+    name: &str,
+    spec: &Svg,
+    fit: Option<&Layer>,
+    picture: &Picture<'_>,
+    ratio: f64,
+) -> Result<Pieces, Error> {
     let frame = in_px(frame(name, spec.fit.as_deref(), fit, picture)?);
     if spec.file.is_empty() {
         return Err(refuse(name, "`file` is not set: name the svg file to read"));
@@ -224,7 +237,7 @@ pub(super) fn svg(name: &str, spec: &Svg, fit: Option<&Layer>, picture: &Picture
     let limits = Limits::STANDARD;
     let bytes = read_limited(&spec.file, spec.max_kilobytes).map_err(|said| refused(&said))?;
     let drawing = svg::read(&bytes, frame, spec.max_shapes, &limits).map_err(|said| refused(&said))?;
-    let bend = Bend::of(&spec.edge, picture);
+    let bend = Bend::of(&spec.edge, picture, ratio);
     drawing
         .pieces(
             picture.height(),

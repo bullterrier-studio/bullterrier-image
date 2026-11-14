@@ -40,6 +40,8 @@ pub(super) struct Evaluator {
     due: BTreeMap<usize, Vec<String>>,
     /// The photo's subject finder, which a region that finds the subject in each piece asks about crops of the picture.
     finder: Option<Arc<dyn Finder>>,
+    /// Working pixels per design pixel, which the edges of the regions drawn over the picture are scaled by.
+    ratio: f64,
 }
 
 /// The refusal of a `Subject` region with `per` (the region `name`, finding the subject in the pieces of `per`) when
@@ -74,12 +76,13 @@ pub(super) fn check_makeable<'a>(
 
 impl Evaluator {
     /// The evaluator of the `declared` regions of a recipe, holding `held`, the maps of the photo that the steps use, and
-    /// told by `last` when each region is no longer needed. `finder` is the photo's subject finder, if it has one (see
+    /// told by `last` when each region is no longer needed. `ratio` is the working pixels per design pixel. `finder` is the photo's subject finder, if it has one (see
     /// [`check_finder`]).
     pub(super) fn new(
         declared: &Regions,
         held: BTreeMap<String, Arc<Layer>>,
         last: BTreeMap<String, usize>,
+        ratio: f64,
         finder: Option<Arc<dyn Finder>>,
     ) -> Self {
         let mut due: BTreeMap<usize, Vec<String>> = BTreeMap::new();
@@ -98,6 +101,7 @@ impl Evaluator {
             used: last.into_keys().collect(),
             due,
             finder,
+            ratio,
         }
     }
 
@@ -257,19 +261,19 @@ impl Evaluator {
             }
             Some(Region::Grid(spec)) => {
                 let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
-                partition(laid::grid(name, spec, fit.as_deref(), picture)?)
+                partition(laid::grid(name, spec, fit.as_deref(), picture, self.ratio)?)
             }
             Some(Region::Shards(spec)) => {
                 let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
-                partition(laid::shards(name, spec, fit.as_deref(), picture)?)
+                partition(laid::shards(name, spec, fit.as_deref(), picture, self.ratio)?)
             }
             Some(Region::Cuts(spec)) => {
                 let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
-                partition(laid::cuts(name, spec, fit.as_deref(), picture)?)
+                partition(laid::cuts(name, spec, fit.as_deref(), picture, self.ratio)?)
             }
             Some(Region::Path(spec)) => {
                 let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
-                selection(laid::path(name, spec, fit.as_deref(), picture)?)
+                selection(laid::path(name, spec, fit.as_deref(), picture, self.ratio)?)
             }
             // the subject of the whole picture is the built-in one, which is held
             Some(Region::Subject(Subject { per: None, .. })) => self.selected("subject").map(Made::Selection),
@@ -304,7 +308,7 @@ impl Evaluator {
             }
             Some(Region::Svg(spec)) => {
                 let fit = spec.fit.as_deref().map(|fit| self.selected(fit)).transpose()?;
-                let drawn = laid::svg(name, spec, fit.as_deref(), picture)?;
+                let drawn = laid::svg(name, spec, fit.as_deref(), picture, self.ratio)?;
                 Labels::new(height, width, drawn.labels, drawn.count).map(|labels| Made::Pieces {
                     labels: Arc::new(labels),
                     ids: Arc::new(drawn.ids),

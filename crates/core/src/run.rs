@@ -237,7 +237,7 @@ impl<'a> Photo<'a> {
             options.size().or(recipe.size),
             given_subject.as_deref(),
         )?;
-        let ratio = working.ratio();
+        let ratio = working.ratio(options.canvas())?;
         let maps = Maps::new(self, recipe, &working)?;
         // as the working picture has it, which a trace shows like a map a step uses
         let framed_subject = needs_subject.then(|| maps.get("subject", "`frame`")).transpose()?;
@@ -273,6 +273,7 @@ impl<'a> Photo<'a> {
                 &recipe.regions,
                 held,
                 last,
+                ratio,
                 self.finders.get("subject").map(Found::finder),
             ),
         })

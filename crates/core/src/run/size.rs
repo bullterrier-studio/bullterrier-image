@@ -12,12 +12,6 @@ use crate::{Error, Frame, Image, Layer, Picture};
 /// The longest side in px that a recipe's pixel values are written for.
 const DESIGN_SIZE: f64 = 480.0; // constant: the design size of the format, Python's `DESIGN_SIZE`
 
-/// Working pixels per design pixel of the working `picture`: its longest side over [`DESIGN_SIZE`]. The one decision of how
-/// a length in a recipe follows the size of the picture.
-pub(super) fn ratio_of(picture: &Picture<'_>) -> f64 {
-    length::float(picture.height().max(picture.width())) / DESIGN_SIZE
-}
-
 /// What a render is asked for besides the recipe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -25,6 +19,7 @@ pub struct Options {
     size: Option<u32>,
     threads: usize,
     band: Option<NonZeroUsize>,
+    canvas: Option<(u32, u32)>,
 }
 
 impl Default for Options {
@@ -34,6 +29,7 @@ impl Default for Options {
             size: None,
             threads: 1,
             band: None,
+            canvas: None,
         }
     }
 }
@@ -109,6 +105,25 @@ impl Options {
     pub const fn with_band(mut self, rows: NonZeroUsize) -> Self {
         self.band = Some(rows);
         self
+    }
+
+    /// These options with `canvas`, the full canvas that the picture the render returns is placed on, `width` x `height`
+    /// in px of that picture. The render's `px` values then scale by the canvas's longest side over 480 instead of the
+    /// picture's own, so that the pictures placed on one canvas, whatever their sizes, share a length: a `px` value means
+    /// the same number of output pixels on each. Nothing else changes: the picture is not resized, and an effect that
+    /// works out its place in the picture still takes the picture as the whole.
+    ///
+    /// The render is refused, naming `canvas`, for a side of 0 and for a canvas smaller than the picture the render
+    /// returns on either side (after `size`), before anything runs. A canvas of the picture's own size is no canvas.
+    #[must_use]
+    pub const fn with_canvas(mut self, width: u32, height: u32) -> Self {
+        self.canvas = Some((width, height));
+        self
+    }
+
+    /// The canvas asked for, if any, as width and height.
+    pub(super) const fn canvas(self) -> Option<(u32, u32)> {
+        self.canvas
     }
 
     /// The rows a band is, if the render is banded.
@@ -188,9 +203,23 @@ impl<'a> Working<'a> {
         self.made.as_ref().map_or(self.given, Image::as_picture)
     }
 
-    /// Working pixels per design pixel: see [`ratio_of`].
-    pub(super) fn ratio(&self) -> f64 {
-        ratio_of(&self.picture())
+    /// Working pixels per design pixel, the one decision of how a length in a recipe follows the size of the picture: the
+    /// longest side over [`DESIGN_SIZE`], of the `canvas` (width, height) the picture is placed on, else of the picture.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] for a canvas smaller than the picture on a side, which a side of 0 always is.
+    pub(super) fn ratio(&self, canvas: Option<(u32, u32)>) -> Result<f64, Error> {
+        let picture = self.picture();
+        let (height, width) = (picture.height(), picture.width());
+        let Some((canvas_width, canvas_height)) = canvas else {
+            return Ok(length::float(height.max(width)) / DESIGN_SIZE);
+        };
+        if (canvas_width as usize) < width || (canvas_height as usize) < height {
+            return Err(Error::Recipe(format!(
+                "`canvas` {canvas_width} x {canvas_height} must hold the picture, {width} x {height}"
+            )));
+        }
+        Ok(f64::from(canvas_width.max(canvas_height)) / DESIGN_SIZE)
     }
 
     /// `map`, a map of the photo as given, as a map of the working picture: the map itself if the picture is the photo,

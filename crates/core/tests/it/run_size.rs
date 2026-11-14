@@ -4,8 +4,9 @@
 use std::sync::{Arc, Mutex};
 
 use crate::common::Outcome;
-use crate::common::pictures::ramp;
+use crate::common::pictures::{ramp, varied};
 use crate::common::run::{Finds, Recorder, Registered};
+use bullterrier_image::region::{Edge, EdgeStyle, Grid, Pick, Shares};
 use bullterrier_image::{Error, ErrorKind, Image, Input, Layer, Options, Photo, Picture, Presets, Recipe, Stage, Step};
 
 /// A recorder that declares the size ratio and one field parameter, `near`.
@@ -285,4 +286,136 @@ fn a_size_of_0_a_size_too_large_to_hold_is_refused_before_anything_runs() -> Out
     }
     assert_eq!(recorder.received().len(), 0);
     Ok(())
+}
+
+/// A one-step recipe of the recorder, which says the ratio it is handed.
+fn handed_ratio(photo: &Photo<'_>, options: Options) -> Result<Option<f64>, Error> {
+    let recorder = Registered::new(Recorder::new(&[Input::SizeRatio], &[]))?;
+    render(photo, &Recipe::new([Step::new(recorder.name())]), options)?;
+    Ok(recorder.received().pop().map(|received| received.size_ratio))
+}
+
+#[test]
+fn a_canvas_sets_the_ratio_of_design_pixels_to_its_longest_side_over_480() -> Outcome {
+    // (the photo's height and width, the size asked for, the canvas width and height, the ratio): the canvas's longest
+    // side counts, wide or tall, and it is in the pixels of the picture the render returns, so after the size
+    for (height, width, size, canvas, ratio) in [
+        (3, 480, None, (960, 3), 2.0),
+        (3, 480, None, (480, 3), 1.0),
+        (3, 480, None, (500, 960), 2.0),
+        (3, 480, Some(240), (480, 3), 1.0),
+        (6, 480, Some(240), (240, 120), 0.5),
+    ] {
+        let values = vec![0.5; height * width * 3];
+        let photo = Photo::new(Picture::new(height, width, &values)?);
+        let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
+        let handed = handed_ratio(&photo, options.with_canvas(canvas.0, canvas.1))?;
+        assert_eq!(handed, Some(ratio), "{height} x {width} at {size:?} on {canvas:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_canvas_the_size_of_the_picture_is_no_canvas() -> Outcome {
+    let (height, width) = (24, 32);
+    let values = varied(height, width);
+    let photo = Photo::new(Picture::new(height, width, &values)?);
+    let recipe = Recipe::new([Step::new("gaussian_blur").param("radius", 40.0)]).with_region(
+        "panes",
+        Grid {
+            edge: torn(6.0, 48.0),
+            ..Grid::default()
+        },
+    );
+    let plain = render(&photo, &recipe, Options::default())?.into_values();
+    let placed = render(&photo, &recipe, Options::default().with_canvas(32, 24))?.into_values();
+    assert!(plain == placed, "a canvas of the picture's own size changed the render");
+    Ok(())
+}
+
+#[test]
+fn a_length_of_a_step_on_a_canvas_twice_the_picture_is_that_length_doubled() -> Outcome {
+    let (height, width) = (24, 32);
+    let values = varied(height, width);
+    let photo = Photo::new(Picture::new(height, width, &values)?);
+    let blur = |radius: f64| Recipe::new([Step::new("gaussian_blur").param("radius", radius)]);
+    let doubled = render(&photo, &blur(80.0), Options::default())?.into_values();
+    let placed = render(&photo, &blur(40.0), Options::default().with_canvas(64, 48))?.into_values();
+    let alone = render(&photo, &blur(40.0), Options::default())?.into_values();
+    assert!(
+        doubled == placed,
+        "a blur of 40 px on a canvas twice the picture is not a blur of 80 px"
+    );
+    assert!(alone != placed, "the canvas changed nothing");
+    Ok(())
+}
+
+#[test]
+fn the_torn_edge_of_a_region_follows_the_canvas_as_a_length_does() -> Outcome {
+    let (height, width) = (24, 32);
+    let values = varied(height, width);
+    let photo = Photo::new(Picture::new(height, width, &values)?);
+    let torn_panes = |amount: f64, scale: f64| {
+        Recipe::new([Step::new("grade").param("exposure", 1.0).mask("one")])
+            .with_region(
+                "panes",
+                Grid {
+                    edge: torn(amount, scale),
+                    columns: Shares::equal(2),
+                    rows: Shares::equal(2),
+                    ..Grid::default()
+                },
+            )
+            .with_region(
+                "one",
+                Pick {
+                    of: "panes".to_owned(),
+                    pieces: vec![1.into()],
+                },
+            )
+    };
+    let doubled = render(&photo, &torn_panes(12.0, 96.0), Options::default())?.into_values();
+    let placed = render(&photo, &torn_panes(6.0, 48.0), Options::default().with_canvas(64, 48))?.into_values();
+    let alone = render(&photo, &torn_panes(6.0, 48.0), Options::default())?.into_values();
+    assert!(
+        doubled == placed,
+        "the edge of a region on a canvas twice the picture is not an edge twice as wide"
+    );
+    assert!(alone != placed, "the canvas changed nothing");
+    Ok(())
+}
+
+#[test]
+fn a_canvas_with_a_side_of_zero_or_smaller_than_the_picture_is_refused_naming_it() -> Outcome {
+    let values = ramp(4, 6);
+    let photo = Photo::new(Picture::new(4, 6, &values)?);
+    let recipe = Recipe::new([Step::new("grade")]);
+    // (the size asked for, the canvas width and height): 4 x 6 is 8 x 12 at size 12, which no canvas of 6 x 4 holds
+    for (size, canvas) in [
+        (None, (0, 4)),
+        (None, (6, 0)),
+        (None, (5, 4)),
+        (None, (6, 3)),
+        (Some(12), (6, 4)),
+    ] {
+        let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
+        let result = render(&photo, &recipe, options.with_canvas(canvas.0, canvas.1));
+        assert!(
+            matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe && error.to_string().contains("`canvas`")),
+            "{canvas:?} at {size:?}: {result:?}"
+        );
+    }
+    Ok(())
+}
+
+/// A torn edge of `amount` and `scale` design px.
+fn torn(amount: f64, scale: f64) -> Edge {
+    Edge {
+        style: EdgeStyle::Torn,
+        amount,
+        scale,
+        seed: 7,
+        octaves: 3,
+        persistence: 0.25,
+    }
 }
