@@ -1,10 +1,12 @@
-//! The numbers of a recipe by address (`Recipe::numbers`, `number`, `with_value`): what a sweep varies. Expected values
+//! The numbers of a recipe by address (`Recipe::numbers`, `number`, `with_value`, `with_values`): what a sweep varies. Expected values
 //! are worked out by hand from the recipe and the ranges the effects, regions and frame document.
 
 use bullterrier_image::region::{
     Band, Bands, ColorRange, Components, LinearGradient, RadialGradient, Shards, Subject, Svg,
 };
-use bullterrier_image::{Drive, Each, Entry, Error, Frame, Home, Presets, Recipe, Region, Step};
+use bullterrier_image::{
+    Drive, Each, Entry, Error, Frame, Home, Layer, Options, Photo, Picture, Presets, Recipe, Region, Step,
+};
 use serde_json::{Value, json};
 
 use crate::common::Outcome;
@@ -647,4 +649,217 @@ fn every_direction_rotation_and_length_of_a_region_or_the_frame_keeps_the_conven
         assert!(have.contains(listed), "{listed} is listed but is no number");
     }
     Ok(())
+}
+
+// --- `with_values`: several numbers at once, all or nothing -----------------------------------------------------------
+
+/// Recipes that between them have every kind of address: a plain step, a named step, a driven number, an each step with
+/// looks, a region and the frame, and two steps of one effect.
+fn recipes() -> Result<Vec<(&'static str, Recipe)>, Error> {
+    let from = |text: Value| Recipe::from_json(&text.to_string());
+    Ok(vec![
+        ("plain", pulse()),
+        (
+            "named",
+            from(json!({"steps": [{"effect": "grade", "name": "pulse", "params": {"exposure": 0.3}}]}))?,
+        ),
+        (
+            "driven",
+            from(
+                json!({"steps": [{"effect": "grade", "params": {"exposure": {"by": "depth", "start": 0.0, "end": 1.0}}}]}),
+            )?,
+        ),
+        (
+            "each",
+            from(json!({
+                "steps": [{"each": "panes", "looks": [{"effect": "grade", "params": {"exposure": 0.1}}, null], "feather": 0.5}],
+                "regions": {"panes": {"kind": "grid"}},
+            }))?,
+        ),
+        (
+            "region and frame",
+            from(json!({
+                "steps": [{"effect": "grade", "mask": "near"}],
+                "regions": {"near": {"kind": "band", "of": "subject", "low": 0.2, "high": 0.6}},
+                "frame": {"angle": 30.0},
+            }))?,
+        ),
+        (
+            "two of one effect",
+            from(
+                json!({"steps": [{"effect": "grade", "params": {"exposure": 0.1}}, {"effect": "grade", "params": {"exposure": 0.2}}]}),
+            )?,
+        ),
+    ])
+}
+
+/// What `recipe` renders on a small picture, as bits, so that a difference of one bit is seen.
+fn bits(recipe: &Recipe) -> Result<Vec<u32>, Error> {
+    let values: Vec<f32> = (0..4 * 6 * 3_u16).map(|at| f32::from(at % 7) / 7.0).collect();
+    let ramp: Vec<f32> = (0..24_u16).map(|at| f32::from(at) / 24.0).collect();
+    let photo = Photo::new(Picture::new(4, 6, &values)?)
+        .with_map("subject", Layer::new(4, 6, ramp.clone())?)?
+        .with_map("depth", Layer::new(4, 6, ramp)?)?;
+    let out = photo.render(recipe, &Presets::new(), Options::default())?;
+    Ok(out.into_values().into_iter().map(f32::to_bits).collect())
+}
+
+#[test]
+fn setting_every_number_to_its_own_value_gives_the_same_recipe() -> Outcome {
+    for (kind, recipe) in recipes()? {
+        let before = recipe.numbers()?;
+        let own: Vec<(&str, f64)> = before
+            .iter()
+            .filter_map(|number| Some((number.address.as_str(), number.value?)))
+            .collect();
+        assert!(own.len() > 3, "{kind}: {own:?}");
+        let same = recipe.with_values(&own, &Presets::new())?;
+        assert_eq!(same.numbers()?, before, "{kind}");
+        assert_eq!(bits(&same)?, bits(&recipe)?, "{kind} renders differently");
+        for (address, value) in own {
+            let one = recipe.with_value(address, value, &Presets::new())?;
+            assert_eq!(one.numbers()?, before, "{kind}: {address}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_new_value_changes_exactly_that_number() -> Outcome {
+    let rows = [
+        ("plain", "grade.exposure", 0.9),
+        ("plain", "grade.opacity", 0.5),
+        ("named", "pulse.exposure", -0.4),
+        ("named", "grade.exposure", -0.4), // the effect reaches a named step that is the only one
+        ("driven", "grade.exposure.start", 0.25),
+        ("driven", "grade.exposure.end", 0.75),
+        ("driven", "grade.exposure.levels", 8.0),
+        ("each", "each.looks[0].exposure", 0.6),
+        ("each", "each.feather", 2.0),
+        ("each", "each.seed", 5.0),
+        ("region and frame", "region.near.low", 0.4),
+        ("region and frame", "frame.angle", 400.0),
+        ("two of one effect", "grade#2.exposure", 0.9),
+    ];
+    let all = recipes()?;
+    for (kind, address, value) in rows {
+        let recipe = &all.iter().find(|(name, _)| *name == kind).ok_or(kind)?.1;
+        let before = recipe.numbers()?;
+        let after = recipe.with_values(&[(address, value)], &Presets::new())?.numbers()?;
+        let at = recipe.number(address)?.address;
+        assert_eq!(before.len(), after.len(), "{kind}: {address}");
+        for (was, now) in before.iter().zip(&after) {
+            if was.address == at {
+                assert_eq!(now.value, Some(value), "{kind}: {address}");
+            } else {
+                assert_eq!(was, now, "{kind}: {address} changed {}", was.address);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn several_numbers_are_set_together_and_a_rule_between_them_holds_for_the_set() -> Outcome {
+    let recipe = &recipes()?[4].1; // band low 0.2, high 0.6
+    let presets = Presets::new();
+    let moved = recipe.with_values(
+        &[
+            ("region.near.low", 0.7),
+            ("region.near.high", 0.9),
+            ("grade.exposure", 0.5),
+        ],
+        &presets,
+    )?;
+    let value = |address: &str| moved.number(address).map(|number| number.value);
+    assert_eq!(
+        (
+            value("region.near.low")?,
+            value("region.near.high")?,
+            value("grade.exposure")?
+        ),
+        (Some(0.7), Some(0.9), Some(0.5))
+    );
+    let said = refused(recipe.with_values(&[("region.near.low", 0.5), ("region.near.high", 0.3)], &presets));
+    assert!(
+        said.contains("'region.near.low', 'region.near.high'"),
+        "neither is wrong alone, the pair is: {said}"
+    );
+    Ok(())
+}
+
+#[test]
+fn nothing_is_set_unless_every_value_is_accepted() -> Outcome {
+    let recipe = pulse();
+    let before = recipe.numbers()?;
+    let presets = Presets::new();
+    for values in [
+        [("grade.exposure", 0.5), ("grade.contrast", 99.0)],
+        [("grade.contrast", 99.0), ("grade.exposure", 0.5)],
+        [("grade.exposure", 0.5), ("grade.nope", 1.0)],
+        [("grade.exposure", 0.5), ("grade.opacity", f64::NAN)],
+    ] {
+        let said = refused(recipe.with_values(&values, &presets));
+        assert!(!said.is_empty(), "{values:?} was accepted");
+        assert!(!said.contains("grade.exposure"), "a good value is blamed: {said}");
+    }
+    assert_eq!(recipe.numbers()?, before, "the recipe itself is left as it is");
+    Ok(())
+}
+
+#[test]
+fn a_value_out_of_its_range_is_refused_naming_the_address_the_range_and_the_value_never_clamped() -> Outcome {
+    let contrast = pulse().number("grade.contrast")?;
+    let presets = Presets::new();
+    for beyond in [contrast.max + 1.0, contrast.min - 1.0] {
+        let said = refused(pulse().with_values(&[("grade.contrast", beyond)], &presets));
+        assert!(
+            said.contains("'grade.contrast'") && said.contains("`contrast`") && said.contains(&format!("{beyond}")),
+            "{said}"
+        );
+        assert!(
+            said.contains(&format!("{}", contrast.max)) || said.contains(&format!("{}", contrast.min)),
+            "the range is named: {said}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_whole_number_takes_a_whole_value_written_as_a_float_and_refuses_a_fraction() -> Outcome {
+    let recipe = Recipe::new([Step::new("slice_shift")]);
+    let presets = Presets::new();
+    let set = recipe.with_values(&[("slice_shift.bands", 3.0)], &presets)?;
+    assert_eq!(set.number("slice_shift.bands")?.value, Some(3.0));
+    let said = refused(recipe.with_values(&[("slice_shift.bands", 3.5)], &presets));
+    assert!(
+        said.contains("'slice_shift.bands'") && said.contains("whole number") && said.contains("3.5"),
+        "{said}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_cyclic_angle_takes_any_value_and_two_addresses_of_one_number_are_refused() -> Outcome {
+    let presets = Presets::new();
+    let turned = pulse().with_values(&[("frame.angle", -725.0)], &presets)?;
+    assert_eq!(turned.number("frame.angle")?.value, Some(-725.0));
+    let named = Recipe::from_json(&json!({"steps": [{"effect": "grade", "name": "pulse"}]}).to_string())?;
+    let said = refused(named.with_values(&[("pulse.exposure", 0.1), ("grade.exposure", 0.2)], &presets));
+    assert!(
+        said.contains("'pulse.exposure' and 'grade.exposure'") && said.contains("same number"),
+        "{said}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_unknown_address_among_good_ones_lists_what_is_valid_and_the_nearest() {
+    let said = refused(pulse().with_values(&[("grade.exposure", 0.5), ("grade.exposur", 0.1)], &Presets::new()));
+    assert!(
+        said.contains("'grade.exposur'")
+            && said.contains("its numbers:")
+            && said.contains("did you mean grade.exposure"),
+        "{said}"
+    );
 }

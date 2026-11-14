@@ -18,7 +18,7 @@ use crate::{Error, Presets};
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct Number {
-    /// Where it is: see [`Recipe::with_value`].
+    /// Where it is: see [`Recipe::with_values`].
     pub address: String,
     /// Its value now, or none for an optional number the recipe leaves unset (the frame's `aspect`). A number a step does not
     /// write is at its effect's default.
@@ -619,51 +619,94 @@ impl Recipe {
         Ok(Located { place, rest, number })
     }
 
-    /// A copy of the recipe with the number at `address` (see [`number`](Self::number)) set to `value`; the recipe itself is
-    /// left as it is. A whole number takes a whole `value`, a cyclic angle any, and a number of a drive is set through its
-    /// `.start`, `.end` or `.levels`. The result is checked (with `presets`) as any recipe is, so a value out of its range
-    /// is refused naming the address, the number and the range, never clamped.
+    /// [`with_values`](Self::with_values) for the one number at `address` (see [`number`](Self::number)).
     ///
     /// # Errors
-    /// [`Error::Recipe`] naming the address for an address that points at nothing (listing what is there), a driven number
-    /// set by itself, a `.start` of a number that is not driven, a `value` that is not finite or not whole where it must
-    /// be, or a value the recipe refuses; [`Error::UnknownEffect`] for a step of an effect that is not registered.
+    /// As [`with_values`](Self::with_values).
     pub fn with_value(&self, address: &str, value: f64, presets: &Presets) -> Result<Self, Error> {
-        let (target, rest, row) = self.reach(address)?;
-        let refuse = |why: String| Error::Recipe(format!("{}: {why}", q(address)));
-        if !value.is_finite() {
-            return Err(refuse(format!("{value} is not a finite number")));
-        }
-        let written = if row.whole {
-            if value.fract() != 0.0 {
-                return Err(refuse(format!("{} is a whole number, got {value}", q(&rest))));
+        self.with_values(&[(address, value)], presets)
+    }
+
+    /// A copy of the recipe with each number at an address of `values` (see [`number`](Self::number)) set to its value; the
+    /// recipe itself is left as it is, and nothing is set unless every value is accepted. A whole number takes a whole value
+    /// (`3.0`), a cyclic angle any, and a number of a drive is set through its `.start`, `.end` or `.levels`. The result is
+    /// checked (with `presets`) as any recipe is, once, with all the values in: a value out of its range is refused naming
+    /// the address, the number and the range, never clamped, and a rule between numbers set together holds for the set.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] naming the address for an address that points at nothing (listing what is there), two addresses
+    /// that reach one number, a driven number set by itself, a `.start` of a number that is not driven, a value that is not
+    /// finite or not whole where it must be, or a value the recipe refuses (naming the addresses whose values it refuses,
+    /// or all of them when only the set breaks a rule); [`Error::UnknownEffect`] for a step of an effect that is not
+    /// registered.
+    pub fn with_values(&self, values: &[(&str, f64)], presets: &Presets) -> Result<Self, Error> {
+        let json = self.written(values)?;
+        let check = |json: &Value| Self::from_json(&json.to_string()).and_then(|changed| changed.checked(presets));
+        check(&json).map_err(|error| {
+            let alone = |(address, value): &(&str, f64)| {
+                self.written(&[(address, *value)])
+                    .and_then(|json| check(&json))
+                    .is_err()
+            };
+            let mut blamed: Vec<&str> = values
+                .iter()
+                .filter(|each| alone(each))
+                .map(|(address, _)| *address)
+                .collect();
+            if blamed.is_empty() {
+                blamed = values.iter().map(|(address, _)| *address).collect();
             }
-            #[expect(
-                clippy::cast_possible_truncation,
-                reason = "a whole value of a range that fits an i64"
-            )]
-            Value::from(value as i64)
-        } else {
-            Value::from(value)
-        };
-        let mut json = serde_json::to_value(self).map_err(|error| refuse(error.to_string()))?;
-        let slot = match &target {
-            Home::Step(index) => {
-                let step = &mut json["steps"][*index];
-                step_slot(step, &rest).ok_or_else(|| refuse(format!("{} is not set in this step", q(&rest))))?
+            let blamed: Vec<String> = blamed.into_iter().map(q).collect();
+            Error::Recipe(format!("{}: {error}", blamed.join(", ")))
+        })
+    }
+
+    /// The recipe in its JSON form with each number of `values` written, not yet checked as a recipe.
+    fn written(&self, values: &[(&str, f64)]) -> Result<Value, Error> {
+        let mut json = serde_json::to_value(self).map_err(|error| Error::Recipe(error.to_string()))?;
+        let mut reached: Vec<(Home, String, &str)> = Vec::new();
+        for &(address, value) in values {
+            let (target, rest, row) = self.reach(address)?;
+            let refuse = |why: String| Error::Recipe(format!("{}: {why}", q(address)));
+            if let Some((_, _, first)) = reached.iter().find(|(home, name, _)| *home == target && *name == rest) {
+                return Err(Error::Recipe(format!(
+                    "{} and {} reach the same number: give it one value",
+                    q(first),
+                    q(address)
+                )));
             }
-            Home::Region(name) => &mut json["regions"][name][&rest],
-            Home::Frame => {
-                if json.get("frame").is_none() {
-                    json["frame"] = Value::Object(Map::new());
+            if !value.is_finite() {
+                return Err(refuse(format!("{value} is not a finite number")));
+            }
+            let written = if row.whole {
+                if value.fract() != 0.0 {
+                    return Err(refuse(format!("{} is a whole number, got {value}", q(&rest))));
                 }
-                &mut json["frame"][&rest]
-            }
-        };
-        *slot = written;
-        Self::from_json(&json.to_string())
-            .and_then(|changed| changed.checked(presets))
-            .map_err(|error| refuse(error.to_string()))
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "a whole value of a range that fits an i64"
+                )]
+                Value::from(value as i64)
+            } else {
+                Value::from(value)
+            };
+            let slot = match &target {
+                Home::Step(index) => {
+                    let step = &mut json["steps"][*index];
+                    step_slot(step, &rest).ok_or_else(|| refuse(format!("{} is not set in this step", q(&rest))))?
+                }
+                Home::Region(name) => &mut json["regions"][name][&rest],
+                Home::Frame => {
+                    if json.get("frame").is_none() {
+                        json["frame"] = Value::Object(Map::new());
+                    }
+                    &mut json["frame"][&rest]
+                }
+            };
+            *slot = written;
+            reached.push((target, rest, address));
+        }
+        Ok(json)
     }
 
     /// What `address` points at: the step, region or frame, the rest of the address, and the number there.
@@ -798,7 +841,13 @@ fn step_slot<'a>(step: &'a mut Value, rest: &str) -> Option<&'a mut Value> {
         return Some(&mut step[rest]);
     }
     if let Some((name, part)) = rest.split_once('.') {
-        return step.get_mut("params")?.get_mut(name)?.get_mut(part);
+        return Some(
+            step.get_mut("params")?
+                .get_mut(name)?
+                .as_object_mut()?
+                .entry(part)
+                .or_insert(Value::Null),
+        );
     }
     if step.get("params").is_none() {
         step["params"] = Value::Object(Map::new());
