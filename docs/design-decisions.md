@@ -599,6 +599,14 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   working picture's longest side over 480, and is carried in the frame (`Place`); there is no public setter. A public
   `Options::with_canvas` is a later, additive change when a caller (video, placing a tile on a larger canvas) needs it.
   `Place { canvas_height, canvas_width, first_row }` is an input an effect declares like `size_ratio`.
+- **Built: `Options::with_canvas(width, height)` (design scale from the canvas).** The "later, additive change" above, asked
+  for by a caller that places a layer picture on a larger canvas (`bullterrier-scene`). *Reason:* a length in px is a length
+  on the canvas, so it must be the same number of output pixels on every layer of one canvas; the working picture's own side
+  would give a smaller layer a finer grain than its neighbour. The canvas is in the picture's output pixels (the ratio stays a
+  derived value, never an input). It reaches effects, `each` feathers and region edges alike, through the one ratio the runner
+  derives; `Place` still describes the picture (canvas size and first row for position-aware effects wait for the banded render).
+  Python is not exposed yet: a `canvas=(width, height)` on `render` and `render_all` would follow `band` through `bridge` and
+  the extension.
 - **Footprints of the 57 whole-picture effects, by reason (audit for B1/B2).** Of the 57 files that name `Footprint::Whole`,
   56 say it for every parameter set; `edges` says it only for `canny` (sobel and dog already reach). A footprint is about
   the *input* rows an output row reads: an effect that draws objects or noise from the seed over the canvas and reads no
