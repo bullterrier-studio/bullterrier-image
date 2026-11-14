@@ -79,6 +79,23 @@ longest side over 480, not the picture's, so a `px` value is the same number of 
 Nothing else follows the canvas yet: `Place` is still the picture. A side of 0 is refused (`Error::Recipe`, naming
 `canvas`); a canvas smaller than the picture is fine (it only fixes the scale). Not in Python.
 
+**Spread:** `Effect::spread(params) -> Spread` says how far an effect paints beyond the edge of the box of its content (none by default; `Spread::NONE` for an effect that
+recolours or paints inside its shapes), per side in working px, or `Spread::Unbounded`. It is a separate promise from `Footprint`, which is about the rows
+an effect reads: a sideways reach costs a band nothing but is room to a caller. The promise: on a plain background with some content, whatever the effect makes
+that differs from what it makes of the plain background lies within the content's box grown by the spread. A file in `src/effects/` declares it as
+`pub(crate) fn spread(&Params) -> Spread` (the build script finds it; an effect without one spreads none): `Spread::of_footprint(footprint(params))` for an
+effect that reaches as far sideways as it reads rows (the radius and a bicubic window's 2 px), `Spread::moved` for a shift, an explicit sum otherwise,
+`Spread::Unbounded` where it is not worked out (a warp about the picture's centre, a statistic of the whole picture, a tiling). `tests/it/spread.rs` holds every
+effect to its word with a block on a grey canvas, over the parameter sweep, so one that paints outward and says nothing fails. `Recipe::spread(presets,
+longest_side) -> Result<Spread, Error>` is the room of a whole recipe, in px of a picture (or canvas) of that longest side: the steps' spreads add, a step of opacity 0 adds none, an
+`each` step and a driven step add their widest look and level; it reads parameters only and loads no picture or table. `Spread::pixels()` rounds up
+to whole pixels (top, right, bottom, left). **Caveat for a caller that grows the picture by that room:** an effect sees the grown picture as the whole, so one
+that places itself by the picture's bounds is placed in the room too: `vignette`, a `x`/`y` centre (`swirl`, `pinch_bulge`, `lens_distortion`,
+`radial_blur`, `kaleidoscope`, `polar`, `light_rays`, `lens_flare`, `gradient`, `fractal`, `chromatic_aberration`), anything numbered by canvas place (grain, noise
+fields, `vhs`, `scanlines`, patterns), `frame`, and a statistic of the whole picture (`auto_levels`, `equalize`, `color_transfer`, `dehaze`, `tone_map`). A look that
+mixes one of these with a halo shifts the former by the room. Not built: rendering a recipe on a grown picture with those effects' geometry taken from the
+original box (`Options::with_room`), see `design-decisions.md`. Not in Python yet.
+
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
 (`finders={"subject": ...}`); the core's `Photo` takes the same (`with_map`, `with_finder`). `subject`, `depth` and `light` (made
 from the working picture: framed and sized, before any step) are built in, and `background` is 1 - `subject`; any other map is a recipe's `given` region.

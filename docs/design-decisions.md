@@ -666,6 +666,31 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   ratio. *Reason:* scaling is known in one place; a footprint in design px re-implemented it per effect and missed the floor
   (a `px` value below its `min` in working px when the picture shrinks), so `ambient_occlusion` radius 1 at ratio 0.2 read 4
   rows against a margin of 3. `tests/it/banded.rs` renders every `px` parameter of every effect whole and banded through `Photo::render` at ratios 0.2 to 2.
+- **Settled: an effect's spread is its own declaration, apart from its footprint (scene's room for looks).** `Effect::spread(params) ->
+  Spread` says how far an effect paints beyond the box of its content; `Recipe::spread(presets, longest_side)` adds the steps'. *Why not
+  `Footprint`:* a footprint is the rows an effect reads, so a band can be cut; its contract lets an effect read a whole row, and says nothing
+  of painting outside the picture (`anamorphic_streaks` reads 0 rows and paints a row's width; `echo` with `dx` the same). *Shape:* one
+  value per side (top, right, bottom, left) in working px, plus `Unbounded`. A drop shadow, an `echo` and a `lenticular` strip move content one way,
+  so one number would double the room on three sides for every shadow; `Unbounded` is for what is not worked out, as `Footprint::Whole` is, and
+  is always true. A symmetric `f64` was the smaller type; the shadow decided it. *In working px, from the scaled parameters:* as for a footprint,
+  so the floor of a `px` value and the canvas's design scale are applied once, in the runner's `Table::scaled`; `Recipe::spread` takes the longest
+  side the render's `px` follow (the canvas's, else the working picture's) and works out the ratio as a render does. *Default none:* most effects
+  recolour; the per-effect declaration is a one-line `spread` in the effect's file, found by the build script, so adding an effect still edits
+  nothing else. *Not trusted:* `tests/it/spread.rs` renders every effect over its sweep, a bright block on a grey canvas (grey, so a dark shadow shows
+  as much as a halo), and fails any that paints beyond its box by more than it says, including one that says nothing: that is how the list of
+  effects that paint outward was found (55 of 87 effects made something else of the block's surroundings than of a plain grey, among them `sharpen`, whose ringing paints outside an
+  edge, and effects of the whole picture, which changes everywhere). 28 of the 55 say `Unbounded`; the 27 worked out are
+  those with a reach from their parameters (the blurs, `bloom`, `outline`, `drop_shadow`, `starburst`, `echo`, `chromatic_aberration`, `rgb_split`, ...).
+  `Spread::of_footprint` is the shortcut for an effect whose sideways reach is its row reach (the radius and 2 px of a bicubic window, as a band's
+  margin keeps); the oracle, not the shortcut, is what holds each to it. *Sums, not a chain's own bound:* a step's halo can be blurred again by the
+  next, so the room of a chain is the sum; a mask or a blend only hides, so it lessens nothing; opacity 0 hides the step, so it adds none.
+  *The grown picture is not the original:* a caller that grows the picture by the room hands effects a picture whose bounds are not the content's, so
+  effects that place themselves by the picture (the vignette, the `x`/`y` centres, `Place`-numbered noise, `frame`, whole-picture statistics) are
+  placed in the room (listed in `architecture.md`). *Deferred: `Options::with_room(px)`*, a render on a picture grown by `px` with those effects' geometry
+  taken from the original box. It touches the 30 effects that read `Place` and the 11 with a centre, each a new input and a test that the grown render
+  equals the plain one inside the box, which is more than a day; scene can grow the picture itself until a look needs both a halo and a vignette. *Not
+  in Python:* the facade has `Recipe.parameters()` for `numbers()`, but the return value (per-side numbers or unbounded) is a new Python type and the
+  only caller is Rust.
 - **Settled: the band height trades memory for time (banded render).** Measured on 24 MP (4000 x 6000), `grade`,
   `vignette`, `gaussian_blur` radius 2, `grain`; memory is the peak beyond the photo as a multiple of the 288 MB image
   made, time against the whole render at 1 / 4 threads (median of 3):

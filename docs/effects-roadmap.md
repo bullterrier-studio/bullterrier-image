@@ -330,13 +330,13 @@ Each item is built only when video or scene needs it.
 Asked by `bullterrier-scene` while building real pieces, and by the three directions in the design repository's `future.md`
 (animated posters, websites, a drag-and-drop editor). Each is built when scene or video needs it.
 
-- **A sideways footprint.** `Footprint::Radius` reports rows only (its docs: a sideways reach "costs nothing"), so a caller cannot
-  ask how far past the picture's box an effect reaches. *Why:* scene cannot give a layer room for a halo or a bloom, nor let
-  light spill past its box (scene C5b room). *Evidence:* scene's `docs/api.md`, "Needs from others" (a look ends where the
-  raster ends).
-- **A public recipe-level margin query.** `Footprint::margin` is public per effect; the margin of a whole recipe is internal to
-  `run/step.rs` and `run/band.rs`. *Why:* scene needs one number for a layer's chain to size the room. *Evidence:* the same
-  scene row.
+- **Done: a sideways reach and a recipe-level query.** Not a sideways `Footprint` but a separate `Effect::spread` (how far an effect paints
+  beyond its content's box, per side in working px, or `Unbounded`) and `Recipe::spread(presets, longest_side)`, the steps' sum for scene's room
+  (`architecture.md`, "Spread"; `design-decisions.md`). Remains: 28 of the 55 effects that paint outward say `Unbounded` (warps about the
+  picture's centre, tilings, reflections, tone statistics, `vhs`, `ntsc`, `anamorphic_streaks`, `light_rays`, `quadtree`, ...): a bound for each is a
+  parameter formula and a row in the oracle `tests/it/spread.rs` away, worked out when a look needs it; `Recipe::spread` in Python
+  (`Recipe.parameters()` is its neighbour); `Options::with_room(px)`, a render on a grown picture with the position-aware effects' geometry taken from the
+  original box (the vignette, the `x`/`y` centres, `Place`-numbered noise, `frame`): until then a grown picture shifts them.
 - **Position-aware effects, with a public canvas size and first row** (banded render for scene B1). `Place { canvas_height,
   canvas_width, first_row }` exists as an effect input (`Inputs::with_place`) and the runner fills it for its own bands;
   `Options` has no way to set the first row, and `with_canvas` sets only the scale. *Why:* a scene composed band by band
