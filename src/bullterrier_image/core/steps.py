@@ -669,35 +669,17 @@ class Recipe:
         so is an address the recipe does not have
         (listing the valid ones and the nearest), a driven number set by itself (set its `.start`, `.end` or `.levels`)
         and a `.start` of a number that is not driven."""
-        document = self._document()
-        changes: dict[tuple, dict[str, Any]] = {}
-        where: dict[tuple, dict[str, str]] = {}  # the address that set each number
-        for address, value in values.items():
-            located = native.locate(document, address)
-            target, rest = tuple(located["place"]), located["rest"]
-            if isinstance(value, np.generic):
-                value = value.item()  # a number from numpy is the Python number it holds
-            if located["number"]["whole"] and isinstance(value, float) and value.is_integer():
-                value = int(value)
-            if rest in changes.get(target, {}):
-                raise RecipeError(f"{where[target][rest]!r} and {address!r} reach the same number: give it one value")
-            changes.setdefault(target, {})[rest] = value
-            where.setdefault(target, {})[rest] = address
-        steps, regions, frame = list(self.steps), dict(self.regions), self.frame
-        for target, put in changes.items():
-            try:
-                match target:
-                    case ("step", index):
-                        steps[index] = _set_step(steps[index], put)
-                    case ("region", name):
-                        regions[name] = _set_numbers(regions[name], put)
+        with registry.holding() as hold:
+            touched = native.with_values(recipe_dict(self, hold), dict(values))  # the core resolves, sets and checks
+            steps, regions, frame = list(self.steps), dict(self.regions), self.frame
+            for kind, where, written in touched:
+                match kind:
+                    case "step":
+                        steps[where] = _step_from_dict(registry.resolved(written))
+                    case "region":
+                        regions[where] = _region_from_dict(where, written)
                     case _:
-                        frame = _set_numbers(frame, put)
-            except RecipeError as error:
-                blamed = [where[target][rest] for rest in put if _refuses(self, target, rest, put[rest])]
-                raise RecipeError(
-                    f"{', '.join(repr(address) for address in blamed or where[target].values())}: {error}"
-                ) from None
+                        frame = Framing(**written)
         return self.replace(steps=steps, frame=frame, regions=regions)
 
     def _document(self) -> dict[str, Any]:
@@ -711,71 +693,3 @@ def _parameter(found: Mapping[str, Any]) -> Parameter:
     return Parameter(
         found["value"], found["unit"], found["min"], found["max"], found["doc"], found["whole"], found["cyclic"]
     )
-
-
-def _set_step(step: Step | Each, put: Mapping[str, Any]) -> Step | Each:
-    """`step` with the numbers `put` (by the rest of an address, see `_step_numbers`) set: a new step, checked."""
-    return _set_each(step, put) if isinstance(step, Each) else _set_effect_step(step, put)
-
-
-def _set_each(each: Each, put: Mapping[str, Any]) -> Each:
-    """`each` with its `feather`, `opacity`, `seed` and the numbers of its looks (`looks[0].gain`) set from `put`."""
-    own = {rest: value for rest, value in put.items() if not rest.startswith("looks[")}
-    by_look: dict[int, dict[str, Any]] = {}
-    for rest, value in put.items():
-        if rest.startswith("looks["):
-            number, _, inner = rest[len("looks[") :].partition("].")
-            by_look.setdefault(int(number), {})[inner] = value
-    looks = [
-        _set_effect_step(look, by_look[index]) if isinstance(look, Step) and index in by_look else look
-        for index, look in enumerate(each.looks)
-    ]
-    return Each(
-        each.each,
-        looks=looks,
-        mask=each.mask,
-        opacity=own.get("opacity", each.opacity),
-        blend_mode=each.blend_mode,
-        assign=each.assign,
-        seed=own.get("seed", each.seed),
-        feather=own.get("feather", each.feather),
-        name=each.name,
-    )
-
-
-def _set_effect_step(step: Step, put: Mapping[str, Any]) -> Step:
-    """`step` with its numbers, `opacity` and the ends of its drives set from `put`."""
-    params, opacity = dict(step.params), step.opacity
-    ends: dict[str, dict[str, Any]] = {}
-    for rest, value in put.items():
-        name, _, part = rest.partition(".")
-        if rest == "opacity":
-            opacity = value
-        elif part:
-            ends.setdefault(name, {})[part] = value
-        else:
-            params[rest] = value
-    for name, parts in ends.items():
-        params[name] = Drive(**{**plain(params[name]), **parts})
-    return step.replace(**params, opacity=opacity)
-
-
-def _set_numbers[M](model: M, put: Mapping[str, Any]) -> M:
-    """`model` (a region kind or the framing) with the numbers `put` set; a new model, checked afresh."""
-    return type(model)(**{**plain(model), **put})
-
-
-def _refuses(recipe: Recipe, target: tuple, rest: str, value: Any) -> bool:
-    """Whether setting the one number `rest` of `target` (see `Recipe._reach`) to `value`, alone, is refused: how an
-    error that came from several numbers set together is blamed on the ones that cause it."""
-    try:
-        match target:
-            case ("step", index):
-                _set_step(recipe.steps[index], {rest: value})
-            case ("region", name):
-                _set_numbers(recipe.regions[name], {rest: value})
-            case _:
-                _set_numbers(recipe.frame, {rest: value})
-    except RecipeError:
-        return True
-    return False

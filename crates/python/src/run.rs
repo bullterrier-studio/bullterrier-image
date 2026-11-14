@@ -222,6 +222,55 @@ pub(crate) fn locate<'py>(py: Python<'py>, recipe: &Bound<'py, PyDict>, address:
     )
 }
 
+/// `recipe` (a dict, as for `render`) with each number at an address of `values` (address to number) set, as
+/// `Recipe::with_values` in the core does, with the presets the core ships none of: only what the call changed, as a list
+/// of `["step", index, entry]`, `["region", name, region]` and `["frame", None, frame]`, each in the form `recipe` is
+/// written in, one for every step, region and the frame that an address reaches.
+///
+/// `CoreError` of kind `recipe` naming the address when one points at nothing, a value is not a number or the recipe
+/// refuses a value; nothing is returned then.
+#[pyfunction]
+pub(crate) fn with_values<'py>(
+    py: Python<'py>,
+    recipe: &Bound<'py, PyDict>,
+    values: &Bound<'py, PyDict>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let recipe = recipe_of(recipe)?;
+    let mut set = Vec::new();
+    for (address, value) in values {
+        let address = address.extract::<String>()?;
+        let number = value.extract::<f64>().map_err(|_| {
+            core_error(Error::Recipe(format!(
+                "'{address}': {} is not a number",
+                value.repr().map_or_else(|_| "that".to_owned(), |text| text.to_string())
+            )))
+        })?;
+        set.push((address, number));
+    }
+    let asked: Vec<(&str, f64)> = set
+        .iter()
+        .map(|(address, number)| (address.as_str(), *number))
+        .collect();
+    let changed = serde_json::to_value(recipe.with_values(&asked, &Presets::new()).map_err(core_error)?)
+        .map_err(|error| core_error(Error::Recipe(error.to_string())))?;
+    let mut touched: Vec<Value> = Vec::new();
+    for (address, _) in &asked {
+        let place = match recipe.locate(address).map_err(core_error)?.place {
+            bullterrier_image::Home::Step(index) => json!(["step", index, changed["steps"][index]]),
+            bullterrier_image::Home::Region(name) => json!(["region", name, changed["regions"][&name]]),
+            _ => json!([
+                "frame",
+                null,
+                changed.get("frame").cloned().unwrap_or_else(|| json!({}))
+            ]),
+        };
+        if !touched.contains(&place) {
+            touched.push(place);
+        }
+    }
+    from_json(py, &Value::Array(touched))
+}
+
 /// Every stage of rendering `recipe` on `rgb`, with the arguments and the failures of `render`: a list of `(kind,
 /// number or name, array)`, in this order. `("input", None, rgb)` is the photo, `("subject", None, map)` and
 /// `("depth", None, map)` are the maps the recipe uses (float32 `(height, width)`, if it uses them),

@@ -557,7 +557,7 @@ def _mirror(effect: "ModelledEffect", model: type[EffectParams]) -> None:
     name = effect.__name__
 
     def run(rgb: np.ndarray, params: dict[str, Any], *, size_ratio: float, **inputs: Any) -> np.ndarray:
-        values = from_checked(model, _resolved(params))  # the core has checked and scaled them
+        values = from_checked(model, resolved(params))  # the core has checked and scaled them
         if "size_ratio" in effect.inputs:
             inputs["size_ratio"] = size_ratio
         result = effect.run(rgb, values, **inputs)
@@ -637,7 +637,7 @@ def holding() -> Iterator[Held]:
         _HELD.reset(token)
 
 
-def _resolved(value: Any) -> Any:
+def resolved(value: Any) -> Any:
     """`value`, a parameter as the core hands it over, with the objects the call holds back in place of references."""
     held = _HELD.get()
     if held is None:
@@ -647,9 +647,9 @@ def _resolved(value: Any) -> Any:
     if isinstance(value, dict):
         if value.keys() == {_REFERENCE}:
             return held.objects[value[_REFERENCE]]
-        return {key: _resolved(item) for key, item in value.items()}
+        return {key: resolved(item) for key, item in value.items()}
     if isinstance(value, list):
-        return [_resolved(item) for item in value]
+        return [resolved(item) for item in value]
     return value
 
 

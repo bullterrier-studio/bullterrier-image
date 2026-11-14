@@ -70,7 +70,7 @@ mod _core {
     #[pymodule_export]
     use super::run::{
         check_recipe, check_step, known_maps, locate, map_problem, needs, number_pieces, numbers, read_format,
-        recipe_format, refine_edge, region_map, render, trace,
+        recipe_format, refine_edge, region_map, render, trace, with_values,
     };
 }
 
