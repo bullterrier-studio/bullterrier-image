@@ -31,11 +31,42 @@ use maps::{Found, Maps};
 use regions::Evaluator;
 pub use size::Options;
 use size::Working;
+use size::ratio_of;
 use step::{Prepared, prepare};
 pub use trace::Stage;
 
 use crate::ops::par;
-use crate::{Error, Image, Layer, Lut, Picture, Presets, Recipe};
+use crate::{Error, Image, Layer, Lut, Picture, Presets, Recipe, Spread};
+
+impl Recipe {
+    /// How far `self` paints beyond the edge of the picture it is rendered on: the room, in output pixels, that a
+    /// caller gives a picture so that no halo is cut at its edge (see [`Spread`]). The steps' spreads add, as each step
+    /// works on what the one before made; a step shown at opacity 0 adds none, an `each` step the widest of its looks'
+    /// and a driven step the widest of its levels'. A mask only hides, so it does not lessen it.
+    ///
+    /// `longest_side` is the longest side in px of what a render's `px` values follow: the longer side of the canvas
+    /// given to [`Options::with_canvas`], else of the picture the render works on (at the size [`Options::with_size`]
+    /// or the recipe's `size` ask for, else the picture's own, as the `frame` leaves it). A `px` of the recipe is then
+    /// `longest_side / 480` pixels, as in a render. Only the parameters are read: no picture or lookup table is loaded.
+    ///
+    /// The effects of a render that grows the picture see the grown picture: one that places itself by the picture's
+    /// bounds (a vignette's centre, a warp's, `frame`) places itself in the room too.
+    ///
+    /// # Errors
+    /// Whatever [`Recipe::checked`] refuses the recipe for, and [`Error::Recipe`] for a `longest_side` of 0.
+    pub fn spread(&self, presets: &Presets, longest_side: u32) -> Result<Spread, Error> {
+        if longest_side == 0 {
+            return Err(Error::Recipe("`longest_side` must be >= 1, got 0".to_owned()));
+        }
+        self.check_rules(presets)?;
+        let ratio = ratio_of(f64::from(longest_side));
+        let mut total = Spread::NONE;
+        for (index, entry) in self.steps.iter().enumerate() {
+            total = total.then(step::spread(presets, ratio, entry, &format!("step {}", index + 1))?);
+        }
+        Ok(total)
+    }
+}
 
 /// A picture a recipe is rendered on, with the maps of it that the recipe names (`subject`, `depth`, a region): handed in
 /// or found by a [`Finder`]. It borrows the picture: rendering never copies or changes it.

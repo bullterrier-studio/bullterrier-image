@@ -24,6 +24,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.amplitude), params.edge == Edge::Wrap)
 }
 
+/// How far `ripple` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Move every pixel by a sine wave of `wavelength` and `amplitude` that travels in the direction `angle`.
 ///
 /// A pixel at distance s px from the picture's centre measured along the wave's direction (`angle` degrees clockwise from

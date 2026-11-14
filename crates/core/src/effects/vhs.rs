@@ -28,6 +28,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 
+/// How far `vhs` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Make the picture look like a worn videotape or a failing analog signal: tracking bands, dropouts, wobbling rows, bled
 /// colour and tape noise (static, snow).
 ///

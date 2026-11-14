@@ -22,6 +22,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 
+/// How far `focus_blur` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// A shallow depth of field, or a tilt-shift miniature: pixels whose `field` value lies near `focus` stay sharp, and the
 /// farther a value lies from it, higher or lower, the more the pixel is blurred, up to `radius`.
 ///

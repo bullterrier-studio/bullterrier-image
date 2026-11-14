@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `polar` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Which way `polar` converts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum Direction {

@@ -20,6 +20,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `color_transfer` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// The smallest spread of a photo's channel that is scaled up, in Oklab units.
 const MIN_SPREAD: f64 = 0.002; // constant: half an 8-bit step of Oklab lightness; less is rounding noise, not picture
 
@@ -96,7 +101,7 @@ fn moments(pixels: &[[f32; 3]], first: usize, alpha: Option<&[f32]>) -> Moments 
 
 /// The weighted spread of `pixels` (`alpha`, if any, weighs each), or none if the weights add up to nothing. The chunks
 /// are summed in order, so the result does not depend on the thread count.
-fn spread(pixels: &[[f32; 3]], alpha: Option<&[f32]>) -> Option<Spread> {
+fn photo_spread(pixels: &[[f32; 3]], alpha: Option<&[f32]>) -> Option<Spread> {
     let parts = par::chunks(pixels, SPREAD_CHUNK, |first, part| moments(part, first, alpha));
     let mut all = Moments {
         weight: 0.0,
@@ -123,8 +128,8 @@ fn spread(pixels: &[[f32; 3]], alpha: Option<&[f32]>) -> Option<Spread> {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let reference = inputs
         .image("reference")
-        .and_then(|asset| spread(asset.as_picture().pixels(), asset.alpha()));
-    let own = spread(picture.pixels(), None);
+        .and_then(|asset| photo_spread(asset.as_picture().pixels(), asset.alpha()));
+    let own = photo_spread(picture.pixels(), None);
     let (Some(target), Some(own)) = (reference, own) else {
         return picture.map(|pixel| pixel);
     };

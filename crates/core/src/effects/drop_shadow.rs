@@ -27,6 +27,19 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `drop_shadow` paints beyond the picture's edge: the farthest copy's move, the way it moves, and the blur's reach
+/// on every side.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    if params.edge == Edge::Wrap {
+        return crate::Spread::Unbounded;
+    }
+    let heading = f64::from(params.angle.rem_euclid(360.0)).to_radians(); // constant: a full turn in degrees
+    let far = f64::from(params.copies) * f64::from(params.offset);
+    // constant: the Gaussian reaches int(truncate x blur + 0.5) px
+    let blur = f64::from(params.blur * params.truncate) + 0.5;
+    crate::Spread::moved(far * heading.sin(), far * heading.cos()).then(crate::Spread::all(blur))
+}
+
 /// Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by `blur`:
 /// a drop shadow, layered paper cutouts or a long shadow.
 ///

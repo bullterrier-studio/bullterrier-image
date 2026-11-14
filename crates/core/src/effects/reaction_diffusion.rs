@@ -28,6 +28,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `reaction_diffusion` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts.
 ///
 /// The model has two chemicals, u (starting at 1 everywhere) and v (starting at 0). Where the picture's brightness is above

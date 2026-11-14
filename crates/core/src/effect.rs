@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::params::{Declared, Kind, Table};
-use crate::{Error, Footprint, Image, Inputs, Picture};
+use crate::{Error, Footprint, Image, Inputs, Picture, Spread};
 
 /// The sections of the effect catalogue. Every effect is in exactly one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -203,6 +203,16 @@ pub trait Effect: Send + Sync {
         Ok(Footprint::Whole)
     }
 
+    /// How far it paints beyond the edge of the picture when run with `params`: [`Spread::NONE`] unless the effect says
+    /// it paints outward (a halo, a shadow, a blur). `params` are as for [`footprint`](Self::footprint), already in
+    /// working pixels. An effect that paints outward and does not say so has its halo cut where a caller gave it no room.
+    ///
+    /// # Errors
+    /// [`Error::Params`] if `params` are not the effect's parameters, as for [`apply`](Self::apply).
+    fn spread(&self, _params: &Value) -> Result<Spread, Error> {
+        Ok(Spread::NONE)
+    }
+
     /// Run it on `picture` with `params` (an object with the effect's parameters): a new image of the picture's size.
     /// `inputs` holds the inputs the effect declares and nothing else, each of the picture's size: the core makes it
     /// so (see [`Inputs`]).
@@ -251,22 +261,25 @@ pub(crate) struct Meta {
 }
 
 /// An effect written in Rust, in a file of `src/effects/`: its `META`, its `Params` (read from the parameters), its
-/// `footprint` and its `render`. The build script makes one for each file.
+/// `footprint`, its `spread` if it paints outward and its `render`. The build script makes one for each file.
 pub(crate) struct Native<P> {
     name: &'static str,
     meta: &'static Meta,
     /// The `FieldName` parameters of `P`, read from its declaration, so a field is declared once.
     fields: Vec<FieldParam>,
     footprint: fn(&P) -> Footprint,
+    spread: Option<fn(&P) -> Spread>,
     render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
 }
 
 impl<P: Declared> Native<P> {
-    /// The effect called `name` (its file's name) with its `meta`, `footprint` and `render`.
+    /// The effect called `name` (its file's name) with its `meta`, `footprint`, `spread` (none: it paints nothing outward)
+    /// and `render`.
     pub(crate) fn new(
         name: &'static str,
         meta: &'static Meta,
         footprint: fn(&P) -> Footprint,
+        spread: Option<fn(&P) -> Spread>,
         render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
     ) -> Self {
         let fields = P::table()
@@ -280,6 +293,7 @@ impl<P: Declared> Native<P> {
             meta,
             fields,
             footprint,
+            spread,
             render,
         }
     }
@@ -322,6 +336,11 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
 
     fn footprint(&self, params: &Value) -> Result<Footprint, Error> {
         Ok((self.footprint)(&self.read(params)?))
+    }
+
+    fn spread(&self, params: &Value) -> Result<Spread, Error> {
+        let params = self.read(params)?;
+        Ok(self.spread.map_or(Spread::NONE, |spread| spread(&params)))
     }
 
     fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
@@ -372,7 +391,7 @@ mod tests {
 
     #[test]
     fn the_fields_are_the_field_parameters_of_the_declaration_with_their_default_names() {
-        let probe = Native::new("probe", &META, footprint, render);
+        let probe = Native::new("probe", &META, footprint, None, render);
         assert_eq!(
             probe.fields(),
             [FieldParam::new("follow", "depth"), FieldParam::new("within", "light")]

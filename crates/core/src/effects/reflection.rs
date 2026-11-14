@@ -22,6 +22,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `reflection` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// A floor mirror: the picture above a shape's lowest row is mirrored about it, softened and fading with depth.
 ///
 /// The floor line is the bottom of the shape; the reflection is `height` of the shape's height deep, blurred by `blur`,

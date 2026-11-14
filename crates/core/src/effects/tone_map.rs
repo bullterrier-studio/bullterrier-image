@@ -23,6 +23,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(2.0 * f64::from(params.radius))
 }
 
+/// How far `tone_map` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Luminance below this (about 13 stops under white) counts as this much in the logarithm, so black has a finite
 /// logarithm; a guard against log(0), as in Reinhard et al. 2002's small delta.
 const LUMINANCE_FLOOR: f32 = 1e-4; // constant: Reinhard et al. 2002's delta

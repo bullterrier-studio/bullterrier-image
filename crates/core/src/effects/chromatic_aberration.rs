@@ -24,6 +24,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
 }
 
+/// How far `chromatic_aberration` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// The spectrum as a simple rule, not a colour-matching table: the pure colours of the HSV colour wheel from red to blue
 /// (red, yellow, green, cyan, blue), equally spaced, with the weight of each channel changing linearly between them.
 // constant: the five pure colours of the standard HSV colour wheel from red to blue, one RGB row each

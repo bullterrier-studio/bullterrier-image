@@ -29,7 +29,7 @@ pub enum Footprint {
 
 /// The rows beyond `ceil(radius)` that a margin keeps for reading between pixels: bicubic interpolation reads from
 /// one row above to two below the row it is at (a window of 3 rows is the widest of any effect's neighbourhood).
-const TAPS: usize = 2; // constant: the extra rows of a bicubic window
+pub(crate) const TAPS: usize = 2; // constant: the extra rows of a bicubic window
 
 impl Footprint {
     /// `Radius(radius)`, or [`Whole`](Self::Whole) if the effect `wraps` the picture round its edge: a row near the top

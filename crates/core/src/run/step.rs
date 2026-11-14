@@ -12,7 +12,7 @@ use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
 use crate::params::Kind;
 use crate::recipe::drive;
-use crate::{BlendMode, Entry, Error, Image, Inputs, Labels, Layer, Lut, Picture, Place, Presets, Step};
+use crate::{BlendMode, Entry, Error, Image, Inputs, Labels, Layer, Lut, Picture, Place, Presets, Spread, Step};
 
 /// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
 /// names, for an `each` step its looks the same.
@@ -162,6 +162,31 @@ fn complete(
     Ok(Value::Object(table.scaled(design, ratio)))
 }
 
+/// The runs of `step` (at `place`) of `effect` for the values `given`: one, or one for each level of its drives, each
+/// with its values checked and scaled like a plain step's.
+fn runs(effect: &dyn Effect, step: &Step, given: &Map<String, Value>, ratio: f64, place: &str) -> Result<Runs, Error> {
+    let drives = drive::in_params(&step.effect, given, place)?;
+    let Some((_, first)) = drives.first() else {
+        return Ok(Runs::One {
+            scaled: complete(effect, &step.effect, given, ratio, place)?,
+        });
+    };
+    let levels = (0..first.levels)
+        .map(|level| {
+            let mut values = given.clone();
+            for (name, drive) in &drives {
+                values.insert(name.clone(), Value::from(drive.value(level)));
+            }
+            complete(effect, &step.effect, &values, ratio, place)
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(Runs::Driven {
+        by: first.by.clone(),
+        top: first.levels - 1,
+        levels,
+    })
+}
+
 /// The table each lookup table parameter of `effect` names in `runs` (the parameters are the same at every level of a
 /// drive: a table is not drivable), found by `assets`; a parameter with no name is the identity table and has none.
 ///
@@ -240,28 +265,7 @@ impl StepRun {
                 .map_err(|why| Error::Recipe(format!("{place}: {why}")))?;
             fields.push((field.parameter.clone(), name.to_owned()));
         }
-        let drives = drive::in_params(&step.effect, &given, place)?;
-        let runs = if let Some((_, first)) = drives.first() {
-            // one run for each level of the drives, each with its values checked and scaled like a plain step's
-            let levels = (0..first.levels)
-                .map(|level| {
-                    let mut values = given.clone();
-                    for (name, drive) in &drives {
-                        values.insert(name.clone(), Value::from(drive.value(level)));
-                    }
-                    complete(&*effect, &step.effect, &values, ratio, place)
-                })
-                .collect::<Result<_, _>>()?;
-            Runs::Driven {
-                by: first.by.clone(),
-                top: first.levels - 1,
-                levels,
-            }
-        } else {
-            Runs::One {
-                scaled: complete(&*effect, &step.effect, &given, ratio, place)?,
-            }
-        };
+        let runs = runs(&*effect, step, &given, ratio, place)?;
         let luts = tables(&*effect, &runs, assets, place)?;
         let pictures = pictures(&*effect, &runs, assets, place)?;
         Ok(Self {
@@ -388,4 +392,51 @@ fn pieces_of(pieces: Arc<Labels>, at: usize, rows: usize) -> Arc<Labels> {
     } else {
         Arc::new(pieces.rows(at, at + rows))
     }
+}
+
+/// How far `entry` (at `place`, as `step 2`) paints beyond the picture's edge at `ratio` working pixels per design pixel:
+/// worked out from its parameters alone, loading no picture or table. A step of opacity 0 shows nothing, so spreads none; a
+/// driven step spreads as far as its widest level; an `each` step as far as its widest look.
+///
+/// # Errors
+/// What preparing the entry refuses for its parameters: [`Error::UnknownEffect`], [`Error::Params`], [`Error::Invalid`].
+pub(super) fn spread(presets: &Presets, ratio: f64, entry: &Entry, place: &str) -> Result<Spread, Error> {
+    match entry {
+        Entry::Step(step) => step_spread(presets, ratio, step, place),
+        Entry::Each(each) => {
+            if each.opacity == Some(0.0) {
+                return Ok(Spread::NONE);
+            }
+            let mut widest = Spread::NONE;
+            for (index, look) in each.looks.iter().enumerate() {
+                if let Some(step) = look {
+                    widest = widest.widest(step_spread(
+                        presets,
+                        ratio,
+                        step,
+                        &format!("{place}, look {}", index + 1),
+                    )?);
+                }
+            }
+            Ok(widest)
+        }
+    }
+}
+
+fn step_spread(presets: &Presets, ratio: f64, step: &Step, place: &str) -> Result<Spread, Error> {
+    let effect = crate::registry::effect(&step.effect)?;
+    if step.opacity.unwrap_or_else(|| effect.opacity()) == 0.0 {
+        return Ok(Spread::NONE);
+    }
+    let given = presets.under(step, place)?;
+    Ok(match runs(&*effect, step, &given, ratio, place)? {
+        Runs::One { scaled } => effect.spread(&scaled)?,
+        Runs::Driven { levels, .. } => {
+            let mut widest = Spread::NONE;
+            for level in &levels {
+                widest = widest.widest(effect.spread(level)?);
+            }
+            widest
+        }
+    })
 }

@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Radius(0.0)
 }
 
+/// How far `anamorphic_streaks` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Horizontal streaks of light: what is brighter than `threshold` is smeared along its row, tinted `color` and screened
 /// over the picture by `amount`.
 ///

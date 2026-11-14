@@ -21,6 +21,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `ascii` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Redraw the picture as text: a grid of characters `cell` px wide, each chosen by the brightness under it.
 ///
 /// Each character covers one cell of the grid and is picked from `chars` by how much ink it puts down, so the picture's

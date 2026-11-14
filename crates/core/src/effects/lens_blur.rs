@@ -26,6 +26,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.radius), params.edge == Edge::Wrap)
 }
 
+/// How far `lens_blur` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Blur the picture over a disc of `radius` px, as an out-of-focus lens does, favouring bright pixels.
 ///
 /// Every pixel becomes the average of the pixels within `radius` px of it (one on the rim counts for the share of it

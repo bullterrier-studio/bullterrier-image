@@ -26,6 +26,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `bloom` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Bloom, glow, soft focus or halation: light bleeding from what is brighter than `threshold`, blurred at `octaves`
 /// scales and screened over the picture.
 ///

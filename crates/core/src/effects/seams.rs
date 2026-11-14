@@ -22,6 +22,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(f64::from(params.width) / 2.0 + 1.0)
 }
 
+/// How far `seams` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Draw a solid line or band along every border between the pieces of a partition.
 ///
 /// The line is one flat colour, centred on each border and anti-aliased along its edges; the picture's own border is not

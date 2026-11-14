@@ -12,6 +12,12 @@ use crate::{Error, Frame, Image, Layer, Picture};
 /// The longest side in px that a recipe's pixel values are written for.
 const DESIGN_SIZE: f64 = 480.0; // constant: the design size of the format, Python's `DESIGN_SIZE`
 
+/// Working pixels per design pixel for a longest side of `longest_side` px: the one decision of how a length in a recipe
+/// follows the size of the picture.
+pub(super) fn ratio_of(longest_side: f64) -> f64 {
+    longest_side / DESIGN_SIZE
+}
+
 /// What a render is asked for besides the recipe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
@@ -213,14 +219,14 @@ impl<'a> Working<'a> {
         let picture = self.picture();
         let (height, width) = (picture.height(), picture.width());
         let Some((canvas_width, canvas_height)) = canvas else {
-            return Ok(length::float(height.max(width)) / DESIGN_SIZE);
+            return Ok(ratio_of(length::float(height.max(width))));
         };
         if canvas_width == 0 || canvas_height == 0 {
             return Err(Error::Recipe(format!(
                 "`canvas` {canvas_width} x {canvas_height} must have both sides at least 1"
             )));
         }
-        Ok(f64::from(canvas_width.max(canvas_height)) / DESIGN_SIZE)
+        Ok(ratio_of(f64::from(canvas_width.max(canvas_height))))
     }
 
     /// `map`, a map of the photo as given, as a map of the working picture: the map itself if the picture is the photo,

@@ -22,6 +22,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 
+/// How far `slice_shift` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Glitch tearing: the picture cut into strips and bands that slide sideways by random distances, wrapping around.
 ///
 /// Cut the picture into horizontal strips at random rows and slide each sideways by a random distance, then slide `bands`

@@ -2,7 +2,7 @@
 //! every effect; adding an effect adds its file and edits nothing else) and the text of the presets and looks that ship
 //! with it (`data/presets/*.toml`, `data/looks/*.toml`).
 
-use std::fmt::{self, Write as _};
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::{env, fs, io};
 
@@ -14,7 +14,7 @@ fn main() -> io::Result<()> {
     let out = env::var_os("OUT_DIR").ok_or_else(|| io::Error::other("cargo sets OUT_DIR"))?;
     let folder = Path::new(&manifest).join("src").join("effects");
     println!("cargo::rerun-if-changed={}", folder.display());
-    let code = table(&effect_files(&folder)?).map_err(io::Error::other)?;
+    let code = table(&effect_files(&folder)?).map_err(|error| io::Error::other(error.to_string()))?;
     fs::write(PathBuf::from(&out).join("effects.rs"), code)?;
     let mut shipped = String::new();
     for (name, kind) in [("presets", "PRESETS"), ("looks", "LOOKS")] {
@@ -141,8 +141,9 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
 
 /// The Rust source of the list: a module per effect file, the `EffectParams` impl that names the effect of its `Params`,
 /// and `builtin()`, which makes each effect from its `META`, its `Params` (read from the parameters), its `footprint`
-/// (`fn(&Params) -> Footprint`) and its `render` (`fn(&Picture, &Params, &Inputs) -> Image`).
-fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
+/// (`fn(&Params) -> Footprint`), its `spread` (`fn(&Params) -> Spread`, if the file declares one: an effect that paints
+/// nothing outward has none) and its `render` (`fn(&Picture, &Params, &Inputs) -> Image`).
+fn table(files: &[(String, PathBuf)]) -> Result<String, Box<dyn std::error::Error>> {
     let mut code = String::new();
     for (name, path) in files {
         writeln!(
@@ -157,10 +158,15 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, fmt::Error> {
         code,
         "pub(crate) fn builtin() -> Vec<::std::sync::Arc<dyn crate::effect::Effect>> {{\n    vec!["
     )?;
-    for (name, _) in files {
+    for (name, path) in files {
+        let spread = if fs::read_to_string(path)?.contains("\npub(crate) fn spread(") {
+            format!("Some({name}::spread)")
+        } else {
+            "None".to_owned()
+        };
         writeln!(
             code,
-            "        ::std::sync::Arc::new(crate::effect::Native::new({name:?}, &{name}::META, {name}::footprint, {name}::render)),"
+            "        ::std::sync::Arc::new(crate::effect::Native::new({name:?}, &{name}::META, {name}::footprint, {spread}, {name}::render)),"
         )?;
     }
     writeln!(code, "    ]\n}}")?;

@@ -28,6 +28,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `liquid_metal` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground.
 ///
 /// The height is the Rec. 709 luminance smoothed by `smoothing`; only brightness matters, the picture's hues are gone. A

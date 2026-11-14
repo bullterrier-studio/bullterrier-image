@@ -25,6 +25,12 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `starburst` paints beyond the picture's edge: a spike's `length` from its point, a stroke's width and a pixel of
+/// its soft edge more.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::all(f64::from(params.length + params.width) + 1.0)
+}
+
 /// The highest `threshold` there is (the `max` of the field); `limit` raises a threshold no further, so near-white pixels
 /// still light.
 const MAX_THRESHOLD: f32 = 0.99; // constant: the field's documented maximum

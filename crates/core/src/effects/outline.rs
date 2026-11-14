@@ -23,6 +23,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(f64::from(params.width + params.glow) + 1.0) // constant: the antialiasing ramp's px
 }
 
+/// How far `outline` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Which side of the shape's edge the stroke lies on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum Position {

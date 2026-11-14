@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `quadtree` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges.
 ///
 /// Each cell is filled with the average colour of the photo under it. A cell splits into four while its colours spread

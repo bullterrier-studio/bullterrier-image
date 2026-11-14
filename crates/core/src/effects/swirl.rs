@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `swirl` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Twist the picture about the centre `x`, `y` by `angle` degrees there, falling to nothing at `radius`.
 ///
 /// The picture is turned about the centre by an angle that falls smoothly from `angle` at the centre to nothing at

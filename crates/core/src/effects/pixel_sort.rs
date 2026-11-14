@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `pixel_sort` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// What the pixels are measured and put in order by.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum By {

@@ -34,6 +34,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     }
 }
 
+/// How far `edges` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// How edges are found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Choice)]
 pub enum Method {

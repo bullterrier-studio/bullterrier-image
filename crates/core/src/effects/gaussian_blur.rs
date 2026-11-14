@@ -24,6 +24,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `gaussian_blur` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Soften the picture with a Gaussian blur of standard deviation `radius` px.
 ///
 /// Each colour channel is blurred on its own. Every pixel becomes a weighted average of its neighbours, the weights a

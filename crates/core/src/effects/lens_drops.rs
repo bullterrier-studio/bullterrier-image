@@ -30,6 +30,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `lens_drops` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Put `count` water drops on the picture, each showing the blurred scene turned upside down by `refraction`.
 ///
 /// A drop at a random place has a random radius from (1 - `size_variation`) x `radius` to all of it. The pixel at offset d

@@ -25,6 +25,14 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `echo` paints beyond the picture's edge: the farthest copy's move, the way it moves.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    if params.edge == Edge::Wrap {
+        return crate::Spread::Unbounded;
+    }
+    let last = f64::from(params.copies.unsigned_abs());
+    crate::Spread::moved(last * f64::from(params.dy), last * f64::from(params.dx))
+}
 /// Lay `copies` translucent copies over the picture, each (`dx`, `dy`) px further from it and weaker by `fade`.
 ///
 /// The result is the weighted average of the picture (weight 1) and copy k, the picture moved by k times (`dx`, `dy`)

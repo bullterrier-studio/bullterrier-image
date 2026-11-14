@@ -22,6 +22,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.length), params.edge == Edge::Wrap)
 }
 
+/// How far `motion_blur` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.
 ///
 /// Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay

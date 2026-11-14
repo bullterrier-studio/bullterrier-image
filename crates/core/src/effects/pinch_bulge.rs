@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `pinch_bulge` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Push the picture out (`amount` above 0, a bulge) or in (below 0, a pinch) about the centre `x`, `y`.
 ///
 /// The picture about the centre is magnified (bulge) or shrunk (pinch) most at the centre and not at all at `radius`.

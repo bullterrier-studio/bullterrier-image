@@ -41,6 +41,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `displace` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Move every pixel by two independent noise fields (down and right), by `amount` px typically: warp, tearing, scatter,
 /// frosted glass.
 ///

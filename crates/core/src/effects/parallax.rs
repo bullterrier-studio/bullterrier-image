@@ -29,6 +29,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `parallax` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Shift every layer of the picture by amount x (depth - focus) px along `angle`, as a sideways camera move would: layers
 /// nearer than `focus` shift along `angle`, farther ones the opposite way, each by its distance in depth from the focus.
 ///

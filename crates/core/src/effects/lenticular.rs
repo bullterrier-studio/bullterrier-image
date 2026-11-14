@@ -22,6 +22,13 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Radius(0.0)
 }
 
+/// How far `lenticular` paints beyond the picture's edge: a strip slides sideways by `shift`.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    if params.edge == Edge::Wrap {
+        return crate::Spread::Unbounded;
+    }
+    crate::Spread::moved(0.0, f64::from(params.shift))
+}
 /// Cut the picture into vertical strips of `strip` px and slide every second one sideways by `shift` px, as a lenticular
 /// print is seen off-centre.
 ///

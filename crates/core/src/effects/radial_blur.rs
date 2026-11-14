@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `radial_blur` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`.
 ///
 /// Every pixel becomes the average of `samples` points spread evenly along the arc or ray through it (centred on the

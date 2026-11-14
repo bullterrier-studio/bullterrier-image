@@ -60,6 +60,7 @@ mod registry;
 mod run;
 mod sheet;
 pub mod shipped;
+mod spread;
 
 pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error, ErrorKind, MapKind};
@@ -84,6 +85,7 @@ pub use recipe::{
 pub use registry::{effect, effects, register, unregister};
 pub use run::{Finder, Options, Photo, Stage};
 pub use sheet::{Tile, contact_sheet};
+pub use spread::Spread;
 
 /// Run the effect called `effect` on `picture` with `params` (an object with exactly the effect's parameters); a new
 /// image of the picture's size. `inputs` is what is on offer: the effect receives the part it declares.

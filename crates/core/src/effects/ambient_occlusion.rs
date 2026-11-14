@@ -22,6 +22,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 
+/// How far `ambient_occlusion` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// An ambient occlusion: each pixel darkened by `gain` times how much farther it lies than the depth around it, within
 /// `radius`.
 ///

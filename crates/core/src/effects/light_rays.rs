@@ -24,6 +24,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `light_rays` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by `amount`.
 ///
 /// Every pixel gathers the highlights from `samples` points on the line between itself and the light, from itself to

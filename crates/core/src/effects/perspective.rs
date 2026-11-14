@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `perspective` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Tilt the picture as a camera would see it: keystone it by `vertical` then `horizontal`, shear, turn and zoom it.
 ///
 /// A perspective correction: a keystone and a skew along each axis, then a turn and a zoom about the centre. The picture is

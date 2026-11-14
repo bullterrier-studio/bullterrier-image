@@ -171,6 +171,7 @@ mod shift;
 mod shipped;
 mod slice_shift;
 mod spatial;
+mod spread;
 mod starburst;
 mod step_check;
 mod stretch;

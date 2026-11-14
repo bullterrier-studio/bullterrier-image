@@ -25,6 +25,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `dehaze` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// The smallest airlight channel used as a divisor, so a black picture (airlight 0) cannot divide by zero; it changes no
 /// picture with a visible sky (a channel below 1/1000 is black in any 8-bit file).
 const MIN_AIRLIGHT: f32 = 1e-3; // constant: below one 8-bit level, so no visible picture is changed

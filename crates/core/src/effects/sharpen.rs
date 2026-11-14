@@ -24,6 +24,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `sharpen` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// An unsharp mask: the difference between the picture and a blurred copy is added back, scaled by `amount`.
 ///
 /// Sharpen, or add clarity: add `amount` times the detail that a `radius` px Gaussian blur removes. Detail smaller

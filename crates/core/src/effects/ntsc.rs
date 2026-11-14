@@ -25,6 +25,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 
+/// How far `ntsc` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Smear the colour of the picture along its rows and let a share of it crawl into brightness, like an NTSC signal.
 ///
 /// In YIQ (FCC coefficients) the colour axes I and Q are blurred by a Gaussian along each row only, while brightness Y is

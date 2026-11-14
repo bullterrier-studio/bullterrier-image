@@ -26,6 +26,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
 }
 
+/// How far `melt` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Pull the bright parts of each column downward, up to `amount` px, by a drip length that differs per column.
 ///
 /// Each column has a drip length between 0 and 1: smooth noise along the row, `scale` px wide and of mean 0 and

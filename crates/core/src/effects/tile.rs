@@ -22,6 +22,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `tile` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Repeat the picture scaled down in a grid, or slide it around: a rolling scan, a wrap-around shift.
 ///
 /// The picture is averaged down by area (each new pixel is the mean of the source pixels it covers, fractions of a pixel

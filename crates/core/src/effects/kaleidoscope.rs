@@ -23,6 +23,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `kaleidoscope` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Fold the picture about the centre `x`, `y` into `segments` sectors, each a wedge of the picture and its mirror: a
 /// kaleidoscope, or with one segment a plain mirror.
 ///

@@ -20,6 +20,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `equalize` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 // constant: the clipped excess is redistributed until less than this share of a tile's pixels is left over (a pure
 // stopping guard: the loop shrinks the excess geometrically, so this ends it long before f64 rounding matters)
 const EXCESS_TOLERANCE: f64 = 1e-9;

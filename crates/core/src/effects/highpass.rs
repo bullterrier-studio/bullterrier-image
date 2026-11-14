@@ -21,6 +21,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
 }
 
+/// How far `highpass` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// The level the detail is centred on.
 const MID_GREY: f32 = 0.5; // constant: halfway between black and white
 

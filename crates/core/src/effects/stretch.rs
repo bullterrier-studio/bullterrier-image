@@ -20,6 +20,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `stretch` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Which way the line is smeared.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Choice)]
 pub enum Axis {

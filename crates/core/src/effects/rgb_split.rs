@@ -27,6 +27,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.amount), params.edge == Edge::Wrap)
 }
 
+/// How far `rgb_split` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Which channels part.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Choice)]
 pub enum Pair {

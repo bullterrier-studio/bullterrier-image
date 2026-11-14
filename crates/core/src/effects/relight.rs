@@ -30,6 +30,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     )
 }
 
+/// How far `relight` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`: bump
 /// lighting, emboss, relighting by depth.
 ///

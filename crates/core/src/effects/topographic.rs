@@ -25,6 +25,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `topographic` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// What lies between the contour lines.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum Fill {

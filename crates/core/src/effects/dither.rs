@@ -30,6 +30,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// How far `dither` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// How tones become a pattern of dots.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum Method {

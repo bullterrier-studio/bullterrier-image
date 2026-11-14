@@ -26,6 +26,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.amount) + taps, params.edge == Edge::Wrap)
 }
 
+/// How far `flow_warp` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Carry the picture `amount` px along a flow whose direction is `angle` plus `variation` degrees of fractal noise.
 ///
 /// The flow at each pixel points `angle` degrees clockwise from pointing right, turned by a noise field (`scale`,

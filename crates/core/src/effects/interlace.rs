@@ -22,6 +22,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Pixel
 }
 
+/// How far `interlace` paints beyond the picture's edge: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// Which of the two fields of rows slides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Choice)]
 pub enum Field {
