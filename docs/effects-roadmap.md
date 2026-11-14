@@ -324,3 +324,35 @@ Each item is built only when video or scene needs it.
   image's job.
 - **Speed and memory.** `.superpowers/todos/performance.md` (what was measured, what is left), `banded-render-optimisation.md`
   (the banded render's open items) and `e7-ledger.md` (the E7 batches, their decisions and the breaks they made).
+
+## From scene and the future directions (2026-11-14)
+
+Asked by `bullterrier-scene` while building real pieces, and by the three directions in the design repository's `future.md`
+(animated posters, websites, a drag-and-drop editor). Each is built when scene or video needs it.
+
+- **A sideways footprint.** `Footprint::Radius` reports rows only (its docs: a sideways reach "costs nothing"), so a caller cannot
+  ask how far past the picture's box an effect reaches. *Why:* scene cannot give a layer room for a halo or a bloom, nor let
+  light spill past its box (scene C5b room). *Evidence:* scene's `docs/api.md`, "Needs from others" (a look ends where the
+  raster ends).
+- **A public recipe-level margin query.** `Footprint::margin` is public per effect; the margin of a whole recipe is internal to
+  `run/step.rs` and `run/band.rs`. *Why:* scene needs one number for a layer's chain to size the room. *Evidence:* the same
+  scene row.
+- **Position-aware effects, with a public canvas size and first row** (banded render for scene B1). `Place { canvas_height,
+  canvas_width, first_row }` exists as an effect input (`Inputs::with_place`) and the runner fills it for its own bands;
+  `Options` has no way to set the first row, and `with_canvas` sets only the scale. *Why:* a scene composed band by band
+  must run a vignette, a seeded noise or a gradient as the same pixels as the whole render. *Evidence:* scene's roadmap, B1
+  (deferred for this).
+- **Python `canvas=` for `Options::with_canvas`.** Rust only today (`design-decisions.md`: "Built: `Options::with_canvas`" says
+  Python would follow `band` through `bridge` and the stubs). *Why:* a Python caller placing a layer on a larger canvas gets
+  the layer's own design scale. *Evidence:* none from a Python caller yet; scene calls the Rust API.
+- **A keyline helper:** grow a cut-out into an outline as alpha only (a stroke without its host picture). *Why:* a poster
+  keyline needs the stroke alone. *Evidence:* the Conan poster used `fx.outline(field="subject")` on a second picture with
+  `lighten` (`bullterrier-demos/feedback/scene-conan.md`, 6): it works and is awkward.
+- **A WebAssembly build proof.** `cargo check -p bullterrier-image --target wasm32-unknown-unknown` with default features
+  compiles in about 10 s (measured 2026-11-14); no browser has run it. Open: rayon threads (`wasm-bindgen-rayon` or a
+  single-thread fallback), `std::fs`, `glob` and the clock, and the AI finders (subject, depth, SAM 2), which are native
+  only (feature `onnx` loads the ONNX Runtime library at run time): onnxruntime-web later, or cut out on a server and hand
+  back the matte. *Why:* effects live in a web page (direction 2). Done when a browser demo renders a recipe.
+- **Done, pushed (recorded so nobody redoes it):** a look's `px` follow the canvas through `with_canvas`; a canvas smaller than
+  the picture is allowed, and only fixes the scale (scene scales a layer past the canvas edge). A look's `px` are image's
+  design pixels, 1/480 of the canvas long side.
