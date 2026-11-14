@@ -118,6 +118,9 @@ a beat onto a bloom, frame after frame) can read the numbers and set them withou
   the range as any recipe does (cyclic angle takes any real, stores same direction inside its turn), refuses an address the
   recipe lacks (naming it, listing valid ones and nearest). Whole number may be written `3.0`. `bt-image sweep` takes the same
   addresses.
+- All or nothing: every address and value is checked before any is set, and a rule between numbers set together (`low` at most
+  `high`) holds for the set. The setter is the core's, `Recipe::with_values(&[(address, value)], presets)` in Rust, which
+  Python calls.
 
 ## One look at any size
 

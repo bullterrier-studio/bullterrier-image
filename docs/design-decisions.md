@@ -1164,8 +1164,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
     (`Path.d`, `Curve.path`): only the core reads path data, so `Recipe(...)` calls `_core.check_recipe` and a bad path is
     refused when the recipe is made, not when the region is. *Cost:* every `Recipe` (and so every `with_values`) is checked
     twice, by its models and by the core. *Revisit when* the models are generated from the core's declarations (R5).
-  - *`Recipe.parameters` and `with_values` stay a Python walk* over the steps, regions and frame (addresses are file-order
-    data, but the walk is 150 lines against a Rust twin plus a binding).
+  - *`Recipe.parameters` and `with_values` are the core's* (`Recipe::numbers`, `with_values`); Python rebuilds only what a call touched.
   - *`render_all` finds, the core renders.* Each map the recipes need is handed in or found once by `find_map`, then each
     recipe is rendered with the maps it knows; a single `render` takes the same path. The core is only asked for a
     finder for the subject of each piece of a `Subject` region with `per`.
@@ -1232,7 +1231,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   for a look, `region.<name>.<number>` and `frame.<number>`; a step is its optional `name`, else its effect (`each` for an
   `Each`) when the recipe has one such step, else the effect and its number from 1 (`bloom#2`, which `sweep` already
   wrote). `parameters()` gives each a `Parameter` (value, unit, minimum, maximum, doc, whole) from the number's own
-  declaration; `with_values` returns a copy, re-validating only what changed. *Reason:* the video package maps a control
+  declaration; `with_values` returns a copy, all or nothing. *Reason:* the video package maps a control
   signal onto a number within its limits, every frame, and must learn the numbers, units and ranges from image, not
   hold a copy of them; before this only `sweep` could name a value, and only a top-level step's parameter. One grammar
   serves `sweep`, a driver and an editor. *Consequence:* `name` is a step key (reserved, so no effect may have a parameter
@@ -1441,7 +1440,8 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
 - **Sweeps and addresses are the core's.** `Recipe::numbers`, `number` and `with_value` read the numbers of steps from the effects'
   parameter tables and those of the frame and the regions from `REGION_ROWS` and `FRAME_ROWS` (`recipe/numbers.rs`). The checks
   of `Frame` and `Region` keep their own bounds, for readability; a parity test holds each row to its check (the edge accepted, one
-  step beyond refused) and a completeness test fails for a numeric field with no row. Python's `Recipe.with_values` remains.
+  step beyond refused) and a completeness test fails for a numeric field with no row. `Recipe::with_values` sets several numbers at once, all or nothing, and Python's `Recipe.with_values` calls it:
+  scene and video link the core and must not rewrite a recipe document by address, which would leak image's knowledge out of image.
 - **`install onnx`, `models` and `doctor` are the CLI's half of "ONNX is optional".** The package pins ONNX Runtime 1.23.2 (the
   newest release that publishes macOS on Intel, Linux and Windows on x86-64 and arm64) with the size and SHA-256 of each
   platform's archive (`finding/runtime.rs`); `install` downloads the archive through the verified `download::fetch`, takes the
