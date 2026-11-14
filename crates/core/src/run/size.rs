@@ -113,8 +113,9 @@ impl Options {
     /// the same number of output pixels on each. Nothing else changes: the picture is not resized, and an effect that
     /// works out its place in the picture still takes the picture as the whole.
     ///
-    /// The render is refused, naming `canvas`, for a side of 0 and for a canvas smaller than the picture the render
-    /// returns on either side (after `size`), before anything runs. A canvas of the picture's own size is no canvas.
+    /// The render is refused, naming `canvas`, for a side of 0, before anything runs. The canvas only fixes the scale: it
+    /// may be smaller than the picture (a layer scaled past the canvas's edge). A canvas of the picture's own size is no
+    /// canvas.
     #[must_use]
     pub const fn with_canvas(mut self, width: u32, height: u32) -> Self {
         self.canvas = Some((width, height));
@@ -207,16 +208,16 @@ impl<'a> Working<'a> {
     /// longest side over [`DESIGN_SIZE`], of the `canvas` (width, height) the picture is placed on, else of the picture.
     ///
     /// # Errors
-    /// [`Error::Recipe`] for a canvas smaller than the picture on a side, which a side of 0 always is.
+    /// [`Error::Recipe`] for a canvas with a side of 0.
     pub(super) fn ratio(&self, canvas: Option<(u32, u32)>) -> Result<f64, Error> {
         let picture = self.picture();
         let (height, width) = (picture.height(), picture.width());
         let Some((canvas_width, canvas_height)) = canvas else {
             return Ok(length::float(height.max(width)) / DESIGN_SIZE);
         };
-        if (canvas_width as usize) < width || (canvas_height as usize) < height {
+        if canvas_width == 0 || canvas_height == 0 {
             return Err(Error::Recipe(format!(
-                "`canvas` {canvas_width} x {canvas_height} must hold the picture, {width} x {height}"
+                "`canvas` {canvas_width} x {canvas_height} must have both sides at least 1"
             )));
         }
         Ok(f64::from(canvas_width.max(canvas_height)) / DESIGN_SIZE)

@@ -605,6 +605,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   would give a smaller layer a finer grain than its neighbour. The canvas is in the picture's output pixels (the ratio stays a
   derived value, never an input). It reaches effects, `each` feathers and region edges alike, through the one ratio the runner
   derives; `Place` still describes the picture (canvas size and first row for position-aware effects wait for the banded render).
+  A canvas smaller than the picture is allowed (it was refused first; a caller that scales a layer past the canvas's edge needs
+  it): the canvas only fixes the scale, and only a side of 0 is refused.
   Python is not exposed yet: a `canvas=(width, height)` on `render` and `render_all` would follow `band` through `bridge` and
   the extension.
 - **Footprints of the 57 whole-picture effects, by reason (audit for B1/B2).** Of the 57 files that name `Footprint::Whole`,

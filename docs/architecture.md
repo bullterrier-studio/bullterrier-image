@@ -76,8 +76,8 @@ take `threads=`; `Step.apply` and `fx` use 1.
 **Canvas:** `Options::with_canvas(width, height)` names the full canvas the returned picture is placed on, in the pixels of that picture
 (after `size`). The design scale (`px` per design px: effect parameters, the `each` feather, a region's edge) is then the canvas's
 longest side over 480, not the picture's, so a `px` value is the same number of output pixels on every picture of one canvas.
-Nothing else follows the canvas yet: `Place` is still the picture. A side of 0, or a canvas smaller than the picture, is refused
-(`Error::Recipe`, naming `canvas`). Not in Python.
+Nothing else follows the canvas yet: `Place` is still the picture. A side of 0 is refused (`Error::Recipe`, naming
+`canvas`); a canvas smaller than the picture is fine (it only fixes the scale). Not in Python.
 
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
 (`finders={"subject": ...}`); the core's `Photo` takes the same (`with_map`, `with_finder`). `subject`, `depth` and `light` (made

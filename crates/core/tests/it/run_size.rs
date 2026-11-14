@@ -386,24 +386,34 @@ fn the_torn_edge_of_a_region_follows_the_canvas_as_a_length_does() -> Outcome {
 }
 
 #[test]
-fn a_canvas_with_a_side_of_zero_or_smaller_than_the_picture_is_refused_naming_it() -> Outcome {
+fn a_canvas_with_a_side_of_zero_is_refused_naming_it() -> Outcome {
     let values = ramp(4, 6);
     let photo = Photo::new(Picture::new(4, 6, &values)?);
     let recipe = Recipe::new([Step::new("grade")]);
-    // (the size asked for, the canvas width and height): 4 x 6 is 8 x 12 at size 12, which no canvas of 6 x 4 holds
-    for (size, canvas) in [
-        (None, (0, 4)),
-        (None, (6, 0)),
-        (None, (5, 4)),
-        (None, (6, 3)),
-        (Some(12), (6, 4)),
-    ] {
-        let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
-        let result = render(&photo, &recipe, options.with_canvas(canvas.0, canvas.1));
+    for canvas in [(0, 4), (6, 0), (0, 0)] {
+        let result = render(&photo, &recipe, Options::default().with_canvas(canvas.0, canvas.1));
         assert!(
             matches!(&result, Err(error) if error.kind() == ErrorKind::Recipe && error.to_string().contains("`canvas`")),
-            "{canvas:?} at {size:?}: {result:?}"
+            "{canvas:?}: {result:?}"
         );
+    }
+    Ok(())
+}
+
+/// A picture larger than the canvas (a layer scaled past its edge) is fine: the canvas only fixes the design scale.
+#[test]
+fn a_canvas_smaller_than_the_picture_still_sets_the_ratio() -> Outcome {
+    let values = vec![0.5; 4 * 6 * 3];
+    let photo = Photo::new(Picture::new(4, 6, &values)?);
+    // (the size asked for, the canvas width and height, the ratio): 4 x 6 is 8 x 12 at size 12
+    for (size, canvas, ratio) in [
+        (None, (3, 2), 3.0 / 480.0),
+        (None, (240, 2), 0.5),
+        (Some(12), (6, 4), 6.0 / 480.0),
+    ] {
+        let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
+        let handed = handed_ratio(&photo, options.with_canvas(canvas.0, canvas.1))?;
+        assert_eq!(handed, Some(ratio), "{canvas:?} at {size:?}");
     }
     Ok(())
 }
