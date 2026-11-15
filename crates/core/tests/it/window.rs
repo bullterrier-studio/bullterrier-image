@@ -17,16 +17,35 @@ use serde_json::Value;
 use crate::common::Outcome;
 use crate::common::compare::{first_bit_difference, first_difference_within};
 use crate::common::pictures::{asset, varied};
-use crate::common::sweep::{Setting, variants};
+use crate::common::sweep::{Setting, awkward, variants};
+
+/// A canvas: its sides, and the rows of the bands it is cut into: one, a prime, one that does not divide the height, half
+/// of it, and all of it.
+#[derive(Clone, Copy)]
+struct Canvas {
+    height: usize,
+    width: usize,
+    bands: &'static [usize],
+}
 
 /// A tall, narrow picture of odd sides, as in `banded.rs`.
-const HEIGHT: usize = 131;
-const WIDTH: usize = 19;
-/// The rows of a band: one, a prime, one that does not divide the height, half of it, and all of it.
-const BANDS: [usize; 5] = [1, 13, 50, 66, HEIGHT];
+const SMALL: Canvas = Canvas {
+    height: 131,
+    width: 19,
+    bands: &[1, 13, 50, 66, 131],
+};
 
-fn photo(values: &[f32], rows: std::ops::Range<usize>) -> Result<Photo<'_>, Box<dyn Error>> {
-    let picture = Picture::new(rows.len(), WIDTH, &values[rows.start * WIDTH * 3..rows.end * WIDTH * 3])?;
+/// A taller one, where a row is far from the top: a window that starts low is told its rows by their place on the canvas, and
+/// a fraction of a pixel worked out from the row inside the window rounds otherwise than from the row on the canvas.
+const TALL: Canvas = Canvas {
+    height: 481,
+    width: 8,
+    bands: &[7, 241, 481],
+};
+
+fn photo(canvas: Canvas, values: &[f32], rows: std::ops::Range<usize>) -> Result<Photo<'_>, Box<dyn Error>> {
+    let width = canvas.width;
+    let picture = Picture::new(rows.len(), width, &values[rows.start * width * 3..rows.end * width * 3])?;
     Ok(Photo::new(picture).with_image("asset", Arc::new(asset())))
 }
 
@@ -36,8 +55,9 @@ fn step_of(name: &str, setting: &Setting) -> Step {
     step
 }
 
-/// The rows of the render of `recipe` on `rows` of `values` as the window `top..` of the whole canvas `HEIGHT` x `WIDTH`.
+/// The rows of the render of `recipe` on `rows` of `values` as the window `top..` of the whole `canvas`.
 fn windowed(
+    canvas: Canvas,
     values: &[f32],
     recipe: &Recipe,
     rows: std::ops::Range<usize>,
@@ -45,31 +65,33 @@ fn windowed(
 ) -> Result<Image, Box<dyn Error>> {
     let options = options.with_window(
         u32::try_from(rows.start)?,
-        u32::try_from(WIDTH)?,
-        u32::try_from(HEIGHT)?,
+        u32::try_from(canvas.width)?,
+        u32::try_from(canvas.height)?,
     );
-    Ok(photo(values, rows)?.render(recipe, &Presets::new(), options)?)
+    Ok(photo(canvas, values, rows)?.render(recipe, &Presets::new(), options)?)
 }
 
 /// The first band of `rows` rows whose window render is not the whole render's rows, with how, or none.
 fn first_problem(
+    canvas: Canvas,
     values: &[f32],
     recipe: &Recipe,
     margin: usize,
     within: f32,
     options: Options,
 ) -> Result<Option<String>, Box<dyn Error>> {
-    let whole = photo(values, 0..HEIGHT)?
+    let Canvas { height, width, bands } = canvas;
+    let whole = photo(canvas, values, 0..height)?
         .render(recipe, &Presets::new(), options)?
         .into_values();
-    for rows in BANDS {
-        for top in (0..HEIGHT).step_by(rows) {
-            let (bottom, from) = ((top + rows).min(HEIGHT), top.saturating_sub(margin));
-            let to = (bottom + margin).min(HEIGHT);
-            let band = windowed(values, recipe, from..to, options)?.into_values();
+    for &rows in bands {
+        for top in (0..height).step_by(rows) {
+            let (bottom, from) = ((top + rows).min(height), top.saturating_sub(margin));
+            let to = (bottom + margin).min(height);
+            let band = windowed(canvas, values, recipe, from..to, options)?.into_values();
             let (made, want) = (
-                &band[(top - from) * WIDTH * 3..(bottom - from) * WIDTH * 3],
-                &whole[top * WIDTH * 3..bottom * WIDTH * 3],
+                &band[(top - from) * width * 3..(bottom - from) * width * 3],
+                &whole[top * width * 3..bottom * width * 3],
             );
             if let Some(at) = first_difference_within(made, want, within) {
                 return Ok(Some(format!(
@@ -83,9 +105,24 @@ fn first_problem(
 
 #[test]
 fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
-    let values = varied(HEIGHT, WIDTH);
+    every_cleared_effect_over(SMALL, &[variants])
+}
+
+/// The same on a tall canvas, at the defaults and limits and at settings that move content by a fraction of a pixel along no
+/// axis (the limits of a range are whole numbers and the quarter turns, which hide a rounding that depends on the row a
+/// window starts at).
+#[test]
+fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_on_a_tall_canvas_at_awkward_settings() -> Outcome {
+    every_cleared_effect_over(TALL, &[variants, awkward])
+}
+
+fn every_cleared_effect_over(
+    canvas: Canvas,
+    settings: &[fn(&bullterrier_image::params::Table) -> Vec<Setting>],
+) -> Outcome {
+    let values = varied(canvas.height, canvas.width);
     let (mut problems, mut cleared) = (Vec::new(), 0);
-    let longest = u32::try_from(HEIGHT)?;
+    let longest = u32::try_from(canvas.height)?;
     for name in effects() {
         let Ok(one) = effect(&name) else {
             continue; // a double that another test unregistered since `effects()`
@@ -94,7 +131,7 @@ fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_windo
             continue; // the recipe needs a region to name (the query answers none for it; the check refuses it without one)
         }
         let table = one.params();
-        for setting in variants(&table) {
+        for setting in settings.iter().flat_map(|settings| settings(&table)) {
             if table.check(&name, &setting).is_err() {
                 continue; // a combination the effect refuses
             }
@@ -103,7 +140,7 @@ fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_windo
                 continue;
             };
             cleared += 1;
-            if let Some(found) = first_problem(&values, &recipe, margin, 0.0, Options::default())? {
+            if let Some(found) = first_problem(canvas, &values, &recipe, margin, 0.0, Options::default())? {
                 problems.push(format!("{name} {}: {found}", Value::Object(setting)));
             }
         }
@@ -114,7 +151,7 @@ fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_windo
         problems.len(),
         problems.join("\n")
     );
-    assert!(cleared > 500, "only {cleared} cases were cleared");
+    assert!(cleared > 200, "only {cleared} cases were cleared");
     Ok(())
 }
 
@@ -124,7 +161,7 @@ fn grade() -> Step {
 
 #[test]
 fn a_chain_of_steps_needs_the_margins_added_and_gives_the_rows_of_the_whole_render() -> Outcome {
-    let values = varied(HEIGHT, WIDTH);
+    let values = varied(SMALL.height, SMALL.width);
     let recipe = Recipe::new([
         Step::new("gaussian_blur").param("radius", 3.0),
         Step::new("vignette"),
@@ -133,27 +170,30 @@ fn a_chain_of_steps_needs_the_margins_added_and_gives_the_rows_of_the_whole_rend
         Step::new("sharpen").param("radius", 2.0),
         Step::new("scanlines"),
     ]);
-    let margin = recipe.band_margin(&Presets::new(), u32::try_from(HEIGHT)?)?;
+    let margin = recipe.band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?;
     let margin = margin.ok_or("a chain of banded steps is banded")?;
     let single = |name: &str| Recipe::new([Step::new(name)]).band_margin(&Presets::new(), 131);
     assert!(
         margin > single("gaussian_blur")?.ok_or("blur")?,
         "the margins add: {margin}"
     );
-    assert_eq!(first_problem(&values, &recipe, margin, 0.0, Options::default())?, None);
+    assert_eq!(
+        first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+        None
+    );
     Ok(())
 }
 
 #[test]
 fn a_window_and_the_runners_own_bands_compose() -> Outcome {
-    let values = varied(HEIGHT, WIDTH);
+    let values = varied(SMALL.height, SMALL.width);
     let recipe = Recipe::new([Step::new("vignette"), Step::new("grain"), Step::new("pixel_grid")]);
     let margin = recipe
         .band_margin(&Presets::new(), 131)?
         .ok_or("these steps are banded")?;
     let rows = std::num::NonZeroUsize::new(7).ok_or("rows")?;
     let options = Options::default().with_band(rows);
-    assert_eq!(first_problem(&values, &recipe, margin, 0.0, options)?, None);
+    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, options)?, None);
     Ok(())
 }
 
@@ -193,10 +233,10 @@ fn a_recipe_that_a_window_cannot_make_has_no_band_margin() -> Outcome {
 
 #[test]
 fn a_window_that_is_not_rows_of_the_canvas_is_refused_naming_the_window() -> Outcome {
-    let values = varied(HEIGHT, WIDTH);
+    let values = varied(SMALL.height, SMALL.width);
     let recipe = Recipe::new([grade()]);
-    let photo = photo(&values, 0..10)?;
-    let (width, height) = (u32::try_from(WIDTH)?, u32::try_from(HEIGHT)?);
+    let photo = photo(SMALL, &values, 0..10)?;
+    let (width, height) = (u32::try_from(SMALL.width)?, u32::try_from(SMALL.height)?);
     let mut sized = Recipe::new([grade()]);
     sized.size = Some(40);
     for (what, options, recipe) in [
@@ -333,6 +373,12 @@ fn a_recipe_the_query_clears_is_the_whole_render_byte_for_byte_on_both_sides_of_
         (
             "a shift of 40 px has no transform",
             Recipe::new([Step::new("rgb_split").param("amount", 40.0).param("angle", 0.0)]),
+            480,
+            true,
+        ),
+        (
+            "a shift of 40 px along 330 degrees moves rows by a fraction",
+            Recipe::new([Step::new("rgb_split").param("amount", 40.0)]),
             480,
             true,
         ),

@@ -13,10 +13,16 @@ use super::sample::{Interpolation, Sampler};
 /// exactly; the values never leave the range of the picture. `edge` says what lies beyond the picture's edge, which a move
 /// uncovers on one side; any distance is allowed, also beyond the picture's size. With `Extension::Wrap` the picture's total
 /// is kept.
+///
+/// `canvas_row` is the canvas row of the picture's first row (0 for a picture that is its own canvas). A window of a canvas
+/// then gets the position of each row it reads by the row's place on the canvas, as the whole render does: a fraction of a
+/// pixel worked out from the row inside the window rounds otherwise at another magnitude. Where `dy` is a whole number or a
+/// multiple of an f32 (exact in f64, so no rounding depends on the row) 0 gives the same picture.
 pub(crate) fn shifted(
     pixels: &[[f32; 3]],
     height: usize,
     width: usize,
+    canvas_row: usize,
     dy: f64,
     dx: f64,
     edge: Extension,
@@ -32,8 +38,10 @@ pub(crate) fn shifted(
             )]
             {
                 let (row, column) = (first_row + at / width, at % width);
+                // the canvas row less `dy`, then back into the picture: both steps are exact for the sums the render reads
+                let canvas_position = (canvas_row + row) as f64 - dy;
                 *pixel = sampler
-                    .at(row as f64 - dy, column as f64 - dx)
+                    .at(canvas_position - canvas_row as f64, column as f64 - dx)
                     .map(|level| level as f32);
             }
         }

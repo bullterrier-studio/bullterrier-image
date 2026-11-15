@@ -66,3 +66,25 @@ pub(crate) fn variants(table: &Table) -> Vec<Setting> {
     }
     cases
 }
+
+/// The settings that move things by a fraction of a pixel along no axis: each number alone at two shares of its range that
+/// are neither end nor middle (a direction lands off the quarter turns, a distance between whole pixels). Some may be
+/// refused by the table: those are left out when they are checked.
+#[allow(clippy::cast_possible_truncation, reason = "limits are small whole numbers")]
+pub(crate) fn awkward(table: &Table) -> Vec<Setting> {
+    let mut cases = Vec::new();
+    for field in &table.fields {
+        let (Some(low), Some(high)) = (number(field.min), number(field.max)) else {
+            continue;
+        };
+        for share in [0.37, 0.71] {
+            let value = match field.kind {
+                Kind::Float => json!(low + (high - low) * share),
+                Kind::Int => json!((low + (high - low) * share).round() as i64),
+                _ => continue,
+            };
+            cases.push(Setting::from_iter([(field.name.to_owned(), value)]));
+        }
+    }
+    cases
+}

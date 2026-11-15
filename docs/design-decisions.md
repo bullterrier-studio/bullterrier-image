@@ -703,6 +703,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   `exact_margin` answers none for. The effect says it with `Footprint::transformed(blur::is_fourier(..))`, by the predicate the blur itself
   uses; the sweep of `tests/it/window.rs` holds every effect it clears to the byte, so an effect that forgets fails there. The answer is
   conservative where the width is not in the parameters (`anamorphic_streaks`: a row as wide as the picture).
+  A distance worked out by a trig function (`rgb_split`, `drop_shadow`) is rounded by the row it is subtracted from, so `ops::shift::shifted`
+  takes the canvas row of the picture's first row and reads from the position of the canvas row (found by `tests/it/window.rs` on a tall canvas, at
+  awkward settings: `rgb_split` at 180 degrees differed in one bit from row 427 on); a distance that is a multiple of an f32 is exact in f64 and passes 0.
   *Noise (the old category-B question):* every seeded effect that bands hashes the canvas place or draws a list over the canvas
   (B2, B3), so a jump-ahead of the sequential stream was never needed and no render changed; those still whole are `jpeg_crush`,
   `shatter` and the `perlin`, `worley` and `sine` kinds of `noise_field` (statistic of the whole picture or a whole-picture structure).

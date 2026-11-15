@@ -136,7 +136,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         f64::from(params.offset_y) * cell_height as f64,
         f64::from(params.offset_x) * cell_width as f64,
     );
-    let cell = shifted(&cell, cell_height, cell_width, down, across, Extension::Wrap);
+    let cell = shifted(&cell, cell_height, cell_width, 0, down, across, Extension::Wrap);
     picture.map_at(|row, column, _| {
         cell[(row % cell_height) * cell_width + column % cell_width].map(|level| level.clamp(0.0, 1.0))
     })

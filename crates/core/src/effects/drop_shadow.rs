@@ -126,7 +126,15 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         let along = (number - 1) as f32 / copies.saturating_sub(1).max(1) as f32; // 0 at the first copy, 1 at the last
         let opacity = params.copy_opacity * (1.0 - params.fade * along);
         let steps = f64::from(number);
-        let moved = shifted(&silhouette, height, width, down * steps, right * steps, edge);
+        let moved = shifted(
+            &silhouette,
+            height,
+            width,
+            inputs.place(picture).first_row,
+            down * steps,
+            right * steps,
+            edge,
+        );
         let cover: Vec<f32> = moved.iter().map(|pixel| pixel[0]).collect();
         let cover = gaussian_filter_owned(
             cover,

@@ -68,6 +68,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         picture.pixels(),
         height,
         width,
+        0, // no move down
         0.0,
         f64::from(params.offset),
         params.edge.extension(),

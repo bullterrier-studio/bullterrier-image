@@ -13,13 +13,13 @@ use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::shift::shifted;
 use crate::params::{Choice, Params};
-use crate::{Image, Inputs, Picture};
+use crate::{Image, Input, Inputs, Picture};
 
 /// Where `rgb_split` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
     category: Category::Glitch,
     opacity: 1.0,
-    inputs: &[],
+    inputs: &[Input::Place],
 };
 
 /// What `rgb_split` reads around a pixel.
@@ -74,7 +74,7 @@ pub struct Params {
 }
 
 /// The picture with its channels moved apart.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     let radians = f64::from(params.angle).to_radians();
     let dx = f64::from(params.amount) * radians.cos();
@@ -82,8 +82,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let dy = f64::from(params.amount) * radians.sin();
     let edge = params.edge.extension();
     let pixels = picture.pixels();
-    let red = shifted(pixels, height, width, dy, dx, edge);
-    let opposite = shifted(pixels, height, width, -dy, -dx, edge);
+    let first_row = inputs.place(picture).first_row;
+    let red = shifted(pixels, height, width, first_row, dy, dx, edge);
+    let opposite = shifted(pixels, height, width, first_row, -dy, -dx, edge);
     let green_moves = params.pair == Pair::RedCyan;
     let split = pixels
         .iter()

@@ -83,6 +83,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             picture.pixels(),
             height,
             width,
+            0, // a copy moves by a multiple of an f32: exact in f64, so no rounding depends on the row
             steps * f64::from(params.dy),
             steps * f64::from(params.dx),
             params.edge.extension(),
