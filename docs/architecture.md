@@ -78,6 +78,14 @@ take `threads=`; `Step.apply` and `fx` use 1.
 longest side over 480, not the picture's, so a `px` value is the same number of output pixels on every picture of one canvas.
 Nothing else follows the canvas yet: `Place` is still the picture. A side of 0 is refused (`Error::Recipe`, naming
 `canvas`); a canvas smaller than the picture is fine (it only fixes the scale). Not in Python.
+**Window:** `Options::with_window(first_row, canvas_width, canvas_height)` says the picture handed to `render` is rows of a larger canvas
+from canvas row `first_row`: the runner builds every effect's `Place` from it (`run/size.rs` `Origin`; the steps of a band the runner cuts add their
+offset), and the design scale follows the window's canvas (it replaces `with_canvas`). No effect reads it differently: a position-aware effect already
+reads `Place`, so a band of rows equals the same rows of the whole render. Refused (`Error::Recipe`, naming `window`): a width other than the picture's,
+rows beyond the canvas, a side of 0, and a `frame` or `size` (they change the rows). `Recipe::band_margin(presets, longest_side) -> Option<usize>` is the
+caller's query: the rows to hand each side of a band (the steps' margins add), none for a recipe a window cannot make: a `frame` or `size`, a step that
+reads the whole picture, an `each` or driven step, or one with a `mask`, `partition` or field parameter (the maps of a band are not the canvas's).
+`tests/it/window.rs` renders every effect it clears as windows of band plus margin against the whole render. Not in Python.
 
 **Spread:** `Effect::spread(params) -> Spread` says how far an effect paints beyond the edge of the box of its content (none by default; `Spread::NONE` for an effect that
 recolours or paints inside its shapes), per side in working px, or `Spread::Unbounded`. It is a separate promise from `Footprint`, which is about the rows

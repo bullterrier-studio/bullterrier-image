@@ -604,7 +604,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   on the canvas, so it must be the same number of output pixels on every layer of one canvas; the working picture's own side
   would give a smaller layer a finer grain than its neighbour. The canvas is in the picture's output pixels (the ratio stays a
   derived value, never an input). It reaches effects, `each` feathers and region edges alike, through the one ratio the runner
-  derives; `Place` still describes the picture (canvas size and first row for position-aware effects wait for the banded render).
+  derives; `Place` still describes the picture (the window, below, is what sets a first row).
   A canvas smaller than the picture is allowed (it was refused first; a caller that scales a layer past the canvas's edge needs
   it): the canvas only fixes the scale, and only a side of 0 is refused.
   Python is not exposed yet: a `canvas=(width, height)` on `render` and `render_all` would follow `band` through `bridge` and
@@ -691,6 +691,20 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   equals the plain one inside the box, which is more than a day; scene can grow the picture itself until a look needs both a halo and a vignette. *Not
   in Python:* the facade has `Recipe.parameters()` for `numbers()`, but the return value (per-side numbers or unbounded) is a new Python type and the
   only caller is Rust.
+- **Built: `Options::with_window(first_row, canvas_width, canvas_height)` and `Recipe::band_margin` (a public frame of reference).**
+  *Why:* scene renders a looked layer band by band; every position-aware effect already reads `Place` (B1b to B3b), and the runner
+  built it from the working picture alone, so only a first row and a canvas were missing. *Shape:* one setter, on the window of rows,
+  not a `Place` in `Options`: the canvas size also fixes the design scale (a `with_canvas` that placed the picture would have moved the
+  `Place` of every smaller layer picture scene hands it with `with_canvas`, so `with_canvas` keeps meaning scale only). The runner
+  offsets the window by the rows of a band it cuts itself, so a window composes with `with_band`. *Refused:* a picture that is not
+  the canvas's width, rows beyond the canvas, and a `frame` or `size` (they change the rows); named `window`. *The query:* `band_margin`
+  returns the margin because a caller needs the number; it is none where a band of the canvas is not the canvas: `Whole` steps, `each`,
+  driven steps, and steps that read a map or pieces (a band's `subject`, a feathered or blurred region, is the band's, not the canvas's).
+  It promises what `with_band` does (within 1e-4, byte for byte except a Fourier-summed blur, from a reach of 16 working px). *Not
+  settled here:* an exact-only answer (a look with a large blur has the Fourier sum, so it is banded within rounding, not to the bit).
+  *Noise (the old category-B question):* every seeded effect that bands hashes the canvas place or draws a list over the canvas
+  (B2, B3), so a jump-ahead of the sequential stream was never needed and no render changed; those still whole are `jpeg_crush`,
+  `shatter` and the `perlin`, `worley` and `sine` kinds of `noise_field` (statistic of the whole picture or a whole-picture structure).
 - **Settled: the band height trades memory for time (banded render).** Measured on 24 MP (4000 x 6000), `grade`,
   `vignette`, `gaussian_blur` radius 2, `grain`; memory is the peak beyond the photo as a multiple of the 288 MB image
   made, time against the whole render at 1 / 4 threads (median of 3):

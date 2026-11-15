@@ -337,11 +337,10 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
   parameter formula and a row in the oracle `tests/it/spread.rs` away, worked out when a look needs it; `Recipe::spread` in Python
   (`Recipe.parameters()` is its neighbour); `Options::with_room(px)`, a render on a grown picture with the position-aware effects' geometry taken from the
   original box (the vignette, the `x`/`y` centres, `Place`-numbered noise, `frame`): until then a grown picture shifts them.
-- **Position-aware effects, with a public canvas size and first row** (banded render for scene B1). `Place { canvas_height,
-  canvas_width, first_row }` exists as an effect input (`Inputs::with_place`) and the runner fills it for its own bands;
-  `Options` has no way to set the first row, and `with_canvas` sets only the scale. *Why:* a scene composed band by band
-  must run a vignette, a seeded noise or a gradient as the same pixels as the whole render. *Evidence:* scene's roadmap, B1
-  (deferred for this).
+- **Done: position-aware effects, with a public canvas size and first row** (banded render for scene B1). `Options::with_window(first_row,
+  canvas_width, canvas_height)` and `Recipe::band_margin` (`architecture.md`, "Window"; `design-decisions.md`). Every effect that bands reads
+  `Place`, so a band of rows equals the same rows of the whole render (oracle: `tests/it/window.rs`). Remains: Python (`window=`), an exact-only
+  answer of `band_margin` for Fourier blurs, and `Options::with_room` (the next item).
 - **Python `canvas=` for `Options::with_canvas`.** Rust only today (`design-decisions.md`: "Built: `Options::with_canvas`" says
   Python would follow `band` through `bridge` and the stubs). *Why:* a Python caller placing a layer on a larger canvas gets
   the layer's own design scale. *Evidence:* none from a Python caller yet; scene calls the Rust API.

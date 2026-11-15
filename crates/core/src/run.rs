@@ -30,13 +30,13 @@ pub use maps::Finder;
 use maps::{Found, Maps};
 use regions::Evaluator;
 pub use size::Options;
-use size::Working;
 use size::ratio_of;
+use size::{Origin, Working};
 use step::{Prepared, prepare};
 pub use trace::Stage;
 
 use crate::ops::par;
-use crate::{Error, Image, Layer, Lut, Picture, Presets, Recipe, Spread};
+use crate::{Error, Frame, Image, Layer, Lut, Picture, Presets, Recipe, Spread};
 
 impl Recipe {
     /// How far `self` paints beyond the edge of the picture it is rendered on: the room, in output pixels, that a
@@ -65,6 +65,39 @@ impl Recipe {
             total = total.then(step::spread(presets, ratio, entry, &format!("step {}", index + 1))?);
         }
         Ok(total)
+    }
+
+    /// The rows of margin a render of a band of this recipe needs on each side, or none if the recipe cannot be rendered
+    /// in bands: the answer a caller needs to cut a picture into bands and give each to [`Options::with_window`].
+    ///
+    /// Hand a render the rows of the picture from the band's first row less this margin to its last row plus it (fewer
+    /// where the picture ends), with [`Options::with_window`] saying where they lie on the canvas, and the rows of the
+    /// band in what it returns are the rows of the whole picture's render (as for [`Options::with_band`]: within float
+    /// rounding, 1e-4, and byte for byte except where a step blurs by a Fourier transform, from a reach of 16 working
+    /// px, whose sum depends on the length of the rows given it). The margins of the steps add, as each reads what the
+    /// one before made.
+    ///
+    /// The answer is none for a recipe with a `frame` or a `size` (they change the rows), and with a step that reads the
+    /// whole picture (an effect whose [`Footprint`](crate::Footprint) is `Whole`), a driven step, an `each` step, or one
+    /// with a `mask`, a `partition` or a field parameter: a map or the pieces of a band are not the canvas's. It
+    /// reads parameters only and loads no picture or table. `longest_side` is as for [`spread`](Self::spread).
+    ///
+    /// # Errors
+    /// Whatever [`Recipe::checked`] refuses the recipe for, and [`Error::Recipe`] for a `longest_side` of 0.
+    pub fn band_margin(&self, presets: &Presets, longest_side: u32) -> Result<Option<usize>, Error> {
+        if longest_side == 0 {
+            return Err(Error::Recipe("`longest_side` must be >= 1, got 0".to_owned()));
+        }
+        self.check_rules(presets)?;
+        let ratio = ratio_of(f64::from(longest_side));
+        let mut total = 0_usize;
+        for (index, entry) in self.steps.iter().enumerate() {
+            match step::band_margin(presets, ratio, entry, &format!("step {}", index + 1))? {
+                Some(margin) => total = total.saturating_add(margin),
+                None => return Ok(None),
+            }
+        }
+        Ok((self.frame == Frame::default() && self.size.is_none()).then_some(total))
     }
 }
 
@@ -268,6 +301,7 @@ impl<'a> Photo<'a> {
             options.size().or(recipe.size),
             given_subject.as_deref(),
         )?;
+        let origin = working.origin(options)?;
         let ratio = working.ratio(options.canvas())?;
         let maps = Maps::new(self, recipe, &working)?;
         // as the working picture has it, which a trace shows like a map a step uses
@@ -295,6 +329,7 @@ impl<'a> Photo<'a> {
         let last = reach.into_iter().map(|reached| (reached.name, reached.last)).collect();
         Ok(Run {
             working,
+            origin,
             ratio,
             steps: steps.into_iter(),
             ran: 0,
@@ -317,6 +352,8 @@ impl<'a> Photo<'a> {
 struct Run<'a> {
     /// The picture the steps work on: the photo, or the copy of it at the size asked for.
     working: Working<'a>,
+    /// Where the working picture lies on its canvas.
+    origin: Origin,
     ratio: f64,
     steps: std::vec::IntoIter<Prepared>,
     /// How many steps have run.
@@ -338,7 +375,13 @@ impl Run<'_> {
             .current
             .as_ref()
             .map_or_else(|| self.working.picture(), Image::as_picture);
-        let after = step.apply(&before, self.ratio, &mut self.regions, &self.working.picture(), 0)?;
+        let after = step.apply(
+            &before,
+            self.ratio,
+            &mut self.regions,
+            &self.working.picture(),
+            (0, self.origin),
+        )?;
         self.regions.release(self.ran);
         self.ran += 1;
         self.current = Some(after);

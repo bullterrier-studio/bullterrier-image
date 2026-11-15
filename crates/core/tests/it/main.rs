@@ -190,3 +190,4 @@ mod torn_edge;
 mod trace;
 mod typed_params;
 mod vhs;
+mod window;

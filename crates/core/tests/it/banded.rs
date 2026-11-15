@@ -43,7 +43,7 @@ const BANDED_AT_LEAST: usize = 20;
 /// follows the height (`ops/fft`).
 // constant: an FFT blur's sum depends on the window length; the largest difference measured was 5.1e-5 (relight); a
 // footprint bug shows as at least a Gaussian tail, much larger than 1e-4
-const TOLERANCE: f32 = 1e-4;
+pub(crate) const TOLERANCE: f32 = 1e-4;
 
 /// The photo of `values`, handed the maps every recipe may name (`subject`: blocks, `depth`: a hash) and the picture
 /// `asset`.
@@ -224,7 +224,7 @@ fn in_px(table: &bullterrier_image::params::Table, setting: &Setting) -> bool {
 /// long as the band: their sums differ in the last bits between a band and the whole (measured up to 7.3e-5, `liquid_metal`).
 /// They are held to `TOLERANCE`; every other effect is held to the byte. An effect that fails the byte test for this
 /// reason and is not listed is listed here, once its failure is shown to be only that.
-const FFT_BLURS: [&str; 16] = [
+pub(crate) const FFT_BLURS: [&str; 16] = [
     "ambient_occlusion",
     "anamorphic_streaks",
     "bloom",

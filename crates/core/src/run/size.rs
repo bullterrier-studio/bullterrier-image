@@ -7,7 +7,7 @@ use std::sync::Arc;
 use super::frame::Geometry;
 use crate::ops::length;
 use crate::ops::resample::Resize;
-use crate::{Error, Frame, Image, Layer, Picture};
+use crate::{Error, Frame, Image, Layer, Picture, Place};
 
 /// The longest side in px that a recipe's pixel values are written for.
 const DESIGN_SIZE: f64 = 480.0; // constant: the design size of the format, Python's `DESIGN_SIZE`
@@ -26,6 +26,31 @@ pub struct Options {
     threads: usize,
     band: Option<NonZeroUsize>,
     canvas: Option<(u32, u32)>,
+    window: Option<Window>,
+}
+
+/// The rows of a canvas that the picture handed to a render is (see [`Options::with_window`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Window {
+    first_row: u32,
+    width: u32,
+    height: u32,
+}
+
+/// Where the working picture lies on its canvas: what an effect's [`Place`] is made from.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Origin {
+    canvas_height: usize,
+    canvas_width: usize,
+    /// The canvas row of the working picture's row 0.
+    first_row: usize,
+}
+
+impl Origin {
+    /// The place of the rows of the working picture from row `at` on.
+    pub(super) fn place(self, at: usize) -> Place {
+        Place::new(self.canvas_height, self.canvas_width, self.first_row + at)
+    }
 }
 
 impl Default for Options {
@@ -36,6 +61,7 @@ impl Default for Options {
             threads: 1,
             band: None,
             canvas: None,
+            window: None,
         }
     }
 }
@@ -128,9 +154,37 @@ impl Options {
         self
     }
 
-    /// The canvas asked for, if any, as width and height.
+    /// These options with `window`: the picture the render is handed is the `rows` rows of a canvas `canvas_width` x
+    /// `canvas_height` from canvas row `first_row`, in px of that picture. It makes a render of a band of a larger
+    /// canvas the same pixels as the same rows of the render of the whole: an effect's place (a vignette's distance
+    /// from the middle, noise numbered by position, a gradient, a screen's lattice) is its place on the canvas, and the
+    /// design scale follows the canvas, as for [`with_canvas`](Self::with_canvas) (which a window replaces).
+    ///
+    /// To make rows `top` to `bottom` of a picture whose effects reach `margin` rows (see
+    /// [`Recipe::band_margin`]), hand the render the rows `top - margin` to `bottom + margin` (fewer where the picture
+    /// ends) with `first_row` their first, and keep the rows `top` to `bottom` of what it returns: the margin rows are
+    /// not the whole render's.
+    ///
+    /// The render is refused, naming `window`, before anything runs, for a picture that is not `canvas_width` wide, one
+    /// that does not lie within the canvas, a canvas side of 0, and for a recipe whose `frame` or `size` (or an `size` in
+    /// the options) changes the picture's rows: they are the whole picture's, not a band's. The maps and pictures a
+    /// step names are those of the band: a recipe that uses one is the caller's to band (see [`Recipe::band_margin`]).
+    #[must_use]
+    pub const fn with_window(mut self, first_row: u32, canvas_width: u32, canvas_height: u32) -> Self {
+        self.window = Some(Window {
+            first_row,
+            width: canvas_width,
+            height: canvas_height,
+        });
+        self
+    }
+
+    /// The canvas the design scale follows, if any, as width and height: the window's, else the one asked for.
     pub(super) const fn canvas(self) -> Option<(u32, u32)> {
-        self.canvas
+        match self.window {
+            Some(window) => Some((window.width, window.height)),
+            None => self.canvas,
+        }
     }
 
     /// The rows a band is, if the render is banded.
@@ -227,6 +281,51 @@ impl<'a> Working<'a> {
             )));
         }
         Ok(ratio_of(f64::from(canvas_width.max(canvas_height))))
+    }
+
+    /// Where the working picture lies on its canvas: on itself, unless `options` give a window.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] for a window the picture is not the rows of (see [`Options::with_window`]).
+    pub(super) fn origin(&self, options: Options) -> Result<Origin, Error> {
+        let picture = self.picture();
+        let (height, width) = (picture.height(), picture.width());
+        let Some(window) = options.window else {
+            return Ok(Origin {
+                canvas_height: height,
+                canvas_width: width,
+                first_row: 0,
+            });
+        };
+        let (canvas_height, canvas_width, first_row) =
+            (window.height as usize, window.width as usize, window.first_row as usize);
+        let refuse = |why: String| Error::Recipe(format!("`window` {why}"));
+        if canvas_width == 0 || canvas_height == 0 {
+            return Err(refuse(format!(
+                "{canvas_width} x {canvas_height} must have both sides at least 1"
+            )));
+        }
+        if self.made.is_some() {
+            return Err(refuse(
+                "needs the photo as it is: the recipe's `frame` or `size` changes its rows".to_owned(),
+            ));
+        }
+        if canvas_width != width {
+            return Err(refuse(format!(
+                "is {canvas_width} px wide, the picture {width}: a window is rows of the canvas"
+            )));
+        }
+        if first_row + height > canvas_height {
+            return Err(refuse(format!(
+                "of rows {first_row}..{} does not lie in a canvas of {canvas_height} rows",
+                first_row + height
+            )));
+        }
+        Ok(Origin {
+            canvas_height,
+            canvas_width,
+            first_row,
+        })
     }
 
     /// `map`, a map of the photo as given, as a map of the working picture: the map itself if the picture is the photo,

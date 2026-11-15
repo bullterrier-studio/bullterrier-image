@@ -8,11 +8,12 @@ use serde_json::{Map, Value};
 use super::assets::Assets;
 use super::each::EachRun;
 use super::regions::Evaluator;
+use super::size::Origin;
 use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
 use crate::params::Kind;
 use crate::recipe::drive;
-use crate::{BlendMode, Entry, Error, Image, Inputs, Labels, Layer, Lut, Picture, Place, Presets, Spread, Step};
+use crate::{BlendMode, Entry, Error, Image, Input, Inputs, Labels, Layer, Lut, Picture, Presets, Spread, Step};
 
 /// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
 /// names, for an `each` step its looks the same.
@@ -39,7 +40,8 @@ impl Prepared {
     /// This entry run on `before`, with the selections it names made by `regions` for `working`, the picture the render
     /// works on, and the result laid over `before`; `ratio` is the working picture's size over the design size.
     /// `before` is `working`, or, for a step with a [`margin`](Self::margin), the rows of it from `at` on (an `each`
-    /// step is always run on all of it, at 0): the maps the step names are cut to those rows and it is told its place.
+    /// step is always run on all of it, at 0): the maps the step names are cut to those rows and it is told its place,
+    /// those rows of the canvas `origin` says the working picture lies on. `at` is the pair of the two.
     ///
     /// # Errors
     /// Why a region could not be made, or an effect failed.
@@ -49,11 +51,11 @@ impl Prepared {
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
-        at: usize,
+        at: (usize, Origin),
     ) -> Result<Image, Error> {
         match self {
             Self::Step(step) => step.apply(before, ratio, regions, working, at),
-            Self::Each(each) => each.apply(before, ratio, regions, working),
+            Self::Each(each) => each.apply(before, ratio, regions, working, at.1),
         }
     }
 
@@ -305,17 +307,14 @@ impl StepRun {
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
-        at: usize,
+        (at, origin): (usize, Origin),
     ) -> Result<Image, Error> {
         let rows = before.height();
         let mut fields = Vec::with_capacity(self.fields.len());
         for (parameter, region) in &self.fields {
             fields.push((parameter, rows_of(regions.selection(region, working)?, at, rows)));
         }
-        let mut offered =
-            Inputs::default()
-                .with_size_ratio(ratio)
-                .with_place(Place::new(working.height(), working.width(), at));
+        let mut offered = Inputs::default().with_size_ratio(ratio).with_place(origin.place(at));
         for (parameter, layer) in &fields {
             offered = offered.with_field(parameter.as_str(), layer);
         }
@@ -391,6 +390,31 @@ fn pieces_of(pieces: Arc<Labels>, at: usize, rows: usize) -> Arc<Labels> {
         pieces
     } else {
         Arc::new(pieces.rows(at, at + rows))
+    }
+}
+
+/// The rows of margin `entry` (at `place`, as `step 2`) needs when it runs on a window of its canvas at `ratio` working pixels per
+/// design pixel, or none if a window cannot make it: an `each` step, a driven step, one that reads a map or the pieces of a
+/// partition (a band's own maps are not the canvas's) and one whose effect reads the whole picture. Parameters only.
+///
+/// # Errors
+/// What preparing the entry refuses for its parameters: [`Error::UnknownEffect`], [`Error::Params`], [`Error::Invalid`].
+pub(super) fn band_margin(presets: &Presets, ratio: f64, entry: &Entry, place: &str) -> Result<Option<usize>, Error> {
+    let Entry::Step(step) = entry else {
+        return Ok(None);
+    };
+    let effect = crate::registry::effect(&step.effect)?;
+    let reads_pieces = step.mask.is_some()
+        || step.partition.is_some()
+        || !effect.fields().is_empty()
+        || effect.inputs().contains(&Input::Partition);
+    if reads_pieces {
+        return Ok(None);
+    }
+    let given = presets.under(step, place)?;
+    match runs(&*effect, step, &given, ratio, place)? {
+        Runs::One { scaled } => Ok(effect.footprint(&scaled)?.margin()),
+        Runs::Driven { .. } => Ok(None),
     }
 }
 

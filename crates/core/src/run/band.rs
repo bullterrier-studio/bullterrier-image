@@ -48,7 +48,13 @@ impl Run<'_> {
             .current
             .as_ref()
             .map_or_else(|| self.working.picture(), Image::as_picture);
-        let after = step.apply(&before, self.ratio, &mut self.regions, &self.working.picture(), 0)?;
+        let after = step.apply(
+            &before,
+            self.ratio,
+            &mut self.regions,
+            &self.working.picture(),
+            (0, self.origin),
+        )?;
         self.regions.release(self.ran);
         self.ran += 1;
         self.current = Some(after);
@@ -71,7 +77,7 @@ impl Run<'_> {
                 let mut image: Option<Image> = None;
                 for step in steps {
                     let before: Picture<'_> = image.as_ref().map_or_else(|| input.rows(from, to), Image::as_picture);
-                    let after = step.apply(&before, self.ratio, &mut self.regions, &working, from)?;
+                    let after = step.apply(&before, self.ratio, &mut self.regions, &working, (from, self.origin))?;
                     image = Some(after);
                 }
                 let made = image.as_ref().map(Image::as_picture);

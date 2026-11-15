@@ -2,6 +2,7 @@
 
 use super::assets::Assets;
 use super::regions::Evaluator;
+use super::size::Origin;
 use super::step::{Overlay, StepRun};
 use crate::ops::blur;
 use crate::ops::pieces::piece;
@@ -75,6 +76,7 @@ impl EachRun {
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
+        origin: Origin,
     ) -> Result<Image, Error> {
         let pieces = regions.pieces(&self.partition, working)?;
         let given = assignment(self.assign, self.seed, self.looks.len(), pieces.pieces());
@@ -91,7 +93,7 @@ impl EachRun {
                 .map(|&label| f32::from(u8::from(given[piece(label)] == index)))
                 .collect();
             blur::gaussian(&mut weights, height, width, self.feather * ratio);
-            let result = look.apply(before, ratio, regions, working, 0)?;
+            let result = look.apply(before, ratio, regions, working, (0, origin))?;
             for (((out, was), now), weight) in out
                 .iter_mut()
                 .zip(before.pixels())
