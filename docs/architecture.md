@@ -65,7 +65,8 @@ parameter travels as the name `$picture:<digest>` and a `Lut` as `$lut:<digest>`
 the Python `Lut` wraps the core's table (`_core.Lut`). `_core.effects()` lists those mirrors too;
 `effects(declared=True)` only the effects whose parameters the core declares.
 **Threads:** `Options::with_threads(n)` (default 1: none started; 0: every core; at most 256, else refused) makes `render` and
-`trace` install a rayon pool of that size (`ops/par.rs`); the render stays on the calling thread, only row bands run on the
+`trace` install the rayon pool of that size (`ops/par.rs`: one for each count, started the first time and shared by every render at that count in the
+process, so renders running at once on several threads of the caller use n threads in all); the render stays on the calling thread, only row bands run on the
 pool, and rayon's global pool is never used. A kernel fills its output with `par::rows(out, row_len, |first_row, band| ..)`
 (`Picture::map` and `map_at` do, so a per-pixel effect is threaded as written); outside a pool it runs inline, and
 `Effect::apply` takes no thread parameter. Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only

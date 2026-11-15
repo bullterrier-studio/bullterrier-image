@@ -1063,8 +1063,11 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   reduction chunks by the data so the sum is the same at any count. *The render stays on the calling thread:*
   `pool.install(render)` would run Python effects on a pool thread, where the `ContextVar` behind picture parameters is
   empty, and `use_current_thread` leaks the pool's registry and fails a second render on the thread; the bands alone run
-  on the pool (an install per `par::rows` call, 4 to 16 us). *A pool per render, no cache:* creating, using and dropping
-  10 threads took 0.1 ms (M4), under 1 percent of a 16 ms frame. *No feature flag:* rayon is a plain dependency (MIT or
+  on the pool (an install per `par::rows` call, 4 to 16 us). *One shared pool for each thread count (changed 2026-11-15; first a pool per render, 0.1 ms to start 10 threads):* renders on several threads
+  of the caller each started a pool, so 8 renders at once at 4 threads ran their bands on 13 threads (measured by thread
+  ids, `ops/par.rs`), and a caller that renders frames side by side used cores for each one over. A pool is made the
+  first time a count is asked for and kept for the life of the process (idle threads, at most one pool per count), and
+  every render at that count shares it: `with_threads(n)` means the process's n threads, not n for this render. *No feature flag:* rayon is a plain dependency (MIT or
   Apache-2.0, small). *No GPU yet:* the CPU benchmark below is the baseline to beat, and the effects are still mostly
   numpy; revisit after the E-batches. *Numbers* (M4, 1080p, 12-step all-native look, 543 ms at 1 thread): 294 ms at 2,
   204 at 4, 145 at 10 (3.7x); laying a step is memory bound (2.4x at 10), grade 4.3x. In the Python-bodied recipes of

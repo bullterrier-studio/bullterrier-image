@@ -124,7 +124,9 @@ impl Options {
     /// These options with `threads`, how many threads the render may use: 1 (the default) runs everything on the calling
     /// thread and starts none, 0 uses one for each core of the machine, and no more than 256 are allowed (the render is
     /// refused, naming the number, before anything runs). The picture a render returns does not depend on it: the
-    /// same bytes at any number of threads. Only work that is the same for every row of the picture, such as laying a
+    /// same bytes at any number of threads. The threads are those of a pool of that size shared by every render at that count in the
+    /// process (started the first time and kept), so renders running at once on several threads of the caller share n
+    /// threads and do not each start n. Only work that is the same for every row of the picture, such as laying a
     /// step over its input, framing and resizing the photo, and an effect that works pixel by pixel, is shared out.
     ///
     /// The default is one because the usual use of more cores is to render several pictures at once (see
