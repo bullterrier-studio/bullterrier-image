@@ -125,10 +125,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         .collect();
     let carry = |pixels: &[[f32; 3]]| {
         let sampler = Sampler::new(pixels, height, width, params.interpolation, params.edge.extension());
-        Centre::new(height, width, 0.5, 0.5).warp(&sampler, |spot| {
-            let (down, across) = behind[spot.index];
-            (spot.row - down, spot.column - across)
-        })
+        // a spot counts rows on the canvas, so a position is rounded as the whole render rounds it
+        Centre::new(height, width, 0.5, 0.5)
+            .with_first_row(place.first_row)
+            .warp(&sampler, |spot| {
+                let (down, across) = behind[spot.index];
+                (spot.row - down, spot.column - across)
+            })
     };
     let mut carried = carry(picture.pixels());
     for _ in 1..params.steps {

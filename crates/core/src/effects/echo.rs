@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::edge::Edge;
-use crate::ops::shift::shifted;
+use crate::ops::shift::{rows_exact, shifted};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
 
@@ -23,6 +23,8 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
         f64::from(params.copies.unsigned_abs()) * f64::from(params.dy.abs()),
         params.edge == Edge::Wrap,
     )
+    // a copy of an unplaced picture is read at a row less its distance: the whole render and a window round a fine one apart
+    .rounded(!rows_exact(f64::from(params.dy)))
 }
 
 /// How far `echo` paints beyond the picture's edge: the farthest copy's move, the way it moves.
@@ -83,7 +85,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             picture.pixels(),
             height,
             width,
-            0, // a copy moves by a multiple of an f32: exact in f64, so no rounding depends on the row
+            0, // the picture is its own canvas: `footprint` says a distance `rows_exact` does not carry is not for a window
             steps * f64::from(params.dy),
             steps * f64::from(params.dx),
             params.edge.extension(),

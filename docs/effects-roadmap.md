@@ -369,8 +369,10 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
     `band_margin` takes a flag saying the maps are the canvas's own, for the regions that are pixel-local (`given`, `color_range`, gradients, `band`
     of a given map); a region with a feather or a blur needs its own margin.
   - *Exact only:* done 2026-11-15 (`band_margin` answers none for a step that sums a blur by the Fourier transform; `design-decisions.md`).
-  - *Room:* a boxed step does not reach a halo an earlier step painted into the room (`architecture.md`, "Room"). The signed-`Place` design that
-    would lift it: `Place` gets a signed `first_row` and a `first_col`, the box's size as the canvas; every one of the 30 `Place` readers takes
+  - *Room:* a boxed step does not reach a halo an earlier step painted into the room (`architecture.md`, "Room"). **Decided 2026-11-15: not
+    built, a design change:** `Place` is public and its `first_row` is a `usize` (a signed one changes the API), the 30 readers and the noise lattice
+    and numbering of draws would change what they draw past the box edge, and each needs its own exactness argument; the remedy stays the order of the
+    steps (halos last). The signed-`Place` design that would lift it: `Place` gets a signed `first_row` and a `first_col`, the box's size as the canvas; every one of the 30 `Place` readers takes
     its columns from it; the noise lattice (`cubic`) and the numbering of draws (`row * width + column` wrapped as `i64` so a column past the
     box does not alias the next row) take negative places; clumped noise reads the room through the edge rule of the box. Do it per effect,
     grain and vignette first, each with the box-equality oracle of `tests/it/room.rs`.

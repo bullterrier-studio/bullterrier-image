@@ -110,10 +110,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         params.interpolation,
         params.edge.extension(),
     );
-    Centre::new(height, width, 0.5, 0.5).warp(&sampler, |spot| {
-        (
-            spot.row + gain * f64::from(down[spot.index]),
-            spot.column + gain * f64::from(across[spot.index]),
-        )
-    })
+    // a spot counts rows on the canvas, so a position is rounded as the whole render rounds it
+    Centre::new(height, width, 0.5, 0.5)
+        .with_first_row(place.first_row)
+        .warp(&sampler, |spot| {
+            (
+                spot.row + gain * f64::from(down[spot.index]),
+                spot.column + gain * f64::from(across[spot.index]),
+            )
+        })
 }

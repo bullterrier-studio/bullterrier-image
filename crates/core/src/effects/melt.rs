@@ -66,7 +66,7 @@ pub struct Params {
 }
 
 /// The picture with its bright parts pulled down.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     // constant: one octave of noise on a strip one pixel high, so the other two layer settings have no effect
     let strip = field_rows(
@@ -92,8 +92,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         params.interpolation,
         params.edge.extension(),
     );
-    Centre::new(height, width, 0.5, 0.5).warp(&sampler, |spot| {
-        let bright = f64::from(luminance(picture.pixels()[spot.index]));
-        (spot.row - amount * drip[spot.index % width] * bright, spot.column)
-    })
+    // a spot counts rows on the canvas, so a position is rounded as the whole render rounds it
+    Centre::new(height, width, 0.5, 0.5)
+        .with_first_row(inputs.place(picture).first_row)
+        .warp(&sampler, |spot| {
+            let bright = f64::from(luminance(picture.pixels()[spot.index]));
+            (spot.row - amount * drip[spot.index % width] * bright, spot.column)
+        })
 }

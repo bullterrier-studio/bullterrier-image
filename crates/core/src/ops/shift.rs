@@ -4,6 +4,14 @@ use super::edge::{Extension, Source};
 use super::par;
 use super::sample::{Interpolation, Sampler};
 
+/// Whether `distance` (in pixels) is a multiple of 2^-26: every row of a picture (at most 2^26 rows) less such a distance, and
+/// less a distance of up to 32 times it, is then exact in an f64, so the position that [`shifted`] reads does not round by
+/// the row it is worked out from. A finer distance (1e-7) makes a window that starts low and the whole render read a
+/// position that differs in the last bits.
+pub(crate) fn rows_exact(distance: f64) -> bool {
+    (distance * 67_108_864.0).fract() == 0.0 // constant: 2^26, the most rows of a picture (ops/length.rs: 1 << 26 pixels)
+}
+
 /// The `height` x `width` `pixels` (row after row, both at least 1) moved down by `dy` and right by `dx` px (a negative
 /// distance moves them up or left), as a new picture of the same size.
 ///
@@ -16,8 +24,8 @@ use super::sample::{Interpolation, Sampler};
 ///
 /// `canvas_row` is the canvas row of the picture's first row (0 for a picture that is its own canvas). A window of a canvas
 /// then gets the position of each row it reads by the row's place on the canvas, as the whole render does: a fraction of a
-/// pixel worked out from the row inside the window rounds otherwise at another magnitude. Where `dy` is a whole number or a
-/// multiple of an f32 (exact in f64, so no rounding depends on the row) 0 gives the same picture.
+/// pixel worked out from the row inside the window rounds otherwise at another magnitude. Where `dy` is [`rows_exact`] (a
+/// whole number, or a multiple of 2^-26) no rounding depends on the row and 0 gives the same picture.
 pub(crate) fn shifted(
     pixels: &[[f32; 3]],
     height: usize,

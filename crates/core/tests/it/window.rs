@@ -17,7 +17,7 @@ use serde_json::Value;
 use crate::common::Outcome;
 use crate::common::compare::{first_bit_difference, first_difference_within};
 use crate::common::pictures::{asset, varied};
-use crate::common::sweep::{Setting, awkward, variants};
+use crate::common::sweep::{Setting, awkward, fine, variants};
 
 /// A canvas: its sides, and the rows of the bands it is cut into: one, a prime, one that does not divide the height, half
 /// of it, and all of it.
@@ -41,6 +41,13 @@ const TALL: Canvas = Canvas {
     height: 481,
     width: 8,
     bands: &[7, 241, 481],
+};
+
+/// A very tall one, where a row is far enough from the top for a position that differs from it by 1e-9 to round by the row.
+const FINE: Canvas = Canvas {
+    height: 30_001,
+    width: 2,
+    bands: &[997],
 };
 
 fn photo(canvas: Canvas, values: &[f32], rows: std::ops::Range<usize>) -> Result<Photo<'_>, Box<dyn Error>> {
@@ -105,7 +112,7 @@ fn first_problem(
 
 #[test]
 fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
-    every_cleared_effect_over(SMALL, &[variants])
+    every_cleared_effect_over(SMALL, &[variants], 200)
 }
 
 /// The same on a tall canvas, at the defaults and limits and at settings that move content by a fraction of a pixel along no
@@ -113,12 +120,19 @@ fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_windo
 /// window starts at).
 #[test]
 fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_on_a_tall_canvas_at_awkward_settings() -> Outcome {
-    every_cleared_effect_over(TALL, &[variants, awkward])
+    every_cleared_effect_over(TALL, &[variants, awkward], 200)
+}
+
+/// The same on a canvas of 30,001 rows, at settings that move content by a distance too fine for a row to carry.
+#[test]
+fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_at_distances_too_fine_for_a_row() -> Outcome {
+    every_cleared_effect_over(FINE, &[fine], 20)
 }
 
 fn every_cleared_effect_over(
     canvas: Canvas,
     settings: &[fn(&bullterrier_image::params::Table) -> Vec<Setting>],
+    at_least: usize,
 ) -> Outcome {
     let values = varied(canvas.height, canvas.width);
     let (mut problems, mut cleared) = (Vec::new(), 0);
@@ -151,7 +165,7 @@ fn every_cleared_effect_over(
         problems.len(),
         problems.join("\n")
     );
-    assert!(cleared > 200, "only {cleared} cases were cleared");
+    assert!(cleared > at_least, "only {cleared} cases were cleared");
     Ok(())
 }
 
@@ -394,6 +408,33 @@ fn a_recipe_the_query_clears_is_the_whole_render_byte_for_byte_on_both_sides_of_
         .iter()
         .filter_map(|(what, recipe, height, cleared)| {
             thin_problem(recipe, *height, *cleared).map_or_else(
+                |error| Some(format!("{what}: {error}")),
+                |problem| problem.map(|found| format!("{what}: {found}")),
+            )
+        })
+        .collect();
+    assert!(
+        problems.is_empty(),
+        "{} problems:\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
+}
+
+/// `echo` has no `Place`, so a window reads a distance down by the row inside the window: only a distance a row can carry
+/// (a multiple of 2^-26) is cleared.
+#[test]
+fn echo_is_cleared_for_a_distance_a_row_can_carry_and_not_for_a_finer_one() {
+    let down = |dy: f64| Recipe::new([Step::new("echo").param("dy", dy)]);
+    let rows = [
+        ("a whole number of rows", down(3.0), true),
+        ("0.3 px, a multiple of 2^-26", down(0.3), true),
+        ("too fine for a row to carry", down(1e-7), false),
+    ];
+    let problems: Vec<String> = rows
+        .iter()
+        .filter_map(|(what, recipe, cleared)| {
+            thin_problem(recipe, 480, *cleared).map_or_else(
                 |error| Some(format!("{what}: {error}")),
                 |problem| problem.map(|found| format!("{what}: {found}")),
             )

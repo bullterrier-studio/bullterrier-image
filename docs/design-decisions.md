@@ -705,7 +705,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   conservative where the width is not in the parameters (`anamorphic_streaks`: a row as wide as the picture).
   A distance worked out by a trig function (`rgb_split`, `drop_shadow`) is rounded by the row it is subtracted from, so `ops::shift::shifted`
   takes the canvas row of the picture's first row and reads from the position of the canvas row (found by `tests/it/window.rs` on a tall canvas, at
-  awkward settings: `rgb_split` at 180 degrees differed in one bit from row 427 on); a distance that is a multiple of an f32 is exact in f64 and passes 0.
+  awkward settings: `rgb_split` at 180 degrees differed in one bit from row 427 on); a distance that is a multiple of 2^-26 (`ops::shift::rows_exact`)
+  is exact in f64 for every row of a picture, and a distance of 0 (`lenticular`, `interlace`) trivially, so those pass 0 (`tile` is `Whole`: its cell is its own canvas).
+  A distance finer than that (1e-7 px) rounds by the row: `echo`, which has no `Place` (a `Place` reader runs on the box, not the room), says
+  `Footprint::Rounded` (`margin` reads a radius, `exact_margin` none) for such a `dy`; `displace`, `melt` and `flow_warp`, which have the `Place`, give
+  their `Centre` the canvas row (`with_first_row`), so a spot counts rows on the canvas. Found 2026-11-15 by the mutation check of the effects that pass 0
+  (`tests/it/window.rs`, a canvas of 30,001 rows at 1e-7 and 1e-9: 13 effect settings differed in one bit); the 6,033 whole renders of the sweep hash the same
+  before and after.
   *Noise (the old category-B question):* every seeded effect that bands hashes the canvas place or draws a list over the canvas
   (B2, B3), so a jump-ahead of the sequential stream was never needed and no render changed; those still whole are `jpeg_crush`,
   `shatter` and the `perlin`, `worley` and `sine` kinds of `noise_field` (statistic of the whole picture or a whole-picture structure).
@@ -719,7 +725,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   the same pixels), needs no edit to any effect, and covers the whole-picture statistics (`auto_levels`, `equalize`, `color_transfer`,
   `dehaze`, `tone_map`, which then read the box only, as asked). *What it costs:* a boxed step does not reach what an earlier step painted
   into the room: a vignette after a bloom leaves the halo undarkened, a seam along the box edge. The remedy is the order of the steps
-  (halos last), or the signed `Place` for the effects a look needs (the grain and the vignette first), each with its oracle. *Which steps:*
+  (halos last), or the signed `Place` for the effects a look needs (the grain and the vignette first), each with its oracle. **Decided 2026-11-15, not
+  built:** it changes the public `Place` (`first_row` is a `usize`) and what 30 readers, the noise lattice and the numbering of draws produce past the
+  box edge, so it is a design change; the limit stays and the order of steps is the remedy. *Which steps:*
   `each`, driven, `Whole` and `Input::Place` ones; the oracle `tests/it/room.rs` found two more that anchor to the picture's left edge
   without reading `Place` (`lenticular` strips, `melt` noise) and they now declare it. One effect, `anamorphic_streaks`, reads the room
   beside the box's edge by design (a streak is light from the row's whole width) and says its spread is not worked out: the oracle skips it.

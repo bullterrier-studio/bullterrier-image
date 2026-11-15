@@ -27,6 +27,10 @@ pub enum Footprint {
     /// Fourier transform, whose sum depends on the rows it is given: a window of rows differs from the whole render in the
     /// last bits (measured up to 7.3e-5), so [`exact_margin`](Self::exact_margin) is none.
     Fourier(f64),
+    /// As [`Radius`](Self::Radius), and the effect reads rows at a distance too fine for every row to carry (see
+    /// `ops::shift::rows_exact`): the position it reads rounds by the row it is worked out from, so a window of rows that
+    /// starts low differs from the whole render in the last bits and [`exact_margin`](Self::exact_margin) is none.
+    Rounded(f64),
     /// An output pixel may depend on any input pixel, on the row it is in or on the picture's height.
     Whole,
 }
@@ -54,6 +58,17 @@ impl Footprint {
         }
     }
 
+    /// This footprint for an effect that reads rows at a distance too fine for every row to carry when `fine`: a
+    /// [`Radius`](Self::Radius) or [`Pixel`](Self::Pixel) becomes [`Rounded`](Self::Rounded), another stays as it is.
+    #[must_use]
+    pub(crate) fn rounded(self, fine: bool) -> Self {
+        match self {
+            Self::Radius(radius) if fine => Self::Rounded(radius),
+            Self::Pixel if fine => Self::Rounded(0.0),
+            other => other,
+        }
+    }
+
     /// The rows of margin to render above and below a band of rows: none for [`Pixel`](Self::Pixel); for
     /// [`Radius`](Self::Radius) and [`Fourier`](Self::Fourier) the radius rounded up to a whole row, and two
     /// rows more for the pixels an interpolation reads beside the place it is asked for; `None` for
@@ -67,17 +82,17 @@ impl Footprint {
                 clippy::cast_sign_loss,
                 reason = "a radius is a finite number of 0 or more; a margin beyond the picture means the whole of it"
             )]
-            Self::Radius(radius) | Self::Fourier(radius) => Some(radius.ceil() as usize + TAPS),
+            Self::Radius(radius) | Self::Fourier(radius) | Self::Rounded(radius) => Some(radius.ceil() as usize + TAPS),
             Self::Whole => None,
         }
     }
 
     /// [`margin`](Self::margin) for a window that must give the rows of the whole render bit for bit: none for
-    /// [`Fourier`](Self::Fourier) as well as [`Whole`](Self::Whole).
+    /// [`Fourier`](Self::Fourier) and [`Rounded`](Self::Rounded) as well as [`Whole`](Self::Whole).
     #[must_use]
     pub fn exact_margin(self) -> Option<usize> {
         match self {
-            Self::Fourier(_) => None,
+            Self::Fourier(_) | Self::Rounded(_) => None,
             other => other.margin(),
         }
     }

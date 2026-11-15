@@ -59,7 +59,9 @@ impl Spread {
         match footprint {
             Footprint::Pixel => Self::NONE,
             #[expect(clippy::cast_precision_loss, reason = "a window of a few pixels")]
-            Footprint::Radius(radius) | Footprint::Fourier(radius) => Self::all(radius + TAPS as f64),
+            Footprint::Radius(radius) | Footprint::Fourier(radius) | Footprint::Rounded(radius) => {
+                Self::all(radius + TAPS as f64)
+            }
             _ => Self::Unbounded,
         }
     }

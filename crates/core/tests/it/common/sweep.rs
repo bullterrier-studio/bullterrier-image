@@ -88,3 +88,21 @@ pub(crate) fn awkward(table: &Table) -> Vec<Setting> {
     }
     cases
 }
+
+/// The settings that move things by a distance too fine for a row to carry: each number alone at 1e-7 and 1e-9 where the
+/// range holds them. A position read at such a distance from a far row rounds by the row it is worked out from, so a window
+/// that starts low and the whole render read slightly different positions.
+pub(crate) fn fine(table: &Table) -> Vec<Setting> {
+    let mut cases = Vec::new();
+    for field in &table.fields {
+        let (Some(low), Some(high)) = (number(field.min), number(field.max)) else {
+            continue;
+        };
+        for value in [1e-7, 1e-9] {
+            if field.kind == Kind::Float && (low..=high).contains(&value) {
+                cases.push(Setting::from_iter([(field.name.to_owned(), json!(value))]));
+            }
+        }
+    }
+    cases
+}
