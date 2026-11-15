@@ -24,6 +24,21 @@ pub(crate) const META: Meta = Meta {
 /// What `lens_blur` reads around a pixel.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.radius), params.edge == Edge::Wrap)
+        .transformed(params.radius > 0.0 && disc(f64::from(params.radius)).by_fourier())
+}
+
+/// The disc of `radius` px: a pixel's weight is the share of it inside the disc, estimated by a linear ramp one pixel wide
+/// across the rim (the usual anti-aliased edge: 1 half a pixel inside, 0 half a pixel outside, 1/2 on the rim itself).
+fn disc(radius: f64) -> Kernel {
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a reach in px, small and positive"
+    )]
+    let reach = radius.ceil() as usize;
+    Kernel::from_fn((reach, reach), |down, right| {
+        (radius + 0.5 - down.hypot(right)).clamp(0.0, 1.0)
+    })
 }
 
 /// How far `lens_blur` paints beyond the picture's edge: as far as it reads.
@@ -60,18 +75,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     if params.radius == 0.0 {
         return picture.map(|pixel| pixel);
     }
-    let radius = f64::from(params.radius);
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "a reach in px, small and positive"
-    )]
-    let reach = radius.ceil() as usize;
-    // A pixel's weight is the share of it inside the disc, estimated by a linear ramp one pixel wide across the rim (the
-    // usual anti-aliased edge: 1 half a pixel inside, 0 half a pixel outside, 1/2 on the rim itself).
-    let disc = Kernel::from_fn((reach, reach), |down, right| {
-        (radius + 0.5 - down.hypot(right)).clamp(0.0, 1.0)
-    });
+    let disc = disc(f64::from(params.radius));
     let edge = params.edge.extension();
     if params.highlights == 0.0 {
         return Image::from_pixels(height, width, convolve(picture.pixels(), height, width, &disc, edge));

@@ -73,14 +73,15 @@ impl Recipe {
     ///
     /// Hand a render the rows of the picture from the band's first row less this margin to its last row plus it (fewer
     /// where the picture ends), with [`Options::with_window`] saying where they lie on the canvas, and the rows of the
-    /// band in what it returns are the rows of the whole picture's render (as for [`Options::with_band`]: within float
-    /// rounding, 1e-4, and byte for byte except where a step blurs by a Fourier transform, from a reach of 16 working
-    /// px, whose sum depends on the length of the rows given it). The margins of the steps add, as each reads what the
-    /// one before made.
+    /// band in what it returns are the rows of the whole picture's render, byte for byte (unlike [`Options::with_band`],
+    /// which is within float rounding, 1e-4, where a step blurs by a Fourier transform). The margins of the steps add, as
+    /// each reads what the one before made.
     ///
     /// The answer is none for a recipe with a `frame` or a `size` (they change the rows), and with a step that reads the
     /// whole picture (an effect whose [`Footprint`](crate::Footprint) is `Whole`), a driven step, an `each` step, or one
-    /// with a `mask`, a `partition` or a field parameter: a map or the pieces of a band are not the canvas's. It
+    /// with a `mask`, a `partition` or a field parameter: a map or the pieces of a band are not the canvas's. It is none too
+    /// for a step that sums a blur by a Fourier transform ([`Footprint::Fourier`](crate::Footprint::Fourier): a blur
+    /// reaching 16 working px or more, or a kernel of more than 128 taps), whose sum depends on the rows it is given. It
     /// reads parameters only and loads no picture or table. `longest_side` is as for [`spread`](Self::spread).
     ///
     /// # Errors

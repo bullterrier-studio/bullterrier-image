@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
-use crate::ops::blur::gaussian_filter;
+use crate::ops::blur::{gaussian_filter, is_fourier};
 use crate::ops::edge::Edge;
 use crate::ops::random::Rng;
 use crate::ops::sample::{Interpolation, Sampler};
@@ -28,6 +28,7 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
         f64::from((1.0 + params.refraction) * params.radius + params.truncate * params.blur),
         params.edge == Edge::Wrap,
     )
+    .transformed(is_fourier(f64::from(params.blur), f64::from(params.truncate)))
 }
 
 /// How far `lens_drops` paints beyond the picture's edge: as far as it reads.

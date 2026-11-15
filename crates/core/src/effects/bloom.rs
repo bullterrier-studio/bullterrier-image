@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Meta};
-use crate::ops::blur::gaussian_filter_plane;
+use crate::ops::blur::{gaussian_filter_plane, is_fourier};
 use crate::ops::edge::EdgeOrConstant;
 use crate::ops::light::{highlights, screen};
 use crate::params::{Color, Params};
@@ -24,6 +24,7 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
         f64::from(params.radius * params.truncate),
         params.edge == EdgeOrConstant::Wrap,
     )
+    .transformed(is_fourier(f64::from(params.radius), f64::from(params.truncate)))
 }
 
 /// How far `bloom` paints beyond the picture's edge: as far as it reads.

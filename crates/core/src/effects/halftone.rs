@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
-use crate::ops::blur::gaussian_filter;
+use crate::ops::blur::{gaussian_filter, is_fourier};
 use crate::ops::cast;
 use crate::ops::color::{luminance, vivid};
 use crate::ops::edge::EdgeOrConstant;
@@ -35,6 +35,7 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
         (HALF_DIAGONAL + blur) * cell + 1.0,
         params.edge == EdgeOrConstant::Wrap && params.sigma > 0.0,
     )
+    .transformed(params.sigma > 0.0 && is_fourier(cell * f64::from(params.sigma), f64::from(params.truncate)))
 }
 
 /// How far `halftone` paints beyond the picture's edge: as far as it reads.

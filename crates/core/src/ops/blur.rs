@@ -297,6 +297,11 @@ pub(crate) fn is_fourier(sigma: f64, truncate: f64) -> bool {
     reach(sigma, truncate) >= FFT_FROM_REACH
 }
 
+/// Whether a kernel of the weights `half` (at distance 0, 1, ... from a sample) is summed by the Fourier transform.
+pub(crate) fn is_fourier_half(half: &[f64]) -> bool {
+    half.len() > FFT_FROM_REACH
+}
+
 /// The weights of the Gaussian kernel at distance 0, 1, ... from a sample, to its reach, summing to 1 when the other
 /// side is counted too.
 pub(crate) fn weights(sigma: f64, truncate: f64) -> Vec<f64> {
@@ -323,10 +328,10 @@ pub(crate) enum Smoothing {
 
 impl Smoothing {
     pub(crate) fn new(half: &[f64], len: usize) -> Self {
-        if half.len() - 1 < FFT_FROM_REACH {
-            Self::Direct(half.to_vec())
-        } else {
+        if is_fourier_half(half) {
             Self::Fourier(LineFilter::new(half, len))
+        } else {
+            Self::Direct(half.to_vec())
         }
     }
 

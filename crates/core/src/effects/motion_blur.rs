@@ -20,6 +20,7 @@ pub(crate) const META: Meta = Meta {
 /// What `motion_blur` reads around a pixel.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.length), params.edge == Edge::Wrap)
+        .transformed(params.length > 0.0 && line(f64::from(params.angle), f64::from(params.length)).by_fourier())
 }
 
 /// How far `motion_blur` paints beyond the picture's edge: as far as it reads.

@@ -343,8 +343,8 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
   (`Recipe.parameters()` is its neighbour).
 - **Done: position-aware effects, with a public canvas size and first row** (banded render for scene B1). `Options::with_window(first_row,
   canvas_width, canvas_height)` and `Recipe::band_margin` (`architecture.md`, "Window"; `design-decisions.md`). Every effect that bands reads
-  `Place`, so a band of rows equals the same rows of the whole render (oracle: `tests/it/window.rs`). Remains: Python (`window=`), an exact-only
-  answer of `band_margin` for Fourier blurs.
+  `Place`, so a band of rows equals the same rows of the whole render (oracle: `tests/it/window.rs`). Remains: Python (`window=`). `band_margin` is exact-only
+  (`Footprint::Fourier`, `design-decisions.md`).
 - **Done: `Options::with_room(top, right, bottom, left)`** (`architecture.md`, "Room"; `design-decisions.md`): a step that places itself by the picture
   or reads all of it runs on the original box; the room is left as it received it. Remains: a boxed step reaching a halo painted into the room (a signed
   `Place` for the effects a look needs), `Recipe::spread` and `with_room` in Python.
@@ -368,9 +368,7 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
     band's maps and pieces are the band's. Lifting it: scene hands the caller's maps cut to the band (`Photo::with_map` of the band) and
     `band_margin` takes a flag saying the maps are the canvas's own, for the regions that are pixel-local (`given`, `color_range`, gradients, `band`
     of a given map); a region with a feather or a blur needs its own margin.
-  - *Exact only:* `band_margin` promises `with_band`'s 1e-4 (Fourier blurs of 16 working px or more differ in the last bits with the window's
-    length). An exact-only answer wants each effect to say whether its blur is Fourier at its scaled parameters (`ops/blur::is_fourier`), or the
-    Fourier transform to be of a fixed length whatever the window.
+  - *Exact only:* done 2026-11-15 (`band_margin` answers none for a step that sums a blur by the Fourier transform; `design-decisions.md`).
   - *Room:* a boxed step does not reach a halo an earlier step painted into the room (`architecture.md`, "Room"). The signed-`Place` design that
     would lift it: `Place` gets a signed `first_row` and a `first_col`, the box's size as the canvas; every one of the 30 `Place` readers takes
     its columns from it; the noise lattice (`cubic`) and the numbering of draws (`row * width + column` wrapped as `i64` so a column past the

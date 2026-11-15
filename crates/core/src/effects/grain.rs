@@ -7,7 +7,7 @@ use crate::effect::{Category, Input, Meta};
 use crate::ops::cast;
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
-use crate::ops::noise::{clumped, standard_normal};
+use crate::ops::noise::{clumped, clumps_by_fourier, standard_normal};
 use crate::ops::random::{mix, unit};
 use crate::params::{Choice, Params};
 use crate::{Image, Inputs, Picture, Place};
@@ -20,9 +20,9 @@ pub(crate) const META: Meta = Meta {
 };
 
 /// What `grain` reads around a pixel.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
     // the noise is a function of the canvas place and the seed, whatever the clumping; the picture is read at the pixel
-    Footprint::Pixel
+    Footprint::Pixel.transformed(clumps_by_fourier(f64::from(params.size), f64::from(params.truncate)))
 }
 
 /// Where the noise values come from.

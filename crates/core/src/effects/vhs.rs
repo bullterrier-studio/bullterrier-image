@@ -8,7 +8,7 @@ use crate::ops::chroma::smeared;
 use crate::ops::colorspace::{rgb_to_yiq, yiq_to_rgb};
 use crate::ops::edge::Edge;
 use crate::ops::length::whole;
-use crate::ops::noise::{clumped, standard_normal};
+use crate::ops::noise::{clumped, clumps_by_fourier, standard_normal};
 use crate::ops::par;
 use crate::ops::random::{Rng, mix, unit};
 use crate::ops::shift::{Band, slide_row};
@@ -24,8 +24,10 @@ pub(crate) const META: Meta = Meta {
 
 /// What `vhs` reads around a pixel: bands, dropouts and the wobble fall at canvas rows chosen from the seed and the canvas's
 /// height, the snow and the noise are numbered by canvas place, and a row reads only itself.
-pub(crate) fn footprint(_params: &Params) -> Footprint {
+pub(crate) fn footprint(params: &Params) -> Footprint {
+    // the snow and the wobble are summed along whole rows or one canvas line, the same for any window; the noise down the rows is not
     Footprint::Pixel
+        .transformed(params.noise > 0.0 && clumps_by_fourier(f64::from(params.noise_size), f64::from(params.truncate)))
 }
 
 /// How far `vhs` paints beyond the picture's edge: not worked out.

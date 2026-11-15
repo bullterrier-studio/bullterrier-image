@@ -444,7 +444,7 @@ pub(super) fn band_margin(presets: &Presets, ratio: f64, entry: &Entry, place: &
     }
     let given = presets.under(step, place)?;
     match runs(&*effect, step, &given, ratio, place)? {
-        Runs::One { scaled } => Ok(effect.footprint(&scaled)?.margin()),
+        Runs::One { scaled } => Ok(effect.footprint(&scaled)?.exact_margin()),
         Runs::Driven { .. } => Ok(None),
     }
 }

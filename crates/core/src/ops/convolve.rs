@@ -11,7 +11,7 @@
 //! weights is summed tap by tap, a row of weights is filtered line by line, and any other is filtered by the 2-D
 //! Fourier transform of the picture.
 
-use super::blur::Smoothing;
+use super::blur::{Smoothing, is_fourier_half};
 use super::edge::{Extension, Source};
 use super::fft::PlaneFilter;
 use super::length::float;
@@ -65,6 +65,15 @@ impl Kernel {
     /// mean back into the sum of the weighted samples.
     pub(crate) const fn total(&self) -> f64 {
         self.total
+    }
+
+    /// Whether [`convolve`] filters by this kernel through the Fourier transform, whose sums depend on the rows it is given:
+    /// a row of weights reaching 16 px or more (as for a blur), or any other kernel of more than `DIRECT_TAPS` weights.
+    pub(crate) fn by_fourier(&self) -> bool {
+        match self.half_row() {
+            Some(half) => is_fourier_half(&half),
+            None => self.weights.iter().filter(|weight| **weight > 0.0).count() > DIRECT_TAPS,
+        }
     }
 
     /// The weights at distance 0, 1, ... from the middle of the one row of a kernel that has one and is the same on
@@ -123,6 +132,9 @@ impl Method {
         if let Some(half) = kernel.half_row() {
             return Self::Rows(Smoothing::new(&half, width));
         }
+        if kernel.by_fourier() {
+            return Self::Plane(PlaneFilter::new(&kernel.weights, kernel.reach, height, width));
+        }
         let cols = 2 * kernel.reach.1 + 1;
         let taps: Vec<(usize, usize, f32)> = kernel
             .weights
@@ -137,11 +149,7 @@ impl Method {
                 (2 * kernel.reach.0 - index / cols, 2 * kernel.reach.1 - index % cols, weight)
             })
             .collect();
-        if taps.len() <= DIRECT_TAPS {
-            Self::Taps(taps)
-        } else {
-            Self::Plane(PlaneFilter::new(&kernel.weights, kernel.reach, height, width))
-        }
+        Self::Taps(taps)
     }
 
     /// `planes` convolved.

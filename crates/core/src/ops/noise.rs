@@ -5,7 +5,7 @@
 //! or with the lattice's fineness. The lattice is fixed in the frame: its spacing is a share of the picture's long side, so
 //! the same picture at twice the size has the same noise, sampled at twice as many places.
 
-use super::blur::{gaussian_filter_plane, weights};
+use super::blur::{gaussian_filter_plane, is_fourier, weights};
 use super::edge::{Extension, Source};
 use super::par;
 use super::random::{mix, unit};
@@ -158,6 +158,11 @@ pub(crate) fn standard_normal(seed: u32, stream: u64, at: usize) -> f32 {
     // Box-Muller (1958): two independent uniforms make a standard normal; 1 - u is in (0, 1], so its log is finite
     let radius = (-2.0 * (1.0 - word(0)).ln()).sqrt();
     cast::single(radius * (std::f64::consts::TAU * word(1)).cos())
+}
+
+/// Whether [`clumped`] sums its blur, for specks of `size` px cut off at `truncate` sigmas, by the Fourier transform.
+pub(crate) fn clumps_by_fourier(size: f64, truncate: f64) -> bool {
+    size > 1.0 && is_fourier(size / 2.0, truncate)
 }
 
 /// The `rows` rows from canvas row `first_row` on, of a `height` x `width` canvas, of a field of mean 0 and deviation 1

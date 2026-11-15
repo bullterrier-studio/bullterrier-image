@@ -19,6 +19,7 @@ pub(crate) const META: Meta = Meta {
 /// What `highpass` reads around a pixel.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::reach(f64::from(params.radius * params.truncate), params.edge == Edge::Wrap)
+        .transformed(blur::is_fourier(f64::from(params.radius), f64::from(params.truncate)))
 }
 
 /// How far `highpass` paints beyond the picture's edge: as far as it reads.

@@ -22,6 +22,7 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
         f64::from(params.radius * params.truncate),
         params.edge == EdgeOrConstant::Wrap,
     )
+    .transformed(blur::is_fourier(f64::from(params.radius), f64::from(params.truncate)))
 }
 
 /// How far `gaussian_blur` paints beyond the picture's edge: as far as it reads.

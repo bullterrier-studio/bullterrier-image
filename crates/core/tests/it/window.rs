@@ -3,7 +3,7 @@
 //!
 //! Every effect the query clears, with its defaults and each parameter alone at its limits, is rendered whole, then as
 //! windows of the picture rows from the band's first row less the margin to its last plus the margin, and the rows of the
-//! band compared with the whole (byte for byte; to `TOLERANCE` for an effect of `FFT_BLURS`, as in `banded.rs`).
+//! band compared with the whole, byte for byte: a recipe with a blur summed by a Fourier transform is not cleared.
 
 use std::error::Error;
 use std::sync::Arc;
@@ -14,9 +14,8 @@ use bullterrier_image::{
 };
 use serde_json::Value;
 
-use crate::banded::{FFT_BLURS, TOLERANCE};
 use crate::common::Outcome;
-use crate::common::compare::first_difference_within;
+use crate::common::compare::{first_bit_difference, first_difference_within};
 use crate::common::pictures::{asset, varied};
 use crate::common::sweep::{Setting, variants};
 
@@ -104,12 +103,7 @@ fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_windo
                 continue;
             };
             cleared += 1;
-            let within = if FFT_BLURS.contains(&name.as_str()) {
-                TOLERANCE
-            } else {
-                0.0
-            };
-            if let Some(found) = first_problem(&values, &recipe, margin, within, Options::default())? {
+            if let Some(found) = first_problem(&values, &recipe, margin, 0.0, Options::default())? {
                 problems.push(format!("{name} {}: {found}", Value::Object(setting)));
             }
         }
@@ -146,10 +140,7 @@ fn a_chain_of_steps_needs_the_margins_added_and_gives_the_rows_of_the_whole_rend
         margin > single("gaussian_blur")?.ok_or("blur")?,
         "the margins add: {margin}"
     );
-    assert_eq!(
-        first_problem(&values, &recipe, margin, TOLERANCE, Options::default())?,
-        None
-    );
+    assert_eq!(first_problem(&values, &recipe, margin, 0.0, Options::default())?, None);
     Ok(())
 }
 
@@ -162,7 +153,7 @@ fn a_window_and_the_runners_own_bands_compose() -> Outcome {
         .ok_or("these steps are banded")?;
     let rows = std::num::NonZeroUsize::new(7).ok_or("rows")?;
     let options = Options::default().with_band(rows);
-    assert_eq!(first_problem(&values, &recipe, margin, TOLERANCE, options)?, None);
+    assert_eq!(first_problem(&values, &recipe, margin, 0.0, options)?, None);
     Ok(())
 }
 
@@ -247,4 +238,125 @@ fn a_window_that_is_not_rows_of_the_canvas_is_refused_naming_the_window() -> Out
         Options::default().with_window(height - 10, width, height),
     )?;
     Ok(())
+}
+
+/// The canvas `height` rows by `THIN` columns: a thin picture whose long side is its height, so a blur's reach passes the
+/// switch to the Fourier transform at a height that is cheap to render.
+const THIN: usize = 64;
+
+/// The first problem in the render of `recipe` on a thin canvas of `height` rows: a band whose rows differ from the whole
+/// render's, byte for byte, or an answer of the query other than `cleared`.
+fn thin_problem(recipe: &Recipe, height: usize, cleared: bool) -> Result<Option<String>, Box<dyn Error>> {
+    let values = varied(height, THIN);
+    let (width, canvas) = (u32::try_from(THIN)?, u32::try_from(height)?);
+    let render = |rows: std::ops::Range<usize>, window: bool| -> Result<Vec<f32>, Box<dyn Error>> {
+        let picture = Picture::new(rows.len(), THIN, &values[rows.start * THIN * 3..rows.end * THIN * 3])?;
+        let mut options = Options::default();
+        if window {
+            options = options.with_window(u32::try_from(rows.start)?, width, canvas);
+        }
+        Ok(Photo::new(picture)
+            .render(recipe, &Presets::new(), options)?
+            .into_values())
+    };
+    let margin = recipe.band_margin(&Presets::new(), canvas)?;
+    if let Some(margin) = margin {
+        let whole = render(0..height, false)?;
+        for rows in [height / 3 + 1, 13] {
+            for top in (0..height).step_by(rows) {
+                let (bottom, from) = ((top + rows).min(height), top.saturating_sub(margin));
+                let band = render(from..(bottom + margin).min(height), true)?;
+                let made = &band[(top - from) * THIN * 3..(bottom - from) * THIN * 3];
+                if let Some(at) = first_bit_difference(made, &whole[top * THIN * 3..bottom * THIN * 3]) {
+                    return Ok(Some(format!("band of {rows} rows from row {top}: value {at} differs")));
+                }
+            }
+        }
+    }
+    Ok((margin.is_some() != cleared).then(|| format!("cleared is {}, want {cleared}", margin.is_some())))
+}
+
+#[test]
+fn a_recipe_the_query_clears_is_the_whole_render_byte_for_byte_on_both_sides_of_the_fourier_switch() {
+    let one = |name: &str, key: &str, value: f64| Recipe::new([Step::new(name).param(key, value)]);
+    // a blur reaching under 16 working px is summed tap by tap; from 16, or a kernel of more than 128 taps, by a transform
+    // whose rounding depends on the rows it is given
+    let rows = [
+        ("grain, a speck summed tap by tap", one("grain", "size", 4.0), 480, true),
+        (
+            "grain, a speck summed by Fourier",
+            one("grain", "size", 1.0),
+            3900,
+            false,
+        ),
+        (
+            "gaussian_blur summed tap by tap",
+            one("gaussian_blur", "radius", 3.0),
+            480,
+            true,
+        ),
+        (
+            "gaussian_blur summed by Fourier",
+            one("gaussian_blur", "radius", 5.0),
+            480,
+            false,
+        ),
+        ("lens_blur of 81 taps", one("lens_blur", "radius", 4.0), 480, true),
+        (
+            "lens_blur of more than 128 taps, by Fourier",
+            one("lens_blur", "radius", 7.0),
+            480,
+            false,
+        ),
+        ("sharpen summed tap by tap", one("sharpen", "radius", 1.0), 480, true),
+        ("sharpen summed by Fourier", one("sharpen", "radius", 5.0), 480, false),
+        ("motion_blur of 20 taps", one("motion_blur", "length", 20.0), 480, true),
+        (
+            "motion_blur of more than 128 taps, by Fourier",
+            one("motion_blur", "length", 200.0),
+            480,
+            false,
+        ),
+        (
+            "anamorphic_streaks, a row as wide as the picture",
+            Recipe::new([Step::new("anamorphic_streaks")]),
+            480,
+            false,
+        ),
+        ("vhs, noise summed tap by tap", one("vhs", "noise_size", 3.0), 480, true),
+        (
+            "vhs, noise summed by Fourier",
+            one("vhs", "noise_size", 20.0),
+            480,
+            false,
+        ),
+        (
+            "a shift of 40 px has no transform",
+            Recipe::new([Step::new("rgb_split").param("amount", 40.0).param("angle", 0.0)]),
+            480,
+            true,
+        ),
+        ("vignette", Recipe::new([Step::new("vignette")]), 3900, true),
+        (
+            "a chain with one transform step",
+            Recipe::new([Step::new("vignette"), Step::new("grain").param("size", 1.0)]),
+            3900,
+            false,
+        ),
+    ];
+    let problems: Vec<String> = rows
+        .iter()
+        .filter_map(|(what, recipe, height, cleared)| {
+            thin_problem(recipe, *height, *cleared).map_or_else(
+                |error| Some(format!("{what}: {error}")),
+                |problem| problem.map(|found| format!("{what}: {found}")),
+            )
+        })
+        .collect();
+    assert!(
+        problems.is_empty(),
+        "{} problems:\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
 }

@@ -20,7 +20,9 @@ pub(crate) const META: Meta = Meta {
 
 /// What `anamorphic_streaks` reads around a pixel.
 pub(crate) fn footprint(_params: &Params) -> Footprint {
-    Footprint::Radius(0.0)
+    // the streak is a row of weights as wide as the picture, which a transform sums on any picture of 17 px or more (the
+    // width is not known from the parameters)
+    Footprint::Radius(0.0).transformed(true)
 }
 
 /// How far `anamorphic_streaks` paints beyond the picture's edge: not worked out.

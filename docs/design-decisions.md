@@ -697,8 +697,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   the canvas's width, rows beyond the canvas, and a `frame` or `size` (they change the rows); named `window`. *The query:* `band_margin`
   returns the margin because a caller needs the number; it is none where a band of the canvas is not the canvas: `Whole` steps, `each`,
   driven steps, and steps that read a map or pieces (a band's `subject`, a feathered or blurred region, is the band's, not the canvas's).
-  It promises what `with_band` does (within 1e-4, byte for byte except a Fourier-summed blur, from a reach of 16 working px). *Not
-  settled here:* an exact-only answer (a look with a large blur has the Fourier sum, so it is banded within rounding, not to the bit).
+  It promises the rows of the whole render byte for byte (decided 2026-11-15, lesson L21: scene's bands promise the bit and a banded grain on
+  a long side of 3,800 px differed in the last float step): a step that sums a blur by the Fourier transform (a reach of 16 working px or more,
+  or a kernel of more than 128 taps) is `Footprint::Fourier`, which `margin` reads as a radius (so `with_band` and the room are as before) and
+  `exact_margin` answers none for. The effect says it with `Footprint::transformed(blur::is_fourier(..))`, by the predicate the blur itself
+  uses; the sweep of `tests/it/window.rs` holds every effect it clears to the byte, so an effect that forgets fails there. The answer is
+  conservative where the width is not in the parameters (`anamorphic_streaks`: a row as wide as the picture).
   *Noise (the old category-B question):* every seeded effect that bands hashes the canvas place or draws a list over the canvas
   (B2, B3), so a jump-ahead of the sequential stream was never needed and no render changed; those still whole are `jpeg_crush`,
   `shatter` and the `perlin`, `worley` and `sine` kinds of `noise_field` (statistic of the whole picture or a whole-picture structure).

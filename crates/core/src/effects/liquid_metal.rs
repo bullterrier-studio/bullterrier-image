@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Meta};
-use crate::ops::blur::gaussian_filter_plane;
+use crate::ops::blur::{gaussian_filter_plane, is_fourier};
 use crate::ops::color::luminance;
 use crate::ops::edge::Edge;
 use crate::ops::relief::shade_slopes;
@@ -26,6 +26,7 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
         f64::from(params.smoothing * params.truncate) + 1.5,
         params.edge == Edge::Wrap,
     )
+    .transformed(is_fourier(f64::from(params.smoothing), f64::from(params.truncate)))
 }
 
 /// How far `liquid_metal` paints beyond the picture's edge: as far as it reads.
