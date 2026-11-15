@@ -685,10 +685,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   margin keeps); the oracle, not the shortcut, is what holds each to it. *Sums, not a chain's own bound:* a step's halo can be blurred again by the
   next, so the room of a chain is the sum; a mask or a blend only hides, so it lessens nothing; opacity 0 hides the step, so it adds none.
   *The grown picture is not the original:* a caller that grows the picture by the room hands effects a picture whose bounds are not the content's, so
-  effects that place themselves by the picture (the vignette, the `x`/`y` centres, `Place`-numbered noise, `frame`, whole-picture statistics) are
-  placed in the room (listed in `architecture.md`). *Deferred: `Options::with_room(px)`*, a render on a picture grown by `px` with those effects' geometry
-  taken from the original box. It touches the 30 effects that read `Place` and the 11 with a centre, each a new input and a test that the grown render
-  equals the plain one inside the box, which is more than a day; scene can grow the picture itself until a look needs both a halo and a vignette. *Not
+  effects that place themselves by the picture would be placed in the room. Gone with `Options::with_room` (below). *Not
   in Python:* the facade has `Recipe.parameters()` for `numbers()`, but the return value (per-side numbers or unbounded) is a new Python type and the
   only caller is Rust.
 - **Built: `Options::with_window(first_row, canvas_width, canvas_height)` and `Recipe::band_margin` (a public frame of reference).**
@@ -705,6 +702,22 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   *Noise (the old category-B question):* every seeded effect that bands hashes the canvas place or draws a list over the canvas
   (B2, B3), so a jump-ahead of the sequential stream was never needed and no render changed; those still whole are `jpeg_crush`,
   `shatter` and the `perlin`, `worley` and `sine` kinds of `noise_field` (statistic of the whole picture or a whole-picture structure).
+- **Built: `Options::with_room(top, right, bottom, left)` (the box of a grown picture; the padded-raster caveat is gone).** *Why:* scene
+  grows a layer's raster by `Recipe::spread` so that a halo is not cut, and every effect that places itself by the picture was then placed
+  in the room (a vignette's centre, noise numbering, a warp's centre, `frame`, a tone statistic). *Choice: a step that places itself runs on
+  the box, and the room is left as it received it,* not "every such effect takes a signed `Place` and paints into the room". The signed
+  `Place` would touch the 30 `Place` readers, the noise lattice (`cubic` counts lattice points from a non-negative position), clumped
+  noise (an edge rule at the canvas border, a variance counted through it) and the numbering of draws (a column past the box's width would
+  alias the next row, so a stripe repeats); each is a new exactness argument. The box run is exact by construction (the same function of
+  the same pixels), needs no edit to any effect, and covers the whole-picture statistics (`auto_levels`, `equalize`, `color_transfer`,
+  `dehaze`, `tone_map`, which then read the box only, as asked). *What it costs:* a boxed step does not reach what an earlier step painted
+  into the room: a vignette after a bloom leaves the halo undarkened, a seam along the box edge. The remedy is the order of the steps
+  (halos last), or the signed `Place` for the effects a look needs (the grain and the vignette first), each with its oracle. *Which steps:*
+  `each`, driven, `Whole` and `Input::Place` ones; the oracle `tests/it/room.rs` found two more that anchor to the picture's left edge
+  without reading `Place` (`lenticular` strips, `melt` noise) and they now declare it. One effect, `anamorphic_streaks`, reads the room
+  beside the box's edge by design (a streak is light from the row's whole width) and says its spread is not worked out: the oracle skips it.
+  Maps and regions are made for the grown picture and cut to the box, so a region made from a statistic of the picture (`bands` by
+  percentile) differs from the box alone's. The design scale follows the box. Python: not exposed.
 - **Settled: the band height trades memory for time (banded render).** Measured on 24 MP (4000 x 6000), `grade`,
   `vignette`, `gaussian_blur` radius 2, `grain`; memory is the peak beyond the photo as a multiple of the 288 MB image
   made, time against the whole render at 1 / 4 threads (median of 3):

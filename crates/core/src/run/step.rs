@@ -8,7 +8,7 @@ use serde_json::{Map, Value};
 use super::assets::Assets;
 use super::each::EachRun;
 use super::regions::Evaluator;
-use super::size::Origin;
+use super::size::{Origin, Part};
 use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
 use crate::params::Kind;
@@ -41,7 +41,8 @@ impl Prepared {
     /// works on, and the result laid over `before`; `ratio` is the working picture's size over the design size.
     /// `before` is `working`, or, for a step with a [`margin`](Self::margin), the rows of it from `at` on (an `each`
     /// step is always run on all of it, at 0): the maps the step names are cut to those rows and it is told its place,
-    /// those rows of the canvas `origin` says the working picture lies on. `at` is the pair of the two.
+    /// those rows of the canvas `origin` says the working picture lies on. `at` is the pair of the two. A picture with room
+    /// round its box has a [`boxed`](Self::boxed) entry run on the box alone, and the room left as it was.
     ///
     /// # Errors
     /// Why a region could not be made, or an effect failed.
@@ -51,11 +52,50 @@ impl Prepared {
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
-        at: (usize, Origin),
+        (at, origin): (usize, Origin),
+    ) -> Result<Image, Error> {
+        let (height, width) = (before.height(), before.width());
+        let boxed = origin.has_room() && self.boxed()?;
+        let Some(part) = origin.part(at, height, boxed) else {
+            return Ok(Image::from_pixels(height, width, before.pixels().to_vec()));
+        };
+        if part.rows == (at..at + height) && part.columns == (0..width) {
+            return self.apply_part(before, ratio, regions, working, &part);
+        }
+        let (rows, columns) = (part.rows.start - at..part.rows.end - at, part.columns.clone());
+        let boxed = before.crop(rows.clone(), columns.clone());
+        let made = self.apply_part(&boxed.as_picture(), ratio, regions, working, &part)?;
+        let mut out = before.pixels().to_vec();
+        for (row, line) in rows.zip(made.as_picture().pixels().chunks_exact(columns.len())) {
+            out[row * width + columns.start..row * width + columns.end].copy_from_slice(line);
+        }
+        Ok(Image::from_pixels(height, width, out))
+    }
+
+    fn apply_part(
+        &self,
+        before: &Picture<'_>,
+        ratio: f64,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+        part: &Part,
     ) -> Result<Image, Error> {
         match self {
-            Self::Step(step) => step.apply(before, ratio, regions, working, at),
-            Self::Each(each) => each.apply(before, ratio, regions, working, at.1),
+            Self::Step(step) => step.apply(before, ratio, regions, working, part),
+            Self::Each(each) => each.apply(before, ratio, regions, working, part),
+        }
+    }
+
+    /// Whether this entry places itself by the picture it is given or reads all of it, so that on a picture with room it
+    /// runs on the box: an `each` step, a driven step, an effect that says [`Whole`](crate::Footprint::Whole) and one that
+    /// takes the picture's place ([`Input::Place`]).
+    ///
+    /// # Errors
+    /// [`Error::Params`] if the effect refuses its own parameters.
+    fn boxed(&self) -> Result<bool, Error> {
+        match self {
+            Self::Step(step) => Ok(step.effect.inputs().contains(&Input::Place) || step.margin()?.is_none()),
+            Self::Each(_) => Ok(true),
         }
     }
 
@@ -99,7 +139,7 @@ impl Overlay {
         }
     }
 
-    /// `after`, the result for `before` (the rows of `working` from `at`), laid over `before`. A plain step (blend mode normal, opacity 1, no mask) is its
+    /// `after`, the result for `before` (the `part` of `working`), laid over `before`. A plain step (blend mode normal, opacity 1, no mask) is its
     /// result as it is, uncopied.
     pub(super) fn over(
         &self,
@@ -107,16 +147,12 @@ impl Overlay {
         after: Image,
         regions: &mut Evaluator,
         working: &Picture<'_>,
-        at: usize,
+        part: &Part,
     ) -> Result<Image, Error> {
         let mask = self
             .mask
             .as_ref()
-            .map(|mask| {
-                regions
-                    .selection(mask, working)
-                    .map(|mask| rows_of(mask, at, before.height()))
-            })
+            .map(|mask| regions.selection(mask, working).map(|mask| cut(mask, part)))
             .transpose()?;
         Ok(
             if self.opacity >= 1.0 && mask.is_none() && self.blend_mode == BlendMode::Normal {
@@ -307,14 +343,13 @@ impl StepRun {
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
-        (at, origin): (usize, Origin),
+        part: &Part,
     ) -> Result<Image, Error> {
-        let rows = before.height();
         let mut fields = Vec::with_capacity(self.fields.len());
         for (parameter, region) in &self.fields {
-            fields.push((parameter, rows_of(regions.selection(region, working)?, at, rows)));
+            fields.push((parameter, cut(regions.selection(region, working)?, part)));
         }
-        let mut offered = Inputs::default().with_size_ratio(ratio).with_place(origin.place(at));
+        let mut offered = Inputs::default().with_size_ratio(ratio).with_place(part.place);
         for (parameter, layer) in &fields {
             offered = offered.with_field(parameter.as_str(), layer);
         }
@@ -327,11 +362,7 @@ impl StepRun {
         let partition = self
             .partition
             .as_ref()
-            .map(|region| {
-                regions
-                    .pieces(region, working)
-                    .map(|pieces| pieces_of(pieces, at, rows))
-            })
+            .map(|region| regions.pieces(region, working).map(|pieces| cut_pieces(pieces, part)))
             .transpose()?;
         if let Some(pieces) = &partition {
             offered = offered.with_partition(pieces);
@@ -339,11 +370,11 @@ impl StepRun {
         let after = match &self.runs {
             Runs::One { scaled } => effect::run(&*self.effect, before, scaled, &offered)?,
             Runs::Driven { by, top, levels } => {
-                let by = rows_of(regions.selection(by, working)?, at, rows);
+                let by = cut(regions.selection(by, working)?, part);
                 self.driven(before, &offered, &by, *top, levels)?
             }
         };
-        self.overlay.over(before, after, regions, working, at)
+        self.overlay.over(before, after, regions, working, part)
     }
 
     /// The effect run on `before` for each level of the drive that some pixel is on or next to, and each pixel mixes the
@@ -375,21 +406,21 @@ impl StepRun {
     }
 }
 
-/// `layer`, a map of the working picture, cut to the `rows` rows from `at`: the map itself if that is all of it.
-fn rows_of(layer: Arc<Layer>, at: usize, rows: usize) -> Arc<Layer> {
-    if rows == layer.height() {
+/// `layer`, a map of the working picture, cut to `part`: the map itself if that is all of it.
+fn cut(layer: Arc<Layer>, part: &Part) -> Arc<Layer> {
+    if part.rows == (0..layer.height()) && part.columns == (0..layer.width()) {
         layer
     } else {
-        Arc::new(layer.rows(at, at + rows))
+        Arc::new(layer.crop(part.rows.clone(), part.columns.clone()))
     }
 }
 
-/// As [`rows_of`], for the pieces of a partition.
-fn pieces_of(pieces: Arc<Labels>, at: usize, rows: usize) -> Arc<Labels> {
-    if rows == pieces.height() {
+/// As [`cut`], for the pieces of a partition.
+pub(super) fn cut_pieces(pieces: Arc<Labels>, part: &Part) -> Arc<Labels> {
+    if part.rows == (0..pieces.height()) && part.columns == (0..pieces.width()) {
         pieces
     } else {
-        Arc::new(pieces.rows(at, at + rows))
+        Arc::new(pieces.crop(part.rows.clone(), part.columns.clone()))
     }
 }
 

@@ -2,6 +2,7 @@
 //! pixels to design pixels.
 
 use std::num::NonZeroUsize;
+use std::ops::Range;
 use std::sync::Arc;
 
 use super::frame::Geometry;
@@ -27,6 +28,8 @@ pub struct Options {
     band: Option<NonZeroUsize>,
     canvas: Option<(u32, u32)>,
     window: Option<Window>,
+    /// The room around the box of the picture, as top, right, bottom and left.
+    room: [u32; 4],
 }
 
 /// The rows of a canvas that the picture handed to a render is (see [`Options::with_window`]).
@@ -37,19 +40,56 @@ struct Window {
     height: u32,
 }
 
-/// Where the working picture lies on its canvas: what an effect's [`Place`] is made from.
+/// Where the working picture lies on its canvas, and which part of it is the box: what an effect's [`Place`] is made from.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Origin {
     canvas_height: usize,
     canvas_width: usize,
     /// The canvas row of the working picture's row 0.
     first_row: usize,
+    /// The room round the box in the canvas: top, right, bottom, left.
+    room: [usize; 4],
+}
+
+/// A part of the working picture that a step is run on, and where that part lies on the canvas it sees.
+#[derive(Clone, Debug)]
+pub(super) struct Part {
+    /// Its rows and columns of the working picture.
+    pub(super) rows: Range<usize>,
+    pub(super) columns: Range<usize>,
+    /// Where its first row and column lie on the canvas the effect sees (the box, with a room).
+    pub(super) place: Place,
 }
 
 impl Origin {
-    /// The place of the rows of the working picture from row `at` on.
-    pub(super) fn place(self, at: usize) -> Place {
-        Place::new(self.canvas_height, self.canvas_width, self.first_row + at)
+    /// Whether the picture has room around its box.
+    pub(super) fn has_room(self) -> bool {
+        self.room != [0; 4]
+    }
+
+    /// The part of the `rows` rows of the working picture from row `at` that a step runs on: all of them, or, for a step that
+    /// is `boxed` (it places itself by its picture or reads all of it) and a picture with room, the rows and columns of
+    /// the box among them. None if no row of them is in the box.
+    pub(super) fn part(self, at: usize, rows: usize, boxed: bool) -> Option<Part> {
+        let [top, right, bottom, left] = self.room;
+        let (first, last) = (self.first_row + at, self.first_row + at + rows);
+        if !boxed || !self.has_room() {
+            return Some(Part {
+                rows: at..at + rows,
+                columns: 0..self.canvas_width,
+                place: Place::new(self.canvas_height, self.canvas_width, first),
+            });
+        }
+        let (start, end) = (first.max(top), last.min(self.canvas_height - bottom));
+        (start < end).then(|| Part {
+            rows: at + start - first..at + end - first,
+            columns: left..self.canvas_width - right,
+            place: Place::new(
+                self.canvas_height - top - bottom,
+                self.canvas_width - left - right,
+                start - top,
+            ),
+        })
     }
 }
 
@@ -62,6 +102,7 @@ impl Default for Options {
             band: None,
             canvas: None,
             window: None,
+            room: [0; 4],
         }
     }
 }
@@ -179,12 +220,25 @@ impl Options {
         self
     }
 
-    /// The canvas the design scale follows, if any, as width and height: the window's, else the one asked for.
-    pub(super) const fn canvas(self) -> Option<(u32, u32)> {
-        match self.window {
-            Some(window) => Some((window.width, window.height)),
-            None => self.canvas,
-        }
+    /// These options with room of `top`, `right`, `bottom` and `left` px around the box of the picture: the picture handed to
+    /// the render is the box grown by that room (a caller makes room for what a look paints beyond its content: a halo, a
+    /// shadow; see [`Recipe::spread`](crate::Recipe::spread)), and the render is of the box. With a [window](Self::with_window) the
+    /// room is in its canvas.
+    ///
+    /// A step that places itself by its picture (an effect that takes the picture's place: a vignette, a centre, noise numbered
+    /// by position, `frame`) or reads all of it (a statistic, a warp about the middle) is run on the box alone, as it would be
+    /// on the picture without room: the box it makes is the same bits, its `px` follow the box's longest side, and the room
+    /// round it is left as the step received it. Every other step runs on the whole grown picture, so what it paints into the room
+    /// (a halo) is kept, and reads the room's pixels at the box's edge. A later step that places itself so does not reach a halo
+    /// an earlier one painted.
+    ///
+    /// The render is refused, naming `room`, before anything runs, for a room that leaves no box, and for a recipe whose `frame`
+    /// or `size` (or a `size` in the options) changes the picture: the room is a part of the picture as it is. The maps a step
+    /// names are of the grown picture.
+    #[must_use]
+    pub const fn with_room(mut self, top: u32, right: u32, bottom: u32, left: u32) -> Self {
+        self.room = [top, right, bottom, left];
+        self
     }
 
     /// The rows a band is, if the render is banded.
@@ -265,15 +319,25 @@ impl<'a> Working<'a> {
     }
 
     /// Working pixels per design pixel, the one decision of how a length in a recipe follows the size of the picture: the
-    /// longest side over [`DESIGN_SIZE`], of the `canvas` (width, height) the picture is placed on, else of the picture.
+    /// longest side over [`DESIGN_SIZE`], of the box of the window's canvas, else of the canvas `options` name, else of the
+    /// box of the picture (the picture less its room).
     ///
     /// # Errors
     /// [`Error::Recipe`] for a canvas with a side of 0.
-    pub(super) fn ratio(&self, canvas: Option<(u32, u32)>) -> Result<f64, Error> {
+    pub(super) fn ratio(&self, options: Options) -> Result<f64, Error> {
         let picture = self.picture();
-        let (height, width) = (picture.height(), picture.width());
+        let [top, right, bottom, left] = options.room;
+        let boxed = |width: u32, height: u32| (width.saturating_sub(left + right), height.saturating_sub(top + bottom));
+        let canvas = match (options.window, options.canvas) {
+            (Some(window), _) => Some(boxed(window.width, window.height)),
+            (None, canvas) => canvas,
+        };
         let Some((canvas_width, canvas_height)) = canvas else {
-            return Ok(ratio_of(length::float(height.max(width))));
+            let side = picture
+                .height()
+                .saturating_sub((top + bottom) as usize)
+                .max(picture.width().saturating_sub((left + right) as usize));
+            return Ok(ratio_of(length::float(side)));
         };
         if canvas_width == 0 || canvas_height == 0 {
             return Err(Error::Recipe(format!(
@@ -283,48 +347,61 @@ impl<'a> Working<'a> {
         Ok(ratio_of(f64::from(canvas_width.max(canvas_height))))
     }
 
-    /// Where the working picture lies on its canvas: on itself, unless `options` give a window.
+    /// Where the working picture lies on its canvas: on itself, unless `options` give a window, and what part of it is the
+    /// box, unless they give room.
     ///
     /// # Errors
-    /// [`Error::Recipe`] for a window the picture is not the rows of (see [`Options::with_window`]).
+    /// [`Error::Recipe`] for a window the picture is not the rows of (see [`Options::with_window`]), and for room that leaves no
+    /// box or a recipe that changes the picture (see [`Options::with_room`]).
     pub(super) fn origin(&self, options: Options) -> Result<Origin, Error> {
         let picture = self.picture();
         let (height, width) = (picture.height(), picture.width());
-        let Some(window) = options.window else {
-            return Ok(Origin {
-                canvas_height: height,
-                canvas_width: width,
-                first_row: 0,
-            });
+        let room = options.room.map(|side| side as usize);
+        let (what, canvas_height, canvas_width, first_row) = match options.window {
+            Some(window) => (
+                "window",
+                window.height as usize,
+                window.width as usize,
+                window.first_row as usize,
+            ),
+            None => ("room", height, width, 0),
         };
-        let (canvas_height, canvas_width, first_row) =
-            (window.height as usize, window.width as usize, window.first_row as usize);
-        let refuse = |why: String| Error::Recipe(format!("`window` {why}"));
-        if canvas_width == 0 || canvas_height == 0 {
-            return Err(refuse(format!(
-                "{canvas_width} x {canvas_height} must have both sides at least 1"
-            )));
+        let refuse = |why: String| Error::Recipe(format!("`{what}` {why}"));
+        if options.window.is_some() || room != [0; 4] {
+            if canvas_width == 0 || canvas_height == 0 {
+                return Err(refuse(format!(
+                    "{canvas_width} x {canvas_height} must have both sides at least 1"
+                )));
+            }
+            if self.made.is_some() {
+                return Err(refuse(
+                    "needs the photo as it is: the recipe's `frame` or `size` changes it".to_owned(),
+                ));
+            }
+            if canvas_width != width {
+                return Err(refuse(format!(
+                    "is {canvas_width} px wide, the picture {width}: a window is rows of the canvas"
+                )));
+            }
+            if first_row + height > canvas_height {
+                return Err(refuse(format!(
+                    "of rows {first_row}..{} does not lie in a canvas of {canvas_height} rows",
+                    first_row + height
+                )));
+            }
         }
-        if self.made.is_some() {
-            return Err(refuse(
-                "needs the photo as it is: the recipe's `frame` or `size` changes its rows".to_owned(),
-            ));
-        }
-        if canvas_width != width {
-            return Err(refuse(format!(
-                "is {canvas_width} px wide, the picture {width}: a window is rows of the canvas"
-            )));
-        }
-        if first_row + height > canvas_height {
-            return Err(refuse(format!(
-                "of rows {first_row}..{} does not lie in a canvas of {canvas_height} rows",
-                first_row + height
+        let [top, right, bottom, left] = room;
+        if top + bottom >= canvas_height || left + right >= canvas_width {
+            return Err(Error::Recipe(format!(
+                "`room` of {top}, {right}, {bottom}, {left} px (top, right, bottom, left) leaves no box in a picture of \
+                 {canvas_height} x {canvas_width}"
             )));
         }
         Ok(Origin {
             canvas_height,
             canvas_width,
             first_row,
+            room,
         })
     }
 

@@ -49,8 +49,9 @@ impl Recipe {
     /// or the recipe's `size` ask for, else the picture's own, as the `frame` leaves it). A `px` of the recipe is then
     /// `longest_side / 480` pixels, as in a render. Only the parameters are read: no picture or lookup table is loaded.
     ///
-    /// The effects of a render that grows the picture see the grown picture: one that places itself by the picture's
-    /// bounds (a vignette's centre, a warp's, `frame`) places itself in the room too.
+    /// A picture grown by this room is rendered with [`Options::with_room`], so that a step that places itself by the picture
+    /// (a vignette's centre, a warp's) takes the original box, not the grown picture, as its own; the `px` then follow the box's
+    /// longest side, which is the `longest_side` to give.
     ///
     /// # Errors
     /// Whatever [`Recipe::checked`] refuses the recipe for, and [`Error::Recipe`] for a `longest_side` of 0.
@@ -302,7 +303,7 @@ impl<'a> Photo<'a> {
             given_subject.as_deref(),
         )?;
         let origin = working.origin(options)?;
-        let ratio = working.ratio(options.canvas())?;
+        let ratio = working.ratio(options)?;
         let maps = Maps::new(self, recipe, &working)?;
         // as the working picture has it, which a trace shows like a map a step uses
         let framed_subject = needs_subject.then(|| maps.get("subject", "`frame`")).transpose()?;

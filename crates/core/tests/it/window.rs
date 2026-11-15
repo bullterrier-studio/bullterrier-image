@@ -88,7 +88,9 @@ fn every_effect_the_query_clears_gives_the_rows_of_the_whole_render_from_a_windo
     let (mut problems, mut cleared) = (Vec::new(), 0);
     let longest = u32::try_from(HEIGHT)?;
     for name in effects() {
-        let one = effect(&name)?;
+        let Ok(one) = effect(&name) else {
+            continue; // a double that another test unregistered since `effects()`
+        };
         if one.inputs().contains(&Input::Partition) || !one.fields().is_empty() {
             continue; // the recipe needs a region to name (the query answers none for it; the check refuses it without one)
         }

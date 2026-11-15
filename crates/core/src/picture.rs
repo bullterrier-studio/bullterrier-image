@@ -1,6 +1,7 @@
 //! The picture an effect reads and the image it makes.
 
 use std::fmt;
+use std::ops::Range;
 
 use crate::Error;
 use crate::ops::par;
@@ -95,6 +96,15 @@ impl<'a> Picture<'a> {
             width: self.width,
             pixels: &self.pixels[from * self.width..to * self.width],
         }
+    }
+
+    /// The `rows` and `columns` of the picture (each a non-empty range within it), as an image of their own.
+    pub(crate) fn crop(&self, rows: Range<usize>, columns: Range<usize>) -> Image {
+        let (height, width) = (rows.len(), columns.len());
+        let pixels = rows
+            .flat_map(|row| self.pixels[row * self.width..][columns.clone()].iter().copied())
+            .collect();
+        Image::from_pixels(height, width, pixels)
     }
 
     /// A new image of this picture's size whose every pixel is `change` of the pixel at its place: the shape of an

@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::ops::Range;
 
 use crate::effect::{Effect, Input};
 use crate::{Error, Image, Lut, Picture};
@@ -110,12 +111,15 @@ impl Layer {
         &self.values
     }
 
-    /// The map of rows `from..to` of this one (`from < to <= height`), which a band of a picture is given.
-    pub(crate) fn rows(&self, from: usize, to: usize) -> Self {
+    /// The map of the `rows` and `columns` of this one (each a non-empty range within the map), which a band or the box of a
+    /// picture is given.
+    pub(crate) fn crop(&self, rows: Range<usize>, columns: Range<usize>) -> Self {
         Self {
-            height: to - from,
-            width: self.width,
-            values: self.values[from * self.width..to * self.width].to_vec(),
+            height: rows.len(),
+            width: columns.len(),
+            values: rows
+                .flat_map(|row| self.values[row * self.width..][columns.clone()].iter().copied())
+                .collect(),
         }
     }
 }
@@ -202,12 +206,14 @@ impl Labels {
         &self.values
     }
 
-    /// The labelling of rows `from..to` of this one (`from < to <= height`), among the same pieces.
-    pub(crate) fn rows(&self, from: usize, to: usize) -> Self {
+    /// The labelling of the `rows` and `columns` of this one (each a non-empty range within it), among the same pieces.
+    pub(crate) fn crop(&self, rows: Range<usize>, columns: Range<usize>) -> Self {
         Self {
-            height: to - from,
-            width: self.width,
-            values: self.values[from * self.width..to * self.width].to_vec(),
+            height: rows.len(),
+            width: columns.len(),
+            values: rows
+                .flat_map(|row| self.values[row * self.width..][columns.clone()].iter().copied())
+                .collect(),
             pieces: self.pieces,
         }
     }

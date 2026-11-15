@@ -97,12 +97,18 @@ effect that reaches as far sideways as it reads rows (the radius and a bicubic w
 effect to its word with a block on a grey canvas, over the parameter sweep, so one that paints outward and says nothing fails. `Recipe::spread(presets,
 longest_side) -> Result<Spread, Error>` is the room of a whole recipe, in px of a picture (or canvas) of that longest side: the steps' spreads add, a step of opacity 0 adds none, an
 `each` step and a driven step add their widest look and level; it reads parameters only and loads no picture or table. `Spread::pixels()` rounds up
-to whole pixels (top, right, bottom, left). **Caveat for a caller that grows the picture by that room:** an effect sees the grown picture as the whole, so one
-that places itself by the picture's bounds is placed in the room too: `vignette`, a `x`/`y` centre (`swirl`, `pinch_bulge`, `lens_distortion`,
-`radial_blur`, `kaleidoscope`, `polar`, `light_rays`, `lens_flare`, `gradient`, `fractal`, `chromatic_aberration`), anything numbered by canvas place (grain, noise
-fields, `vhs`, `scanlines`, patterns), `frame`, and a statistic of the whole picture (`auto_levels`, `equalize`, `color_transfer`, `dehaze`, `tone_map`). A look that
-mixes one of these with a halo shifts the former by the room. Not built: rendering a recipe on a grown picture with those effects' geometry taken from the
-original box (`Options::with_room`), see `design-decisions.md`. Not in Python yet.
+to whole pixels (top, right, bottom, left). **A caller that grows the picture by that room** renders it with `Options::with_room(top, right, bottom, left)` (below), so that the effects that
+place themselves by the picture (the vignette, a `x`/`y` centre, `Place`-numbered noise, `frame`, a statistic of the whole picture) take the original box, not the grown picture, as theirs.
+
+**Room:** `Options::with_room(top, right, bottom, left)` says the picture handed to `render` is the box grown by that room, and the render is of the box. The design scale
+follows the box's longest side (the window's canvas less the room, else the picture less it). A *boxed* step is run on the box alone, as on a picture without room, and the
+room round it is left as the step received it (`run/step.rs`, `Prepared::apply`, `Origin::part`): an `each` step, a driven step, an effect whose `Footprint` is `Whole`
+(statistics and warps about the middle read the box only) and an effect that declares `Input::Place` (it places itself by the picture; `lenticular` and `melt` declare it for
+strips and noise counted from the picture's left edge). Every other step runs on the whole grown picture, so a halo it paints into the room is kept and it reads the room
+beside the box's edge. **The limit:** a boxed step does not reach what an earlier step painted into the room (a vignette after a bloom leaves the halo undarkened); a look
+that wants it continuous orders the halos last. Regions (`mask`, fields, partitions) are made for the grown picture and cut to the box. With `with_window` the room is in the
+window's canvas; with `with_band` the runner's bands compose. Refused (`Error::Recipe`, naming `room`): a room that leaves no box, and a `frame` or `size`. `tests/it/room.rs`
+renders every effect on a grown picture (its edge repeated) against the box alone: bit for bit for a boxed step, and inside its margin and spread for the others. Not in Python.
 
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
 (`finders={"subject": ...}`); the core's `Photo` takes the same (`with_map`, `with_finder`). `subject`, `depth` and `light` (made

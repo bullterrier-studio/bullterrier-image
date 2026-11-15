@@ -335,12 +335,42 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
   (`architecture.md`, "Spread"; `design-decisions.md`). Remains: 28 of the 55 effects that paint outward say `Unbounded` (warps about the
   picture's centre, tilings, reflections, tone statistics, `vhs`, `ntsc`, `anamorphic_streaks`, `light_rays`, `quadtree`, ...): a bound for each is a
   parameter formula and a row in the oracle `tests/it/spread.rs` away, worked out when a look needs it; `Recipe::spread` in Python
-  (`Recipe.parameters()` is its neighbour); `Options::with_room(px)`, a render on a grown picture with the position-aware effects' geometry taken from the
-  original box (the vignette, the `x`/`y` centres, `Place`-numbered noise, `frame`): until then a grown picture shifts them.
+  (`Recipe.parameters()` is its neighbour).
 - **Done: position-aware effects, with a public canvas size and first row** (banded render for scene B1). `Options::with_window(first_row,
   canvas_width, canvas_height)` and `Recipe::band_margin` (`architecture.md`, "Window"; `design-decisions.md`). Every effect that bands reads
   `Place`, so a band of rows equals the same rows of the whole render (oracle: `tests/it/window.rs`). Remains: Python (`window=`), an exact-only
-  answer of `band_margin` for Fourier blurs, and `Options::with_room` (the next item).
+  answer of `band_margin` for Fourier blurs.
+- **Done: `Options::with_room(top, right, bottom, left)`** (`architecture.md`, "Room"; `design-decisions.md`): a step that places itself by the picture
+  or reads all of it runs on the original box; the room is left as it received it. Remains: a boxed step reaching a halo painted into the room (a signed
+  `Place` for the effects a look needs), `Recipe::spread` and `with_room` in Python.
+- **Remaining of the banded-looks batch (written when the session closed; sub-batches 2 and 3 were not started because the audit found them built).**
+  - *Category A (position only)* and the seeded ones that were B and C in the 2026-11 audit (`design-decisions.md`, "Footprints of the 57"): built
+    in B1b to B3b, not by this batch. `grain`, `paper_texture`, `noise_field` kind `value`, `fog`, `vhs` noise hash the canvas place; `dead_pixels`,
+    `slice_shift`, `vhs`, `dust_scratches`, `particles`, `light_leak`, `lens_drops`, `flow_lines` draw a bounded list over the canvas from the seed and
+    take what falls in the rows. `tests/it/window.rs` and `banded.rs` hold them to the whole render. **No jump-ahead of the sequential `Rng` is
+    needed** (xoshiro256++, `ops/random.rs`): it would have to skip `rows x width x draws` values, which the effects that still draw sequentially
+    cannot state (rejection sampling, `Rng::below`, `shuffled`, a data-dependent count), and a hash of the canvas place already does what it was
+    for without changing a render. Keep that: never mix the two sources in one effect.
+  - *Still `Whole` (so `band_margin` answers none), by reason:* B/C `shatter` (a Voronoi over the canvas from the seed: the cells could be drawn
+    over the canvas and clipped, as `dead_pixels` does; the nearest-cell search is then `Radius`) and `jpeg_crush` (averages the canvas down to
+    design px; a block row's DC differences run along it); `noise_field` kinds `perlin`, `worley`, `sine` (their own picture-wide standardisation:
+    divide by a known deviation as `field_rows` does, or leave whole); D `auto_levels`, `dehaze`, `equalize`, `color_transfer`, `gradient_map`,
+    `radial_blur`, `starburst`, `tone_map` (a statistic of the whole picture: a band cannot have it unless the caller hands it the canvas's
+    statistic, a new input); E `droste`, `kaleidoscope`, `lens_distortion`, `perspective`, `polar`, `light_rays`, `pinch_bulge`, `swirl`, `tile`,
+    `quadtree`, `dither`, `disperse`, `reaction_diffusion`, `reflection`, `rim_light`, `relight` (Fourier blur), `edges` (canny), `ascii`,
+    `pixel_sort` and `stretch` (vertical).
+  - *Steps a window cannot make* whatever their effect: `each`, driven steps, and any step with a `mask`, `partition` or field parameter, because a
+    band's maps and pieces are the band's. Lifting it: scene hands the caller's maps cut to the band (`Photo::with_map` of the band) and
+    `band_margin` takes a flag saying the maps are the canvas's own, for the regions that are pixel-local (`given`, `color_range`, gradients, `band`
+    of a given map); a region with a feather or a blur needs its own margin.
+  - *Exact only:* `band_margin` promises `with_band`'s 1e-4 (Fourier blurs of 16 working px or more differ in the last bits with the window's
+    length). An exact-only answer wants each effect to say whether its blur is Fourier at its scaled parameters (`ops/blur::is_fourier`), or the
+    Fourier transform to be of a fixed length whatever the window.
+  - *Room:* a boxed step does not reach a halo an earlier step painted into the room (`architecture.md`, "Room"). The signed-`Place` design that
+    would lift it: `Place` gets a signed `first_row` and a `first_col`, the box's size as the canvas; every one of the 30 `Place` readers takes
+    its columns from it; the noise lattice (`cubic`) and the numbering of draws (`row * width + column` wrapped as `i64` so a column past the
+    box does not alias the next row) take negative places; clumped noise reads the room through the edge rule of the box. Do it per effect,
+    grain and vignette first, each with the box-equality oracle of `tests/it/room.rs`.
 - **Python `canvas=` for `Options::with_canvas`.** Rust only today (`design-decisions.md`: "Built: `Options::with_canvas`" says
   Python would follow `band` through `bridge` and the stubs). *Why:* a Python caller placing a layer on a larger canvas gets
   the layer's own design scale. *Evidence:* none from a Python caller yet; scene calls the Rust API.

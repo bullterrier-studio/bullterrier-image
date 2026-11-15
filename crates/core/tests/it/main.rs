@@ -148,6 +148,7 @@ mod resize;
 mod rgb_split;
 mod rim_light;
 mod ripple;
+mod room;
 mod rotate;
 mod rounding;
 mod run_frame;

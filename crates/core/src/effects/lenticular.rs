@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use crate::Footprint;
-use crate::effect::{Category, Meta};
+use crate::effect::{Category, Input, Meta};
 use crate::ops::edge::Edge;
 use crate::ops::shift::shifted;
 use crate::params::Params;
@@ -14,7 +14,8 @@ use crate::{Image, Inputs, Picture};
 pub(crate) const META: Meta = Meta {
     category: Category::Distortion,
     opacity: 1.0,
-    inputs: &[],
+    // the strips are counted from the picture's left edge: a render with room runs the effect on the box (`Options::with_room`)
+    inputs: &[Input::Place],
 };
 
 /// What `lenticular` reads around a pixel.

@@ -107,7 +107,9 @@ pub enum Input {
     /// Working pixels per design pixel: for an effect whose light or density is per working pixel.
     SizeRatio,
     /// Where the picture lies on the canvas a render works on (see [`Place`](crate::Place)): for an effect whose answer
-    /// at a pixel depends on the pixel's place on the canvas, which the picture it is handed may be only a band of.
+    /// at a pixel depends on the pixel's place on the canvas, which the picture it is handed may be only a band of. An
+    /// effect that is anchored to its picture's bounds without reading it (strips counted from the left edge) declares it too:
+    /// a render with room runs such an effect on the box of the picture (see [`Options::with_room`](crate::Options::with_room)).
     Place,
 }
 
