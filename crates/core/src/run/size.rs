@@ -161,14 +161,14 @@ impl Options {
     /// design scale follows the canvas, as for [`with_canvas`](Self::with_canvas) (which a window replaces).
     ///
     /// To make rows `top` to `bottom` of a picture whose effects reach `margin` rows (see
-    /// [`Recipe::band_margin`]), hand the render the rows `top - margin` to `bottom + margin` (fewer where the picture
+    /// [`Recipe::band_margin`](crate::Recipe::band_margin)), hand the render the rows `top - margin` to `bottom + margin` (fewer where the picture
     /// ends) with `first_row` their first, and keep the rows `top` to `bottom` of what it returns: the margin rows are
     /// not the whole render's.
     ///
     /// The render is refused, naming `window`, before anything runs, for a picture that is not `canvas_width` wide, one
     /// that does not lie within the canvas, a canvas side of 0, and for a recipe whose `frame` or `size` (or an `size` in
     /// the options) changes the picture's rows: they are the whole picture's, not a band's. The maps and pictures a
-    /// step names are those of the band: a recipe that uses one is the caller's to band (see [`Recipe::band_margin`]).
+    /// step names are those of the band: a recipe that uses one is the caller's to band (see [`Recipe::band_margin`](crate::Recipe::band_margin)).
     #[must_use]
     pub const fn with_window(mut self, first_row: u32, canvas_width: u32, canvas_height: u32) -> Self {
         self.window = Some(Window {
