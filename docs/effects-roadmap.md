@@ -319,9 +319,11 @@ A look is added to `examples/recipes/` by the batch that builds its last missing
 Each item is built only when video or scene needs it.
 
 - **Subject matte (R6 extras).** Matte refinement as a post-process of the subject matte (the guided filter is the primitive),
-  and an AI upscaler as a model kind in the model catalogue.
+  and an AI upscaler as a model kind in the model catalogue. Also asked by real pieces: filling holes in a matte, and
+  taking a region or a colour out of it (a leash, grass at the feet were painted out by hand); and a note in
+  `subject-and-depth.md` that SAM 2's matte can be softer, with holes, than Apple Vision's on the same photo.
 - **Effects, in this order of value.** `distance_field`; glass, then emboss and bevel (new rows); `dissolve`;
-  `color_transfer` (the picture parameter kind may already unblock it: check); `denoise`. `stipple`, `engraving` and
+  `denoise`. `stipple`, `engraving` and
   `crosshatch` are planned in [dither-and-print.md](dither-and-print.md).
 - **Input depth (a watch item).** A 16-bit input is read as sRGB. Colour management beyond sRGB (CMYK, ICC output) is not
   image's job.
@@ -380,6 +382,8 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
 - **A keyline helper:** grow a cut-out into an outline as alpha only (a stroke without its host picture). *Why:* a poster
   keyline needs the stroke alone. *Evidence:* the Conan poster used `fx.outline(field="subject")` on a second picture with
   `lighten` (`bullterrier-demos/feedback/scene-conan.md`, 6): it works and is awkward.
+- **`Path` in the star export.** `from bullterrier_image import *` shadows `pathlib.Path` with the region `Path`. *Why:* a
+  script that imports both breaks quietly. *Wanted:* a name that does not collide, or `Path` left out of `__all__`.
 - **A WebAssembly build proof.** `cargo check -p bullterrier-image --target wasm32-unknown-unknown` with default features
   compiles in about 10 s (measured 2026-11-14); no browser has run it. Open: rayon threads (`wasm-bindgen-rayon` or a
   single-thread fallback), `std::fs`, `glob` and the clock, and the AI finders (subject, depth, SAM 2), which are native

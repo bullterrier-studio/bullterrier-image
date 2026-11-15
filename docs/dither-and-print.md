@@ -42,7 +42,11 @@ Today: a rotated square grid; `shape` dot (round) or line; `separation` none, cm
 | Screen geometry | The screen laid in other coordinates: wave (rows displaced by a sine), rings (concentric about `x`, `y`), spiral, rays. With `shape` line these are the wavy-line, ring, spiral and sunburst looks. One coordinate map before the existing screen; every other parameter keeps its meaning. |
 | Tone moves the line | With `shape` line, tone displaces the line instead of widening it: ridgelines and waveforms. Check against the rule above when built; a new effect if half the parameters stop mattering. |
 | RGB separation | Three additive screens (red, green, blue) on black, each at its own angle, beside cmyk and spot. |
+| Fractional `cell` | `cell` is whole pixels today, so a fine screen at a small size jumps (1 px at 480 is 2.7 px at 1280). A screen's pitch is a length, not a count: allow fractions. |
 | Print realism | Dot gain (dots grow with ink spread), uneven ink (seeded noise in coverage), paper specks. Also for `dither`'s `inks`. |
+
+One idea, one name: `halftone` calls its separate inks `separation="spot"`, `dither` calls them `separation="inks"`;
+settle one name with this work.
 
 A ruling in lines per inch is a size question: `cell` px = the print's DPI over the ruling, scaled to the recipe's size.
 Documented with the DPI write option, no parameter.
