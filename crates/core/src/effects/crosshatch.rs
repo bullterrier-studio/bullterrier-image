@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::effect::{Category, Input, Meta};
 use crate::ops::color::luminance;
-use crate::ops::hatch::Lines;
+use crate::ops::hatch::{Lines, Tone};
 use crate::ops::length::float;
 use crate::ops::par;
 use crate::params::{Color, Params};
@@ -68,8 +68,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         .map(|k| Lines::new(f64::from(params.angle) + turn * float(k), spacing))
         .collect();
     let (paper, color) = (params.paper.0, params.color.0);
-    let paper_light = f64::from(luminance(paper));
-    let reach = f64::from(luminance(color)) - paper_light;
+    let tone = Tone::new(paper, color);
     let pixels = picture.pixels();
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |top, band| {
@@ -77,11 +76,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             let row = top + offset;
             let y = float(place.first_row + row) + 0.5;
             for (column, pixel) in line.iter_mut().enumerate() {
-                let darkness = if reach.abs() < f64::EPSILON {
-                    0.0
-                } else {
-                    ((f64::from(luminance(pixels[row * width + column])) - paper_light) / reach).clamp(0.0, 1.0)
-                };
+                let darkness = tone.of_light(luminance(pixels[row * width + column]));
                 let x = float(column) + 0.5;
                 // `bare` is the share of the pixel no layer has inked, `left` the share of paper the tone still has to cover
                 let (mut bare, mut left) = (1.0, 1.0);

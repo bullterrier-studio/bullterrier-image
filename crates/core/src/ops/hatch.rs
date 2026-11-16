@@ -4,6 +4,8 @@
 //! The canvas is read in pixels with a pixel's corner at whole numbers (its centre at a half). Lines run `angle` degrees
 //! clockwise on screen from the x axis, `spacing` apart, the first centred half a spacing from the canvas's top left corner.
 
+use super::color::luminance;
+
 /// Parallel lines `spacing` px apart.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Lines {
@@ -35,5 +37,32 @@ impl Lines {
         // a pixel one px across, centred `off` from a line, overlaps the line's band [-half, half] by this much
         let overlap = |off: f64| ((off + 0.5).min(half) - (off - 0.5).max(-half)).max(0.0); // constant: half a px each side
         (overlap(off) + overlap(off - self.spacing) + overlap(off + self.spacing)).min(1.0)
+    }
+}
+
+/// How dark a pixel is between a paper and an ink: where its Rec. 709 luminance lies from the paper's (0) to the ink's (1).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Tone {
+    paper: f64,
+    reach: f64,
+}
+
+impl Tone {
+    /// The scale from the `paper`'s luminance to the `color`'s.
+    pub(crate) fn new(paper: [f32; 3], color: [f32; 3]) -> Self {
+        let paper = f64::from(luminance(paper));
+        Self {
+            paper,
+            reach: f64::from(luminance(color)) - paper,
+        }
+    }
+
+    /// The darkness (0..1) of a pixel of luminance `light`; 0 when ink and paper are equally bright, since no tone is then
+    /// asked of the ink.
+    pub(crate) fn of_light(&self, light: f32) -> f64 {
+        if self.reach.abs() < f64::EPSILON {
+            return 0.0;
+        }
+        ((f64::from(light) - self.paper) / self.reach).clamp(0.0, 1.0)
     }
 }
