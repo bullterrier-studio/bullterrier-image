@@ -767,6 +767,20 @@ fn a_serpentine_scan_turns_the_kernel_round_on_odd_rows() -> Result<(), Error> {
 }
 
 #[test]
+fn a_serpentine_row_passes_its_error_down_on_the_mirrored_side() -> Result<(), Error> {
+    // Sierra Lite again (2 right, 1 below left, 1 below, over 4), three rows of three; exact fractions, worked by script.
+    // Row 1 is scanned right to left and its 0.4 at the right sends a share of its error to the below-right side of
+    // each pixel, so row 2 (0.43 0.35 0.35) comes out "010"; with the below tap not turned round it would be "101".
+    let picture = greys(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.4, 0.43, 0.35, 0.35], 3);
+    let turned = Params {
+        serpentine: true,
+        ..ink(Method::SierraLite, 1.0)
+    };
+    assert_eq!(bits(&run(&turned, &picture)?, 3), "000 000 010");
+    Ok(())
+}
+
+#[test]
 fn a_serpentine_row_is_the_plain_scan_of_that_row_turned_round() -> Result<(), Error> {
     // Row 0 is pure, so passes nothing down: row 1 starts clean, and scanned right to left it must equal the plain scan
     // of its mirror image, mirrored back.
