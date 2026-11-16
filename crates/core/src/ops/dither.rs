@@ -19,7 +19,7 @@ pub(crate) struct Kernel {
     divisor: f32,
     /// For a kernel whose weights depend on the pixel's level: the weights of each tap for levels 0 to 127, replacing the
     /// taps' own weights, with their sum as the divisor.
-    levels: Option<&'static [[u16; 3]; 128]>,
+    levels: Option<&'static [[u16; 3]; 128]>, // constant: Ostromoukhov's table has 128 rows, levels 0 to 127
 }
 
 /// Floyd and Steinberg (1976): 7/16 right, 3/16 below left, 5/16 below, 1/16 below right.
@@ -31,6 +31,7 @@ pub(crate) const FLOYD_STEINBERG: Kernel = Kernel {
 
 /// Atkinson (Apple MacPaint): 1/8 to each of six pixels, so a quarter of the error is dropped.
 pub(crate) const ATKINSON: Kernel = Kernel {
+    // constant: Atkinson's published error weights, the taps and the divisor
     taps: &[
         (1, 0, 1.0),
         (2, 0, 1.0),
@@ -45,6 +46,7 @@ pub(crate) const ATKINSON: Kernel = Kernel {
 
 /// Jarvis, Judice and Ninke (1976): 7/48 and 5/48 right; 3 5 7 5 3 below; 1 3 5 3 1 two below.
 pub(crate) const JARVIS_JUDICE_NINKE: Kernel = Kernel {
+    // constant: Jarvis, Judice and Ninke (1976), the taps and the divisor
     taps: &[
         (1, 0, 7.0),
         (2, 0, 5.0),
@@ -65,6 +67,7 @@ pub(crate) const JARVIS_JUDICE_NINKE: Kernel = Kernel {
 
 /// Stucki (1981): JJN's shape with weights 8 4 / 2 4 8 4 2 / 1 2 4 2 1 over 42.
 pub(crate) const STUCKI: Kernel = Kernel {
+    // constant: Stucki (1981), the taps and the divisor
     taps: &[
         (1, 0, 8.0),
         (2, 0, 4.0),
@@ -85,6 +88,7 @@ pub(crate) const STUCKI: Kernel = Kernel {
 
 /// Burkes (1988): Stucki without its third row, 8 4 / 2 4 8 4 2 over 32.
 pub(crate) const BURKES: Kernel = Kernel {
+    // constant: Burkes (1988), the taps and the divisor
     taps: &[
         (1, 0, 8.0),
         (2, 0, 4.0),
@@ -100,6 +104,7 @@ pub(crate) const BURKES: Kernel = Kernel {
 
 /// Sierra (1989), three rows: 5 3 / 2 4 5 4 2 / 2 3 2 over 32.
 pub(crate) const SIERRA: Kernel = Kernel {
+    // constant: Sierra (1989), the taps and the divisor
     taps: &[
         (1, 0, 5.0),
         (2, 0, 3.0),
@@ -118,6 +123,7 @@ pub(crate) const SIERRA: Kernel = Kernel {
 
 /// Sierra (1989), two rows: 4 3 / 1 2 3 2 1 over 16.
 pub(crate) const SIERRA_TWO_ROW: Kernel = Kernel {
+    // constant: Sierra (1989), two-row, the taps and the divisor
     taps: &[
         (1, 0, 4.0),
         (2, 0, 3.0),
@@ -140,6 +146,7 @@ pub(crate) const SIERRA_LITE: Kernel = Kernel {
 
 /// Stevenson and Arce (1985), a hexagonal lattice's weights on the square grid: 32 two right; 12 26 30 16 below; 12 26 12; 5 12 12 5, over 200.
 pub(crate) const STEVENSON_ARCE: Kernel = Kernel {
+    // constant: Stevenson and Arce (1985), the taps and the divisor
     taps: &[
         (2, 0, 32.0),
         (-3, 1, 12.0),
@@ -315,7 +322,7 @@ const ROWS_ALIVE: usize = 4; // constant: Stevenson and Arce's taps reach three 
 )]
 fn folded_level(value: f32) -> usize {
     let level = (value.clamp(0.0, 1.0) * 255.9999) as usize; // constant: Ostromoukhov's 256 levels
-    if level > 127 { 255 - level } else { level }
+    if level > 127 { 255 - level } else { level } // constant: Ostromoukhov's table is turned about level 127
 }
 
 /// The palette colour nearest to `value` (an index) and what is left over: `value` less that colour.
@@ -392,6 +399,8 @@ const KNUTH_CLASSES: [u8; 64] = [
     9, 26, 28, 14, 22, 30, 35, 49, 41, 33, 20, 4, 6, 11, 43, 59, 57, 52, 12, 0, 3, 19, 51, 63, 60, 44, 24, 16, 8, 27,
     39, 47, 55, 36,
 ];
+/// The number of classes.
+const CLASS_COUNT: u8 = 64; // constant: Knuth's class matrix has 64 classes
 /// The class matrix's side.
 const CLASS_SIDE: usize = 8; // constant: Knuth's class matrix is 8 x 8
 
@@ -411,7 +420,7 @@ pub(crate) fn dot_diffusion(
     let class_at = |row: usize, column: usize| KNUTH_CLASSES[(row % CLASS_SIDE) * CLASS_SIDE + column % CLASS_SIDE];
     let mut waiting = vec![[0.0_f32; 3]; height * width];
     let mut chosen = vec![0; height * width];
-    for class in 0..64_u8 {
+    for class in 0..CLASS_COUNT {
         let at = KNUTH_CLASSES.iter().position(|&each| each == class).unwrap_or_default();
         let (first_row, first_column) = (at / CLASS_SIDE, at % CLASS_SIDE);
         for row in (first_row..height).step_by(CLASS_SIDE) {
@@ -421,8 +430,8 @@ pub(crate) fn dot_diffusion(
                 let (pick, miss) = settle(value, palette);
                 chosen[row * width + column] = pick;
                 // the higher-class neighbours inside the picture, with their weights
-                let mut heirs = [(0_usize, 0_usize, 0.0_f32); 8];
-                let mut count = 0;
+                let mut heirs = [(0_usize, 0_usize, 0.0_f32); 8]; // constant: a pixel has eight neighbours
+                let mut count = 0; // constant: no heir found yet
                 for (down, right) in [
                     (-1, -1),
                     (-1, 0),
@@ -551,7 +560,7 @@ const CLUSTERED: [u16; 64] = [
 
 /// The ranks of the 45 degree clustered-dot matrix, 8 x 8, row after row: the Go dither library's
 /// `ClusteredDotDiagonal8x8` (from the libcaca study, part 2), turned round (63 - rank) as `CLUSTERED` is.
-// constant: https://github.com/makeworld-the-better-one/dither/blob/master/ordered_ditherers.go, http://caca.zoy.org/study/part2.html
+// constant: Go dither library ClusteredDotDiagonal8x8, https://github.com/makeworld-the-better-one/dither/blob/master/ordered_ditherers.go and http://caca.zoy.org/study/part2.html
 const CLUSTERED_45: [u16; 64] = [
     39, 53, 51, 37, 28, 16, 14, 26, 55, 63, 61, 49, 18, 4, 2, 12, 41, 57, 59, 47, 20, 6, 0, 10, 33, 43, 45, 35, 30, 22,
     8, 24, 29, 17, 15, 27, 38, 52, 50, 36, 19, 5, 3, 13, 54, 62, 60, 48, 21, 7, 1, 11, 40, 56, 58, 46, 31, 23, 9, 25,
@@ -594,6 +603,7 @@ impl Thresholds<'_> {
                 ranks, rows, columns, ..
             } => usize::from(ranks[(row % rows) * columns + column % columns]),
             Self::Noise { seed } => {
+                // constant: a rank is the top 16 bits of the 64-bit hash
                 // the top 16 bits of the word hashed from the seed and the pixel's place
                 usize::try_from(mix(*seed, &[u64::try_from(row * width + column).unwrap_or_default()]) >> 48)
                     .unwrap_or_default()

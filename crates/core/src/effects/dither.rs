@@ -406,7 +406,7 @@ fn pattern(
     let (amount, serpentine) = (params.pattern, params.serpentine);
     // an ink plane holds its coverage in the first channel, whatever the space
     let lightness = if params.space == Space::Rgb && params.separation == Separation::None {
-        [0.2126, 0.7152, 0.0722] // constant: ITU-R BT.709
+        [0.2126, 0.7152, 0.0722] // constant: Rec. 709 luma weights, ITU-R BT.709
     } else {
         [1.0, 0.0, 0.0]
     };
