@@ -109,7 +109,7 @@ const NARROWEST_RAY: f32 = 0.5; // constant: below it a ray is about a pixel wid
 /// (`step` = 2^n old rays to one) so that none is narrower than [`NARROWEST_RAY`]. The wedges are `count / step` (not
 /// whole when `count` is not a multiple of `step`: the last is narrower, and is stretched to a cell like the rest).
 fn ray_wedges(count: f32, radius: f32) -> f32 {
-    let mut step = 1.0;
+    let mut step = 1.0; // constant: one ray to one, before any merge
     while step < count && TURN * radius * step / count < NARROWEST_RAY {
         step *= 2.0;
     }
