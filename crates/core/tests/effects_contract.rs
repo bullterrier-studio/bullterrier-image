@@ -476,6 +476,9 @@ fn seed_needs(effect: &str) -> Setting {
     } else if effect == "torn_edge" {
         // the default width tears the whole picture whatever the seed
         setting(&[("width", json!(3.0)), ("roughness", json!(0.9))])
+    } else if effect == "halftone" {
+        // an even press has nothing random
+        setting(&[("ink_noise", json!(0.8))])
     } else if effect == "disperse" {
         // nothing happens at progress 0, and the picture is two rows of cells at cell 2
         setting(&[("progress", json!(0.5)), ("cell", json!(2)), ("jitter", json!(1.0))])

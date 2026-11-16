@@ -185,6 +185,17 @@ fn conditional() -> Vec<Conditional> {
             field: "wavelength",
             with: vec![("screen", json!("wave"))],
         },
+        // a speck's size shows once there are specks, and the seed once the press is uneven
+        Conditional {
+            effect: "halftone",
+            field: "speck_size",
+            with: vec![("specks", json!(5.0))],
+        },
+        Conditional {
+            effect: "halftone",
+            field: "seed",
+            with: vec![("ink_noise", json!(0.5))],
+        },
         // a table that is none is the identity, which the amount mixes in without change
         Conditional {
             effect: "lut",
@@ -405,6 +416,27 @@ fn conditional() -> Vec<Conditional> {
             effect: "dither",
             field: "offset_angle",
             with: vec![("separation", json!("spot")), ("offset", json!(5.0))],
+        },
+        // the press's realism applies to the printed inks only; a speck's size shows once there are specks
+        Conditional {
+            effect: "dither",
+            field: "dot_gain",
+            with: vec![("separation", json!("spot"))],
+        },
+        Conditional {
+            effect: "dither",
+            field: "ink_noise",
+            with: vec![("separation", json!("spot"))],
+        },
+        Conditional {
+            effect: "dither",
+            field: "specks",
+            with: vec![("separation", json!("spot"))],
+        },
+        Conditional {
+            effect: "dither",
+            field: "speck_size",
+            with: vec![("separation", json!("spot")), ("specks", json!(5.0))],
         },
         // the k-means rounds change the colours only when the starting colours are not yet the answer
         Conditional {
