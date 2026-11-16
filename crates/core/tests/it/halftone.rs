@@ -955,6 +955,10 @@ fn a_fractional_cell_keeps_the_tone_within_what_its_soft_edge_adds() -> Result<(
     // The ink is the dots' area plus what the one pixel soft edge adds: pi f^2 / 12 px^2 a dot (f = 1), a share
     // pi / (12 cell^2) of its cell. Allow twice that, as a dot of a pixel or two is not a clean disc, and 0.01 for the
     // partial cells at the picture's edge (a picture of 480 px at size 480, so the cell is the recipe's).
+    // Only the ramp share is derived (0.036 at cell 2.7); the factor 2 and the 0.01 are an empirical envelope, not a
+    // derivation: at 2.7 px a dot is a few pixels, not a disc, and dots at 0.9 overlap and clip (measured error up to
+    // 0.076 against the bound 0.082). The bound at 13.3 (0.013) is the tight one; the cell 2.7 case guards against a
+    // gross error (a rounded pitch is off by 0.1 or more) and not against a small one.
     for cell in [2.7_f64, 13.3] {
         let bound = 2.0 * std::f64::consts::PI / (12.0 * cell * cell) + 0.01;
         for tone in [0.1_f32, 0.25, 0.5, 0.75, 0.9] {
@@ -1072,5 +1076,31 @@ fn the_tone_blur_is_sigma_times_the_fractional_cell_in_px() -> Result<(), Error>
     )?;
     let after = run_picture(&Params { sigma: 0.0, ..screen }, height, width, &blurred)?;
     assert_close(&whole, &after, 1e-5, "blur of sigma x cell px");
+    Ok(())
+}
+
+#[test]
+fn the_ink_does_not_jump_when_the_cell_passes_a_whole_or_a_half_number() -> Result<(), Box<dyn std::error::Error>> {
+    // The edge ramp and the fade-in of a tiny dot are lengths in px (fractions of the pitch): a cell a hair either side of
+    // 2.5 or 3 changes the picture by a hair. A pitch rounded or ceiled there is a different ramp, a visible step in ink.
+    for tone in [0.02_f32, 0.5] {
+        for (below, above) in [(2.499_f64, 2.501_f64), (2.999, 3.001)] {
+            let ink = |cell| -> Result<f64, Box<dyn std::error::Error>> {
+                let (red, _) = through_recipe(cell, tone, (480, 480), Some(480))?;
+                Ok(1.0 - f64::from(red.iter().sum::<f32>()) / red.len() as f64)
+            };
+            let (a, b) = (ink(below)?, ink(above)?);
+            assert!((a - b).abs() < 0.002, "tone {tone}: ink {a} at cell {below}, {b} at {above}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_whole_number_cell_written_in_a_recipe_file_still_loads() -> Result<(), Box<dyn std::error::Error>> {
+    use bullterrier_image::{Options, Photo, Picture, Presets, Recipe};
+    let recipe = Recipe::from_toml("[[step]]\neffect = \"halftone\"\ncell = 14\n")?;
+    let values = flat(24, 24, 0.5);
+    Photo::new(Picture::new(24, 24, &values)?).render(&recipe, &Presets::new(), Options::default())?;
     Ok(())
 }
