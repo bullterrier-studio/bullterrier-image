@@ -16,6 +16,7 @@ pub(crate) mod components;
 pub(crate) mod convolve;
 pub(crate) mod cutout;
 pub(crate) mod cuts;
+pub(crate) mod dash_rows;
 pub(crate) mod distance;
 pub(crate) mod dither;
 pub(crate) mod edge;

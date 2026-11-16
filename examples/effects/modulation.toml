@@ -1,0 +1,15 @@
+# Tone as rows of dashes: black rows on cream paper, bent into slow waves, the error carried back and forth.
+name = "modulation"
+size = 480
+
+[[step]]
+effect = "modulation"
+angle = 20
+spacing = 7
+dash = 3
+thickness = 0.8
+color = "#1b1b1f"
+paper = "#f4efe4"
+sway = 4
+wavelength = 90
+weave = true

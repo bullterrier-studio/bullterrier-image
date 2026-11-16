@@ -110,6 +110,24 @@ fn conditional() -> Vec<Conditional> {
             field: "edge",
             with: vec![("strip", json!(2))],
         },
+        // the test picture is darker than the default thickness (every cell is inked), where a dash's length and the
+        // direction of the carry show nothing
+        Conditional {
+            effect: "modulation",
+            field: "dash",
+            with: vec![("thickness", json!(1.0))],
+        },
+        Conditional {
+            effect: "modulation",
+            field: "weave",
+            with: vec![("thickness", json!(1.0)), ("spacing", json!(2.0)), ("dash", json!(1.0))],
+        },
+        // the length of a swing matters only while rows swing
+        Conditional {
+            effect: "modulation",
+            field: "wavelength",
+            with: vec![("sway", json!(6.0))],
+        },
         // the value beyond the edge is seen only by the edge rule that uses it
         Conditional {
             effect: "gaussian_blur",

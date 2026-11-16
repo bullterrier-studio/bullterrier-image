@@ -584,6 +584,27 @@ fn dither_blocks_of_their_most_dots_work_and_one_more_is_refused() {
 }
 
 #[test]
+fn modulation_at_its_least_spacing_and_dash_works_and_less_is_refused() {
+    // rows x cells follow spacing and dash in design px (the picture's size scales both), so their least bounds the work
+    let pixels = vec![0.5; 60 * 60 * 3];
+    let render = |field: &str, value: f64| {
+        Photo::new(Picture::new(60, 60, &pixels)?)
+            .render(
+                &Recipe::new([Step::new("modulation").param(field, value)]),
+                &Presets::new(),
+                Options::default(),
+            )
+            .map(drop)
+    };
+    for (field, least) in [("spacing", 2.0), ("dash", 1.0)] {
+        let works = render(field, least);
+        assert!(works.is_ok(), "{field}: {works:?}");
+        let past = render(field, least - 0.1);
+        assert!(refused(&past, &[field]), "{field}: {past:?}");
+    }
+}
+
+#[test]
 fn a_halftone_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
     // the same ranks as dither's matrix: 256 x 256 places is the most
     let pixels = vec![0.5; 20 * 20 * 3];
