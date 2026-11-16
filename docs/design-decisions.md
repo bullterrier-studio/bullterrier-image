@@ -1554,3 +1554,15 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   black). *Reason for the angles:* the three most visible cmyk screens (cyan 15, black 45, magenta 75) are the classic 30
   degrees apart, the most a square screen allows for three, and green, the brightest channel, takes 45 where a screen shows
   least, as black does in cmyk. *Consequence:* the separation logic is `Inks::rgb` in `ops/inks.rs`, beside cmyk and spot.
+- **Every `halftone` shape keeps the tone, through one spot function (halftone batch, 2026-11-16).** A shape is a spot
+  function on its cell (`Spot` in `ops/inks.rs`: a value per place) and the level whose area in the cell equals the ink; a
+  pixel is inked where the value is below the level, and the feathered edge is centred on the level so it keeps the area. The
+  round dot's level is `sqrt(a / pi)` cells up to `a = pi / 4` (dots touch) and above that the radius whose circle clipped to
+  the cell has area `a`, bisected to 1e-6 cells (never past the corner, so `footprint` holds); `line` is `a / 2` from the
+  row's centreline. Later shapes are variants with their own value and level. *Reason:* the dot was `sqrt(a / 2)` cells, so
+  it printed pi / 2 of the tone (mean ink 0.74 at tone 0.5, 0.95 at 0.75), against the doc and the coverage oracle; `dot_gain`
+  assumes coverage = tone. *Cost:* every existing halftone picture gets lighter (measured on the bullterrier photo: the
+  `risograph` look's mean brightness 0.415 to 0.502, the halftone example's 0.471 to 0.572): demo 06, demo 10's night look and
+  scene pieces with halftone change (scene sees it at its next image pin); the dots touch at 78.5 % tone, not at half (that
+  is `euclidean`'s). The coverage oracle (black on white, `cell` 20, `feather` 1, `sigma` 0, flat greys at 0.1 to 0.9)
+  now holds within 0.008 for `dot` and `line`.
