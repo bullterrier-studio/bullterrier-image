@@ -646,6 +646,7 @@ LENGTHS_AS_SHARES = {
     ("light_rays", "length"): "each pixel's distance from the light",
     ("tile", "offset_x"): "one copy's width",
     ("tile", "offset_y"): "one copy's height",
+    ("modulation", "thickness"): "the distance between rows",
     ("pattern", "thickness"): "one `cell`",
     ("pattern", "radius"): "one `cell`",
     ("pixel_grid", "gap"): "a stripe's width, a third of `cell`",

@@ -104,7 +104,7 @@ impl Rows {
                 let row = self.first.0 + i64::try_from(first + offset).unwrap_or(0);
                 for (cell, tone) in tones.iter_mut().enumerate() {
                     let j = self.first.1 + i64::try_from(cell).unwrap_or(0);
-                    let mut sum = 0.0;
+                    let mut sum = 0.0_f64; // constant: no tap has been read yet
                     for a in 0..TAPS {
                         let u = (float_i(j) + (float(a) + 0.5) / float(TAPS)) * dash;
                         for b in 0..TAPS {
@@ -180,7 +180,7 @@ const fn float_i(index: i64) -> f64 {
 /// inked where its tone plus the error carried so far reaches one half, and the rest of what it wanted or got over goes on to
 /// the next cell, starting from the first, or from the last when `reverse`. `out` is as long as `tones`.
 pub(crate) fn diffuse(tones: &[f32], reverse: bool, out: &mut [bool]) {
-    let mut carried = 0.0f32;
+    let mut carried = 0.0_f32; // constant: nothing is owed before the first cell
     let mut step = |index: usize| {
         let want = tones[index] + carried;
         let inked = want >= 0.5; // constant: the midpoint of 0..1
