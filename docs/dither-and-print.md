@@ -26,9 +26,9 @@ the pattern shows is `pattern`. Done 2026-11-16, bar the later items below.
 
 | Addition | What it is |
 |---|---|
-| Attribute cells | The palette search limited per block: each n x n block (8 by default) gets two colours of the palette, ink and paper, and dithers between them (ZX Spectrum colour clash; MSX rows of 8 x 1, C64 hires as presets). |
-| Pattern tiles | Tone picks one tile from an ordered set (classic 2 x 2, weave, brick, grid, fishnet, spiral), the set a preset or a caller's picture strip. |
-| `phase` | A state that shifts the threshold or noise tile by a step. A caller rendering a series sets it per picture: the pattern holds still or moves. With `seed`, the same for diffusion's noise. Keeping a dither steady over a moving sequence needs the previous picture and is not image's. |
+| ~~Attribute cells~~ **Done** (2026-11-16) | The palette search limited per block: each n x n block (8 by default) gets two colours of the palette, ink and paper, and dithers between them (ZX Spectrum colour clash; MSX rows of 8 x 1, C64 hires as presets). |
+| ~~Pattern tiles~~ **Done** (2026-11-16, `method="tiles"` with a caller's strip; the bundled sets wait for presets that can name a picture) | Tone picks one tile from an ordered set (classic 2 x 2, weave, brick, grid, fishnet, spiral), the set a preset or a caller's picture strip. |
+| ~~`phase`~~ **Done** (2026-11-16, ordered and noise methods; diffusion ignores it) | A state that shifts the threshold or noise tile by a step. A caller rendering a series sets it per picture: the pattern holds still or moves. With `seed`, the same for diffusion's noise. Keeping a dither steady over a moving sequence needs the previous picture and is not image's. |
 | Named palettes as data | The named palettes are `Palette` variants today. A library of dozens belongs in `data/presets`, like the gradient maps, not in an enum. |
 
 Tone maps (a curve before the dither) need no parameter: a `curves` or `levels` step before `dither` is one. The gap is
@@ -59,7 +59,7 @@ Documented with the DPI write option, no parameter.
 
 | Effect | What it does |
 |---|---|
-| `modulation` | Rows (or columns, or diagonals) of dashes whose length or pitch carries tone: one-dimensional error diffusion along each row. `sway` bends the rows, `weave` alternates their direction, `dash` sets a length. Its parameters mean nothing to the 2-D methods, so not a `dither` method. |
+| ~~`modulation`~~ **Done** (2026-11-16) | Rows (or columns, or diagonals) of dashes whose length or pitch carries tone: one-dimensional error diffusion along each row. `sway` bends the rows, `weave` alternates their direction, `dash` sets a length. Its parameters mean nothing to the 2-D methods, so not a `dither` method. |
 | `mosaic` | The picture rebuilt from caller-given tile pictures, each cell the tile nearest in mean colour (Oklab), optionally tinted. No tile art is bundled (design decision): tiles are a `picture` list or folder. |
 | `stipple`, `crosshatch`, `engraving` | Rows in [effects-roadmap.md](effects-roadmap.md) ("Stylised looks"), moved from "On demand" to planned here. |
 
@@ -96,7 +96,7 @@ It gives data; drawing the boxes is vector's and scene's, following them over a 
 
 1. ~~`dither` methods and matrices; `serpentine`.~~ **Done** (2026-11-16); open: Guo-Liu and Mese matrices, Peano curve, the four-shade camera set.
 2. ~~`halftone` dot shapes, screen geometry, RGB separation, print realism.~~ **Done** (2026-11-16); open: see the later items under `halftone`.
-3. `modulation`, `stipple`, `crosshatch`, `engraving`; attribute cells, pattern tiles, `phase`.
+3. ~~`modulation`; attribute cells, pattern tiles, `phase`.~~ **Done** (2026-11-16, batch A); open: `stipple`, `crosshatch`, `engraving` (batch B).
 4. Presets: gradient maps, palettes as data, tone curves.
 5. Data beside the picture, when scene's plates or vector's tracing is built.
 6. `mosaic`, the detector.
