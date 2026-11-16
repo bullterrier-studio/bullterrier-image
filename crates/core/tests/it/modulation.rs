@@ -2,6 +2,13 @@
 //! off, on, off, on, off), the tone a flat picture must keep within the half dash a row's error can be left over, the
 //! transpose a quarter turn must give, and the whole render for rows told their place.
 
+#![expect(
+    clippy::cast_precision_loss,
+    clippy::float_cmp,
+    clippy::chunks_exact_to_as_chunks,
+    reason = "small pixel counts and coordinates; paper is exactly 1.0; a picture's channels are read three at a time"
+)]
+
 use bullterrier_image::Error;
 use bullterrier_image::effects::modulation::Params;
 use bullterrier_image::params::Color;

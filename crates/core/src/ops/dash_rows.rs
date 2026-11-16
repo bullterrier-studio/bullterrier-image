@@ -33,13 +33,18 @@ pub(crate) struct Rows {
     cos: f64,
     /// The index of the first row, and of the first cell of every row.
     first: (i64, i64),
-    rows: usize,
+    lines: usize,
     cells: usize,
 }
 
 #[expect(clippy::cast_possible_truncation, reason = "a floor of a length on a canvas")]
 fn floor(value: f64) -> i64 {
     value.floor() as i64
+}
+
+#[expect(clippy::cast_possible_truncation, reason = "a ceiling of a length on a canvas")]
+fn ceil(value: f64) -> i64 {
+    value.ceil() as i64
 }
 
 /// Taps along each side of a cell whose tone is the mean of their reads.
@@ -65,14 +70,14 @@ impl Rows {
         );
         let first_cell = floor(low / shape.dash);
         let first_row = floor((near - shape.sway) / shape.spacing) - 1;
-        let last_row = ((far + shape.sway) / shape.spacing).ceil() as i64 + 1; // shortcut: a count of rows is small
-        let cells = (high / shape.dash).ceil() as i64 - first_cell;
+        let last_row = ceil((far + shape.sway) / shape.spacing) + 1;
+        let cells = ceil(high / shape.dash) - first_cell;
         Self {
             shape,
             sin,
             cos,
             first: (first_row, first_cell),
-            rows: usize::try_from(last_row - first_row).unwrap_or(1),
+            lines: usize::try_from(last_row - first_row).unwrap_or(1),
             cells: usize::try_from(cells).unwrap_or(1).max(1),
         }
     }
@@ -86,7 +91,7 @@ impl Rows {
     /// a canvas point (0..1); a cell inks as many dashes as that share of `thickness` needs, found by diffusing its error
     /// along the row, from the far end in rows `weave` turns round (every other one).
     pub(crate) fn inked(&self, weave: bool, darkness: impl Fn(f64, f64) -> f64 + Sync) -> Vec<bool> {
-        let mut inked = vec![false; self.rows * self.cells];
+        let mut inked = vec![false; self.lines * self.cells];
         let Shape {
             dash,
             spacing,
@@ -121,6 +126,10 @@ impl Rows {
     /// How much ink the rows paint on the pixel whose centre is the canvas point (`x`, `y`), 0..1: the row it lies in and
     /// the nearer neighbour, each a band of `thickness` x `spacing` with a one px ramp for an edge, along the cells of
     /// `inked` (from [`Rows::inked`]), a cell's end a ramp too, so neighbouring dashes join.
+    #[expect(
+        clippy::many_single_char_names,
+        reason = "canvas coordinates x, y and the rotated u, v"
+    )]
     pub(crate) fn coverage(&self, inked: &[bool], x: f64, y: f64) -> f32 {
         let Shape {
             spacing,
@@ -138,7 +147,7 @@ impl Rows {
             let Ok(index) = usize::try_from(row - self.first.0) else {
                 return 0.0;
             };
-            if index >= self.rows {
+            if index >= self.lines {
                 return 0.0;
             }
             let column = usize::try_from(cell - self.first.1).unwrap_or(0).min(last);
