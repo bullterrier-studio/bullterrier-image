@@ -1214,7 +1214,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   generation; the best wins; an amount within 0.001 of 0 or 1 is 0 or 1). *Reason:* the earlier model (log density, amounts
   as continuous layers) solved amounts that a screen then printed as areas: one black ink printed a 0.5 grey at 0.889 and
   cmyk 0.2 at 0.316. *Consequence:* amounts are tone-true (a flat colour the inks can mix prints as itself within the
-  dot's own error); out-of-gamut colours get the nearest reachable print; spot and cmyk pictures change (darker, nearer the
+  dot's own error) for a single ink on every screen and for several inks on `grid` and `wave`; on `rings`, `spiral` and `rays`
+  the inks' rows coincide (`angle` moves none: a row depends on the distance from the centre), so they nest instead of
+  overlapping independently and a separation prints off-tone (a 0.5/0.5 mix of two inks, green target 0.439: rings 0.538,
+  spiral 0.515, rays 0.340 with `line`; later item: decorrelate the inks of a concentric screen); out-of-gamut colours get the nearest reachable print; spot and cmyk pictures change (darker, nearer the
   photo: demo 06's two-ink poster too). cmyk keeps its black generation (black = darkness `1 - max(r, g, b)` of the
   colour relative to the paper), scaled up by what the black ink reaches (`#231f20` lets some light through, which was the
   shadow error), cyan, magenta and yellow fitted to the rest; a colour as dark as the black ink gets is black alone, not a

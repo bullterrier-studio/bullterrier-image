@@ -41,15 +41,16 @@ euclidean, matrix or line; `separation` none, cmyk, spot or rgb; offset misregis
 
 | Addition | What it is |
 |---|---|
-| ~~Dot shapes~~ **Done** (2026-11-16) | Square, ellipse (with an aspect), diamond, euclidean (round, square at mid tone, as print screens), and a caller's spot function as a `picture` of one cell. |
+| ~~Dot shapes~~ **Done** (2026-11-16) | Square, ellipse (with an aspect), diamond, euclidean (round, a diamond at mid tone, as print screens), and a caller's spot function as a `picture` of one cell. |
 | ~~Screen geometry~~ **Done** (2026-11-16) | The screen laid in other coordinates: wave (rows displaced by a sine), rings (concentric about `x`, `y`), spiral, rays. With `shape` line these are the wavy-line, ring, spiral and sunburst looks. One coordinate map before the existing screen; every other parameter keeps its meaning. |
 | Tone moves the line | With `shape` line, tone displaces the line instead of widening it: ridgelines and waveforms. Check against the rule above when built; a new effect if half the parameters stop mattering. |
+| ~~RGB separation~~ **Done** (2026-11-16) | Three additive screens (red, green, blue) on black, each at its own angle, beside cmyk and spot. |
 | ~~Fractional `cell`~~ **Done** (2026-11-16) | `cell` is a length in px: a fine screen no longer jumps between sizes. |
 | ~~Print realism~~ **Done** (2026-11-16) | Dot gain (dots grow with ink spread), uneven ink (seeded noise in coverage), paper specks. Also for `dither`'s `spot`. |
 
 One idea, one name: both effects call separate inks `separation="spot"` (`dither` said `"inks"`; renamed). **Done** (2026-11-16).
 
-Open, later: "Tone moves the line" (above); a separation-aware default `paper` (the default black paper makes cmyk and spot print black); `rays` with `shape` line crowds into a moire blob near the centre, where a ray is narrower than a pixel.
+Open, later: "Tone moves the line" (above); decorrelate the inks of a concentric screen (on `rings`, `spiral` and `rays` every ink's rows coincide, so a separation prints off-tone; `grid` and `wave` keep the tone); a separation-aware default `paper` (the default black paper makes cmyk and spot print black); `rays` with `shape` line crowds into a moire blob near the centre, where a ray is narrower than a pixel.
 
 A ruling in lines per inch is a size question: `cell` px = the print's DPI over the ruling, scaled to the recipe's size.
 Documented with the DPI write option, no parameter.

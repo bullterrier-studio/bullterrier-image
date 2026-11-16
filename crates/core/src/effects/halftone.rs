@@ -87,10 +87,11 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 /// `paper`, as the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black
 /// generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0
 /// and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four
-/// colours), finding how much of each makes the photo's colour (the nearest in optical density), with the screens
+/// colours), finding how much of each makes the photo's colour (least squares on the colour relative to the paper, each amount 0 to 1), with the screens
 /// `angle` + 30 degrees apart (45, 75, 105, 135 by default); 'rgb' adds red, green and blue light on black, one screen
 /// per channel (as large as the channel's value), at 15, 45 and 75 degrees added to `angle`, white where all three are
-/// full, and ignores `paper`. `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`. `offset` px
+/// full, and ignores `paper`. `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`; a separation keeps the tone on 'grid' and
+/// 'wave' screens only (see `screen`). `offset` px
 /// moves the second ink's screen that far from the first along `offset_angle`, the
 /// third twice as far and the fourth three times, as a misregistered press does. `dot_gain`, `ink_noise` and `specks` (with
 /// `speck_size` and `seed`) print as a press does: fatter dots, uneven dots and bare specks in the ink; all 0 prints the clean screen.
@@ -101,7 +102,9 @@ pub struct Params {
     /// and `amplitude` cells high), 'rings' (round the centre `x`, `y`), 'spiral' (an Archimedean spiral about it, a cell
     /// more each turn) or 'rays' (straight out from it, as many as make a cell about as wide as `cell` half way to the
     /// nearest edge, wider beyond and narrower within). With shape 'line' these are wavy lines, rings, a spiral and a
-    /// sunburst; `angle` turns them. Every setting keeps the tone as a grid does.
+    /// sunburst; `angle` turns them. A single ink keeps the tone on every screen. Several inks (a `separation`) keep it on
+    /// 'grid' and 'wave'; on 'rings', 'spiral' and 'rays' every ink's rows coincide (`angle` moves none of them), so the
+    /// inks nest instead of overlapping and a separation prints off-tone.
     #[param(default = Grid)]
     pub screen: Screen,
     /// With screen 'rings', 'spiral' or 'rays': the centre's horizontal position as a fraction of the way across the
@@ -139,7 +142,8 @@ pub struct Params {
     pub matrix: PictureName,
     /// How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta, yellow and black), 'spot'
     /// (the colours in `inks`) or 'rgb' (red, green and blue light). Cmyk and spot print over `paper` like transparent
-    /// layers, each in its own screen; 'rgb' adds light on black and ignores `paper`.
+    /// layers, each in its own screen; 'rgb' adds light on black and ignores `paper`. The inks keep the picture's tone with `screen`
+    /// 'grid' and 'wave'; on 'rings', 'spiral' and 'rays' their rows coincide and a separation prints off-tone.
     #[param(default = None)]
     pub separation: Separation,
     /// Distance between neighbouring dots in px (the screen's pitch), not necessarily a whole number. Larger = fewer, bigger dots, a coarser print.
@@ -150,34 +154,34 @@ pub struct Params {
     /// angle for one ink.
     #[param(default = 45.0, unit = degrees, min = 0, max = 360, cyclic)]
     pub angle: f32,
-    /// The ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave it out to give each dot the
+    /// With no `separation`: the ink: one colour for every dot ('#rrggbb', '#rgb' or three numbers 0..1); leave it out to give each dot the
     /// colour of the photo under it, brightened so small dots stay visible (by at most 1 / `ink_floor`).
-    #[param()]
+    #[param(advanced)]
     pub ink: Option<Color>,
     /// With no `ink`: the most a dot's colour is brightened, as a floor 0.01 to 1 on its strongest channel: a colour whose
     /// strongest channel is below it is scaled by 1 / `ink_floor` instead of up to full, so dark areas stay dark. Lowering it
     /// brightens dark colours more; 1 = colours as they are.
-    #[param(default = 0.35, unit = fraction, min = 0.01, max = 1)]
+    #[param(default = 0.35, unit = fraction, min = 0.01, max = 1, advanced)]
     pub ink_floor: f32,
     /// The paper colour between the dots; ignored with 'rgb' separation (always black). On a dark paper (Rec. 709 luminance below `paper_threshold`) bright tones get the
     /// ink; on a light one, dark tones.
     #[param(default = "#000000")]
     pub paper: Color,
-    /// The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (bright tones get the ink) rather than light
+    /// With no `separation`: the Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (bright tones get the ink) rather than light
     /// (dark tones get it); 0.5 = mid grey. Raising it lets lighter paper count as dark: 0 treats every paper as light, 1
     /// every paper but white as dark.
-    #[param(default = 0.5, unit = fraction, min = 0, max = 1)]
+    #[param(default = 0.5, unit = fraction, min = 0, max = 1, advanced)]
     pub paper_threshold: f32,
     /// With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three numbers 0..1), in the order they
     /// are offset and turned; ignored otherwise. Each pixel's colour is split into amounts of these inks.
-    #[param(default = ["#ff4d6d", "#2b59ff"], min_length = 1, max_length = 4)]
+    #[param(default = ["#ff4d6d", "#2b59ff"], min_length = 1, max_length = 4, advanced)]
     pub inks: Vec<Color>,
     /// With 'cmyk', 'spot' or 'rgb' separation: how far in px the second ink's screen is moved from the first (the third twice
     /// as far, the fourth three times), as ink misregistered on a press; 0 = all screens in register.
-    #[param(default = 0.0, unit = px, min = 0, max = 100)]
+    #[param(default = 0.0, unit = px, min = 0, max = 100, advanced)]
     pub offset: f32,
     /// With an `offset`: the direction of the move, in degrees clockwise on screen from the x axis (90 is downward).
-    #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)]
+    #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic, advanced)]
     pub offset_angle: f32,
     /// Gaussian sigma, in cells, of the blur that averages the tone each dot stands for: 0 = each dot sees only the pixel at
     /// its centre (detail, but noisy), larger = smoother tone that spreads into neighbouring dots.

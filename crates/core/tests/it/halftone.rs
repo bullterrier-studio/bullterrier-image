@@ -1477,6 +1477,24 @@ fn two_spot_inks_print_the_colours_they_can_mix_at_those_colours() -> Result<(),
 }
 
 #[test]
+fn two_spot_inks_keep_the_tone_on_a_grid_and_a_wave_screen_with_dots_and_lines() -> Result<(), Error> {
+    // concentric screens (rings, spiral, rays) are not here: their inks' rows coincide, see the `screen` doc
+    let inks = [PINK, BLUE];
+    let photo = mixed([1.0; 3], &inks, &[0.5, 0.5]);
+    for screen in [Screen::Grid, Screen::Wave] {
+        for shape in [Shape::Dot, Shape::Line] {
+            let params = Params {
+                screen,
+                shape,
+                ..separated(Separation::Spot, &inks)
+            };
+            assert_mean(&params, photo, photo, 0.02)?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn cmyk_prints_greys_at_their_level_in_the_shadows_too() -> Result<(), Error> {
     let params = separated(Separation::Cmyk, &[]);
     for grey in [0.2, 0.5, 0.8] {
