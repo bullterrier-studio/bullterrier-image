@@ -1547,24 +1547,3 @@ fn dither_spot_ordered_and_noise_methods_print_one_black_ink_at_its_grey() -> Re
     }
     Ok(())
 }
-
-#[test]
-fn dither_spot_refuses_a_dark_paper_naming_paper_and_prints_on_a_light_one() {
-    let picture = (4, 4, vec![0.5_f32; 48]);
-    let spot = |paper: &str| {
-        with_matrix(
-            "bayer",
-            None,
-            &[("separation", json!("spot")), ("paper", json!(paper))],
-            &picture,
-        )
-    };
-    let refused = spot("#000000");
-    assert!(
-        matches!(&refused, Err(error) if error.to_string().contains("paper")),
-        "{refused:?}"
-    );
-    assert!(spot("#f0f0f0").is_ok());
-    // no separation does not look at the paper
-    assert!(with_matrix("bayer", None, &[("paper", json!("#000000"))], &picture).is_ok());
-}

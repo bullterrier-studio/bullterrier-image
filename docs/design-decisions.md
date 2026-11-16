@@ -1250,13 +1250,12 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   whose levels (odd eighths) fall exactly on the boundary 1 - a, where the old picture followed the solver's last float digit;
   between sixteenths the pictures differ, the old ones being quantised. The error-diffusion methods keep the palette dither;
   Atkinson passes on three quarters of the error, with several inks as with one (green 0.366 against 0.439), by design.
-- **`cmyk` and `spot` separations refuse a dark `paper`, in `halftone` and `dither`.** Ink printed over black stays black, so the
-  picture came out solid black with no sign why (`halftone`'s default `paper` is black). The check hook refuses at run, naming
-  `paper` and saying the inks print subtractively, so a light paper is needed; `rgb` (additive, on black) and `none` are
-  unaffected. Dark is the Rec. 709 luminance below `paper_threshold` in `halftone`, below 0.5 (its default) in `dither`, which
-  has no such parameter. *Reason:* a separation-aware default `paper` would hide the choice and still print black for a
-  dark paper someone sets; refusing makes the bad state impossible. *Consequence:* a caller that set a separation on the
-  default paper now sets `paper`.
+- **`halftone`'s `cmyk` and `spot` separations refuse a dark `paper`.** Ink printed over black stays black, and
+  `halftone`'s default `paper` is black, so a separation on the defaults printed solid black with no sign why. The check
+  hook refuses at run, naming `paper` (dark: Rec. 709 luminance below `paper_threshold`); `rgb` (additive, on black) and
+  `none` are unaffected. *Reason:* refusing makes the silent black impossible. `dither` refuses nothing: its `paper` is
+  read only with `spot` and is white by default, so no default prints black, and a dark paper set on purpose prints as
+  documented. *Consequence:* a `halftone` caller that set a separation on the default paper now sets `paper`.
 - **`dither` has one `method` list; `serpentine` is its own parameter.** Every look is a `method` value: the row-scanned
   diffusion kernels (`floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`,
   `sierra_lite`, `stevenson_arce`, `ostromoukhov`), other diffusion (`dot_diffusion`, `riemersma`), and ordered

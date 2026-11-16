@@ -8,7 +8,6 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start};
-use crate::ops::color::luminance;
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{
     ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, OSTROMOUKHOV, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW,
@@ -41,8 +40,6 @@ pub(crate) fn spread(_params: &Params) -> crate::Spread {
     crate::Spread::Unbounded
 }
 
-/// The Rec. 709 luminance below which a `paper` is dark: the same mid grey as `halftone`'s default `paper_threshold`.
-const DARK_PAPER: f32 = 0.5; // constant: mid grey, halftone's default paper_threshold
 
 /// How tones become a pattern of dots.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
@@ -156,7 +153,7 @@ pub enum Init {
 /// the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat
 /// colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four
 /// colours): the photo's colours are split into amounts of the inks (as in `halftone`), mixed
-/// back as printed subtractively over `paper` (inks overlap like transparent layers, so a dark `paper` is refused), and dithered
+/// back as printed subtractively over `paper` (inks overlap like transparent layers and only darken it, so use a light `paper`), and dithered
 /// once with `method` and `cell` against the paper, each ink and every overlap. `palette`,
 /// `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no
 /// `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
@@ -255,8 +252,8 @@ pub struct Params {
     /// offset; ignored otherwise. Each pixel's colour is split into amounts of these inks.
     #[param(default = ["#ff4d6d", "#2b59ff"], min_length = 1, max_length = 4)]
     pub inks: Vec<Color>,
-    /// With 'spot' separation: the paper colour the inks are printed over, where no ink lands. A dark one (Rec. 709 luminance below 0.5) is refused with 'spot'
-    /// separation: the inks print subtractively and only darken the paper, so use a light one.
+    /// With 'spot' separation: the paper colour the inks are printed over, where no ink lands. The inks print
+    /// subtractively and only darken it, so a light paper shows them best.
     #[param(default = "#ffffff")]
     pub paper: Color,
     /// With 'spot' separation: how far in px the second ink's layer is moved from the first (the third twice as far, the
@@ -473,18 +470,11 @@ fn thresholds(method: Method, params: &Params, inputs: &Inputs<'_>) -> Option<Th
     })
 }
 
-/// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high; 'spot' separation
-/// on a dark `paper`, where ink printed over black stays black.
+/// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
 ///
 /// # Errors
-/// [`Error::Recipe`] naming `matrix` or `paper`.
+/// [`Error::Recipe`] naming `matrix`.
 pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
-    if params.separation == Separation::Spot && luminance(params.paper.0) < DARK_PAPER {
-        return Err(Error::Recipe(
-            "dither: `paper` is dark, and `separation` 'spot' prints the inks subtractively, so ink on it stays black: use a light paper"
-                .into(),
-        ));
-    }
     if params.method != Method::Matrix {
         return Ok(());
     }
