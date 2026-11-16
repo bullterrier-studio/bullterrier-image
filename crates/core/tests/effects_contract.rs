@@ -526,7 +526,7 @@ fn cyclic_needs(effect: &str, field: &str) -> Setting {
         ("particles", "angle") => setting(&[("length", json!(40.0)), ("density", json!(8.0))]),
         // the wind shows once pieces are on their way
         ("disperse", "angle") => setting(&[("progress", json!(0.5)), ("cell", json!(2))]),
-        ("dither", "offset_angle") => setting(&[("separation", json!("inks")), ("offset", json!(5.0))]),
+        ("dither", "offset_angle") => setting(&[("separation", json!("spot")), ("offset", json!(5.0))]),
         // the direction of a colour pair needs an end colour
         ("outline", "angle") => setting(&[("color_end", json!("#000000"))]),
         _ => Setting::new(),

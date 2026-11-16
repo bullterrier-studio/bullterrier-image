@@ -122,7 +122,7 @@ pub enum Separation {
     /// From `palette`.
     None,
     /// One layer of dots per ink in `inks`, printed over `paper`.
-    Inks,
+    Spot,
 }
 
 /// The colour space in which dots are matched to palette colours, the `photo` colours are searched, and errors are measured.
@@ -149,7 +149,7 @@ pub enum Init {
 /// The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar
 /// the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in
 /// the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat
-/// colours. Colours are matched, and errors measured, in `space`. `separation` 'inks' prints the `inks` instead (one to four
+/// colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four
 /// colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours
 /// split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers
 /// printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`,
@@ -238,19 +238,19 @@ pub struct Params {
     /// noise.
     #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
     pub seed: u32,
-    /// How the colours are chosen: 'none' (from `palette`) or 'inks' (one layer of dots per colour of `inks`, printed over
+    /// How the colours are chosen: 'none' (from `palette`) or 'spot' (one layer of dots per colour of `inks`, printed over
     /// `paper` like transparent layers).
     #[param(default = None)]
     pub separation: Separation,
-    /// With 'inks' separation: the one to four ink colours ('#rrggbb', '#rgb' or three numbers 0..1), in the order they are
+    /// With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three numbers 0..1), in the order they are
     /// offset; ignored otherwise. Each pixel's colour is split into amounts of these inks.
     #[param(default = ["#ff4d6d", "#2b59ff"], min_length = 1, max_length = 4)]
     pub inks: Vec<Color>,
-    /// With 'inks' separation: the paper colour the inks are printed over, where no ink lands. Use a light one: inks only
+    /// With 'spot' separation: the paper colour the inks are printed over, where no ink lands. Use a light one: inks only
     /// darken it.
     #[param(default = "#ffffff")]
     pub paper: Color,
-    /// With 'inks' separation: how far in px the second ink's layer is moved from the first (the third twice as far, the
+    /// With 'spot' separation: how far in px the second ink's layer is moved from the first (the third twice as far, the
     /// fourth three times), as ink misregistered on a press; 0 = all layers in register.
     #[param(default = 0.0, unit = px, min = 0, max = 100)]
     pub offset: f32,
@@ -548,7 +548,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let cell = whole(f64::from(params.cell)).max(1);
     let (rows, columns) = (height.div_ceil(cell), width.div_ceil(cell));
     let dots = averaged(picture.pixels(), (height, width), cell);
-    if params.separation == Separation::Inks {
+    if params.separation == Separation::Spot {
         return printed(&dots, (rows, columns), cell, (height, width), params, inputs);
     }
     let matched = in_space(&dots, params.space);

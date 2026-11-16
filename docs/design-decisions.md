@@ -1215,10 +1215,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   first: four spot inks are for flat art, use `cmyk` for four tones); the offset needs no random misregistration, which
   would be a hidden tunable and break determinism, and a direction with a distance is what a loose press plate does.
   *Consequence:* ink 0 is the reference and never moves; `cmyk` screens are the classic 15, 75, 0 and 45 added to `angle`.
-- **`dither` prints inks as binary layers, with its own `separation`, `inks`, `paper`, `offset`, `offset_angle`.** Each ink's
+- **`dither` prints inks as binary layers, with its own `separation` ('none', 'spot'), `inks`, `paper`, `offset`, `offset_angle`.** Each ink's
   coverage plane (`Inks::coverages`) is dithered to 0 and 1 with the chosen `method`, `cell` and `pattern`, shifted by whole
   pixels and printed over `paper`; `palette` and `custom` are not reused for inks. *Reason:* a palette is colours to choose
-  between, inks are layers that overlap, and one more `separation` mode keeps the two effects reading alike without a
+  between, inks are layers that overlap, and one more `separation` mode ('spot', as in `halftone`) keeps the two effects reading alike without a
   shared parameter set. *Consequence:* the pixels are the 2^n combinations of the inks over the paper; the layers are
   dithered one after another in ink order, so the result does not depend on the thread count.
 - **`dither` has one `method` list; `serpentine` is its own parameter.** Every look is a `method` value: the row-scanned
@@ -1546,3 +1546,6 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   is lazy and takes 1 to 2 ms; the first `fx` call 55 ms, 40 MB resident). The plugin contract changed with it (see the
   CHANGELOG): the core scales a plugin's pixel values, so the function receives checked, scaled parameters.
 
+- **Separate inks are `separation="spot"` in `halftone` and `dither` (halftone batch, 2026-11-16).** `dither` said `"inks"`;
+  the colour list is `inks` in both. *Reason:* one idea, one name; `"inks"` had no caller outside tests. *Consequence:* no
+  alias before 1.0; `"inks"` is refused naming the choice; a spot render is the picture `"inks"` gave.

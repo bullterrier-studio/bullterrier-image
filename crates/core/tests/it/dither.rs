@@ -793,7 +793,7 @@ const YELLOW: [f32; 3] = [1.0, 0.9, 0.1];
 fn inked(method: Method, inks: &[[f32; 3]]) -> Params {
     Params {
         method,
-        separation: Separation::Inks,
+        separation: Separation::Spot,
         inks: inks.iter().map(|&ink| Color(ink)).collect(),
         paper: Color(PAPER),
         ..Params::default()
@@ -1261,4 +1261,15 @@ fn riemersma_walks_a_rectangle_step_to_step_and_decides_every_pixel_of_long_thin
         );
     }
     Ok(())
+}
+
+#[test]
+fn separation_inks_is_refused_naming_the_choice_and_spot_prints_the_inks() {
+    let picture = (4, 4, vec![0.5_f32; 48]);
+    let refused = with_matrix("floyd_steinberg", None, &[("separation", json!("inks"))], &picture);
+    assert!(
+        matches!(&refused, Err(error) if error.to_string().contains("inks")),
+        "{refused:?}"
+    );
+    assert!(with_matrix("floyd_steinberg", None, &[("separation", json!("spot"))], &picture).is_ok());
 }
