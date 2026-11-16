@@ -21,6 +21,9 @@ const SWEEPS: usize = 64; // constant: a fixed count keeps the result determinis
 /// cannot tell an area that close (a sampled spot resolves 0.0003 of the cell, `SAMPLES`).
 const SNAP: f32 = 1e-3; // constant: just above the sampled spot's resolution of area
 
+/// The place of the black among the cyan, magenta, yellow and black inks.
+const BLACK: usize = 3; // constant: the fourth of cyan, magenta, yellow, black
+
 /// The usual sRGB approximations of the cyan, magenta, yellow and black process inks (Adobe's "SWOP" swatches).
 const PROCESS: [[f32; 3]; MOST_INKS] = [
     [0.0, 0.682, 0.937],   // constant: process cyan #00aeef
@@ -411,7 +414,7 @@ impl Inks {
     pub(crate) fn cmyk_amounts(&self, colour: [f32; 3]) -> [f32; MOST_INKS] {
         let target = ratio(self.paper, colour);
         let darkness = 1.0 - target[0].max(target[1]).max(target[2]);
-        let reach = 1.0 - self.through[3].iter().fold(0.0_f32, |most, light| most.max(*light));
+        let reach = 1.0 - self.through[BLACK].iter().fold(0.0_f32, |most, light| most.max(*light));
         let black = if reach > 0.0 { (darkness / reach).min(1.0) } else { 0.0 };
         if black >= 1.0 {
             return [0.0, 0.0, 0.0, 1.0]; // as dark as the black ink gets: it alone (a rich black is a choice, not a tone)
@@ -442,7 +445,7 @@ impl Inks {
             for _ in 0..SWEEPS {
                 for &k in free {
                     // the light without ink k, and how far ink k darkens each channel at full cover
-                    amounts[k] = 0.0;
+                    amounts[k] = f32::default();
                     let rest = relative(&amounts);
                     let (mut along, mut square) = (0.0, 0.0);
                     for c in 0..3 {
