@@ -224,11 +224,12 @@ fn in_px(table: &bullterrier_image::params::Table, setting: &Setting) -> bool {
 /// long as the band: their sums differ in the last bits between a band and the whole (measured up to 7.3e-5, `liquid_metal`).
 /// They are held to `TOLERANCE`; every other effect is held to the byte. An effect that fails the byte test for this
 /// reason and is not listed is listed here, once its failure is shown to be only that.
-pub(crate) const FFT_BLURS: [&str; 16] = [
+pub(crate) const FFT_BLURS: [&str; 17] = [
     "ambient_occlusion",
     "anamorphic_streaks",
     "bloom",
     "drop_shadow",
+    "engraving",
     "focus_blur",
     "gaussian_blur",
     "grain",

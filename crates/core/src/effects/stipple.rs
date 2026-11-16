@@ -29,6 +29,11 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
     Footprint::Whole
 }
 
+/// Dots paint where the picture's tone asks, over the whole canvas: not worked out.
+pub(crate) fn spread(_params: &Params) -> crate::Spread {
+    crate::Spread::Unbounded
+}
+
 /// The picture as dots of ink on paper, as a pen-and-ink stipple drawing.
 ///
 /// Dots of `radius` px in `color` on `paper`. Darkness is how far a pixel's luminance lies from the `paper`'s towards the

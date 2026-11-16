@@ -32,6 +32,11 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     Footprint::Radius(TRUNCATE * sigma + 1.0).transformed(is_fourier(sigma, TRUNCATE))
 }
 
+/// How far `engraving` paints beyond the picture's edge: as far as it reads.
+pub(crate) fn spread(params: &Params) -> crate::Spread {
+    crate::Spread::of_footprint(footprint(params))
+}
+
 /// Lines whose width carries tone and whose course follows the picture's forms, as on a banknote.
 ///
 /// Parallel lines `spacing` px apart run `angle` degrees below the x axis, anchored at the picture's top left corner. A line
