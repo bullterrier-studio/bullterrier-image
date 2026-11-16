@@ -841,7 +841,7 @@ method : one of 'floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 
     and a memory of the last 16 errors) pass error on in an order of their own. The rest
     are ordered: a repeating matrix of thresholds decides each pixel. `bayer2`, `bayer4`
     and 'bayer' are regular crosshatches of Bayer's 2 x 2, 4 x 4 and 8 x 8 matrices;
-    'clustered' and `clustered_45` are halftone screens (8 x 8, dots in a square grid or
+    'clustered' and `clustered45` are halftone screens (8 x 8, dots in a square grid or
     turned 45 degrees); `blue_noise` is an even, grainless scatter from a repeating 64 x
     64 tile, the one with no visible pattern; `white_noise` is a random threshold for
     every pixel (`seed`); `gameboy_camera` is the Game Boy Camera's 4 x 4 matrix;

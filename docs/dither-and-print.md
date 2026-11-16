@@ -9,7 +9,7 @@ the design repository's `dither-and-print.md`.
 ## `dither`: methods
 
 Today: `floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`, `sierra_lite`,
-`stevenson_arce`, `ostromoukhov`, `dot_diffusion`, `riemersma`, `bayer2`, `bayer4`, `bayer` (8 x 8), `clustered`, `clustered_45`,
+`stevenson_arce`, `ostromoukhov`, `dot_diffusion`, `riemersma`, `bayer2`, `bayer4`, `bayer` (8 x 8), `clustered`, `clustered45`,
 `blue_noise`, `white_noise`, `gameboy_camera`, `matrix` (a picture of thresholds), and `serpentine`. One `method` list; how much of
 the pattern shows is `pattern`. Done 2026-11-16, bar the later items below.
 

@@ -1224,7 +1224,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
 - **`dither` has one `method` list; `serpentine` is its own parameter.** Every look is a `method` value: the row-scanned
   diffusion kernels (`floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`,
   `sierra_lite`, `stevenson_arce`, `ostromoukhov`), other diffusion (`dot_diffusion`, `riemersma`), and ordered
-  (`bayer2`, `bayer4`, `bayer`, `clustered`, `clustered_45`, `blue_noise`, `white_noise`, `gameboy_camera`, `matrix`);
+  (`bayer2`, `bayer4`, `bayer`, `clustered`, `clustered45`, `blue_noise`, `white_noise`, `gameboy_camera`, `matrix`);
   `bayer` stays the 8 x 8. *Reason:* a method-family parameter beside `method` would be ignored by every diffusion
   method, and a look extends an effect only while every parameter still matters for every look; one list is one menu in
   an interface. A recipe's `format` tracks structure, not choices, so new values need no format change. `serpentine`
