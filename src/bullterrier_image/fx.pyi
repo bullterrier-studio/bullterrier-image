@@ -824,7 +824,7 @@ scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges bre
     ...
 
 @_effect
-def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', 'tiles'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, tiles: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, phase: float | Drive = 0.0, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'spot'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, dot_gain: float = 0.0, ink_noise: float = 0.0, specks: float = 0.0, speck_size: float = 3.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
+def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', 'tiles'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, tiles: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, phase: float | Drive = 0.0, block: int = 0, block_height: int = 8, block_group: int = 0, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'spot'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, dot_gain: float = 0.0, ink_noise: float = 0.0, specks: float = 0.0, speck_size: float = 3.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize', 'zx_spectrum', 'msx', 'c64_hires'] | None = None) -> Step:
     """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four colours): the photo's colours are split into amounts of the inks (as in `halftone`), mixed back as printed subtractively over `paper` (inks overlap like transparent layers and only darken it, so use a light `paper`), and dithered once with `method` and `cell` against the paper, each ink and every overlap. `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
 
 Parameters
@@ -886,6 +886,23 @@ phase : number (drivable), cycles, 0 to 1, default 0.0
     fall moves. Used by the ordered, noise and 'matrix' methods, with 'spot' separation
     too; the error-diffusion methods (`floyd_steinberg` and the other kernels,
     `dot_diffusion`, `riemersma`) and 'tiles' ignore it.
+block : whole number, count, 0 to 256, default 0
+    Colour attributes: the width in dots of a block that may use only two of the
+    palette's colours, as the colour attributes of the ZX Spectrum, the MSX and the C64
+    allow. Every block takes the pair of colours whose line lies nearest to its dots
+    (the least summed distance in `space`) and is dithered between those two with
+    `method`; error and thresholds carry across block borders, each dot limited to its
+    block's pair. With a palette longer than 16 colours the pair's ends are tried among
+    the 16 that are nearest to most of the block's dots. 0 = off, every dot takes any
+    colour. Not with 'tiles' or 'spot' separation.
+block_height : whole number, count, 1 to 256, default 8
+    With a `block`: the height of a block in dots (8 x 8 for the Spectrum and the C64, 8
+    x 1 for the MSX). Ignored without a `block`.
+block_group : whole number, count, 0 to 256, default 0
+    With a `block`: 0, or the palette is read in runs of this many colours (at least 2)
+    and a block's two colours come from one run, as the Spectrum's two colours of a
+    block share their brightness (a run of 8 normal colours, then of 8 bright ones,
+    black in both). 0 = any two colours. Ignored without a `block`.
 palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom', default 'photo'
     Where the colours come from. 'photo' finds `colors` colours in the picture itself
     (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
@@ -988,7 +1005,10 @@ Presets
 -------
 posterize : Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels.
 threshold : Threshold: a black-and-white cutout, a 1-bit two-colour bitmap, split where Oklab lightness is 0.5 (about a 0.39 grey). Move the split with a `grade` step before it: `exposure` above 0 lights more of the picture. Set `custom` for other inks.
-palette_quantize : Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8)."""
+palette_quantize : Palette quantize: the picture's own 8 most characteristic colours (k-means in Oklab), flat. Set `colors`, or `palette` for a retro set (gameboy, cga, ega, pico8).
+zx_spectrum : ZX Spectrum: 256 x 192 dots, 8 x 8 attribute blocks of two colours that share their brightness (the colour clash); 15 colours.
+msx : MSX (TMS9918A, screen 2): 256 x 192 dots, every 8 x 1 run of dots has two colours from the 15 of the chip.
+c64_hires : Commodore 64 hires bitmap: 320 x 200 dots, every 8 x 8 cell has two colours from the 16."""
     ...
 
 @_effect
