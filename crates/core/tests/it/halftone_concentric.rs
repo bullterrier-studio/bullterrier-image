@@ -11,7 +11,8 @@ use bullterrier_image::Error;
 use bullterrier_image::effects::halftone::{Params, Screen, Separation, Shape};
 use bullterrier_image::params::Color;
 
-use crate::halftone::{WHITE, bent, flat, ink_where, mean_colour, mixed, red};
+use crate::common::halftone::{mean_colour, mixed};
+use crate::halftone::{WHITE, bent, flat, ink_where, red};
 
 /// The reviewer's two inks, `#ff4d6d` and `#2b59ff`.
 const PINK: [f32; 3] = [1.0, 0.302, 0.427];

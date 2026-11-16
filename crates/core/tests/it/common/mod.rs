@@ -4,10 +4,12 @@
 
 pub(crate) mod compare;
 pub(crate) mod convolution;
+pub(crate) mod dither;
 pub(crate) mod edge;
 pub(crate) mod files;
 pub(crate) mod gaussian;
 pub(crate) mod guided;
+pub(crate) mod halftone;
 pub(crate) mod icc;
 pub(crate) mod numbers;
 pub(crate) mod ops;
