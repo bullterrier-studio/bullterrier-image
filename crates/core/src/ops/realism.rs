@@ -73,3 +73,24 @@ impl Realism {
         [0, 1, 2].map(|channel| printed[channel] * (1.0 - speck) + bare[channel] * speck)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Realism;
+
+    /// Inks in the same cell draw their own numbers: two layers of one dot do not stray together.
+    #[test]
+    fn two_inks_in_one_cell_stray_differently() {
+        let real = Realism {
+            dot_gain: 0.0,
+            ink_noise: 1.0,
+            specks: 0.0,
+            speck_size: 3.0,
+            seed: 1,
+        };
+        let differ = (0..100)
+            .filter(|&cell| real.coverage(0.5, 0, [cell, 7]) != real.coverage(0.5, 1, [cell, 7]))
+            .count();
+        assert!(differ > 95, "{differ}");
+    }
+}
