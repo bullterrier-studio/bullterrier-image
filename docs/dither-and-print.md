@@ -16,8 +16,8 @@ or `method` plus `matrix`) is the batch's decision. How much of the pattern show
 | Diffusion kernels | Jarvis-Judice-Ninke, Stucki, Burkes, Sierra, two-row Sierra, Sierra Lite, Stevenson-Arce: each a weight table on the one diffusion path. |
 | `serpentine` | Rows scanned in alternating direction: removes the diagonal worms of diffusion. |
 | Ostromoukhov | Diffusion whose weights change with the tone (Ostromoukhov, 2001): fewer artefacts in mid-tones. |
-| Dot diffusion | Error passed in the order of a class matrix (Knuth, 1987; Guo-Liu and Mese matrices): parallel, no worms. |
-| Riemersma | Diffusion along a space-filling curve (Hilbert; Peano) with a short error memory. |
+| Dot diffusion | Error passed in the order of a class matrix (Knuth, 1987): parallel, no worms. Built with Knuth's matrix; later: the Guo-Liu and Mese-Vaidyanathan class matrices. |
+| Riemersma | Diffusion along a space-filling curve with a short error memory. Built along the Hilbert curve; later: the Peano curve. |
 | Camera four-shade set | The Game Boy Camera's three thresholds per cell (four shades from one matrix, at its sixteen contrast settings). `gameboy_camera` uses the cell order only, as a black-and-white matrix. |
 
 ## `dither`: modes

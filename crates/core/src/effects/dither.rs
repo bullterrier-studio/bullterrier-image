@@ -12,7 +12,7 @@ use crate::ops::color::luminance;
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{
     ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, OSTROMOUKHOV, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW,
-    STEVENSON_ARCE, STUCKI, Thresholds, Tile, diffuse, from_greys, noise, ordered,
+    STEVENSON_ARCE, STUCKI, Thresholds, Tile, diffuse, dot_diffusion, from_greys, noise, ordered, riemersma,
 };
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
@@ -63,6 +63,12 @@ pub enum Method {
     /// Weights that change with the pixel's level (Ostromoukhov, 2001), tuned for an even grain at every grey; the level is
     /// taken from the pixel's lightness (Oklab) or Rec. 709 luma (rgb); the paper scans serpentine (see `serpentine`).
     Ostromoukhov,
+    /// Knuth's dot diffusion (1987): pixels taken in the order of an 8 x 8 class matrix, each passing its error to its
+    /// neighbours of a higher class; no worms, as a tile's pixels of one class do not depend on each other.
+    DotDiffusion,
+    /// Riemersma's dither (1998): the pixels taken along a Hilbert curve, each shifted by the weighted errors of the last
+    /// 16; a grain with no row direction.
+    Riemersma,
     /// A regular crosshatch of Bayer's 2 x 2 matrix: coarse, four levels.
     Bayer2,
     /// A regular crosshatch of Bayer's 4 x 4 matrix.
@@ -157,7 +163,7 @@ pub struct Params {
     /// 'sierra', `sierra_two_row`, `sierra_lite`, `stevenson_arce` and `ostromoukhov` pass each pixel's error on to its neighbours
     /// (organic grain; they differ in how many pixels and how far the error goes: wider kernels are smoother, narrower ones
     /// sharper and faster; all keep every tone except Atkinson, which drops a quarter of the error, so highlights and
-    /// shadows go clean and the contrast is higher). The rest are ordered: a repeating matrix of thresholds decides each
+    /// shadows go clean and the contrast is higher). `dot_diffusion` (Knuth's 8 x 8 class matrix sets the order, pixels of one class independent) and `riemersma` (a Hilbert curve and a memory of the last 16 errors) pass error on in an order of their own. The rest are ordered: a repeating matrix of thresholds decides each
     /// pixel. `bayer2`, `bayer4` and 'bayer' are regular crosshatches of Bayer's 2 x 2, 4 x 4 and 8 x 8 matrices;
     /// 'clustered' and `clustered_45` are halftone screens (8 x 8, dots in a square grid or turned 45 degrees);
     /// `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile, the one with no visible pattern;
@@ -417,6 +423,8 @@ fn pattern(
         Method::SierraLite => by(&SIERRA_LITE),
         Method::StevensonArce => by(&STEVENSON_ARCE),
         Method::Ostromoukhov => by(&OSTROMOUKHOV),
+        Method::DotDiffusion => dot_diffusion(values, size, palette, amount),
+        Method::Riemersma => riemersma(values, size, palette, amount),
         Method::Bayer2 => tiled(Tile::Bayer2),
         Method::Bayer4 => tiled(Tile::Bayer4),
         Method::Bayer => tiled(Tile::Bayer),

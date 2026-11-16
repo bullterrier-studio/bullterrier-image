@@ -1066,7 +1066,12 @@ fn serpentine_changes_every_diffusion_method_and_no_ordered_one() -> Result<(), 
         Method::StevensonArce,
         Method::Ostromoukhov,
     ];
-    for method in diffusion.into_iter().chain([Method::Bayer, Method::BlueNoise]) {
+    for method in diffusion.into_iter().chain([
+        Method::Bayer,
+        Method::BlueNoise,
+        Method::DotDiffusion,
+        Method::Riemersma,
+    ]) {
         let plain = ink(method, 1.0);
         let turned = Params {
             serpentine: true,
@@ -1137,5 +1142,84 @@ fn in_rgb_ostromoukhov_takes_the_level_from_the_luma_not_from_red() -> Result<()
     };
     let out = run(&params, &picture)?;
     assert_eq!(out[3..], [0.0, 0.0, 0.0]);
+    Ok(())
+}
+
+// ---- dot diffusion and Riemersma ---------------------------------------------------------------------------------------
+
+/// The share of a 64 x 64 flat grey lit in black and white (the counting settings).
+fn lit_share(method: Method, grey: f32) -> Result<f32, Error> {
+    let out = run(&ink(method, 1.0), &greys(&vec![grey; 64 * 64], 64))?;
+    Ok(f32::from(u16::try_from(reds(&out).iter().filter(|&&red| red > 0.5).count()).unwrap_or(0)) / (64.0 * 64.0))
+}
+
+#[test]
+fn dot_diffusion_and_riemersma_keep_the_tone_of_a_flat_grey() -> Result<(), Error> {
+    // Within 0.03 of the grey. Dot diffusion drops the error of the pixels with no higher-class neighbour (by an
+    // exact-fraction script on the same settings: 0.1 gives 0.0955, 0.39 gives 0.3787); Riemersma's memory of 16 leaves
+    // the last errors of the walk unspent.
+    for method in [Method::DotDiffusion, Method::Riemersma] {
+        for grey in [0.1, 0.25, 0.39, 0.5, 0.6, 0.75, 0.9] {
+            let lit = lit_share(method, grey)?;
+            assert!((lit - grey).abs() < 0.03, "{method:?} grey {grey}: {lit} lit");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn dot_diffusion_and_riemersma_decide_every_pixel_even_on_an_odd_sized_picture() -> Result<(), Error> {
+    // 37 x 23: no side is a power of two or a multiple of 8, so a curve over the next power of two skips points and the
+    // class tiles are cut. With black and white every output pixel is exactly one of the two, which no pixel left as the
+    // input value (a varied picture) can be.
+    let picture = (23, 37, varied(23, 37));
+    for method in [Method::DotDiffusion, Method::Riemersma] {
+        let out = run(&ink(method, 1.0), &picture)?;
+        assert_eq!(out.len(), 23 * 37 * 3);
+        assert!(
+            pixels(&out)
+                .iter()
+                .all(|&pixel| near(pixel, BLACK) || near(pixel, WHITE)),
+            "{method:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn dot_diffusion_of_one_tile_of_a_flat_grey_follows_knuths_classes() -> Result<(), Error> {
+    // An 8 x 8 flat grey of 0.39 and 0.499, 0.7 worked in exact fractions by a separate script from Knuth's class
+    // matrix, 2 to each orthogonal and 1 to each diagonal neighbour of a higher class (inside the picture), normalised
+    // over those neighbours, classes in order 0 to 63, a pixel white when its value is at least a half.
+    let rows = [
+        (
+            0.39,
+            "01001001 10010101 01100000 01011011 00000100 11011010 00000001 10101010",
+        ),
+        (
+            0.499,
+            "01101010 10010101 10101010 01010101 10101010 01010101 10101001 01010110",
+        ),
+        (
+            0.7,
+            "10111101 11100111 01111110 10101011 11011101 01110110 11101011 10111101",
+        ),
+    ];
+    for (grey, expected) in rows {
+        let out = run(&ink(Method::DotDiffusion, 1.0), &greys(&[grey; 64], 8))?;
+        assert_eq!(bits(&out, 8), expected, "grey {grey}");
+    }
+    Ok(())
+}
+
+#[test]
+fn riemersma_walks_a_two_by_two_picture_along_the_hilbert_curve() -> Result<(), Error> {
+    // Riemersma's curve over 2 x 2 visits (row, column) (0,0), (1,0), (1,1), (0,1). The picture is 0.6 0.2 / 0.7 0.5;
+    // the error memory weighs the newest error 1 and the ones before it 16^(-1/15) = 0.8313 and 0.6911. (0,0): 0.6, white,
+    // error -0.4. (1,0): 0.7 - 0.4 = 0.3, black, error 0.7. (1,1): 0.5 + 0.7 - 0.4 x 0.8313 = 0.8675, white, error -0.5.
+    // (0,1): 0.2 - 0.5 + 0.7 x 0.8313 - 0.4 x 0.6911 = 0.0055, black. The curve turned the other way, or a raster walk,
+    // lights (1,0) instead of (1,1).
+    let out = run(&ink(Method::Riemersma, 1.0), &greys(&[0.6, 0.2, 0.7, 0.5], 2))?;
+    assert_eq!(bits(&out, 2), "10 01");
     Ok(())
 }

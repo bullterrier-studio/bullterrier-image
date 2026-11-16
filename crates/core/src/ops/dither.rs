@@ -318,9 +318,20 @@ fn folded_level(value: f32) -> usize {
     if level > 127 { 255 - level } else { level }
 }
 
+/// The palette colour nearest to `value` (an index) and what is left over: `value` less that colour.
+fn settle(value: Point, palette: &[Point]) -> (u8, [f32; 3]) {
+    let pick = nearest_one(&value, palette);
+    let colour = palette[usize::from(pick)];
+    (pick, [0, 1, 2].map(|channel| value[channel] - colour[channel]))
+}
+
 /// The level of `value` (before folding): its channels weighted by `lightness`.
 fn level_of(value: [f32; 3], lightness: [f32; 3]) -> f32 {
-    value.iter().zip(lightness).map(|(channel, weight)| channel * weight).sum()
+    value
+        .iter()
+        .zip(lightness)
+        .map(|(channel, weight)| channel * weight)
+        .sum()
 }
 
 /// The palette colour chosen for each pixel of `values` (`height` x `width`, row after row) by error diffusion: indices
@@ -351,12 +362,13 @@ pub(crate) fn diffuse(
             let at = (row % ROWS_ALIVE) * stride + REACH + column;
             let pixel = values[row * width + column];
             let value = [0, 1, 2].map(|channel| pixel[channel] + waiting[at][channel]);
-            let pick = nearest_one(&value, palette);
+            let (pick, miss) = settle(value, palette);
             chosen[row * width + column] = pick;
-            let colour = palette[usize::from(pick)];
-            let level = kernel.levels.map(|table| table[folded_level(level_of(value, lightness))].map(f32::from));
+            let level = kernel
+                .levels
+                .map(|table| table[folded_level(level_of(value, lightness))].map(f32::from));
             let scale = level.map_or(fixed_scale, |row| amount / row.iter().sum::<f32>());
-            let error = [0, 1, 2].map(|channel| (value[channel] - colour[channel]) * scale);
+            let error = miss.map(|part| part * scale);
             for (tap, &(right, down, weight)) in kernel.taps.iter().enumerate() {
                 let weight = level.map_or(weight, |row| row[tap]);
                 let right = if backwards { -right } else { right };
@@ -368,6 +380,142 @@ pub(crate) fn diffuse(
         }
         let done = (row % ROWS_ALIVE) * stride;
         waiting[done..done + stride].fill([0.0; 3]);
+    }
+    chosen
+}
+
+/// The class of each cell of Knuth's 8 x 8 matrix, row after row: the pixels of class 0 are decided first.
+// constant: Knuth, "Digital halftones by dot diffusion", ACM Transactions on Graphics 6 (1987), the class matrix as printed in
+// US patent 8,077,355, Table 2 (https://patents.google.com/patent/US8077355B2/en)
+const KNUTH_CLASSES: [u8; 64] = [
+    34, 48, 40, 32, 29, 15, 23, 31, 42, 58, 56, 53, 21, 5, 7, 10, 50, 62, 61, 45, 13, 1, 2, 18, 38, 46, 54, 37, 25, 17,
+    9, 26, 28, 14, 22, 30, 35, 49, 41, 33, 20, 4, 6, 11, 43, 59, 57, 52, 12, 0, 3, 19, 51, 63, 60, 44, 24, 16, 8, 27,
+    39, 47, 55, 36,
+];
+/// The class matrix's side.
+const CLASS_SIDE: usize = 8; // constant: Knuth's class matrix is 8 x 8
+
+/// The palette colour chosen for each pixel of `values` (`height` x `width`, row after row) by dot diffusion (Knuth, 1987).
+///
+/// The class matrix is tiled over the picture from its top left corner and the pixels are taken class by class, 0 first;
+/// each gets the palette colour closest to its value plus the error passed to it, and `amount` (0 to 1) of the difference
+/// is divided among its neighbours (of the eight around it, those inside the picture) of a higher class, in proportion to
+/// 2 for a side-on neighbour and 1 for a diagonal one. A pixel with no such neighbour loses its error. The pixels of one
+/// class are never neighbours, so their order does not matter.
+pub(crate) fn dot_diffusion(
+    values: &[Point],
+    (height, width): (usize, usize),
+    palette: &[Point],
+    amount: f32,
+) -> Vec<u8> {
+    let class_at = |row: usize, column: usize| KNUTH_CLASSES[(row % CLASS_SIDE) * CLASS_SIDE + column % CLASS_SIDE];
+    let mut waiting = vec![[0.0_f32; 3]; height * width];
+    let mut chosen = vec![0; height * width];
+    for class in 0..64_u8 {
+        let at = KNUTH_CLASSES.iter().position(|&each| each == class).unwrap_or_default();
+        let (first_row, first_column) = (at / CLASS_SIDE, at % CLASS_SIDE);
+        for row in (first_row..height).step_by(CLASS_SIDE) {
+            for column in (first_column..width).step_by(CLASS_SIDE) {
+                let pixel = values[row * width + column];
+                let value = [0, 1, 2].map(|channel| pixel[channel] + waiting[row * width + column][channel]);
+                let (pick, miss) = settle(value, palette);
+                chosen[row * width + column] = pick;
+                // the higher-class neighbours inside the picture, with their weights
+                let mut heirs = [(0_usize, 0_usize, 0.0_f32); 8];
+                let mut count = 0;
+                for (down, right) in [
+                    (-1, -1),
+                    (-1, 0),
+                    (-1, 1),
+                    (0, -1),
+                    (0, 1),
+                    (1, -1),
+                    (1, 0),
+                    (1, 1_isize),
+                ] {
+                    let (Some(near_row), Some(near_column)) =
+                        (row.checked_add_signed(down), column.checked_add_signed(right))
+                    else {
+                        continue;
+                    };
+                    if near_row < height && near_column < width && class_at(near_row, near_column) > class {
+                        let weight = if down == 0 || right == 0 { 2.0 } else { 1.0 }; // constant: Knuth, side-on 2, diagonal 1
+                        heirs[count] = (near_row, near_column, weight);
+                        count += 1;
+                    }
+                }
+                let total: f32 = heirs[..count].iter().map(|heir| heir.2).sum();
+                for &(near_row, near_column, weight) in &heirs[..count] {
+                    for (sum, part) in waiting[near_row * width + near_column].iter_mut().zip(miss) {
+                        *sum += part * amount * weight / total;
+                    }
+                }
+            }
+        }
+    }
+    chosen
+}
+
+/// How many errors Riemersma's dither remembers.
+const MEMORY: usize = 16; // constant: Riemersma (1998), "a list of 16 as a minimum", his program's SIZE
+/// The weight of the newest error in memory against the oldest.
+const MEMORY_RATIO: f32 = 16.0; // constant: Riemersma (1998), his program's MAX
+
+/// The (row, column) of the `step`th point of the Hilbert curve over an `extent` x `extent` square (a power of two), from the top
+/// left corner, as Riemersma's program walks it (first down, then right).
+fn hilbert(extent: usize, step: usize) -> (usize, usize) {
+    let (mut x, mut y, mut left, mut span) = (0, 0, step, 1);
+    while span < extent {
+        let right = 1 & (left / 2);
+        let down = 1 & (left ^ right);
+        if down == 0 {
+            if right == 1 {
+                x = span - 1 - x;
+                y = span - 1 - y;
+            }
+            std::mem::swap(&mut x, &mut y);
+        }
+        x += span * right;
+        y += span * down;
+        left /= 4; // constant: a Hilbert curve's step is in base 4
+        span *= 2;
+    }
+    (y, x)
+}
+
+/// The palette colour chosen for each pixel of `values` (`height` x `width`, row after row) by Riemersma's dither (1998).
+///
+/// The pixels are taken along a Hilbert curve over the smallest square of a power-of-two side that holds the picture, the
+/// points outside the picture skipped. A pixel gets the palette colour closest to its value plus `amount` (0 to 1) of the
+/// weighted sum of the last 16 errors, the newest weighing 1 and each older one less by the same factor, down to 1/16; its
+/// own error is its value (without the sum) less the colour chosen.
+pub(crate) fn riemersma(values: &[Point], (height, width): (usize, usize), palette: &[Point], amount: f32) -> Vec<u8> {
+    #[expect(clippy::cast_precision_loss, reason = "a small constant")]
+    let fall = MEMORY_RATIO.powf(-1.0 / (MEMORY - 1) as f32);
+    // the weights from the oldest error to the newest
+    let weights: [f32; MEMORY] =
+        std::array::from_fn(|age| fall.powi(i32::try_from(MEMORY - 1 - age).unwrap_or_default()));
+    let side = height.max(width).next_power_of_two();
+    let mut recent = [[0.0_f32; 3]; MEMORY]; // the oldest first
+    let mut chosen = vec![0; height * width];
+    for step in 0..side * side {
+        let (row, column) = hilbert(side, step);
+        if row >= height || column >= width {
+            continue;
+        }
+        let pixel = values[row * width + column];
+        let value = [0, 1, 2].map(|channel| {
+            let sum: f32 = recent
+                .iter()
+                .zip(&weights)
+                .map(|(error, weight)| error[channel] * weight)
+                .sum();
+            pixel[channel] + amount * sum
+        });
+        let (pick, _) = settle(value, palette);
+        chosen[row * width + column] = pick;
+        recent.rotate_left(1);
+        recent[MEMORY - 1] = settle(pixel, &[palette[usize::from(pick)]]).1;
     }
     chosen
 }
