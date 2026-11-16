@@ -714,4 +714,42 @@ mod tests {
             assert!(found <= wave_reach(3.0), "wave of {wavelength} cells: {found} cells");
         }
     }
+
+    /// The length, in cells, of the screen cell that holds the place `turns` round an arm of `geometry` that lies `arm` cells
+    /// out (a ring, or the spiral's arm), measured between the two places where the arm leaves it.
+    fn cell_along(geometry: Geometry, centre: [f32; 2], arm: f32, turns: f32, grow: f32) -> f32 {
+        let place = |t: f32| {
+            let (radius, angle) = (arm + grow * t, t * TURN);
+            (centre[0] + radius * angle.cos(), centre[1] + radius * angle.sin())
+        };
+        let cell = |t: f32| {
+            let (u, v) = place(t);
+            geometry.forward(u, v).0.floor()
+        };
+        let base = cell(turns);
+        let edge = |step: f32| {
+            let mut t = turns;
+            while cell(t) == base {
+                t += step;
+            }
+            place(t)
+        };
+        let (one, other) = (edge(-1e-5), edge(1e-5));
+        (one.0 - other.0).hypot(one.1 - other.1)
+    }
+
+    /// A ring's or spiral arm's cell is about a cell long, as it is wide: the dots are round, whatever the radius.
+    #[test]
+    fn a_ring_or_arm_is_cut_into_cells_about_a_cell_long() {
+        let centre = [0.3, -0.2];
+        for ring in 1..30 {
+            let length = cell_along(Geometry::Rings { centre }, centre, ring as f32 + 0.5, 0.37, 0.0);
+            assert!((0.75..1.25).contains(&length), "ring {ring}: {length} cells");
+        }
+        for arm in 0..30 {
+            // the arm's mean radius is the middle of its turn, half a turn in (`arm + 1`)
+            let length = cell_along(Geometry::Spiral { centre }, centre, arm as f32 + 0.5, 0.37, 1.0);
+            assert!((0.75..1.25).contains(&length), "arm {arm}: {length} cells");
+        }
+    }
 }
