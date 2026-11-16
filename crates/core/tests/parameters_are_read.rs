@@ -41,6 +41,11 @@ struct Conditional {
     with: Vec<(&'static str, Value)>,
 }
 
+/// A conditional row.
+fn row(effect: &'static str, field: &'static str, with: Vec<(&'static str, Value)>) -> Conditional {
+    Conditional { effect, field, with }
+}
+
 /// Every parameter that is not read at the defaults, and why.
 #[expect(
     clippy::too_many_lines,
@@ -112,22 +117,14 @@ fn conditional() -> Vec<Conditional> {
         },
         // the test picture is darker than the default thickness (every cell is inked), where a dash's length and the
         // direction of the carry show nothing
-        Conditional {
-            effect: "modulation",
-            field: "dash",
-            with: vec![("thickness", json!(1.0))],
-        },
-        Conditional {
-            effect: "modulation",
-            field: "weave",
-            with: vec![("thickness", json!(1.0)), ("spacing", json!(2.0)), ("dash", json!(1.0))],
-        },
+        row("modulation", "dash", vec![("thickness", json!(1.0))]),
+        row(
+            "modulation",
+            "weave",
+            vec![("thickness", json!(1.0)), ("spacing", json!(2.0)), ("dash", json!(1.0))],
+        ),
         // the length of a swing matters only while rows swing
-        Conditional {
-            effect: "modulation",
-            field: "wavelength",
-            with: vec![("sway", json!(6.0))],
-        },
+        row("modulation", "wavelength", vec![("sway", json!(6.0))]),
         // the value beyond the edge is seen only by the edge rule that uses it
         Conditional {
             effect: "gaussian_blur",
@@ -415,28 +412,16 @@ fn conditional() -> Vec<Conditional> {
             with: vec![("method", json!("matrix"))],
         },
         // the strip of tiles is read by method 'tiles' alone, which refuses to run without one
-        Conditional {
-            effect: "dither",
-            field: "tiles",
-            with: vec![("method", json!("tiles"))],
-        },
+        row("dither", "tiles", vec![("method", json!("tiles"))]),
         // the error-diffusion methods have no tile to shift
-        Conditional {
-            effect: "dither",
-            field: "phase",
-            with: vec![("method", json!("bayer"))],
-        },
+        row("dither", "phase", vec![("method", json!("bayer"))]),
         // the block's height and runs matter only while there is a block
-        Conditional {
-            effect: "dither",
-            field: "block_height",
-            with: vec![("block", json!(8))],
-        },
-        Conditional {
-            effect: "dither",
-            field: "block_group",
-            with: vec![("block", json!(8)), ("palette", json!("cube6"))],
-        },
+        row("dither", "block_height", vec![("block", json!(8))]),
+        row(
+            "dither",
+            "block_group",
+            vec![("block", json!(8)), ("palette", json!("cube6"))],
+        ),
         // the inks, the paper and the offset matter only while the inks print
         Conditional {
             effect: "dither",
