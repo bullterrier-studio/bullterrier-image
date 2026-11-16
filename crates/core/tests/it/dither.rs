@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 
-use bullterrier_image::{Error, Image, Options, Photo, Picture, Presets, Recipe, Step};
-use serde_json::{Value, json};
 use bullterrier_image::effects::dither::{Init, Method, Palette, Params, Separation, Space};
 use bullterrier_image::params::Color;
+use bullterrier_image::{Error, Image, Options, Photo, Picture, Presets, Recipe, Step};
+use serde_json::{Value, json};
 
 use crate::common::pictures::varied;
 use crate::common::pixels::run_picture;
@@ -593,7 +593,11 @@ fn the_small_bayer_matrices_light_the_pixels_of_the_closed_form_in_the_top_share
             let out = lit_on_flat(method, k as f32 / levels as f32, side)?;
             for (at, &on) in out.iter().enumerate() {
                 // a rank is lit when the share of the cells at or above it is within the grey's: the top k n-ths
-                assert_eq!(on, bayer_rank_of(bits, at / side, at % side) >= cells - k * cells / levels, "{method:?} {k}");
+                assert_eq!(
+                    on,
+                    bayer_rank_of(bits, at / side, at % side) >= cells - k * cells / levels,
+                    "{method:?} {k}"
+                );
             }
         }
     }
@@ -659,7 +663,10 @@ fn clustered_dots_keep_every_lit_pixel_lit_and_stay_in_one_dot_per_cluster() -> 
         let mut before: Vec<(usize, usize)> = Vec::new();
         for k in 1..16 {
             let lit = lit_cells(method, k)?;
-            assert!(before.iter().all(|cell| lit.contains(cell)), "{method:?} {k}: a lit pixel went out");
+            assert!(
+                before.iter().all(|cell| lit.contains(cell)),
+                "{method:?} {k}: a lit pixel went out"
+            );
             let dots = pieces(&lit);
             assert!((1..=most_dots).contains(&dots), "{method:?} {k}/16: {dots} dots");
             before = lit;
@@ -712,7 +719,11 @@ fn with_matrix(
 
 /// A grey picture of `rows` x `columns` whose cells are `greys`, row after row.
 fn grey_matrix(rows: usize, columns: usize, greys: &[f32]) -> Result<Image, Error> {
-    Image::new(rows, columns, &greys.iter().flat_map(|&grey| [grey; 3]).collect::<Vec<_>>())
+    Image::new(
+        rows,
+        columns,
+        &greys.iter().flat_map(|&grey| [grey; 3]).collect::<Vec<_>>(),
+    )
 }
 
 #[test]
@@ -744,12 +755,18 @@ fn a_matrix_lights_a_grey_of_k_levels_in_k_cells_brightest_first_with_ties_in_re
     assert_eq!(lit_at(2.0)?, [false, true, true, false]);
     assert_eq!(lit_at(3.0)?, [false, true, true, true]);
     // 4 x 4 (a non-Bayer one: ranks by reading order): k of 16 lit
-    let ramp: Vec<f32> = (0..16).map(|at| f32::from(u8::try_from(at).unwrap_or(0)) / 16.0).collect();
+    let ramp: Vec<f32> = (0..16)
+        .map(|at| f32::from(u8::try_from(at).unwrap_or(0)) / 16.0)
+        .collect();
     let matrix = grey_matrix(4, 4, &ramp)?;
     for k in 1..16_u8 {
         let flat = (4, 4, vec![f32::from(k) / 16.0; 48]);
         let out = with_matrix("matrix", Some(&matrix), &[("matrix", json!("m"))], &flat)?;
-        assert_eq!(out.chunks(3).filter(|pixel| pixel[0] > 0.5).count(), usize::from(k), "{k}/16");
+        assert_eq!(
+            out.chunks(3).filter(|pixel| pixel[0] > 0.5).count(),
+            usize::from(k),
+            "{k}/16"
+        );
     }
     Ok(())
 }

@@ -214,45 +214,30 @@ pub(crate) enum Tile {
     GameboyCamera,
 }
 
-/// The ranks of the straight clustered-dot matrix, 8 x 8, row after row: ImageMagick's `h8x8o` (`config/thresholds.xml`,
+/// The ranks of the straight clustered-dot matrix, 8 x 8, row after row: `ImageMagick`'s `h8x8o` (`config/thresholds.xml`,
 /// from Gernot Hoffmann's "Dithering & Halftoning"), levels 1 to 64 turned round (63 - level + 1) so that the cell lit last
 /// is the dot's centre, as `ordered` lights the highest rank first.
 // constant: ImageMagick h8x8o, https://github.com/ImageMagick/ImageMagick/blob/main/config/thresholds.xml
 const CLUSTERED: [u16; 64] = [
-    57, 43, 31, 21, 28, 45, 55, 60,
-    48, 37, 13, 9, 15, 35, 50, 53,
-    33, 17, 7, 3, 5, 19, 29, 41,
-    23, 11, 4, 0, 2, 12, 24, 26,
-    27, 20, 6, 1, 8, 18, 34, 42,
-    49, 36, 16, 10, 14, 38, 47, 54,
-    56, 46, 30, 22, 32, 44, 58, 62,
-    59, 51, 39, 25, 40, 52, 61, 63,
+    57, 43, 31, 21, 28, 45, 55, 60, 48, 37, 13, 9, 15, 35, 50, 53, 33, 17, 7, 3, 5, 19, 29, 41, 23, 11, 4, 0, 2, 12,
+    24, 26, 27, 20, 6, 1, 8, 18, 34, 42, 49, 36, 16, 10, 14, 38, 47, 54, 56, 46, 30, 22, 32, 44, 58, 62, 59, 51, 39,
+    25, 40, 52, 61, 63,
 ];
 
 /// The ranks of the 45 degree clustered-dot matrix, 8 x 8, row after row: the Go dither library's
 /// `ClusteredDotDiagonal8x8` (from the libcaca study, part 2), turned round (63 - rank) as `CLUSTERED` is.
 // constant: https://github.com/makeworld-the-better-one/dither/blob/master/ordered_ditherers.go, http://caca.zoy.org/study/part2.html
 const CLUSTERED_45: [u16; 64] = [
-    39, 53, 51, 37, 28, 16, 14, 26,
-    55, 63, 61, 49, 18, 4, 2, 12,
-    41, 57, 59, 47, 20, 6, 0, 10,
-    33, 43, 45, 35, 30, 22, 8, 24,
-    29, 17, 15, 27, 38, 52, 50, 36,
-    19, 5, 3, 13, 54, 62, 60, 48,
-    21, 7, 1, 11, 40, 56, 58, 46,
-    31, 23, 9, 25, 32, 42, 44, 34,
+    39, 53, 51, 37, 28, 16, 14, 26, 55, 63, 61, 49, 18, 4, 2, 12, 41, 57, 59, 47, 20, 6, 0, 10, 33, 43, 45, 35, 30, 22,
+    8, 24, 29, 17, 15, 27, 38, 52, 50, 36, 19, 5, 3, 13, 54, 62, 60, 48, 21, 7, 1, 11, 40, 56, 58, 46, 31, 23, 9, 25,
+    32, 42, 44, 34,
 ];
 
 /// The Game Boy Camera's matrix, 4 x 4, row after row: the order of the 16 cells' thresholds (all three levels order them
 /// alike), as the camera's registers A006 on hold them (cell x + 4 y at 3 registers a cell); the camera lights the lowest
 /// threshold first, so the ranks are turned round (15 - order).
 // constant: https://github.com/HerrZatacke/dither-pattern-gen/blob/master/reference/patterns.mjs (first Low Light pattern), the DashBoy camera's SD/config.json
-const GAMEBOY_CAMERA: [u16; 16] = [
-    15, 3, 12, 0,
-    7, 11, 4, 8,
-    13, 1, 14, 2,
-    5, 9, 6, 10,
-];
+const GAMEBOY_CAMERA: [u16; 16] = [15, 3, 12, 0, 7, 11, 4, 8, 13, 1, 14, 2, 5, 9, 6, 10];
 
 /// The thresholds of an ordered dither: a rank for every pixel, out of `count` ranks, the highest lit first.
 pub(crate) enum Thresholds<'a> {
@@ -285,7 +270,8 @@ impl Thresholds<'_> {
             } => usize::from(ranks[(row % rows) * columns + column % columns]),
             Self::Noise { seed } => {
                 // the top 16 bits of the word hashed from the seed and the pixel's place
-                usize::try_from(mix(*seed, &[u64::try_from(row * width + column).unwrap_or_default()]) >> 48).unwrap_or_default()
+                usize::try_from(mix(*seed, &[u64::try_from(row * width + column).unwrap_or_default()]) >> 48)
+                    .unwrap_or_default()
             }
         }
     }
@@ -327,9 +313,9 @@ impl Tile {
     pub(crate) fn thresholds(self) -> Thresholds<'static> {
         static BLUE: OnceLock<Vec<u16>> = OnceLock::new();
         let (ranks, side): (Cow<'static, [u16]>, usize) = match self {
-            Self::Bayer2 => (Cow::Owned(bayer(2)), 2), // constant: a 2 x 2 matrix
-            Self::Bayer4 => (Cow::Owned(bayer(4)), 4), // constant: a 4 x 4 matrix
-            Self::Bayer => (Cow::Owned(bayer(8)), 8),  // constant: Bayer (1973), the 8 x 8 matrix, 64 levels
+            Self::Bayer2 => (Cow::Owned(bayer(2)), 2),         // constant: a 2 x 2 matrix
+            Self::Bayer4 => (Cow::Owned(bayer(4)), 4),         // constant: a 4 x 4 matrix
+            Self::Bayer => (Cow::Owned(bayer(8)), 8),          // constant: Bayer (1973), the 8 x 8 matrix, 64 levels
             Self::Clustered => (Cow::Borrowed(&CLUSTERED), 8), // constant: an 8 x 8 matrix
             Self::Clustered45 => (Cow::Borrowed(&CLUSTERED_45), 8), // constant: an 8 x 8 matrix
             Self::BlueNoise => (Cow::Borrowed(BLUE.get_or_init(blue_noise).as_slice()), BLUE_SIDE),

@@ -262,6 +262,9 @@ pub(crate) struct Meta {
     pub(crate) inputs: &'static [Input],
 }
 
+/// The refusal an effect's file declares: `Err` for a run its parameters and inputs cannot make.
+type Check<P> = fn(&P, &Inputs<'_>) -> Result<(), Error>;
+
 /// An effect written in Rust, in a file of `src/effects/`: its `META`, its `Params` (read from the parameters), its
 /// `footprint`, its `spread` if it paints outward, its `check` if it refuses runs the table cannot, and its `render`. The build script makes one for each file.
 pub(crate) struct Native<P> {
@@ -274,7 +277,7 @@ pub(crate) struct Native<P> {
     render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
     /// What the effect refuses of a step's parameters taken with its inputs, which the table cannot say (a picture that
     /// must be given when another parameter has a value).
-    check: Option<fn(&P, &Inputs<'_>) -> Result<(), Error>>,
+    check: Option<Check<P>>,
 }
 
 impl<P: Declared> Native<P> {
@@ -305,7 +308,7 @@ impl<P: Declared> Native<P> {
     }
 
     /// The effect, refusing a run for which `check` fails (see `check` in `src/effects/`).
-    pub(crate) fn checked(mut self, check: fn(&P, &Inputs<'_>) -> Result<(), Error>) -> Self {
+    pub(crate) fn checked(mut self, check: Check<P>) -> Self {
         self.check = Some(check);
         self
     }

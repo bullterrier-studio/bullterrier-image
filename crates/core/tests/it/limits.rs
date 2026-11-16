@@ -511,7 +511,7 @@ fn blend_at_its_largest_scale_and_margin_sizes_only_what_shows_and_one_past_is_r
 }
 
 #[test]
-fn a_dither_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() -> Result<(), Error> {
+fn a_dither_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
     // the ranks of the matrix are 16 bits: 256 x 256 cells is the most they hold
     let pixels = vec![0.5; 20 * 20 * 3];
     let step = || {
@@ -521,7 +521,7 @@ fn a_dither_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() 
             .param("palette", "custom")
     };
     let render = |rows: usize, columns: usize| {
-        let matrix = Arc::new(Image::new(rows, columns, &vec![0.4; rows * columns * 3])?);
+        let matrix = Image::new(rows, columns, &vec![0.4; rows * columns * 3]).map(Arc::new)?;
         Photo::new(Picture::new(20, 20, &pixels)?)
             .with_image("m", matrix)
             .render(&Recipe::new([step()]), &Presets::new(), Options::default())
@@ -535,7 +535,6 @@ fn a_dither_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() 
         let past = render(rows, columns);
         assert!(refused(&past, &["matrix", "257"]), "{rows} x {columns}: {past:?}");
     }
-    Ok(())
 }
 
 #[test]

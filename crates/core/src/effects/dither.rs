@@ -8,8 +8,8 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start};
-use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::color::luminance;
+use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{
     ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW, STEVENSON_ARCE,
     STUCKI, Thresholds, Tile, diffuse, from_greys, noise, ordered,
@@ -450,7 +450,12 @@ fn matrix_of(inputs: &Inputs<'_>) -> Thresholds<'static> {
     inputs.image("matrix").map_or_else(
         || from_greys(&[0.0], (1, 1)),
         |image| {
-            let greys: Vec<f32> = image.as_picture().pixels().iter().map(|&pixel| luminance(pixel)).collect();
+            let greys: Vec<f32> = image
+                .as_picture()
+                .pixels()
+                .iter()
+                .map(|&pixel| luminance(pixel))
+                .collect();
             from_greys(&greys, (image.height(), image.width()))
         },
     )
