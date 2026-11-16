@@ -1683,9 +1683,10 @@ screen : one of 'grid', 'wave', 'rings', 'spiral', 'rays', default 'grid'
 shape : one of 'dot', 'line', 'square', 'ellipse', 'diamond', 'euclidean', 'matrix', default 'dot'
     What a mark is: 'dot' (round), 'square', 'ellipse' (its axes in the ratio `aspect`),
     'diamond' (a square turned 45 degrees), 'euclidean' (round in highlights, a diamond
-    at 50 %, a round hole in shadows), 'matrix' (the spot function of your picture
-    `matrix`) or 'line' (a line per cell row). Each is as large as the ink needs, so
-    every shape keeps the tone.
+    at 50 %, a round hole in shadows; a smooth cosine variant of the Euclidean spot
+    function, not PostScript's piecewise one), 'matrix' (the spot function of your
+    picture `matrix`) or 'line' (a line per cell row). Each is as large as the ink
+    needs, so every shape keeps the tone.
 separation : one of 'none', 'cmyk', 'spot', 'rgb', default 'none'
     How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta,
     yellow and black), 'spot' (the colours in `inks`) or 'rgb' (red, green and blue
@@ -1751,8 +1752,9 @@ wavelength : number, ratio, 1 to 100, default 6.0
     With screen 'wave': the distance along a row between two crests, in cells.
 aspect : number, ratio, 1 to 8, default 1.0
     With shape 'ellipse': the ratio of the ellipse's long axis (along the screen's rows)
-    to its short one; 1 = a round dot. The area stays the tone's. Ignored with any other
-    shape.
+    to its short one; 1 = a round dot, below 1 is not taken (turn the ellipse with
+    `angle` for a long axis the other way). The area stays the tone's. Ignored with any
+    other shape.
 matrix : picture or none, default None
     With shape 'matrix': the picture of one cell whose grey values are the thresholds at
     each place of it, the path of an image file in a recipe file (relative to the file)

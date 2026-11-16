@@ -119,13 +119,14 @@ pub struct Params {
     #[param(default = 6.0, unit = ratio, min = 1, max = 100, advanced)]
     pub wavelength: f32,
     /// What a mark is: 'dot' (round), 'square', 'ellipse' (its axes in the ratio `aspect`), 'diamond' (a square turned 45
-    /// degrees), 'euclidean' (round in highlights, a diamond at 50 %, a round hole in shadows), 'matrix' (the spot
+    /// degrees), 'euclidean' (round in highlights, a diamond at 50 %, a round hole in shadows; a smooth cosine
+    /// variant of the Euclidean spot function, not PostScript's piecewise one), 'matrix' (the spot
     /// function of your picture `matrix`) or 'line' (a line per cell row). Each is as large as the ink needs, so every shape
     /// keeps the tone.
     #[param(default = Dot)]
     pub shape: Shape,
     /// With shape 'ellipse': the ratio of the ellipse's long axis (along the screen's rows) to its short one; 1 = a round
-    /// dot. The area stays the tone's. Ignored with any other shape.
+    /// dot, below 1 is not taken (turn the ellipse with `angle` for a long axis the other way). The area stays the tone's. Ignored with any other shape.
     #[param(default = 1.0, unit = ratio, min = 1, max = 8, advanced)]
     pub aspect: f32,
     /// With shape 'matrix': the picture of one cell whose grey values are the thresholds at each place of it, the path of

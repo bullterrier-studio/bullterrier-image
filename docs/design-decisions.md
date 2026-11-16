@@ -1582,3 +1582,18 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   Euclidean function is discontinuous where its two halves meet, which leaves a diamond edge with no ramp; the cosine form
   has the same three regimes and is smooth. *Consequence:* the coverage oracle holds within 0.005 for each new shape;
   `matrix` keeps its places' blocks (no smoothing), and its ramp is in ranks, not px, so a fine picture has a sharp edge.
+- **`halftone` `cell` is a length in px, not a count (halftone batch, 2026-11-16).** `f32`, minimum 1, maximum 200; the screen,
+  footprints and band margin take the fractional pitch, and only the final pixel index is rounded. *Reason:* a fine screen at a
+  small size jumped (5 px at 480 is 13.3 px at 1280; the recipe rounded it to 13). *Consequence:* a whole `cell` gives the
+  picture it always gave (hashes equal on 20 pictures); a recipe's `cell` scales without rounding.
+- **`halftone` `screen` bends the grid with one coordinate map (halftone batch, 2026-11-16).** `grid`, `wave`, `rings`, `spiral`
+  and `rays` (`Geometry` in `ops/inks.rs`) map a place of the turned grid to the place the spot screen is laid on, and a cell's
+  centre back to the grid place whose tone it stands for; every other parameter keeps its meaning. The centre (`x`, `y`) is a
+  fraction of the canvas, never of a band's picture, so a band equals the whole. Footprint rule per geometry (how far a pixel
+  is from its cell's centre, in cells): `wave` 1 / sqrt 2 + 2 x `amplitude`; `rings` 1 (measured 0.74); `spiral` 1.5 (measured
+  1.04); `rays` `Whole`, since a ray's cells widen with the distance and a bound would be the far corner. *Known limit:*
+  near the centre of `rays` a wedge is narrower than a pixel, so with `shape` line the rays crowd (a later item).
+- **`halftone` print realism is one shared implementation (halftone batch, 2026-11-16).** `dot_gain` is the gain at 50 % tone,
+  coverage a' = a + 4 g a (1 - a) (exact at 50 %, monotone while g <= 0.25, its maximum); `ink_noise`, `specks`, `speck_size`
+  and `seed` draw from the position-numbered noise (`ops/realism.rs`), so windows and bands agree; `dither`'s `spot` separation
+  uses the same code. Defaults 0: today's picture.
