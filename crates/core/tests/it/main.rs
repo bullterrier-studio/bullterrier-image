@@ -186,6 +186,7 @@ mod spatial;
 mod spread;
 mod starburst;
 mod step_check;
+mod stipple;
 mod stretch;
 mod svg;
 mod svg_drawing;

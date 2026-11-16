@@ -647,6 +647,30 @@ fn engraving_at_its_least_spacing_works_and_less_is_refused() {
 }
 
 #[test]
+fn stipple_at_its_least_radius_and_most_iterations_works_and_past_them_is_refused() {
+    // the dot count is the darkness over a dot's area, so the radius floor bounds it, and a round costs one pass of pixels
+    let pixels = vec![0.0; 60 * 60 * 3];
+    let render = |field: &str, value: serde_json::Value| {
+        Photo::new(Picture::new(60, 60, &pixels)?)
+            .render(
+                &Recipe::new([Step::new("stipple").param(field, value)]),
+                &Presets::new(),
+                Options::default(),
+            )
+            .map(drop)
+    };
+    for (field, edge, past) in [
+        ("radius", serde_json::json!(1.0), serde_json::json!(0.9)),
+        ("iterations", serde_json::json!(50), serde_json::json!(51)),
+    ] {
+        let works = render(field, edge);
+        assert!(works.is_ok(), "{field}: {works:?}");
+        let refusal = render(field, past);
+        assert!(refused(&refusal, &[field]), "{field}: {refusal:?}");
+    }
+}
+
+#[test]
 fn a_halftone_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
     // the same ranks as dither's matrix: 256 x 256 places is the most
     let pixels = vec![0.5; 20 * 20 * 3];

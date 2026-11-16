@@ -1,0 +1,10 @@
+# Tone as ink dots: their number follows the darkness and Lloyd relaxation spreads them evenly.
+name = "stipple"
+size = 480
+
+[[step]]
+effect = "stipple"
+radius = 1.4
+iterations = 15
+color = "#1d2a4a"
+paper = "#f3eee0"
