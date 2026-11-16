@@ -81,7 +81,7 @@ Nothing else follows the canvas yet: `Place` is still the picture. A side of 0 i
 `canvas`); a canvas smaller than the picture is fine (it only fixes the scale). Not in Python.
 **Window:** `Options::with_window(first_row, canvas_width, canvas_height)` says the picture handed to `render` is rows of a larger canvas
 from canvas row `first_row`: the runner builds every effect's `Place` from it (`run/size.rs` `Origin`; the steps of a band the runner cuts add their
-offset), and the design scale follows the window's canvas (it replaces `with_canvas`). No effect reads it differently: a position-aware effect already
+offset), and the design scale follows the window's canvas unless `with_canvas` is given: the canvas fixes the scale, the window the place. No effect reads it differently: a position-aware effect already
 reads `Place`, so a band of rows equals the same rows of the whole render. Refused (`Error::Recipe`, naming `window`): a width other than the picture's,
 rows beyond the canvas, a side of 0, and a `frame` or `size` (they change the rows). `Recipe::band_margin(presets, longest_side) -> Option<usize>` is the
 caller's query: the rows to hand each side of a band (the steps' margins add), none for a recipe a window cannot make: a `frame` or `size`, a step that

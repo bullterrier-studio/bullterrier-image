@@ -212,6 +212,29 @@ fn a_window_and_the_runners_own_bands_compose() -> Outcome {
 }
 
 #[test]
+fn a_canvas_fixes_the_scale_of_a_window_and_the_window_the_place() -> Outcome {
+    let values = varied(SMALL.height, SMALL.width);
+    // blur reaches by px, the vignette by place: the scale from a canvas of 600 on the long side, not the window's 131
+    let recipe = Recipe::new([Step::new("gaussian_blur").param("radius", 3.0), Step::new("vignette")]);
+    let margin = recipe.band_margin(&Presets::new(), 600)?.ok_or("banded")?;
+    let scaled = Options::default().with_canvas(300, 600);
+    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, scaled)?, None);
+    // the canvas is used: the bands without it are not that whole render
+    let whole = photo(SMALL, &values, 0..SMALL.height)?
+        .render(&recipe, &Presets::new(), scaled)?
+        .into_values();
+    let rows = 40..100;
+    let band = windowed(SMALL, &values, &recipe, rows.clone(), Options::default())?.into_values();
+    let want = &whole[rows.start * SMALL.width * 3..rows.end * SMALL.width * 3];
+    assert_eq!(band.len(), want.len());
+    assert!(
+        first_bit_difference(&band, want).is_some(),
+        "a window alone follows its own canvas, not the scale asked for"
+    );
+    Ok(())
+}
+
+#[test]
 fn a_recipe_that_a_window_cannot_make_has_no_band_margin() -> Outcome {
     let presets = Presets::new();
     let none = |recipe: &Recipe| recipe.band_margin(&presets, 131);

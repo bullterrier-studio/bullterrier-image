@@ -607,6 +607,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   derives; `Place` still describes the picture (the window, below, is what sets a first row).
   A canvas smaller than the picture is allowed (it was refused first; a caller that scales a layer past the canvas's edge needs
   it): the canvas only fixes the scale, and only a side of 0 is refused.
+  With a window, `with_canvas` still fixes the scale and the window the place (it first replaced the canvas): a caller banding
+  a layer whose `px` follow another length than the canvas's long side (scene's looks in canvas pixels) needs both, and
+  the one `ratio` keeps the rule in one place. Without `with_canvas` the window's canvas gives the scale, as before.
   Python is not exposed yet: a `canvas=(width, height)` on `render` and `render_all` would follow `band` through `bridge` and
   the extension.
 - **Footprints of the 57 whole-picture effects, by reason (audit for B1/B2).** Of the 57 files that name `Footprint::Whole`,

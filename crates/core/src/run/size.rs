@@ -321,7 +321,7 @@ impl<'a> Working<'a> {
     }
 
     /// Working pixels per design pixel, the one decision of how a length in a recipe follows the size of the picture: the
-    /// longest side over [`DESIGN_SIZE`], of the box of the window's canvas, else of the canvas `options` name, else of the
+    /// longest side over [`DESIGN_SIZE`], of the canvas `options` name, else of the box of the window's canvas, else of the
     /// box of the picture (the picture less its room).
     ///
     /// # Errors
@@ -330,9 +330,10 @@ impl<'a> Working<'a> {
         let picture = self.picture();
         let [top, right, bottom, left] = options.room;
         let boxed = |width: u32, height: u32| (width.saturating_sub(left + right), height.saturating_sub(top + bottom));
-        let canvas = match (options.window, options.canvas) {
-            (Some(window), _) => Some(boxed(window.width, window.height)),
-            (None, canvas) => canvas,
+        let canvas = match (options.canvas, options.window) {
+            (Some(canvas), _) => Some(canvas),
+            (None, Some(window)) => Some(boxed(window.width, window.height)),
+            (None, None) => None,
         };
         let Some((canvas_width, canvas_height)) = canvas else {
             let side = picture
