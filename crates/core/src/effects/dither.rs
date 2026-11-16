@@ -497,7 +497,10 @@ fn printed(
     par::rows(&mut needed, 1, |first, band| {
         for (offset, (out, dot)) in band.iter_mut().zip(&dots[first..]).enumerate() {
             let at = first + offset;
-            let cell = [u64::try_from(at / columns).unwrap_or_default(), u64::try_from(at % columns).unwrap_or_default()];
+            let cell = [
+                u64::try_from(at / columns).unwrap_or_default(),
+                u64::try_from(at % columns).unwrap_or_default(),
+            ];
             *out = inks.coverages(*dot);
             for (ink, amount) in out.iter_mut().enumerate() {
                 *amount = real.coverage(*amount, ink, cell);

@@ -1721,14 +1721,24 @@ fn print_realism_at_zero_is_the_clean_screen_whatever_the_seed_and_speck_size() 
 #[test]
 fn dot_gain_is_its_value_at_half_tone_and_follows_the_curve_elsewhere() -> Result<(), Error> {
     // a' = a + 4 g a (1 - a): at a = 1/2 it is 0.5 + g; the screen keeps the area within 0.015
-    for (gain, tone) in [(0.25, 0.5), (0.1, 0.5), (0.25, 0.2), (0.2, 0.8), (0.25, 0.0), (0.25, 1.0)] {
+    for (gain, tone) in [
+        (0.25, 0.5),
+        (0.1, 0.5),
+        (0.25, 0.2),
+        (0.2, 0.8),
+        (0.25, 0.0),
+        (0.25, 1.0),
+    ] {
         let params = Params {
             dot_gain: gain,
             ..press()
         };
         let want = tone + 4.0 * gain * tone * (1.0 - tone);
         let got = mean(&ink_at(&params, 80, tone)?);
-        assert!((got - want).abs() < 0.015, "gain {gain} tone {tone}: ink {got}, formula {want}");
+        assert!(
+            (got - want).abs() < 0.015,
+            "gain {gain} tone {tone}: ink {got}, formula {want}"
+        );
     }
     // more gain, more ink, at every tone
     for tone in [0.1, 0.3, 0.5, 0.7, 0.9] {
@@ -1763,7 +1773,12 @@ fn ink_noise_is_seeded_uneven_and_keeps_the_mean_ink() -> Result<(), Error> {
     let clean = ink_at(&press(), 400, 0.5)?;
     assert_ne!(a, clean);
     // 400 cells, each straying by up to 0.25 either way: the mean's spread is about 0.007
-    assert!((mean(&a) - mean(&clean)).abs() < 0.03, "{} vs {}", mean(&a), mean(&clean));
+    assert!(
+        (mean(&a) - mean(&clean)).abs() < 0.03,
+        "{} vs {}",
+        mean(&a),
+        mean(&clean)
+    );
     // some cells are inked more and some less than the even screen: the dots differ from one another
     let (high, low) = (
         a.iter().zip(&clean).filter(|(n, c)| **n > **c + 0.05).count(),
@@ -1829,10 +1844,7 @@ fn specks_bare_the_paper_in_ink_and_only_there_and_their_density_is_the_paramete
     assert_eq!(full, ink_at(&specked(2.0, 3.0, 5), 300, 1.0)?);
     assert_ne!(full, ink_at(&specked(2.0, 3.0, 6), 300, 1.0)?);
     // no ink, no specks; in a mid tone a speck only takes ink away
-    assert_eq!(
-        ink_at(&specked(5.0, 10.0, 5), 100, 0.0)?,
-        ink_at(&press(), 100, 0.0)?
-    );
+    assert_eq!(ink_at(&specked(5.0, 10.0, 5), 100, 0.0)?, ink_at(&press(), 100, 0.0)?);
     let (with, without) = (ink_at(&specked(5.0, 4.0, 5), 200, 0.5)?, ink_at(&press(), 200, 0.5)?);
     assert!(with.iter().zip(&without).all(|(w, wo)| *w <= *wo + 1e-6));
     assert!(with.iter().zip(&without).any(|(w, wo)| *w < *wo - 0.5));
@@ -1854,7 +1866,11 @@ fn print_realism_works_with_every_separation() -> Result<(), Error> {
             specks: 5.0,
             ..clean.clone()
         };
-        assert_ne!(run_picture(&real, 80, 90, &rgb)?, run_picture(&clean, 80, 90, &rgb)?, "{separation:?}");
+        assert_ne!(
+            run_picture(&real, 80, 90, &rgb)?,
+            run_picture(&clean, 80, 90, &rgb)?,
+            "{separation:?}"
+        );
     }
     Ok(())
 }

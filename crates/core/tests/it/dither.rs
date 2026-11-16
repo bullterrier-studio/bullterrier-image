@@ -1324,7 +1324,10 @@ fn dither_spot_dot_gain_raises_the_ink_to_the_curve() -> Result<(), Error> {
         };
         let want = tone + 4.0 * gain * tone * (1.0 - tone);
         let got = mean_of(&ink_of(&params, 100, tone)?);
-        assert!((got - want).abs() < 0.02, "gain {gain} tone {tone}: ink {got}, formula {want}");
+        assert!(
+            (got - want).abs() < 0.02,
+            "gain {gain} tone {tone}: ink {got}, formula {want}"
+        );
     }
     Ok(())
 }
@@ -1337,10 +1340,24 @@ fn dither_spot_ink_noise_is_seeded_and_keeps_the_mean() -> Result<(), Error> {
         cell: 4.0,
         ..black_ink()
     };
-    let (a, again, b) = (ink_of(&noisy(1), 200, 0.5)?, ink_of(&noisy(1), 200, 0.5)?, ink_of(&noisy(2), 200, 0.5)?);
+    let (a, again, b) = (
+        ink_of(&noisy(1), 200, 0.5)?,
+        ink_of(&noisy(1), 200, 0.5)?,
+        ink_of(&noisy(2), 200, 0.5)?,
+    );
     assert_eq!(a, again);
     assert_ne!(a, b);
-    assert_ne!(a, ink_of(&Params { ink_noise: 0.0, ..noisy(1) }, 200, 0.5)?);
+    assert_ne!(
+        a,
+        ink_of(
+            &Params {
+                ink_noise: 0.0,
+                ..noisy(1)
+            },
+            200,
+            0.5
+        )?
+    );
     assert!((mean_of(&a) - 0.5).abs() < 0.03, "{}", mean_of(&a));
     Ok(())
 }
