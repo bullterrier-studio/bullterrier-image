@@ -127,7 +127,7 @@ def test_a_star_import_leaves_pathlib_path_alone_and_the_region_path_stays_reach
     assert ns["Path"] is Path  # the region Path must not shadow pathlib.Path
     assert "Recipe" in ns  # the rest of the surface is still exported
     region = bullterrier_image.Path
-    assert region is not Path
+    assert region.__module__.startswith("bullterrier_image")
     ns2: dict[str, object] = {}
     exec("from bullterrier_image import Path", ns2)  # noqa: S102
     assert ns2["Path"] is region
