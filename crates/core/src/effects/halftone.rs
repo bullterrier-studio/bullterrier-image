@@ -169,6 +169,8 @@ struct Cell {
     key: [u32; 2],
     sampled: [f32; 3],
     amounts: [f32; MOST_INKS],
+    /// The spot level of each amount, solved once per cell, not per pixel.
+    levels: [f32; MOST_INKS],
 }
 
 /// `value` rounded to a pixel index no further than `last`.
@@ -261,6 +263,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                 key: [u32::MAX; 2], // a NaN pattern, which no cell has
                 sampled: [0.0; 3],
                 amounts: [0.0; MOST_INKS],
+                levels: [0.0; MOST_INKS],
             })
             .collect();
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
@@ -284,14 +287,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                         remembered.key = [cu.to_bits(), cv.to_bits()];
                         remembered.sampled = sampled;
                         remembered.amounts = amounts(params, &inks, ink_is_bright, sampled);
+                        remembered.levels = remembered.amounts.map(|amount| spot.level(amount));
                     }
-                    let amount = remembered.amounts[if params.separation == Separation::None {
-                        0
-                    } else {
-                        index
-                    }];
+                    let which = if params.separation == Separation::None { 0 } else { index };
                     // the spot function's value here and its level for the ink: inked where the value is below the level
-                    let (distance, radius) = (spot.value(u - cu, v - cv), spot.level(amount));
+                    let (distance, radius) = (spot.value(u - cu, v - cv), remembered.levels[which]);
                     let fade_in = (radius * cell * 2.0 * inv_feather).min(1.0); // constant: the ramp is half a feather on each side
                     coverages[index] = ((radius - distance) * cell * inv_feather + 0.5).clamp(0.0, 1.0) * fade_in; // constant: the ramp is centred on the edge
                 }
