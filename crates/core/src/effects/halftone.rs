@@ -9,7 +9,10 @@ use crate::ops::cast;
 use crate::ops::color::{luminance, vivid};
 use crate::ops::dither::{check_matrix, matrix_greys};
 use crate::ops::edge::EdgeOrConstant;
-use crate::ops::inks::{CMYK_SCREEN_ANGLES, Geometry, Inks, MOST_INKS, RGB_SCREEN_ANGLES, SPOT_SCREEN_STEP, Spot, shift};
+use crate::ops::inks::{
+    CMYK_SCREEN_ANGLES, Geometry, Inks, MOST_INKS, RGB_SCREEN_ANGLES, RINGS_REACH, SPIRAL_REACH, SPOT_SCREEN_STEP,
+    Spot, shift, wave_reach,
+};
 use crate::ops::length::{float, whole};
 use crate::ops::par;
 use crate::params::{Choice, Color, Params, PictureName};
@@ -42,14 +45,14 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
     // interpolation rows.
     const HALF_DIAGONAL: f64 = std::f64::consts::FRAC_1_SQRT_2; // constant: a cell's corner is this many cells from its centre
     // `far`: a grid's cell is half a diagonal across; a wave's pixel and cell centre are a sine apart besides, at most twice the
-    // amplitude; a ring's wedge and a spiral's cell, which are about a cell long and wide, measured over a million random
-    // places at three sizes, are at most 0.74 and 1.04 away, so the bounds are 1 and 1.5; rays widen with the distance
+    // amplitude; a ring's wedge and a spiral's cell, which are about a cell long and wide, measured (`ops::inks`'s test), are at most 0.74
+    // and 1.04 away, bounded by `RINGS_REACH` and `SPIRAL_REACH`; rays widen with the distance
     // from the centre, which the footprint does not know, so a ray's pixel may read from anywhere: the whole picture.
     let far = match params.screen {
         Screen::Grid => HALF_DIAGONAL,
-        Screen::Wave => HALF_DIAGONAL + 2.0 * f64::from(params.amplitude),
-        Screen::Rings => 1.0,
-        Screen::Spiral => 1.5,
+        Screen::Wave => wave_reach(params.amplitude),
+        Screen::Rings => RINGS_REACH,
+        Screen::Spiral => SPIRAL_REACH,
         Screen::Rays => return Footprint::Whole,
     };
     let cell = f64::from(params.cell);
@@ -294,7 +297,10 @@ fn screens(params: &Params, place: Place, count: usize) -> Vec<Turned> {
                 Screen::Rings => Geometry::Rings { centre },
                 Screen::Spiral => Geometry::Spiral { centre },
                 // a cell wide half way to the nearest edge of the canvas
-                Screen::Rays => Geometry::rays(centre, cast::single(float(place.canvas_width.min(place.canvas_height)) / 2.0) / cell),
+                Screen::Rays => Geometry::rays(
+                    centre,
+                    cast::single(float(place.canvas_width.min(place.canvas_height)) / 2.0) / cell,
+                ),
             };
             Turned {
                 sin,
@@ -321,6 +327,22 @@ fn amounts(params: &Params, inks: &Inks, ink_is_bright: bool, sampled: [f32; 3])
         Separation::Cmyk => inks.cmyk_amounts(sampled),
         Separation::Spot => inks.coverages(sampled),
         Separation::Rgb => Inks::rgb_amounts(sampled),
+    }
+}
+
+/// The spot function of the mark `shape` names.
+fn spot_of(params: &Params, inputs: &Inputs<'_>) -> Spot {
+    match params.shape {
+        Shape::Dot => Spot::Round,
+        Shape::Line => Spot::Line,
+        Shape::Square => Spot::Square,
+        Shape::Ellipse => Spot::ellipse(params.aspect),
+        Shape::Diamond => Spot::Diamond,
+        Shape::Euclidean => Spot::euclidean(),
+        Shape::Matrix => {
+            let (greys, size) = matrix_greys(inputs);
+            Spot::matrix(&greys, size)
+        }
     }
 }
 
@@ -358,18 +380,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     };
     let screens = screens(params, place, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;
-    let spot = match params.shape {
-        Shape::Dot => Spot::Round,
-        Shape::Line => Spot::Line,
-        Shape::Square => Spot::Square,
-        Shape::Ellipse => Spot::ellipse(params.aspect),
-        Shape::Diamond => Spot::Diamond,
-        Shape::Euclidean => Spot::euclidean(),
-        Shape::Matrix => {
-            let (greys, size) = matrix_greys(inputs);
-            Spot::matrix(&greys, size)
-        }
-    };
+    let spot = spot_of(params, inputs);
     let (inv_cell, inv_feather) = (1.0 / cell, 1.0 / params.feather);
     let mut pixels = vec![[0.0; 3]; height * width];
     par::rows(&mut pixels, width, |first, band| {

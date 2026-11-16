@@ -506,35 +506,36 @@ fn a_halftone_of_a_fractional_cell_gives_the_rows_of_the_whole_render_from_a_win
     Ok(())
 }
 
-/// A halftone whose screen is bent about a centre on the canvas, which lies in a later band than the first, gives the rows of
+/// A halftone (no blur, so that the footprint is only what the geometry reads) whose screen is bent about a centre on the canvas, which lies in a later band than the first, gives the rows of
 /// the whole render from a window: the centre is a fraction of the canvas, not of the band's picture.
 #[test]
 fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
     let values = varied(SMALL.height, SMALL.width);
     // the centre, at row 104 of 131 and column 5 of 19, lies in the last band of every cut but the whole
-    let at = |screen: &str| {
+    let at = |screen: &str, wavelength: f64| {
         Recipe::new([Step::new("halftone")
             .param("screen", screen)
-            .param("cell", 4.5)
-            .param("sigma", 0.4)
-            .param("amplitude", 1.5)
-            .param("wavelength", 4.0)
+            .param("cell", 100.0) // about 26 px here, so that the rows a cell reads are most of the margin
+            .param("sigma", 0.0)
+            .param("amplitude", 3.0)
+            .param("wavelength", wavelength)
             .param("x", 0.3)
             .param("y", 0.8)])
     };
-    for screen in ["wave", "rings", "spiral"] {
-        let recipe = at(screen);
+    // the shortest wave swings a cell centre furthest from its pixel
+    for (screen, wavelength) in [("wave", 1.0), ("wave", 4.0), ("rings", 4.0), ("spiral", 4.0)] {
+        let recipe = at(screen, wavelength);
         let margin = recipe
             .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
             .ok_or("this halftone is banded")?;
         assert_eq!(
             first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
             None,
-            "{screen}"
+            "{screen} {wavelength}"
         );
     }
     // rays widen with the distance from the centre, so a pixel may read from anywhere: no band is cleared ...
-    let recipe = at("rays");
+    let recipe = at("rays", 4.0);
     assert_eq!(recipe.band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?, None);
     // ... and the rays themselves, which a flat picture shows, are the same from a band that holds no more than its rows
     let flat = vec![0.4; SMALL.height * SMALL.width * 3];
@@ -543,5 +544,56 @@ fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a
         None,
         "rays"
     );
+    Ok(())
+}
+
+/// The footprint is true: changing one row of the picture changes no output row beyond the reach the margin is made of (the
+/// margin less the two rows kept for an interpolation, which a halftone does not make). The picture is a tall one with a
+/// cell of about 26 px, so the reach, rows from the centre of the cell a pixel reads, is most of the margin; the wave at its
+/// shortest wavelength, which swings a cell centre furthest from its pixel, reads furthest.
+#[test]
+fn a_halftone_of_every_screen_geometry_reads_no_further_than_its_margin_says() -> Outcome {
+    let values = varied(SMALL.height, SMALL.width);
+    for (screen, wavelength) in [
+        ("grid", 4.0),
+        ("wave", 1.0),
+        ("wave", 4.0),
+        ("rings", 4.0),
+        ("spiral", 4.0),
+    ] {
+        let recipe = Recipe::new([Step::new("halftone")
+            .param("screen", screen)
+            .param("cell", 100.0)
+            .param("sigma", 0.0)
+            .param("amplitude", 3.0)
+            .param("wavelength", wavelength)
+            .param("x", 0.3)
+            .param("y", 0.8)]);
+        let margin = recipe
+            .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
+            .ok_or("this halftone is banded")?;
+        let render = |values: &[f32]| -> Result<Vec<f32>, Box<dyn Error>> {
+            Ok(photo(SMALL, values, 0..SMALL.height)?
+                .render(&recipe, &Presets::new(), Options::default())?
+                .into_values())
+        };
+        let whole = render(&values)?;
+        let row = SMALL.width * 3;
+        let mut furthest = 0;
+        for changed in 0..SMALL.height {
+            let mut other = values.clone();
+            other[changed * row..(changed + 1) * row].fill(0.5);
+            let made = render(&other)?;
+            for out in
+                (0..SMALL.height).filter(|out| made[out * row..(out + 1) * row] != whole[out * row..(out + 1) * row])
+            {
+                furthest = furthest.max(out.abs_diff(changed));
+            }
+        }
+        assert!(
+            furthest + 2 <= margin,
+            "{screen} {wavelength}: reads {furthest} rows away, margin {margin}"
+        );
+    }
     Ok(())
 }

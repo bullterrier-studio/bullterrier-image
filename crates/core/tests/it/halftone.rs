@@ -1625,3 +1625,54 @@ fn the_lines_of_rays_meet_at_the_centre() -> Result<(), Error> {
     }
     Ok(())
 }
+
+/// A wave's line reads the tone where the line is, not where the grid's row would be: the column 2.5 cells in is a quarter
+/// wave in (wavelength 10), where every line is 2 cells (40 px) from its row, and the picture's tone rises down the picture,
+/// so a line that read the row's tone, 40 px up or down, would be 0.1 of a cell too thin or too thick.
+#[test]
+fn a_waves_line_stands_for_the_tone_where_it_is() -> Result<(), Error> {
+    let (height, width) = (400, 120);
+    let params = Params {
+        amplitude: 2.0,
+        wavelength: 10.0,
+        ..bent(Screen::Wave, Shape::Line)
+    };
+    let grey: Vec<f32> = (0..height * width * 3)
+        .map(|index| 1.0 - (index / 3 / width) as f32 / (height - 1) as f32)
+        .collect();
+    let out = red(&params, height, width, &grey)?;
+    let column: Vec<f32> = (0..height).map(|row| 1.0 - out[row * width + 50]).collect();
+    // each line of ink in the column: its thickness in cells (the ink summed) and its middle row
+    let (mut lines, mut start) = (Vec::new(), None);
+    for (row, ink) in column.iter().enumerate().chain(std::iter::once((height, &0.0))) {
+        match (start, *ink > 0.02) {
+            (None, true) => start = Some(row),
+            (Some(first), false) => {
+                let weight: f32 = column[first..row].iter().sum();
+                let middle = column[first..row]
+                    .iter()
+                    .enumerate()
+                    .map(|(at, ink)| (first + at) as f32 * ink)
+                    .sum::<f32>()
+                    / weight;
+                lines.push((weight / 20.0, middle));
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    // a line cut by the picture's edge is not a whole line
+    let whole: Vec<_> = lines
+        .iter()
+        .filter(|(_, middle)| (40.0..height as f32 - 40.0).contains(middle))
+        .collect();
+    assert!(whole.len() >= 10, "{} lines", whole.len());
+    for (thickness, middle) in whole {
+        let tone = middle / (height - 1) as f32;
+        assert!(
+            (thickness - tone).abs() < 0.03,
+            "line at row {middle}: {thickness} cells, tone there {tone}"
+        );
+    }
+    Ok(())
+}

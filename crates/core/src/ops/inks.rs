@@ -61,6 +61,20 @@ pub(crate) enum Geometry {
     Rays { centre: [f32; 2], count: f32 },
 }
 
+/// How far, in cells, a pixel can be from the centre of its cell on rings: a cell is a wedge of one ring, about a cell long
+/// and wide; the furthest of a lattice of places at three centres is 0.74 (`bent_screens_reach_no_further_than_their_bounds`).
+pub(crate) const RINGS_REACH: f64 = 1.0; // constant: measured 0.74 cells, with room
+
+/// How far, in cells, a pixel can be from the centre of its cell on a wave of `amplitude` cells: half a cell diagonal on a
+/// grid, and the rows sit up to twice the amplitude (a sine's range) higher or lower at the cell's centre than at the pixel.
+pub(crate) fn wave_reach(amplitude: f32) -> f64 {
+    std::f64::consts::FRAC_1_SQRT_2 + 2.0 * f64::from(amplitude)
+}
+
+/// As [`RINGS_REACH`], on a spiral: measured 1.04 cells (the arm is a cell wide and its cell a cell long, but the arm's
+/// radius changes by a cell over one).
+pub(crate) const SPIRAL_REACH: f64 = 1.5; // constant: measured 1.04 cells, with room
+
 const TURN: f32 = std::f32::consts::TAU;
 
 /// The cells of the ring or spiral arm that lies `radius` cells out on average: about one cell long each, and an even
@@ -655,6 +669,49 @@ mod tests {
                     "spot {which} tone {tone}: level {level} cuts {share}"
                 );
             }
+        }
+    }
+
+    /// The furthest a place of the lattice of `count` x `count` places `step` cells apart (about the origin, off every cell
+    /// boundary) is from the centre of its cell on `geometry`, in cells.
+    fn furthest(geometry: Geometry, step: f32, count: i16) -> f64 {
+        let mut furthest = 0.0_f32;
+        for i in -count..count {
+            for j in -count..count {
+                let (u, v) = (f32::from(i) * step + 0.0013, f32::from(j) * step + 0.0007);
+                let (cu, cv) = geometry.forward(u, v);
+                let (back_u, back_v) = geometry.back(cu.floor() + 0.5, cv.floor() + 0.5);
+                furthest = furthest.max((back_u - u).hypot(back_v - v));
+            }
+        }
+        f64::from(furthest)
+    }
+
+    /// A pixel's cell centre, which a pixel reads its tone from, is no further from it than the bound the footprint adds
+    /// rows for. (Only here: no picture shows a read's reach to a hundredth of a cell, a band margin being rounded up to
+    /// rows.) The cells nearest the centre are the oddest, and a coarse lattice misses places there, so a fine one covers
+    /// them (the spiral's furthest is within 3 cells of its centre); a wave is swept over the wavelengths, whose phase
+    /// against the cell grid decides how far a cell's centre is from the pixel.
+    #[test]
+    fn bent_screens_reach_no_further_than_their_bounds() {
+        for centre in [[0.3, -0.2], [0.5, 0.5], [0.0, 0.0]] {
+            for (name, geometry, bound) in [
+                ("rings", Geometry::Rings { centre }, RINGS_REACH),
+                ("spiral", Geometry::Spiral { centre }, SPIRAL_REACH),
+            ] {
+                for (step, count) in [(0.05, 240), (0.004, 1000)] {
+                    let found = furthest(geometry, step, count);
+                    assert!(found <= bound, "{name} about {centre:?}: {found} cells");
+                }
+            }
+        }
+        for wavelength in (20_i16..200).map(|tenth| f32::from(tenth) / 20.0) {
+            let wave = Geometry::Wave {
+                amplitude: 3.0,
+                wavelength,
+            };
+            let found = furthest(wave, 0.02, 300);
+            assert!(found <= wave_reach(3.0), "wave of {wavelength} cells: {found} cells");
         }
     }
 }
