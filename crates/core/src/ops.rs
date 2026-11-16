@@ -2,6 +2,7 @@
 
 pub(crate) mod bands;
 pub(crate) mod blend;
+pub(crate) mod blue_noise;
 pub(crate) mod blur;
 pub(crate) mod cast;
 pub(crate) mod cells;
