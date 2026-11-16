@@ -1214,10 +1214,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   generation; the best wins; an amount within 0.001 of 0 or 1 is 0 or 1). *Reason:* the earlier model (log density, amounts
   as continuous layers) solved amounts that a screen then printed as areas: one black ink printed a 0.5 grey at 0.889 and
   cmyk 0.2 at 0.316. *Consequence:* amounts are tone-true (a flat colour the inks can mix prints as itself within the
-  dot's own error) for a single ink on every screen and for several inks on `grid` and `wave`; on `rings`, `spiral` and `rays`
-  the inks' rows coincide (`angle` moves none: a row depends on the distance from the centre), so they nest instead of
-  overlapping independently and a separation prints off-tone (a 0.5/0.5 mix of two inks, green target 0.439: rings 0.538,
-  spiral 0.515, rays 0.340 with `line`; later item: decorrelate the inks of a concentric screen); out-of-gamut colours get the nearest reachable print; spot and cmyk pictures change (darker, nearer the
+  dot's own error) for a single ink and for several inks on every screen (concentric screens: see the next entry);
+  out-of-gamut colours get the nearest reachable print; spot and cmyk pictures change (darker, nearer the
   photo: demo 06's two-ink poster too). cmyk keeps its black generation (black = darkness `1 - max(r, g, b)` of the
   colour relative to the paper), scaled up by what the black ink reaches (`#231f20` lets some light through, which was the
   shadow error), cyan, magenta and yellow fitted to the rest; a colour as dark as the black ink gets is black alone, not a
@@ -1613,7 +1611,15 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   fraction of the canvas, never of a band's picture, so a band equals the whole. Footprint rule per geometry (how far a pixel
   is from its cell's centre, in cells): `wave` 1 / sqrt 2 + 2 x `amplitude`; `rings` 1 (measured 0.74); `spiral` 1.5 (measured
   1.04); `rays` `Whole`, since a ray's cells widen with the distance and a bound would be the far corner. *Known limit:*
-  near the centre of `rays` a wedge is narrower than a pixel, so with `shape` line the rays crowd (a later item).
+  near the centre of `rays` a wedge is narrower than a pixel, so with `shape` line the rays crowd (fixed: next entries).
+- **Each ink of a concentric screen has its own centre (halftone tone batch, 2026-11-16).** On `rings`, `spiral` and `rays` a
+  row depends on the distance (or angle) from the centre, so with one centre `angle` moved none of the inks' rows: they
+  nested instead of overlapping independently and a separation printed off-tone (0.5/0.5 of `#ff4d6d`, `#2b59ff`, green target
+  0.439: rings line 0.538, spiral 0.515, rays 0.340, rings dot 0.474). Ink k's centre is moved from (`x`, `y`) by k x 4 cells
+  along 45 degrees (`CONCENTRIC_STEP`, `CONCENTRIC_DIRECTION` in `ops/inks.rs`); one ink never moves, and the centre is still a
+  fraction of the canvas, so a band equals the whole. *Reason:* measured on five area pairs, dot and line, three screens: a
+  channel's error is 0.003 to 0.005 (dot) from 3.3 cells up, wider fringes than the picture averages below that, and the
+  direction made no difference. *Consequence:* the tone holds within 0.02 (the grid's bound) for every combination.
 - **`halftone` print realism is one shared implementation (halftone batch, 2026-11-16).** `dot_gain` is the gain at 50 % tone,
   coverage a' = a + 4 g a (1 - a) (exact at 50 %, monotone while g <= 0.25, its maximum); `ink_noise`, `specks`, `speck_size`
   and `seed` draw from the position-numbered noise (`ops/realism.rs`), so windows and bands agree; `dither`'s `spot` separation

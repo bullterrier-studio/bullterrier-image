@@ -10,7 +10,7 @@ use crate::ops::color::{luminance, vivid};
 use crate::ops::dither::{check_matrix, matrix_greys};
 use crate::ops::edge::EdgeOrConstant;
 use crate::ops::inks::{
-    CMYK_SCREEN_ANGLES, Geometry, Inks, MOST_INKS, RGB_SCREEN_ANGLES, RINGS_REACH, SPIRAL_REACH, SPOT_SCREEN_STEP,
+    CMYK_SCREEN_ANGLES, CONCENTRIC_DIRECTION, CONCENTRIC_STEP, Geometry, Inks, MOST_INKS, RGB_SCREEN_ANGLES, RINGS_REACH, SPIRAL_REACH, SPOT_SCREEN_STEP,
     Spot, shift, wave_reach,
 };
 use crate::ops::length::{float, whole};
@@ -102,9 +102,9 @@ pub struct Params {
     /// and `amplitude` cells high), 'rings' (round the centre `x`, `y`), 'spiral' (an Archimedean spiral about it, a cell
     /// more each turn) or 'rays' (straight out from it, as many as make a cell about as wide as `cell` half way to the
     /// nearest edge, wider beyond and narrower within). With shape 'line' these are wavy lines, rings, a spiral and a
-    /// sunburst; `angle` turns them. A single ink keeps the tone on every screen. Several inks (a `separation`) keep it on
-    /// 'grid' and 'wave'; on 'rings', 'spiral' and 'rays' every ink's rows coincide (`angle` moves none of them), so the
-    /// inks nest instead of overlapping and a separation prints off-tone.
+    /// sunburst; `angle` turns them. Every ink keeps the tone on every screen; with a `separation`
+    /// each ink's rings, spiral or rays have a centre of their own, 4 cells further along the diagonal than the last, so that
+    /// the inks overlap independently.
     #[param(default = Grid)]
     pub screen: Screen,
     /// With screen 'rings', 'spiral' or 'rays': the centre's horizontal position as a fraction of the way across the
@@ -311,9 +311,16 @@ fn screens(params: &Params, place: Place, count: usize) -> Vec<Turned> {
             let shift = shift(params.offset, params.offset_angle, ink);
             // the centre as a pixel finds its place in the turned grid, in cells
             let cell = params.cell;
+            // each ink of a concentric screen has its own centre, or the inks' rows coincide
+            let apart = match params.screen {
+                Screen::Rings | Screen::Spiral | Screen::Rays => {
+                    self::shift(CONCENTRIC_STEP * cell, CONCENTRIC_DIRECTION, ink)
+                }
+                Screen::Grid | Screen::Wave => [0.0; 2],
+            };
             let (px, py) = (
-                cast::single(f64::from(params.x) * float(place.canvas_width - 1)) - shift[0],
-                cast::single(f64::from(params.y) * float(place.canvas_height - 1)) - shift[1],
+                cast::single(f64::from(params.x) * float(place.canvas_width - 1)) - shift[0] + apart[0],
+                cast::single(f64::from(params.y) * float(place.canvas_height - 1)) - shift[1] + apart[1],
             );
             let centre = [(px * cos + py * sin) / cell, (py * cos - px * sin) / cell];
             let geometry = match params.screen {

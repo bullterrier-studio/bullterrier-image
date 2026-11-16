@@ -546,6 +546,8 @@ fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a
             .param("sigma", 0.0)
             .param("amplitude", 3.0)
             .param("wavelength", wavelength)
+            .param("separation", "spot")
+            .param("inks", ["#ff4d6d", "#2b59ff"]) // each ink has its own centre on the concentric screens
             .param("x", 0.3)
             .param("y", 0.8)])
     };

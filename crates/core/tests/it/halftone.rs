@@ -1467,7 +1467,7 @@ fn one_black_spot_ink_prints_a_grey_at_its_own_level() -> Result<(), Error> {
 #[test]
 fn two_spot_inks_print_the_colours_they_can_mix_at_those_colours() -> Result<(), Error> {
     let inks = [PINK, BLUE];
-    // concentric screens (rings, spiral, rays) are not here: their inks' rows coincide, see the `screen` doc
+    // concentric screens: `halftone_concentric.rs`
     for screen in [Screen::Grid, Screen::Wave] {
         let params = Params {
             screen,
