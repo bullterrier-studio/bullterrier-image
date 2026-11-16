@@ -369,6 +369,43 @@ fn spot_of(params: &Params, inputs: &Inputs<'_>) -> Spot {
     }
 }
 
+/// The press `params` ask for.
+fn realism(params: &Params) -> Realism {
+    Realism {
+        dot_gain: params.dot_gain,
+        ink_noise: params.ink_noise,
+        specks: params.specks,
+        speck_size: params.speck_size,
+        seed: params.seed,
+    }
+}
+
+/// What shows where a speck bares the paper: the print of no ink.
+fn bare_paper(params: &Params, inks: &Inks, paper: [f32; 3]) -> [f32; 3] {
+    if params.separation == Separation::None {
+        paper
+    } else {
+        inks.print(&[0.0; MOST_INKS])
+    }
+}
+
+/// The amounts the press prints in the cell `cell`, where `wanted` is asked.
+fn printed_amounts(real: &Realism, mut wanted: [f32; MOST_INKS], cell: [u64; 2]) -> [f32; MOST_INKS] {
+    for (ink, amount) in wanted.iter_mut().enumerate() {
+        *amount = real.coverage(*amount, ink, cell);
+    }
+    wanted
+}
+
+/// How much a speck covers the pixel (`x`, `y`) of the canvas, where some ink `coverages` is: a speck bares only ink.
+fn speck_over(real: &Realism, coverages: &[f32; MOST_INKS], x: usize, y: usize) -> f32 {
+    if coverages.iter().any(|&coverage| coverage > 0.0) {
+        real.speck(x, y)
+    } else {
+        0.0
+    }
+}
+
 /// The dot screen.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
@@ -404,18 +441,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let screens = screens(params, place, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;
     let spot = spot_of(params, inputs);
-    let real = Realism {
-        dot_gain: params.dot_gain,
-        ink_noise: params.ink_noise,
-        specks: params.specks,
-        speck_size: params.speck_size,
-        seed: params.seed,
-    };
-    let bare = if params.separation == Separation::None {
-        paper
-    } else {
-        inks.print(&[0.0; MOST_INKS])
-    };
+    let real = realism(params);
+    let bare = bare_paper(params, &inks, paper);
     let (inv_cell, inv_feather) = (1.0 / cell, 1.0 / params.feather);
     let mut pixels = vec![[0.0; 3]; height * width];
     par::rows(&mut pixels, width, |first, band| {
@@ -452,11 +479,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                         remembered.key = [cu.to_bits(), cv.to_bits()];
                         remembered.sampled = sampled;
                         let cell = [u64::from(cu.to_bits()), u64::from(cv.to_bits())];
-                        let mut wanted = amounts(params, &inks, ink_is_bright, sampled);
-                        for (ink, amount) in wanted.iter_mut().enumerate() {
-                            *amount = real.coverage(*amount, ink, cell);
-                        }
-                        remembered.amounts = wanted;
+                        remembered.amounts =
+                            printed_amounts(&real, amounts(params, &inks, ink_is_bright, sampled), cell);
                         remembered.levels = remembered.amounts.map(|amount| spot.level(amount));
                     }
                     let which = if params.separation == Separation::None {
@@ -482,12 +506,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                 } else {
                     paper
                 };
-                // a speck bares the paper where there is ink
-                let speck = if coverages.iter().any(|&coverage| coverage > 0.0) {
-                    real.speck(column, place.first_row + first + offset)
-                } else {
-                    0.0
-                };
+                let speck = speck_over(&real, &coverages, column, place.first_row + first + offset);
                 *out = Realism::specked(printed, bare, speck);
             }
         }

@@ -729,7 +729,7 @@ mod tests {
         let base = cell(turns);
         let edge = |step: f32| {
             let mut t = turns;
-            while cell(t) == base {
+            while cell(t).to_bits() == base.to_bits() {
                 t += step;
             }
             place(t)
@@ -742,13 +742,13 @@ mod tests {
     #[test]
     fn a_ring_or_arm_is_cut_into_cells_about_a_cell_long() {
         let centre = [0.3, -0.2];
-        for ring in 1..30 {
-            let length = cell_along(Geometry::Rings { centre }, centre, ring as f32 + 0.5, 0.37, 0.0);
+        for ring in 1..30_u8 {
+            let length = cell_along(Geometry::Rings { centre }, centre, f32::from(ring) + 0.5, 0.37, 0.0);
             assert!((0.75..1.25).contains(&length), "ring {ring}: {length} cells");
         }
-        for arm in 0..30 {
+        for arm in 0..30_u8 {
             // the arm's mean radius is the middle of its turn, half a turn in (`arm + 1`)
-            let length = cell_along(Geometry::Spiral { centre }, centre, arm as f32 + 0.5, 0.37, 1.0);
+            let length = cell_along(Geometry::Spiral { centre }, centre, f32::from(arm) + 0.5, 0.37, 1.0);
             assert!((0.75..1.25).contains(&length), "arm {arm}: {length} cells");
         }
     }

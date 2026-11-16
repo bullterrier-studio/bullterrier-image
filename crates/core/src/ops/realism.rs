@@ -89,7 +89,7 @@ mod tests {
             seed: 1,
         };
         let differ = (0..100)
-            .filter(|&cell| real.coverage(0.5, 0, [cell, 7]) != real.coverage(0.5, 1, [cell, 7]))
+            .filter(|&cell| real.coverage(0.5, 0, [cell, 7]).to_bits() != real.coverage(0.5, 1, [cell, 7]).to_bits())
             .count();
         assert!(differ > 95, "{differ}");
     }
