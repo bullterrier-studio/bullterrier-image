@@ -1108,3 +1108,18 @@ fn ostromoukhov_keeps_the_tone_of_a_flat_grey_at_every_level() -> Result<(), Err
     }
     Ok(())
 }
+
+#[test]
+fn ostromoukhov_reads_the_row_of_exactly_the_pixels_level_and_its_mirror_above_127() -> Result<(), Error> {
+    // Level 64 of the paper's table has no weight for the pixel below ((11, 10, 0)); its neighbours, 63 and 65, do
+    // ((2447, 2200, 57), (158, 151, 3)). Level 191 is level 64 turned about 127 (255 - 191). So the pixel below a
+    // 0.2509 (level 64) or 0.748 (level 191) pixel gets none of its error, and is lit exactly when its own value is above
+    // a half; a table row one level off would pass a few thousandths of the error down and flip it.
+    let run_pair = |top: f32, bottom: f32| -> Result<Vec<bool>, Error> {
+        let out = run(&ink(Method::Ostromoukhov, 1.0), &greys(&[top, bottom], 1))?;
+        Ok(reds(&out).iter().map(|&red| red > 0.5).collect())
+    };
+    assert_eq!(run_pair(0.2509, 0.4997)?, [false, false]);
+    assert_eq!(run_pair(0.748, 0.5003)?, [true, true]);
+    Ok(())
+}
