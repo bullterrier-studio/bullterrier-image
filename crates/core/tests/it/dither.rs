@@ -1182,6 +1182,13 @@ fn dot_diffusion_and_riemersma_decide_every_pixel_even_on_an_odd_sized_picture()
                 .all(|&pixel| near(pixel, BLACK) || near(pixel, WHITE)),
             "{method:?}"
         );
+        // A pixel the walk skipped is left as the palette's first colour (black), which that check cannot tell from a
+        // decided one. On pure white nothing is diffused (the error is 0), so every pixel must be the palette's second.
+        let white = run(&ink(method, 1.0), &greys(&vec![1.0; 23 * 37], 37))?;
+        assert!(
+            pixels(&white).iter().all(|&pixel| near(pixel, WHITE)),
+            "{method:?} on white"
+        );
     }
     Ok(())
 }
