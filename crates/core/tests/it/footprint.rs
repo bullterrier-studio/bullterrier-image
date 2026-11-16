@@ -10,14 +10,12 @@
 
 use std::error::Error;
 
-use crate::common::{Outcome, core_effects};
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::asset;
 use crate::common::sweep::{Setting, variants};
+use crate::common::{Outcome, core_effects};
 use bullterrier_image::params::{Kind, Table};
-use bullterrier_image::{
-    Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect,
-};
+use bullterrier_image::{Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect};
 use serde_json::{Value, json};
 
 /// The picture is tall and narrow: only the rows matter to a band.

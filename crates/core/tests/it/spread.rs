@@ -10,9 +10,9 @@
 
 use std::error::Error as StdError;
 
-use crate::common::{Outcome, core_effects};
 use crate::common::pictures::asset;
 use crate::common::sweep::{Setting, variants};
+use crate::common::{Outcome, core_effects};
 use bullterrier_image::params::Kind;
 use bullterrier_image::region::{Grid, Shares};
 use bullterrier_image::{

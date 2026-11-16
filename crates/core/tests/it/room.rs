@@ -14,10 +14,10 @@ use bullterrier_image::{
 use serde_json::Value;
 
 use crate::banded::{FFT_BLURS, TOLERANCE};
-use crate::common::{Outcome, core_effects};
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::{asset, varied};
 use crate::common::sweep::{Setting, variants};
+use crate::common::{Outcome, core_effects};
 
 /// The box: a tall, narrow picture of odd sides, as in `banded.rs`.
 const HEIGHT: usize = 61;

@@ -24,11 +24,11 @@ use bullterrier_image::{
 };
 use serde_json::{Value, json};
 
-use crate::common::{Outcome, core_effects};
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::{asset, varied};
 use crate::common::run::{Registered, unique};
 use crate::common::sweep::{Setting, variants};
+use crate::common::{Outcome, core_effects};
 
 /// A tall, narrow picture of odd sides: 64 rows is less than half of it, and a one-row band is a hundred and thirty bands.
 const HEIGHT: usize = 131;
