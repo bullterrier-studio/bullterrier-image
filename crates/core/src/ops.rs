@@ -56,4 +56,5 @@ pub(crate) mod sites;
 pub(crate) mod svg;
 pub(crate) mod textart;
 pub(crate) mod tone;
+pub(crate) mod tiles;
 pub(crate) mod triangles;

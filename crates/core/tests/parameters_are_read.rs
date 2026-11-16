@@ -396,6 +396,12 @@ fn conditional() -> Vec<Conditional> {
             field: "matrix",
             with: vec![("method", json!("matrix"))],
         },
+        // the strip of tiles is read by method 'tiles' alone, which refuses to run without one
+        Conditional {
+            effect: "dither",
+            field: "tiles",
+            with: vec![("method", json!("tiles"))],
+        },
         // the error-diffusion methods have no tile to shift
         Conditional {
             effect: "dither",
@@ -1150,9 +1156,15 @@ fn render(
             })
             .collect::<Vec<_>>(),
     )?;
+    // a strip of tiles is a whole number of its own height wide: two squares
+    let strip = Image::new(
+        4,
+        8,
+        &(0..4_u8 * 8 * 3).map(|at| f32::from(at % 7) / 6.0).collect::<Vec<_>>(),
+    )?;
     for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
         if params[field.name].is_string() {
-            inputs = inputs.with_image(field.name, &asset);
+            inputs = inputs.with_image(field.name, if field.name == "tiles" { &strip } else { &asset });
         }
     }
     Ok(effect.apply(picture, &Value::Object(params), &inputs)?.into_values())

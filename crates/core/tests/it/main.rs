@@ -34,6 +34,7 @@ mod displace;
 mod dither;
 mod dither_phase;
 mod dither_spot;
+mod dither_tiles;
 mod documentation;
 mod drop_shadow;
 mod droste;

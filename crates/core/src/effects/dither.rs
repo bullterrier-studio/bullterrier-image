@@ -18,6 +18,7 @@ use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
 use crate::ops::par;
 use crate::ops::realism::Realism;
+use crate::ops::tiles::{self, Strip};
 use crate::palette::{self, Search};
 use crate::params::{Choice, Color, Params, PictureName};
 use crate::{Error, Image, Inputs, Picture};
@@ -88,6 +89,9 @@ pub enum Method {
     GameboyCamera,
     /// A pattern of your own, the picture `matrix`: its grey values, ranked, are the thresholds.
     Matrix,
+    /// Patterned tiles of your own, the picture `tiles`: each dot is one tile, chosen by its tone, drawn between the two
+    /// palette colours that bracket the dot.
+    Tiles,
 }
 
 /// Where the colours come from.
@@ -170,7 +174,8 @@ pub struct Params {
     /// 'clustered' and `clustered45` are halftone screens (8 x 8, dots in a square grid or turned 45 degrees);
     /// `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile, the one with no visible pattern;
     /// `white_noise` is a random threshold for every pixel (`seed`); `gameboy_camera` is the Game Boy Camera's 4 x 4
-    /// matrix; 'matrix' uses the picture `matrix`. The ordered methods mix colours of any palette, in steps of a
+    /// matrix; 'matrix' uses the picture `matrix`; 'tiles' draws every dot as one tile of the picture `tiles`, picked by its tone, between the
+    /// two palette colours nearest to the dot (it uses no `pattern`, `phase` or `cell`). The ordered methods mix colours of any palette, in steps of a
     /// sixteenth, or of one over the cells of a matrix of fewer than 16 (`bayer2` mixes in quarters); with 'spot' separation they
     /// give each overprint its exact share of the pixel, to one over the cells of the matrix.
     #[param(default = FloydSteinberg)]
@@ -187,11 +192,19 @@ pub struct Params {
     /// in reading order (a flat grey at k of the n levels of a matrix of n cells lights k cells). Ignored with any other method; none is refused with 'matrix'.
     #[param()]
     pub matrix: PictureName,
+    /// With method 'tiles': a strip of n square tiles side by side, as a picture (the path of an image file in a recipe file
+    /// (relative to the file) or in `fx`, or, in Python, a Picture or an array; in Rust, the name of a picture the photo was
+    /// given or the path of an image file), n x its height wide: the height is the tile's side in px, which is the size of one
+    /// dot (`cell` is not used), at most 256 px and 256 tiles. Each dot takes the tile its tone picks, the first tile for the
+    /// dark end and the last for the light end; the tile's pixels above half grey show the lighter of the dot's two colours and the others the
+    /// darker. Ignored with any other method; none is refused with 'tiles', and so is 'spot' separation.
+    #[param()]
+    pub tiles: PictureName,
     /// Where the pattern sits: the tile of an ordered method, of 'matrix' or of the noise is shifted by this share of its
     /// side (rounded down to whole dots), right and down, so 0 and 1 are the same picture; `white_noise`, which has no
     /// tile, shifts by a share of the picture and wraps. The tone of every area stays the same, only where the dots fall
     /// moves. Used by the ordered, noise and 'matrix' methods, with 'spot' separation too; the error-diffusion methods
-    /// (`floyd_steinberg` and the other kernels, `dot_diffusion`, `riemersma`) ignore it.
+    /// (`floyd_steinberg` and the other kernels, `dot_diffusion`, `riemersma`) and 'tiles' ignore it.
     #[param(default = 0.0, unit = cycles, min = 0, max = 1, drivable)]
     pub phase: f32,
     /// Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' (the 4 greens
@@ -209,7 +222,7 @@ pub struct Params {
     /// longer with more colours.
     #[param(default = 8, unit = count, min = 2, max = 256)]
     pub colors: i32,
-    /// The size of one dot in px at the recipe's size (rounded to whole pixels): the picture is dithered on a grid of this
+    /// The size of one dot in px at the recipe's size (rounded to whole pixels; with 'tiles' the tile's side instead): the picture is dithered on a grid of this
     /// size and shown with hard square dots. 0, the default, is one dot per pixel at any render size (so a `pattern` of 0
     /// recolours pixel by pixel); 4 is a chunky dot on a 480 px picture and 10 or more a pixel-art look. Raising it gives
     /// coarser, larger dots.
@@ -483,15 +496,22 @@ fn thresholds(
     Some(thresholds.phased(params.phase))
 }
 
-/// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
+/// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high; method 'tiles' with
+/// no `tiles`, a strip that is not a whole number of tiles wide or has too large a tile or too many, or 'spot' separation.
 ///
 /// # Errors
-/// [`Error::Recipe`] naming `matrix`.
+/// [`Error::Recipe`] naming `matrix`, `tiles` or `separation`.
 pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
-    if params.method != Method::Matrix {
-        return Ok(());
+    match params.method {
+        Method::Matrix => check_matrix("dither", "method 'matrix'", inputs),
+        Method::Tiles if params.separation == Separation::Spot => Err(Error::Recipe(
+            "dither: method 'tiles' cannot be used with `separation` 'spot': a tile is drawn between two palette colours, and \
+             the spot inks print as overlapping layers of ink, not as a palette"
+                .to_owned(),
+        )),
+        Method::Tiles => tiles::check_strip("dither", "method 'tiles'", inputs),
+        _ => Ok(()),
     }
-    check_matrix("dither", "method 'matrix'", inputs)
 }
 
 /// The thresholds of the picture `matrix`, which `check` has seen.
@@ -588,7 +608,12 @@ fn printed(
 /// The picture redrawn.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
-    let cell = whole(f64::from(params.cell)).max(1);
+    let strip = Strip::of(inputs);
+    let cell = if params.method == Method::Tiles {
+        strip.side()
+    } else {
+        whole(f64::from(params.cell)).max(1)
+    };
     let (rows, columns) = (height.div_ceil(cell), width.div_ceil(cell));
     let dots = averaged(picture.pixels(), (height, width), cell);
     if params.separation == Separation::Spot {
@@ -597,6 +622,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let matched = in_space(&dots, params.space);
     let palette = colours(&dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
+    if params.method == Method::Tiles {
+        let out = tiles::draw((&matched, &matched_palette), &palette, &strip, (height, width));
+        return Image::from_pixels(height, width, out);
+    }
     let size = (rows, columns);
     let chosen = pattern(
         params.method,

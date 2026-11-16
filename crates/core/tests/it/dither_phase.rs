@@ -6,7 +6,7 @@ use bullterrier_image::effects::dither::{Method, Palette, Params, Separation, Sp
 use bullterrier_image::params::Color;
 use serde_json::json;
 
-use crate::common::dither::{BLACK, WHITE, grey_matrix, pixels, run, with_matrix};
+use crate::common::dither::{BLACK, WHITE, grey_matrix, near, pixels, run, with_matrix};
 
 fn ink(method: Method, phase: f32) -> Params {
     Params {
@@ -28,8 +28,10 @@ fn is_moved(plain: &[f32], shifted: &[f32], (height, width): (usize, usize), (do
     let (plain, shifted) = (pixels(plain), pixels(shifted));
     (0..height).all(|row| {
         (0..width).all(|column| {
-            shifted[row * width + column]
-                == plain[(row + height - down) % height * width + (column + width - across) % width]
+            near(
+                shifted[row * width + column],
+                plain[(row + height - down) % height * width + (column + width - across) % width],
+            )
         })
     })
 }

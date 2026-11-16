@@ -538,6 +538,30 @@ fn a_dither_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() 
 }
 
 #[test]
+fn dither_tiles_of_their_most_pixels_a_side_and_most_in_a_strip_work_and_one_more_is_refused() {
+    let pixels = vec![0.5; 20 * 20 * 3];
+    let render = |side: usize, count: usize| {
+        let strip = Image::new(side, side * count, &vec![0.4; side * side * count * 3]).map(Arc::new)?;
+        Photo::new(Picture::new(20, 20, &pixels)?)
+            .with_image("t", strip)
+            .render(
+                &Recipe::new([Step::new("dither").param("method", "tiles").param("tiles", "t")]),
+                &Presets::new(),
+                Options::default(),
+            )
+            .map(drop)
+    };
+    for (side, count) in [(256, 1), (1, 256), (3, 256)] {
+        let most = render(side, count);
+        assert!(most.is_ok(), "{side} x {count}: {most:?}");
+    }
+    for (side, count) in [(257, 1), (1, 257)] {
+        let past = render(side, count);
+        assert!(refused(&past, &["tiles", "257"]), "{side} x {count}: {past:?}");
+    }
+}
+
+#[test]
 fn a_halftone_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
     // the same ranks as dither's matrix: 256 x 256 places is the most
     let pixels = vec![0.5; 20 * 20 * 3];

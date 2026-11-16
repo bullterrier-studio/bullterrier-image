@@ -824,12 +824,12 @@ scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges bre
     ...
 
 @_effect
-def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, phase: float | Drive = 0.0, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'spot'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, dot_gain: float = 0.0, ink_noise: float = 0.0, specks: float = 0.0, speck_size: float = 3.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
+def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', 'tiles'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, tiles: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, phase: float | Drive = 0.0, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'spot'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, dot_gain: float = 0.0, ink_noise: float = 0.0, specks: float = 0.0, speck_size: float = 3.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
     """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four colours): the photo's colours are split into amounts of the inks (as in `halftone`), mixed back as printed subtractively over `paper` (inks overlap like transparent layers and only darken it, so use a light `paper`), and dithered once with `method` and `cell` against the paper, each ink and every overlap. `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
 
 Parameters
 ----------
-method : one of 'floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', default 'floyd_steinberg'
+method : one of 'floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', 'tiles', default 'floyd_steinberg'
     How tones become a pattern of dots. `floyd_steinberg`, 'atkinson',
     `jarvis_judice_ninke`, 'stucki', 'burkes', 'sierra', `sierra_two_row`,
     `sierra_lite`, `stevenson_arce` and `ostromoukhov` pass each pixel's error on to its
@@ -848,10 +848,12 @@ method : one of 'floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 
     degrees); `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile,
     the one with no visible pattern; `white_noise` is a random threshold for every pixel
     (`seed`); `gameboy_camera` is the Game Boy Camera's 4 x 4 matrix; 'matrix' uses the
-    picture `matrix`. The ordered methods mix colours of any palette, in steps of a
-    sixteenth, or of one over the cells of a matrix of fewer than 16 (`bayer2` mixes in
-    quarters); with 'spot' separation they give each overprint its exact share of the
-    pixel, to one over the cells of the matrix.
+    picture `matrix`; 'tiles' draws every dot as one tile of the picture `tiles`, picked
+    by its tone, between the two palette colours nearest to the dot (it uses no
+    `pattern`, `phase` or `cell`). The ordered methods mix colours of any palette, in
+    steps of a sixteenth, or of one over the cells of a matrix of fewer than 16
+    (`bayer2` mixes in quarters); with 'spot' separation they give each overprint its
+    exact share of the pixel, to one over the cells of the matrix.
 serpentine : true or false, default False
     Scan odd rows right to left, with the kernel mirrored, so the grain does not slant
     one way (`floyd_steinberg`, 'atkinson', `jarvis_judice_ninke`, 'stucki', 'burkes',
@@ -866,6 +868,16 @@ matrix : picture or none, default None
     brightest are lit first, equal ones in reading order (a flat grey at k of the n
     levels of a matrix of n cells lights k cells). Ignored with any other method; none
     is refused with 'matrix'.
+tiles : picture or none, default None
+    With method 'tiles': a strip of n square tiles side by side, as a picture (the path
+    of an image file in a recipe file (relative to the file) or in `fx`, or, in Python,
+    a Picture or an array; in Rust, the name of a picture the photo was given or the
+    path of an image file), n x its height wide: the height is the tile's side in px,
+    which is the size of one dot (`cell` is not used), at most 256 px and 256 tiles.
+    Each dot takes the tile its tone picks, the first tile for the dark end and the last
+    for the light end; the tile's pixels above half grey show the lighter of the dot's
+    two colours and the others the darker. Ignored with any other method; none is
+    refused with 'tiles', and so is 'spot' separation.
 phase : number (drivable), cycles, 0 to 1, default 0.0
     Where the pattern sits: the tile of an ordered method, of 'matrix' or of the noise
     is shifted by this share of its side (rounded down to whole dots), right and down,
@@ -873,7 +885,7 @@ phase : number (drivable), cycles, 0 to 1, default 0.0
     of the picture and wraps. The tone of every area stays the same, only where the dots
     fall moves. Used by the ordered, noise and 'matrix' methods, with 'spot' separation
     too; the error-diffusion methods (`floyd_steinberg` and the other kernels,
-    `dot_diffusion`, `riemersma`) ignore it.
+    `dot_diffusion`, `riemersma`) and 'tiles' ignore it.
 palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom', default 'photo'
     Where the colours come from. 'photo' finds `colors` colours in the picture itself
     (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
@@ -890,11 +902,11 @@ colors : whole number, count, 2 to 256, default 8
     picture has fewer distinct colours. The ordered methods take longer with more
     colours.
 cell : number, px, 0 to 48, default 0.0
-    The size of one dot in px at the recipe's size (rounded to whole pixels): the
-    picture is dithered on a grid of this size and shown with hard square dots. 0, the
-    default, is one dot per pixel at any render size (so a `pattern` of 0 recolours
-    pixel by pixel); 4 is a chunky dot on a 480 px picture and 10 or more a pixel-art
-    look. Raising it gives coarser, larger dots.
+    The size of one dot in px at the recipe's size (rounded to whole pixels; with
+    'tiles' the tile's side instead): the picture is dithered on a grid of this size and
+    shown with hard square dots. 0, the default, is one dot per pixel at any render size
+    (so a `pattern` of 0 recolours pixel by pixel); 4 is a chunky dot on a 480 px
+    picture and 10 or more a pixel-art look. Raising it gives coarser, larger dots.
 pattern : number, fraction, 0 to 1, default 1.0
     How much of the dot pattern is used: 1 = the method as designed; lower passes less
     error on (the error-diffusion methods) or mixes fewer colours per dot (the ordered
