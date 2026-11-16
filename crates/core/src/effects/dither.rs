@@ -8,11 +8,11 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start};
-use crate::ops::color::luminance;
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{
     ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, OSTROMOUKHOV, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW,
-    STEVENSON_ARCE, STUCKI, Thresholds, Tile, diffuse, dot_diffusion, from_greys, noise, ordered, riemersma,
+    STEVENSON_ARCE, STUCKI, Thresholds, Tile, check_matrix, diffuse, dot_diffusion, from_greys, matrix_greys, noise,
+    ordered, riemersma,
 };
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
@@ -437,9 +437,6 @@ fn pattern(
     }
 }
 
-/// The most pixels along a side of a caller's `matrix`.
-const MATRIX_SIDE: usize = 256; // constant: 256 x 256 cells are 65536 ranks, the most a 16-bit rank holds
-
 /// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
 ///
 /// # Errors
@@ -448,35 +445,13 @@ pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
     if params.method != Method::Matrix {
         return Ok(());
     }
-    let Some(image) = inputs.image("matrix") else {
-        return Err(Error::Recipe(
-            "dither: `matrix` is needed with method 'matrix': a picture name or path".to_owned(),
-        ));
-    };
-    if image.height() > MATRIX_SIDE || image.width() > MATRIX_SIDE {
-        return Err(Error::Recipe(format!(
-            "dither: `matrix` is {} x {} pixels, at most {MATRIX_SIDE} x {MATRIX_SIDE}",
-            image.width(),
-            image.height()
-        )));
-    }
-    Ok(())
+    check_matrix("dither", "method 'matrix'", inputs)
 }
 
 /// The thresholds of the picture `matrix`, which `check` has seen.
 fn matrix_of(inputs: &Inputs<'_>) -> Thresholds<'static> {
-    inputs.image("matrix").map_or_else(
-        || from_greys(&[0.0], (1, 1)),
-        |image| {
-            let greys: Vec<f32> = image
-                .as_picture()
-                .pixels()
-                .iter()
-                .map(|&pixel| luminance(pixel))
-                .collect();
-            from_greys(&greys, (image.height(), image.width()))
-        },
-    )
+    let (greys, size) = matrix_greys(inputs);
+    from_greys(&greys, size)
 }
 
 /// The inks printed: each ink's coverage of the dots is dithered to a layer of 0 and 1 (the layers in the order of the

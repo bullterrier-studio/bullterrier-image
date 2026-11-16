@@ -8,9 +8,11 @@ use std::borrow::Cow;
 use std::sync::OnceLock;
 
 use crate::ops::cluster::{Point, nearest_one};
+use crate::ops::color::luminance;
 use crate::ops::length::whole;
 use crate::ops::par;
 use crate::ops::random::{Rng, mix};
+use crate::{Error, Inputs};
 
 /// Where an error-diffusion kernel sends a pixel's error: (columns right, rows down, weight) for the pixels it reaches,
 /// and the weights' divisor. Every tap lies after the pixel in reading order.
@@ -664,17 +666,62 @@ impl Thresholds<'_> {
     }
 }
 
-/// A caller's matrix as thresholds: `greys` (`rows` x `columns`, row after row) ranked, the brightest cell highest and so
-/// lit first; of equal cells the earlier in reading order is lit first.
-pub(crate) fn from_greys(greys: &[f32], (rows, columns): (usize, usize)) -> Thresholds<'static> {
+/// The most pixels along a side of a caller's `matrix`.
+const MATRIX_SIDE: usize = 256; // constant: 256 x 256 cells are 65536 ranks, the most a 16-bit rank holds
+
+/// What `effect` refuses of the picture `matrix` that `needs` (a setting of it): none given, or one more than 256 pixels
+/// wide or high.
+///
+/// # Errors
+/// [`Error::Recipe`] naming `matrix`.
+pub(crate) fn check_matrix(effect: &str, needs: &str, inputs: &Inputs<'_>) -> Result<(), Error> {
+    let Some(image) = inputs.image("matrix") else {
+        return Err(Error::Recipe(format!(
+            "{effect}: `matrix` is needed with {needs}: a picture name or path"
+        )));
+    };
+    if image.height() > MATRIX_SIDE || image.width() > MATRIX_SIDE {
+        return Err(Error::Recipe(format!(
+            "{effect}: `matrix` is {} x {} pixels, at most {MATRIX_SIDE} x {MATRIX_SIDE}",
+            image.width(),
+            image.height()
+        )));
+    }
+    Ok(())
+}
+
+/// The grey values of the caller's picture `matrix` (its luminance, row after row) and its (rows, columns), which
+/// [`check_matrix`] has seen; one 0 where there is none.
+pub(crate) fn matrix_greys(inputs: &Inputs<'_>) -> (Vec<f32>, (usize, usize)) {
+    inputs.image("matrix").map_or_else(
+        || (vec![0.0], (1, 1)),
+        |image| {
+            let greys = image
+                .as_picture()
+                .pixels()
+                .iter()
+                .map(|&pixel| luminance(pixel))
+                .collect();
+            (greys, (image.height(), image.width()))
+        },
+    )
+}
+
+/// The rank of each of `greys`: the brightest the highest, so lit first, of equal ones the earlier in reading order higher.
+pub(crate) fn rank_greys(greys: &[f32]) -> Vec<u16> {
     let mut order: Vec<usize> = (0..greys.len()).collect();
     order.sort_by(|&a, &b| greys[b].total_cmp(&greys[a]));
     let mut ranks = vec![0_u16; greys.len()];
     for (place, &cell) in order.iter().enumerate() {
         ranks[cell] = u16::try_from(greys.len() - 1 - place).unwrap_or(u16::MAX);
     }
+    ranks
+}
+
+/// A caller's matrix as thresholds: `greys` (`rows` x `columns`, row after row) ranked by [`rank_greys`].
+pub(crate) fn from_greys(greys: &[f32], (rows, columns): (usize, usize)) -> Thresholds<'static> {
     Thresholds::Tiled {
-        ranks: Cow::Owned(ranks),
+        ranks: Cow::Owned(rank_greys(greys)),
         rows,
         columns,
         count: greys.len(),
