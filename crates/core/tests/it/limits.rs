@@ -562,6 +562,28 @@ fn dither_tiles_of_their_most_pixels_a_side_and_most_in_a_strip_work_and_one_mor
 }
 
 #[test]
+fn dither_blocks_of_their_most_dots_work_and_one_more_is_refused() {
+    // the search per block costs a fixed number of distances per dot, so a block's size drives no work; its bound is the
+    // parameter's own
+    let pixels = vec![0.5; 20 * 20 * 3];
+    let render = |field: &str, value: i32| {
+        Photo::new(Picture::new(20, 20, &pixels)?)
+            .render(
+                &Recipe::new([Step::new("dither").param("block", 8).param(field, value)]),
+                &Presets::new(),
+                Options::default(),
+            )
+            .map(drop)
+    };
+    for field in ["block", "block_height", "block_group"] {
+        let most = render(field, 256);
+        assert!(most.is_ok(), "{field}: {most:?}");
+        let past = render(field, 257);
+        assert!(refused(&past, &[field, "257"]), "{field}: {past:?}");
+    }
+}
+
+#[test]
 fn a_halftone_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
     // the same ranks as dither's matrix: 256 x 256 places is the most
     let pixels = vec![0.5; 20 * 20 * 3];

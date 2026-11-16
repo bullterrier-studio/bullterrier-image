@@ -81,7 +81,7 @@ pub(crate) struct Bracket {
 }
 
 /// The nearest point of the segment `from` to `to` to `value`: its squared distance and its place on the segment (0 to 1).
-fn on_segment(value: &Point, from: &Point, to: &Point) -> (f32, f32) {
+pub(crate) fn on_segment(value: &Point, from: &Point, to: &Point) -> (f32, f32) {
     let along = [0, 1, 2].map(|c| to[c] - from[c]);
     let length: f32 = along.iter().map(|d| d * d).sum();
     let place = if length > 0.0 {

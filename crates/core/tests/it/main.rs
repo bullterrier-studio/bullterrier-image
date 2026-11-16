@@ -32,6 +32,7 @@ mod dehaze;
 mod disperse;
 mod displace;
 mod dither;
+mod dither_blocks;
 mod dither_phase;
 mod dither_spot;
 mod dither_tiles;

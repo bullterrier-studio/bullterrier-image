@@ -7,8 +7,9 @@
 use std::borrow::Cow;
 use std::sync::OnceLock;
 
+use crate::ops::attributes::Choices;
 use crate::ops::blue_noise;
-use crate::ops::cluster::{Point, nearest_one};
+use crate::ops::cluster::Point;
 use crate::ops::color::luminance;
 use crate::ops::inks::MOST_INKS;
 use crate::ops::length::whole;
@@ -329,9 +330,9 @@ fn folded_level(value: f32) -> usize {
     if level > 127 { 255 - level } else { level } // constant: Ostromoukhov's table is turned about level 127
 }
 
-/// The palette colour nearest to `value` (an index) and what is left over: `value` less that colour.
-fn settle(value: Point, palette: &[Point]) -> (u8, [f32; 3]) {
-    let pick = nearest_one(&value, palette);
+/// The palette colour nearest to `value` for the dot `at` (an index) and what is left over: `value` less that colour.
+fn settle(value: Point, palette: &Choices<'_>, at: (usize, usize)) -> (u8, [f32; 3]) {
+    let pick = palette.nearest(&value, at);
     let colour = palette[usize::from(pick)];
     (pick, [0, 1, 2].map(|channel| value[channel] - colour[channel]))
 }
@@ -355,7 +356,7 @@ fn level_of(value: [f32; 3], lightness: [f32; 3]) -> f32 {
 pub(crate) fn diffuse(
     values: &[Point],
     (height, width): (usize, usize),
-    palette: &[Point],
+    palette: &Choices<'_>,
     kernel: &Kernel,
     amount: f32,
     serpentine: bool,
@@ -373,7 +374,7 @@ pub(crate) fn diffuse(
             let at = (row % ROWS_ALIVE) * stride + REACH + column;
             let pixel = values[row * width + column];
             let value = [0, 1, 2].map(|channel| pixel[channel] + waiting[at][channel]);
-            let (pick, miss) = settle(value, palette);
+            let (pick, miss) = settle(value, palette, (row, column));
             chosen[row * width + column] = pick;
             let level = kernel
                 .levels
@@ -418,7 +419,7 @@ const CLASS_SIDE: usize = 8; // constant: Knuth's class matrix is 8 x 8
 pub(crate) fn dot_diffusion(
     values: &[Point],
     (height, width): (usize, usize),
-    palette: &[Point],
+    palette: &Choices<'_>,
     amount: f32,
 ) -> Vec<u8> {
     let class_at = |row: usize, column: usize| KNUTH_CLASSES[(row % CLASS_SIDE) * CLASS_SIDE + column % CLASS_SIDE];
@@ -431,7 +432,7 @@ pub(crate) fn dot_diffusion(
             for column in (first_column..width).step_by(CLASS_SIDE) {
                 let pixel = values[row * width + column];
                 let value = [0, 1, 2].map(|channel| pixel[channel] + waiting[row * width + column][channel]);
-                let (pick, miss) = settle(value, palette);
+                let (pick, miss) = settle(value, palette, (row, column));
                 chosen[row * width + column] = pick;
                 // the higher-class neighbours inside the picture, with their weights
                 let mut heirs = [(0_usize, 0_usize, 0.0_f32); 8]; // constant: structural, a pixel has eight neighbours, not tunable
@@ -559,7 +560,12 @@ fn gilbert(height: usize, width: usize, visit: &mut impl FnMut(usize, usize)) {
 /// The pixels are taken along the generalized Hilbert curve over the picture (`gilbert`). A pixel gets the palette colour closest to its value plus `amount` (0 to 1) of the
 /// weighted sum of the last 16 errors, the newest weighing 1 and each older one less by the same factor, down to 1/16; its
 /// own error is its value (without the sum) less the colour chosen.
-pub(crate) fn riemersma(values: &[Point], (height, width): (usize, usize), palette: &[Point], amount: f32) -> Vec<u8> {
+pub(crate) fn riemersma(
+    values: &[Point],
+    (height, width): (usize, usize),
+    palette: &Choices<'_>,
+    amount: f32,
+) -> Vec<u8> {
     #[expect(clippy::cast_precision_loss, reason = "a small constant")]
     let fall = MEMORY_RATIO.powf(-1.0 / (MEMORY - 1) as f32);
     // the weights from the oldest error to the newest
@@ -577,10 +583,11 @@ pub(crate) fn riemersma(values: &[Point], (height, width): (usize, usize), palet
                 .sum();
             pixel[channel] + amount * sum
         });
-        let (pick, _) = settle(value, palette);
+        let pick = palette.nearest(&value, (row, column));
         chosen[row * width + column] = pick;
         recent.rotate_left(1);
-        recent[MEMORY - 1] = settle(pixel, &[palette[usize::from(pick)]]).1;
+        let colour = palette[usize::from(pick)];
+        recent[MEMORY - 1] = [0, 1, 2].map(|channel| pixel[channel] - colour[channel]);
     });
     chosen
 }
@@ -846,7 +853,7 @@ const CANDIDATES: usize = 16; // constant: the common form of Knoll's mixing use
 pub(crate) fn ordered(
     values: &[Point],
     (height, width): (usize, usize),
-    palette: &[Point],
+    palette: &Choices<'_>,
     thresholds: &Thresholds<'_>,
     amount: f32,
 ) -> Vec<u8> {
@@ -871,7 +878,7 @@ pub(crate) fn ordered(
                 let mut owed = [0.0_f32; 3];
                 for candidate in &mut mix[..steps] {
                     let probe = [0, 1, 2].map(|channel| goal[channel] + owed[channel]);
-                    let index = nearest_one(&probe, palette);
+                    let index = palette.nearest(&probe, (row, column));
                     *candidate = place[usize::from(index)];
                     let colour = palette[usize::from(index)];
                     for channel in 0..3 {

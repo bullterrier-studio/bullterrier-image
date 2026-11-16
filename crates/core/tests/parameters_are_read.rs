@@ -408,6 +408,17 @@ fn conditional() -> Vec<Conditional> {
             field: "phase",
             with: vec![("method", json!("bayer"))],
         },
+        // the block's height and runs matter only while there is a block
+        Conditional {
+            effect: "dither",
+            field: "block_height",
+            with: vec![("block", json!(8))],
+        },
+        Conditional {
+            effect: "dither",
+            field: "block_group",
+            with: vec![("block", json!(8)), ("palette", json!("cube6"))],
+        },
         // the inks, the paper and the offset matter only while the inks print
         Conditional {
             effect: "dither",

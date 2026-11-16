@@ -1,5 +1,6 @@
 //! The numeric primitives the effects share, one module per concept (as `bullterrier_image.ops` in Python).
 
+pub(crate) mod attributes;
 pub(crate) mod bands;
 pub(crate) mod blend;
 pub(crate) mod blue_noise;
@@ -55,6 +56,6 @@ pub(crate) mod shift;
 pub(crate) mod sites;
 pub(crate) mod svg;
 pub(crate) mod textart;
-pub(crate) mod tone;
 pub(crate) mod tiles;
+pub(crate) mod tone;
 pub(crate) mod triangles;

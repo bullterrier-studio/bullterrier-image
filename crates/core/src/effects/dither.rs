@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Meta};
+use crate::ops::attributes::{Blocks, Choices, Shape};
 use crate::ops::cluster::{Point, Start};
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{
@@ -207,6 +208,21 @@ pub struct Params {
     /// (`floyd_steinberg` and the other kernels, `dot_diffusion`, `riemersma`) and 'tiles' ignore it.
     #[param(default = 0.0, unit = cycles, min = 0, max = 1, drivable)]
     pub phase: f32,
+    /// Colour attributes: the width in dots of a block that may use only two of the palette's colours, as the colour
+    /// attributes of the ZX Spectrum, the MSX and the C64 allow. Every block takes the pair of colours whose line lies nearest to
+    /// its dots (the least summed distance in `space`) and is dithered between those two with `method`; error and thresholds
+    /// carry across block borders, each dot limited to its block's pair. With a palette longer than 16 colours the pair's
+    /// ends are tried among the 16 that are nearest to most of the block's dots. 0 = off, every dot takes any colour. Not with 'tiles' or 'spot' separation.
+    #[param(default = 0, unit = count, min = 0, max = 256)]
+    pub block: i32,
+    /// With a `block`: the height of a block in dots (8 x 8 for the Spectrum and the C64, 8 x 1 for the MSX). Ignored without a `block`.
+    #[param(default = 8, unit = count, min = 1, max = 256)]
+    pub block_height: i32,
+    /// With a `block`: 0, or the palette is read in runs of this many colours (at least 2) and a block's two colours come from
+    /// one run, as the Spectrum's two colours of a block share their brightness (a run of 8 normal colours, then of 8 bright
+    /// ones, black in both). 0 = any two colours. Ignored without a `block`.
+    #[param(default = 0, unit = count, min = 0, max = 256)]
+    pub block_group: i32,
     /// Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' (the 4 greens
     /// widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8'
     /// (the 16 PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2 to 6 evenly spaced levels
@@ -442,7 +458,7 @@ fn pattern(
     method: Method,
     values: &[Point],
     size: (usize, usize),
-    palette: &[Point],
+    palette: &Choices<'_>,
     params: &Params,
     inputs: &Inputs<'_>,
     space: Space,
@@ -502,6 +518,9 @@ fn thresholds(
 /// # Errors
 /// [`Error::Recipe`] naming `matrix`, `tiles` or `separation`.
 pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
+    if params.block > 0 {
+        check_block(params)?;
+    }
     match params.method {
         Method::Matrix => check_matrix("dither", "method 'matrix'", inputs),
         Method::Tiles if params.separation == Separation::Spot => Err(Error::Recipe(
@@ -512,6 +531,21 @@ pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
         Method::Tiles => tiles::check_strip("dither", "method 'tiles'", inputs),
         _ => Ok(()),
     }
+}
+
+/// What a `block` refuses: 'tiles' (it draws between a pair of its own) and 'spot' separation (overlapping inks, not a
+/// palette), and a `block_group` of 1 (a pair needs two colours of a run).
+fn check_block(params: &Params) -> Result<(), Error> {
+    let cause = if params.method == Method::Tiles {
+        "method 'tiles' draws each dot between a pair of palette colours of its own"
+    } else if params.separation == Separation::Spot {
+        "`separation` 'spot' prints overlapping inks, not a palette to pick pairs from"
+    } else if params.block_group == 1 {
+        "`block_group` 1 leaves a run of one colour, and a block needs two: use 0 or at least 2"
+    } else {
+        return Ok(());
+    };
+    Err(Error::Recipe(format!("dither: `block` cannot be used: {cause}")))
 }
 
 /// The thresholds of the picture `matrix`, which `check` has seen.
@@ -561,6 +595,7 @@ fn printed(
         shared(&amounts, count, (rows, columns), &thresholds, params.pattern)
     } else {
         let target: Vec<[f32; 3]> = amounts.iter().map(|amounts| inks.print(amounts)).collect();
+        let table = Choices::new(&table, None);
         // in sRGB, where the print model mixes: distances in Oklab would pull the mean of the dots off the mix of the inks
         pattern(
             params.method,
@@ -627,11 +662,19 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         return Image::from_pixels(height, width, out);
     }
     let size = (rows, columns);
+    let blocks = (params.block > 0).then(|| {
+        let shape = Shape {
+            width: count(params.block),
+            height: count(params.block_height),
+            group: count(params.block_group),
+        };
+        Blocks::choose(&matched, size, &matched_palette, shape)
+    });
     let chosen = pattern(
         params.method,
         &matched,
         size,
-        &matched_palette,
+        &Choices::new(&matched_palette, blocks.as_ref()),
         params,
         inputs,
         params.space,
