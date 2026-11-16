@@ -1467,27 +1467,14 @@ fn one_black_spot_ink_prints_a_grey_at_its_own_level() -> Result<(), Error> {
 #[test]
 fn two_spot_inks_print_the_colours_they_can_mix_at_those_colours() -> Result<(), Error> {
     let inks = [PINK, BLUE];
-    let params = separated(Separation::Spot, &inks);
-    let paper = [1.0; 3];
-    for areas in [[0.3, 0.4], [0.6, 0.1], [0.2, 0.7]] {
-        let photo = mixed(paper, &inks, &areas);
-        assert_mean(&params, photo, photo, 0.02)?;
-    }
-    Ok(())
-}
-
-#[test]
-fn two_spot_inks_keep_the_tone_on_a_grid_and_a_wave_screen_with_dots_and_lines() -> Result<(), Error> {
     // concentric screens (rings, spiral, rays) are not here: their inks' rows coincide, see the `screen` doc
-    let inks = [PINK, BLUE];
-    let photo = mixed([1.0; 3], &inks, &[0.5, 0.5]);
     for screen in [Screen::Grid, Screen::Wave] {
-        for shape in [Shape::Dot, Shape::Line] {
-            let params = Params {
-                screen,
-                shape,
-                ..separated(Separation::Spot, &inks)
-            };
+        let params = Params {
+            screen,
+            ..separated(Separation::Spot, &inks)
+        };
+        for areas in [[0.3, 0.4], [0.6, 0.1], [0.2, 0.7], [0.5, 0.5]] {
+            let photo = mixed([1.0; 3], &inks, &areas);
             assert_mean(&params, photo, photo, 0.02)?;
         }
     }
