@@ -1189,6 +1189,8 @@ fn changes(
             {
                 continue;
             }
+            // a value the effect refuses (a dark paper with an ink separation) is no alternative to try
+            Err(error) if matches!(error.downcast_ref::<CoreError>(), Some(CoreError::Recipe(_))) => continue,
             other => other?,
         };
         if baseline.as_ref().is_none_or(|baseline| differs(baseline, &result)) {
