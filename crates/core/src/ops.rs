@@ -28,6 +28,7 @@ pub(crate) mod glyphs;
 pub(crate) mod gradient;
 pub(crate) mod grid;
 pub(crate) mod guided;
+pub(crate) mod hatch;
 pub(crate) mod inks;
 pub(crate) mod jpeg;
 pub(crate) mod length;

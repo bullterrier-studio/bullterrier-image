@@ -1,0 +1,11 @@
+# Tone as pen hatching: four layers of lines on cream paper, the darks crossed.
+name = "crosshatch"
+size = 480
+
+[[step]]
+effect = "crosshatch"
+angle = 30
+spacing = 5
+thickness = 0.55
+color = "#1b1b1f"
+paper = "#f4efe4"

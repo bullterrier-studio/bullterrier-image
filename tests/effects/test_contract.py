@@ -647,6 +647,7 @@ LENGTHS_AS_SHARES = {
     ("tile", "offset_x"): "one copy's width",
     ("tile", "offset_y"): "one copy's height",
     ("modulation", "thickness"): "the distance between rows",
+    ("crosshatch", "thickness"): "`spacing`",
     ("pattern", "thickness"): "one `cell`",
     ("pattern", "radius"): "one `cell`",
     ("pixel_grid", "gap"): "a stripe's width, a third of `cell`",

@@ -605,6 +605,30 @@ fn modulation_at_its_least_spacing_and_dash_works_and_less_is_refused() {
 }
 
 #[test]
+fn crosshatch_at_its_least_spacing_and_most_layers_works_and_past_them_is_refused() {
+    // a pixel's work follows the layer count, and a line narrower than a pixel is not drawn: the bounds are the table's
+    let pixels = vec![0.5; 60 * 60 * 3];
+    let render = |field: &str, value: serde_json::Value| {
+        Photo::new(Picture::new(60, 60, &pixels)?)
+            .render(
+                &Recipe::new([Step::new("crosshatch").param(field, value)]),
+                &Presets::new(),
+                Options::default(),
+            )
+            .map(drop)
+    };
+    for (field, edge, past) in [
+        ("spacing", serde_json::json!(2.0), serde_json::json!(1.9)),
+        ("layers", serde_json::json!(6), serde_json::json!(7)),
+    ] {
+        let works = render(field, edge);
+        assert!(works.is_ok(), "{field}: {works:?}");
+        let refusal = render(field, past);
+        assert!(refused(&refusal, &[field]), "{field}: {refusal:?}");
+    }
+}
+
+#[test]
 fn a_halftone_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
     // the same ranks as dither's matrix: 256 x 256 places is the most
     let pixels = vec![0.5; 20 * 20 * 3];
