@@ -1090,7 +1090,10 @@ fn the_ink_does_not_jump_when_the_cell_passes_a_whole_or_a_half_number() -> Resu
                 Ok(1.0 - f64::from(red.iter().sum::<f32>()) / red.len() as f64)
             };
             let (a, b) = (ink(below)?, ink(above)?);
-            assert!((a - b).abs() < 0.002, "tone {tone}: ink {a} at cell {below}, {b} at {above}");
+            assert!(
+                (a - b).abs() < 0.002,
+                "tone {tone}: ink {a} at cell {below}, {b} at {above}"
+            );
         }
     }
     Ok(())
