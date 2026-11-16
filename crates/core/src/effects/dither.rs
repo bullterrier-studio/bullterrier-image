@@ -11,8 +11,8 @@ use crate::ops::cluster::{Point, Start};
 use crate::ops::color::luminance;
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{
-    ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW, STEVENSON_ARCE,
-    STUCKI, Thresholds, Tile, diffuse, from_greys, noise, ordered,
+    ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, OSTROMOUKHOV, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW,
+    STEVENSON_ARCE, STUCKI, Thresholds, Tile, diffuse, from_greys, noise, ordered,
 };
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
@@ -60,6 +60,9 @@ pub enum Method {
     SierraLite,
     /// A wide hexagonal kernel on twelve pixels (Stevenson and Arce, 1985): a fine, even grain.
     StevensonArce,
+    /// Weights that change with the pixel's level (Ostromoukhov, 2001), tuned for an even grain at every grey; the level is
+    /// taken from the first channel (red, or lightness in Oklab); the paper scans serpentine (see `serpentine`).
+    Ostromoukhov,
     /// A regular crosshatch of Bayer's 2 x 2 matrix: coarse, four levels.
     Bayer2,
     /// A regular crosshatch of Bayer's 4 x 4 matrix.
@@ -151,7 +154,7 @@ pub enum Init {
 #[serde(deny_unknown_fields)]
 pub struct Params {
     /// How tones become a pattern of dots. `floyd_steinberg`, 'atkinson', `jarvis_judice_ninke`, 'stucki', 'burkes',
-    /// 'sierra', `sierra_two_row`, `sierra_lite` and `stevenson_arce` pass each pixel's error on to its neighbours
+    /// 'sierra', `sierra_two_row`, `sierra_lite`, `stevenson_arce` and `ostromoukhov` pass each pixel's error on to its neighbours
     /// (organic grain; they differ in how many pixels and how far the error goes: wider kernels are smoother, narrower ones
     /// sharper and faster; all keep every tone except Atkinson, which drops a quarter of the error, so highlights and
     /// shadows go clean and the contrast is higher). The rest are ordered: a repeating matrix of thresholds decides each
@@ -164,8 +167,8 @@ pub struct Params {
     #[param(default = FloydSteinberg)]
     pub method: Method,
     /// Scan odd rows right to left, with the kernel mirrored, so the grain does not slant one way (`floyd_steinberg`,
-    /// 'atkinson', `jarvis_judice_ninke`, 'stucki', 'burkes', 'sierra', `sierra_two_row`, `sierra_lite` and
-    /// `stevenson_arce`; the other methods have no scan direction). Off, every row is scanned left to right.
+    /// 'atkinson', `jarvis_judice_ninke`, 'stucki', 'burkes', 'sierra', `sierra_two_row`, `sierra_lite`,
+    /// `stevenson_arce` and `ostromoukhov`; the other methods have no scan direction). Off, every row is scanned left to right.
     #[param(default = false)]
     pub serpentine: bool,
     /// With method 'matrix': the picture whose grey values are the thresholds, the path of an image file in a recipe file
@@ -407,6 +410,7 @@ fn pattern(
         Method::SierraTwoRow => by(&SIERRA_TWO_ROW),
         Method::SierraLite => by(&SIERRA_LITE),
         Method::StevensonArce => by(&STEVENSON_ARCE),
+        Method::Ostromoukhov => by(&OSTROMOUKHOV),
         Method::Bayer2 => tiled(Tile::Bayer2),
         Method::Bayer4 => tiled(Tile::Bayer4),
         Method::Bayer => tiled(Tile::Bayer),

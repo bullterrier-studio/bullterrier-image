@@ -1028,7 +1028,12 @@ fn a_serpentine_row_is_the_plain_scan_of_that_row_turned_round() -> Result<(), E
     let width = row.len();
     let mut pure_row = vec![0.0; width];
     pure_row[3] = 1.0;
-    for method in [Method::FloydSteinberg, Method::JarvisJudiceNinke, Method::StevensonArce] {
+    for method in [
+        Method::FloydSteinberg,
+        Method::JarvisJudiceNinke,
+        Method::StevensonArce,
+        Method::Ostromoukhov,
+    ] {
         let plain = ink(method, 1.0);
         let turned = Params {
             serpentine: true,
@@ -1059,6 +1064,7 @@ fn serpentine_changes_every_diffusion_method_and_no_ordered_one() -> Result<(), 
         Method::SierraTwoRow,
         Method::SierraLite,
         Method::StevensonArce,
+        Method::Ostromoukhov,
     ];
     for method in diffusion.into_iter().chain([Method::Bayer, Method::BlueNoise]) {
         let plain = ink(method, 1.0);
@@ -1068,6 +1074,37 @@ fn serpentine_changes_every_diffusion_method_and_no_ordered_one() -> Result<(), 
         };
         let same = run(&plain, &picture)? == run(&turned, &picture)?;
         assert_eq!(same, !diffusion.contains(&method), "{method:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn ostromoukhov_picks_each_pixels_weights_by_its_level_and_serpentine_turns_them_round() -> Result<(), Error> {
+    // A flat grey of 0.39 (6 x 4; no pixel lands within 1e-3 of the 0.5 threshold), worked pixel by pixel in exact
+    // fractions by a separate script from the paper's appendix table (Ostromoukhov, SIGGRAPH 2001): the weights
+    // (right, below left, below) of the level int(value * 255.9999), turned about 127 for levels above it, over their
+    // sum, the value including the error passed to the pixel. It differs from Floyd-Steinberg's picture of the same grey.
+    let picture = greys(&[0.39; 24], 6);
+    let plain = ink(Method::Ostromoukhov, 1.0);
+    let turned = Params {
+        serpentine: true,
+        ..plain.clone()
+    };
+    assert_eq!(bits(&run(&plain, &picture)?, 6), "010010 010101 010010 010100");
+    assert_eq!(bits(&run(&turned, &picture)?, 6), "010010 001010 010100 010010");
+    Ok(())
+}
+
+#[test]
+fn ostromoukhov_keeps_the_tone_of_a_flat_grey_at_every_level() -> Result<(), Error> {
+    // A 64 x 64 patch in black and white (the counting settings): the share lit stays within 0.01 of the grey (only the
+    // error that falls off the right and bottom edges is lost). The greys sit in every stretch of the table: the
+    // low levels, the key levels near 64 and 127, and the mirrored half above 127.
+    for grey in [0.02, 0.1, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 0.98] {
+        let out = run(&ink(Method::Ostromoukhov, 1.0), &greys(&vec![grey; 64 * 64], 64))?;
+        let lit =
+            f32::from(u16::try_from(reds(&out).iter().filter(|&&red| red > 0.5).count()).unwrap_or(0)) / (64.0 * 64.0);
+        assert!((lit - grey).abs() < 0.01, "grey {grey}: {lit} lit");
     }
     Ok(())
 }
