@@ -8,16 +8,18 @@ the design repository's `dither-and-print.md`.
 
 ## `dither`: methods
 
-Today: `floyd_steinberg`, `atkinson`, `bayer` (8 x 8), `blue_noise`. How the parameters are shaped (one longer `method` list,
-or `method` plus `matrix`) is the batch's decision. How much of the pattern shows is `pattern` already.
+Today: `floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`, `sierra_lite`,
+`stevenson_arce`, `ostromoukhov`, `dot_diffusion`, `riemersma`, `bayer2`, `bayer4`, `bayer` (8 x 8), `clustered`, `clustered_45`,
+`blue_noise`, `white_noise`, `gameboy_camera`, `matrix` (a picture of thresholds), and `serpentine`. One `method` list; how much of
+the pattern shows is `pattern`. Done 2026-11-16, bar the later items below.
 
 | Addition | What it is |
 |---|---|
-| Diffusion kernels | Jarvis-Judice-Ninke, Stucki, Burkes, Sierra, two-row Sierra, Sierra Lite, Stevenson-Arce: each a weight table on the one diffusion path. |
-| `serpentine` | Rows scanned in alternating direction: removes the diagonal worms of diffusion. |
-| Ostromoukhov | Diffusion whose weights change with the tone (Ostromoukhov, 2001): fewer artefacts in mid-tones. |
-| Dot diffusion | Error passed in the order of a class matrix (Knuth, 1987): parallel, no worms. Built with Knuth's matrix; later: the Guo-Liu and Mese-Vaidyanathan class matrices. |
-| Riemersma | Diffusion along a space-filling curve with a short error memory. Built along the Hilbert curve; later: the Peano curve. |
+| ~~Diffusion kernels~~ **Done** (2026-11-16) | Jarvis-Judice-Ninke, Stucki, Burkes, Sierra, two-row Sierra, Sierra Lite, Stevenson-Arce: each a weight table on the one diffusion path. |
+| ~~`serpentine`~~ **Done** (2026-11-16) | Rows scanned in alternating direction: removes the diagonal worms of diffusion. |
+| ~~Ostromoukhov~~ **Done** (2026-11-16) | Diffusion whose weights change with the tone (Ostromoukhov, 2001): fewer artefacts in mid-tones. |
+| Dot diffusion | Error passed in the order of a class matrix (Knuth, 1987): parallel, no worms. **Done** (2026-11-16) with the class matrix quoted in Knuth's 1987 paper (his program `dot-diff.w` builds a variant differing in about 20 cells); later: the Guo-Liu and Mese-Vaidyanathan class matrices. |
+| Riemersma | Diffusion along a space-filling curve with a short error memory. **Done** (2026-11-16) along the Hilbert curve; later: the Peano curve. |
 | Camera four-shade set | The Game Boy Camera's three thresholds per cell (four shades from one matrix, at its sixteen contrast settings). `gameboy_camera` uses the cell order only, as a black-and-white matrix. |
 
 ## `dither`: modes
@@ -90,7 +92,7 @@ It gives data; drawing the boxes is vector's and scene's, following them over a 
 
 ## Order
 
-1. `dither` methods and matrices; `serpentine`.
+1. ~~`dither` methods and matrices; `serpentine`.~~ **Done** (2026-11-16); open: Guo-Liu and Mese matrices, Peano curve, the four-shade camera set.
 2. `halftone` dot shapes, screen geometry, RGB separation, print realism.
 3. `modulation`, `stipple`, `crosshatch`, `engraving`; attribute cells, pattern tiles, `phase`.
 4. Presets: gradient maps, palettes as data, tone curves.

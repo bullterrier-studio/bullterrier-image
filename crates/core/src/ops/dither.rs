@@ -363,7 +363,7 @@ pub(crate) fn diffuse(
     let mut chosen = vec![0; height * width];
     let fixed_scale = amount / kernel.divisor;
     for row in 0..height {
-        let backwards = serpentine && row % 2 == 1; // constant: odd rows are the ones turned back
+        let backwards = serpentine && row % 2 == 1;
         for step in 0..width {
             let column = if backwards { width - 1 - step } else { step };
             let at = (row % ROWS_ALIVE) * stride + REACH + column;
@@ -430,8 +430,8 @@ pub(crate) fn dot_diffusion(
                 let (pick, miss) = settle(value, palette);
                 chosen[row * width + column] = pick;
                 // the higher-class neighbours inside the picture, with their weights
-                let mut heirs = [(0_usize, 0_usize, 0.0_f32); 8]; // constant: a pixel has eight neighbours
-                let mut count = 0; // constant: no heir found yet
+                let mut heirs = [(0_usize, 0_usize, 0.0_f32); 8]; // constant: structural, a pixel has eight neighbours, not tunable
+                let mut count = 0; // constant: structural, a counter that starts empty, not tunable
                 for (down, right) in [
                     (-1, -1),
                     (-1, 0),
@@ -486,7 +486,7 @@ fn hilbert(extent: usize, step: usize) -> (usize, usize) {
         }
         x += span * right;
         y += span * down;
-        left /= 4; // constant: a Hilbert curve's step is in base 4
+        left /= 4; // constant: structural, a Hilbert curve divides by four per level, not tunable
         span *= 2;
     }
     (y, x)
