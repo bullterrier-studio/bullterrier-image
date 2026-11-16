@@ -189,7 +189,7 @@ fn ellipse_value(aspect: f32, du: f32, dv: f32) -> f32 {
 /// its complement are the same screen half a cell on.
 fn euclidean_value(du: f32, dv: f32) -> f32 {
     use std::f32::consts::{FRAC_1_PI, TAU};
-    let s = ((TAU * du).cos() + (TAU * dv).cos()) / 2.0; // constant: the mean of two cosines, a period a cell
+    let s = f32::midpoint((TAU * du).cos(), (TAU * dv).cos()); // constant: a period a cell
     if s >= 0.0 {
         (1.0 - s).sqrt() * FRAC_1_PI
     } else {
