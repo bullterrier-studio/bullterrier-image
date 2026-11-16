@@ -1223,3 +1223,13 @@ fn riemersma_walks_a_two_by_two_picture_along_the_hilbert_curve() -> Result<(), 
     assert_eq!(bits(&out, 2), "10 01");
     Ok(())
 }
+
+#[test]
+fn riemersma_weighs_older_errors_less_by_a_steady_factor_down_to_a_sixteenth() -> Result<(), Error> {
+    // The picture 0.7 0.1 / 0.95 0.7 along the same curve, (0,0) 0.7 white, error -0.3; (1,0) 0.95 - 0.3 = 0.65 white,
+    // error -0.05; (1,1) 0.7 - 0.05 - 0.3 x 0.8313 = 0.4006 black, error 0.7; (0,1) 0.1 + 0.7 - 0.05 x 0.8313 - 0.3 x 0.6911
+    // = 0.5511 white. Errors weighed alike (1, 1, 1) would give 0.1 + 0.7 - 0.05 - 0.3 = 0.45, black.
+    let out = run(&ink(Method::Riemersma, 1.0), &greys(&[0.7, 0.1, 0.95, 0.7], 2))?;
+    assert_eq!(bits(&out, 2), "11 10");
+    Ok(())
+}
