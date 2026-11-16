@@ -2430,6 +2430,39 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     ...
 
 @_effect
+def modulation(*, angle: float = 0.0, spacing: float = 8.0, dash: float = 4.0, thickness: float = 0.5, color: str | list[float] | tuple[float, float, float] = '#000000', paper: str | list[float] | tuple[float, float, float] = '#ffffff', sway: float = 0.0, wavelength: float = 60.0, weave: bool = False, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """Rows of dashes whose length carries tone.  Rows `spacing` px apart run `angle` degrees below the x axis; each is cut into cells `dash` px long, a cell as wide as the spacing. A cell takes the mean darkness of the picture under it (how far its luminance lies from the `paper`'s towards the `color`'s), and the row is dithered along its length: error is carried from cell to cell, so a dash is inked where the carried tone reaches a half and the rest goes on. Neighbouring inked cells join into one longer dash. A dash is `thickness` of the spacing wide, so ink covers that share of a cell at most: a tone up to `thickness` is kept exactly (the mean ink is the tone), a darker one prints at `thickness` and no darker. `sway` bends the rows into waves of `wavelength` px, and `weave` carries the error the other way along every second row.
+
+Parameters
+----------
+angle : number (cyclic), degrees, 0 to 360, default 0.0
+    Direction of the rows in degrees, clockwise on screen from the x axis (90 is
+    downward). The rows are anchored at the picture's top left corner.
+spacing : number, px, 2 to 100, default 8.0
+    Distance between rows in px. Larger = fewer, coarser rows.
+dash : number, px, 1 to 100, default 4.0
+    Length of a cell along its row in px: the finest dash, and the grain of the tone
+    along a row.
+thickness : number, fraction, 0.05 to 1, default 0.5
+    Width of a dash as a share of `spacing`, and the darkest tone the rows can print:
+    0.5 = half the paper shows between rows even in the darkest areas.
+color : colour, default '#000000'
+    The ink.
+paper : colour, default '#ffffff'
+    The paper between dashes. Tones darker than it get ink.
+
+Advanced parameters
+-------------------
+sway : number, px, 0 to 100, default 0.0
+    How far a row swings to either side of its line, in px: 0 = straight rows.
+wavelength : number, px, 4 to 1000, default 60.0
+    With a `sway`: the distance along a row between two crests, in px.
+weave : true or false, default False
+    Carries the error from the far end along every second row, so that neighbouring rows
+    do not run in step."""
+    ...
+
+@_effect
 def motion_blur(*, angle: float = 0.0, length: float | Drive = 24.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would.  Every pixel becomes the average of the picture along that line, each colour channel on its own, so flat areas stay flat, the mean is kept and the result never leaves the picture's own range. The cost hardly grows with the length.
 

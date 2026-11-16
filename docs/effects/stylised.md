@@ -10,6 +10,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | <img src="../gallery/edges.jpg" width="160" alt="edges"> | `edges` | Edge detection and sketch ink lines in `color` on `background`, by Sobel, Canny or difference of Gaussians. | `method='canny'` `radius=1.5` `threshold=0.1` `softness=0.5` `color='#ffffff'` `background='#000000'` +2 advanced | [edges.toml](../../examples/effects/edges.toml) |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | A print-style dot screen: tone becomes dot size. | `screen='grid'` `shape='dot'` `separation='none'` `cell=14.0` `angle=45.0` `paper='#000000'` `sigma=0.5` `feather=1.0` +20 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
 | <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` +2 advanced | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
+| <img src="../gallery/modulation.jpg" width="160" alt="modulation"> | `modulation` | Rows of dashes whose length carries tone. | `angle=0.0` `spacing=8.0` `dash=4.0` `thickness=0.5` `color='#000000'` `paper='#ffffff'` +3 advanced | [modulation.toml](../../examples/effects/modulation.toml) |
 | <img src="../gallery/quadtree.jpg" width="160" alt="quadtree"> | `quadtree` | Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges. | `threshold=0.06` `max_cell=60.0` `min_cell=5.0` `gap=1.0` `gap_color='#000000'` `rounding=0.0` | [quadtree.toml](../../examples/effects/quadtree.toml) |
 | <img src="../gallery/reaction_diffusion.jpg" width="160" alt="reaction_diffusion"> | `reaction_diffusion` | Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts. | `feed=0.037` `kill=0.06` `steps=300` `cell=8.0` `threshold=0.6` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [reaction_diffusion.toml](../../examples/effects/reaction_diffusion.toml) |
 | <img src="../gallery/seams.jpg" width="160" alt="seams"> | `seams` | Draw a solid line or band along every border between the pieces of a partition. | `width=2.0` `color='#ffffff'` | [seams.toml](../../examples/effects/seams.toml) |
@@ -141,6 +142,27 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- | --- | --- | --- | --- |
 | `truncate` | number | ratio | 1 to 10 | `4.0` | Where the smoothing Gaussian is cut off, in sigmas (only matters when `smoothing` > 0). Larger is more exact and slower. |
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so a tileable picture polishes without a seam). |
+
+</details>
+
+### `modulation`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `0.0` | Direction of the rows in degrees, clockwise on screen from the x axis (90 is downward). The rows are anchored at the picture's top left corner. |
+| `spacing` | number | px | 2 to 100 | `8.0` | Distance between rows in px. Larger = fewer, coarser rows. |
+| `dash` | number | px | 1 to 100 | `4.0` | Length of a cell along its row in px: the finest dash, and the grain of the tone along a row. |
+| `thickness` | number | fraction | 0.05 to 1 | `0.5` | Width of a dash as a share of `spacing`, and the darkest tone the rows can print: 0.5 = half the paper shows between rows even in the darkest areas. |
+| `color` | colour |  |  | `'#000000'` | The ink. |
+| `paper` | colour |  |  | `'#ffffff'` | The paper between dashes. Tones darker than it get ink. |
+
+<details><summary>Advanced parameters (3)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `sway` | number | px | 0 to 100 | `0.0` | How far a row swings to either side of its line, in px: 0 = straight rows. |
+| `wavelength` | number | px | 4 to 1000 | `60.0` | With a `sway`: the distance along a row between two crests, in px. |
+| `weave` | true or false |  |  | `False` | Carries the error from the far end along every second row, so that neighbouring rows do not run in step. |
 
 </details>
 
