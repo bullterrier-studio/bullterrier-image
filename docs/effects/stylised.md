@@ -6,6 +6,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 
 | Example | Effect | What it does | Parameters | Recipe |
 | --- | --- | --- | --- | --- |
+| <img src="../gallery/crosshatch.jpg" width="160" alt="crosshatch"> | `crosshatch` | Layers of straight lines whose weight carries tone: pen hatching in ink on paper. | `layers=4` `angle=45.0` `spacing=6.0` `thickness=0.5` `color='#000000'` `paper='#ffffff'` | [crosshatch.toml](../../examples/effects/crosshatch.toml) |
 | <img src="../gallery/dither.jpg" width="160" alt="dither"> | `dither` | Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`. | `method='floyd_steinberg'` `serpentine=False` `matrix=None` `tiles=None` `phase=0.0` `block=0` `block_height=8` `block_group=0` `palette='photo'` `custom=('#000000', '#ffffff')` `colors=8` `cell=0.0` `pattern=1.0` `separation='none'` `inks=('#ff4d6d', '#2b59ff')` `paper='#ffffff'` `offset=0.0` `offset_angle=0.0` +10 advanced | [dither.toml](../../examples/effects/dither.toml) |
 | <img src="../gallery/edges.jpg" width="160" alt="edges"> | `edges` | Edge detection and sketch ink lines in `color` on `background`, by Sobel, Canny or difference of Gaussians. | `method='canny'` `radius=1.5` `threshold=0.1` `softness=0.5` `color='#ffffff'` `background='#000000'` +2 advanced | [edges.toml](../../examples/effects/edges.toml) |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | A print-style dot screen: tone becomes dot size. | `screen='grid'` `shape='dot'` `separation='none'` `cell=14.0` `angle=45.0` `paper='#000000'` `sigma=0.5` `feather=1.0` +20 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
@@ -15,6 +16,17 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | <img src="../gallery/reaction_diffusion.jpg" width="160" alt="reaction_diffusion"> | `reaction_diffusion` | Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts. | `feed=0.037` `kill=0.06` `steps=300` `cell=8.0` `threshold=0.6` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [reaction_diffusion.toml](../../examples/effects/reaction_diffusion.toml) |
 | <img src="../gallery/seams.jpg" width="160" alt="seams"> | `seams` | Draw a solid line or band along every border between the pieces of a partition. | `width=2.0` `color='#ffffff'` | [seams.toml](../../examples/effects/seams.toml) |
 | <img src="../gallery/topographic.jpg" width="160" alt="topographic"> | `topographic` | Draw contour lines where the smoothed `field` crosses `levels` evenly spaced heights. | `field='light'` `levels=8` `thickness=1.5` `line='#ffffff'` `fill='none'` `colors=('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` `smoothing=5.0` +2 advanced | [topographic.toml](../../examples/effects/topographic.toml) |
+
+### `crosshatch`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `layers` | whole number | count | 1 to 6 | `4` | How many families of lines: 1 = one direction, more = a crossed net in the darks. More layers print darker tones. |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `45.0` | Direction of the first layer in degrees, clockwise on screen from the x axis (90 is downward). |
+| `spacing` | number | px | 2 to 100 | `6.0` | Distance between neighbouring lines of a layer in px. Larger = fewer, coarser lines. |
+| `thickness` | number | fraction | 0.05 to 1 | `0.5` | The widest a line gets, as a share of `spacing`: the darkest tone one layer can print (a tone beyond it is left to the next layers). Smaller = finer lines and more layers needed for the darks. |
+| `color` | colour |  |  | `'#000000'` | The ink. |
+| `paper` | colour |  |  | `'#ffffff'` | The paper between lines. Tones darker than it get ink. |
 
 ### `dither`
 
