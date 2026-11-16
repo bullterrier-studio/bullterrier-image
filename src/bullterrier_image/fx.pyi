@@ -1650,11 +1650,19 @@ noise : Plain sensor noise: independent colour speckle of the same strength in s
     ...
 
 @_effect
-def halftone(*, shape: Literal['dot', 'line', 'square', 'ellipse', 'diamond', 'euclidean', 'matrix'] = 'dot', aspect: float = 1.0, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, separation: Literal['none', 'cmyk', 'spot', 'rgb'] = 'none', cell: float = 14.0, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), offset: float = 0.0, offset_angle: float = 0.0, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+def halftone(*, screen: Literal['grid', 'wave', 'rings', 'spiral', 'rays'] = 'grid', x: float = 0.5, y: float = 0.5, amplitude: float = 1.0, wavelength: float = 6.0, shape: Literal['dot', 'line', 'square', 'ellipse', 'diamond', 'euclidean', 'matrix'] = 'dot', aspect: float = 1.0, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, separation: Literal['none', 'cmyk', 'spot', 'rgb'] = 'none', cell: float = 14.0, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), offset: float = 0.0, offset_angle: float = 0.0, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A print-style dot screen: tone becomes dot size.  A rotated square grid of dots, `cell` px apart, turned `angle` degrees. Each dot looks up the picture, blurred by a Gaussian of `sigma` cells, at its centre, and is as large as the ink that tone needs: the area of a dot is proportional to the ink, so the screen keeps the picture's tones: dots touch at about 78.5 % tone and fill their cell at full tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The dot's edge is a ramp `feather` px wide, centred on its radius and faded in with the dot so that a dot narrower than the ramp prints about its own area (and paper between dots narrower than it fades out, so near-full tones fill), and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.  `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink (a line as wide as `cell` fills it), so the screen keeps the tones the same way; 'square', 'ellipse', 'diamond', 'euclidean' and 'matrix' are other marks that fill their cell the same way, as large as the ink needs. `separation` prints several inks, each its own screen, subtractively over `paper` ('rgb' adds light instead; inks overlap like transparent layers, so use a light `paper`, as the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0 and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four colours), finding how much of each makes the photo's colour (the nearest in optical density), with the screens `angle` + 30 degrees apart (45, 75, 105, 135 by default); 'rgb' adds red, green and blue light on black, one screen per channel (as large as the channel's value), at 15, 45 and 75 degrees added to `angle`, white where all three are full, and ignores `paper`. `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`. `offset` px moves the second ink's screen that far from the first along `offset_angle`, the third twice as far and the fourth three times, as a misregistered press does.
 
 Parameters
 ----------
+screen : one of 'grid', 'wave', 'rings', 'spiral', 'rays', default 'grid'
+    How the rows of the screen run: 'grid' (straight, as the angle sets), 'wave' (each
+    row a sine of `wavelength` cells and `amplitude` cells high), 'rings' (round the
+    centre `x`, `y`), 'spiral' (an Archimedean spiral about it, a cell more each turn)
+    or 'rays' (straight out from it, as many as make a cell about as wide as `cell` half
+    way to the nearest edge, wider beyond and narrower within). With shape 'line' these
+    are wavy lines, rings, a spiral and a sunburst; `angle` turns them. Every setting
+    keeps the tone as a grid does.
 shape : one of 'dot', 'line', 'square', 'ellipse', 'diamond', 'euclidean', 'matrix', default 'dot'
     What a mark is: 'dot' (round), 'square', 'ellipse' (its axes in the ratio `aspect`),
     'diamond' (a square turned 45 degrees), 'euclidean' (round in highlights, a diamond
@@ -1712,6 +1720,18 @@ feather : number, px, 0.1 to 50, default 1.0
 
 Advanced parameters
 -------------------
+x : number, fraction, 0 to 1, default 0.5
+    With screen 'rings', 'spiral' or 'rays': the centre's horizontal position as a
+    fraction of the way across the picture: 0 = the first pixel column, 0.5 = the
+    middle, 1 = the last. Ignored with 'grid' and 'wave'.
+y : number, fraction, 0 to 1, default 0.5
+    With screen 'rings', 'spiral' or 'rays': the centre's vertical position as a
+    fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 =
+    the last. Ignored with 'grid' and 'wave'.
+amplitude : number, ratio, 0 to 10, default 1.0
+    With screen 'wave': how far each row swings to either side, in cells; 0 = a grid.
+wavelength : number, ratio, 1 to 100, default 6.0
+    With screen 'wave': the distance along a row between two crests, in cells.
 aspect : number, ratio, 1 to 8, default 1.0
     With shape 'ellipse': the ratio of the ellipse's long axis (along the screen's rows)
     to its short one; 1 = a round dot. The area stays the tone's. Ignored with any other

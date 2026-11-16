@@ -163,6 +163,28 @@ fn conditional() -> Vec<Conditional> {
             field: "matrix",
             with: vec![("shape", json!("matrix"))],
         },
+        // the screen is a grid at the defaults: its centre is read only by the screens that turn about one, its swing and
+        // its length only by the wave
+        Conditional {
+            effect: "halftone",
+            field: "x",
+            with: vec![("screen", json!("rings"))],
+        },
+        Conditional {
+            effect: "halftone",
+            field: "y",
+            with: vec![("screen", json!("rings"))],
+        },
+        Conditional {
+            effect: "halftone",
+            field: "amplitude",
+            with: vec![("screen", json!("wave"))],
+        },
+        Conditional {
+            effect: "halftone",
+            field: "wavelength",
+            with: vec![("screen", json!("wave"))],
+        },
         // a table that is none is the identity, which the amount mixes in without change
         Conditional {
             effect: "lut",

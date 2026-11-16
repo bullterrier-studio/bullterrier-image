@@ -11,7 +11,7 @@
 
 use std::f32::consts::PI;
 
-use bullterrier_image::effects::halftone::{Params, Separation, Shape};
+use bullterrier_image::effects::halftone::{Params, Screen, Separation, Shape};
 use bullterrier_image::params::{Color, Declared, PictureName};
 use bullterrier_image::{EdgeOrConstant, Error, Image, Inputs, Picture, apply};
 use serde_json::Value;
@@ -1455,6 +1455,173 @@ fn the_ink_of_every_shape_reaches_a_full_tone_without_a_jump() -> Result<(), Err
                 "{shape:?} {cell} {angle}: {almost} at 0.9999, {full} at 1"
             );
         }
+    }
+    Ok(())
+}
+
+// --- screen geometry --------------------------------------------------------------------------------------------------
+
+/// The oracle's lines on the screen `screen`, a picture of `side` x `side` px (odd, so that the centre is a pixel).
+fn bent(screen: Screen, shape: Shape) -> Params {
+    Params {
+        screen,
+        ..oracle(shape)
+    }
+}
+
+fn varied_grey(side: usize) -> Vec<f32> {
+    varied(side, side)
+}
+
+#[test]
+fn a_wave_of_no_amplitude_is_the_grid() -> Result<(), Error> {
+    let values = varied_grey(61);
+    for angle in [0.0, 30.0] {
+        let grid = Params {
+            angle,
+            ..Params::default()
+        };
+        let wave = Params {
+            screen: Screen::Wave,
+            amplitude: 0.0,
+            ..grid.clone()
+        };
+        assert_eq!(
+            first_difference(
+                &run_picture(&grid, 61, 61, &values)?,
+                &run_picture(&wave, 61, 61, &values)?
+            ),
+            None,
+            "angle {angle}"
+        );
+    }
+    let swung = Params {
+        screen: Screen::Wave,
+        ..Params::default()
+    };
+    assert!(
+        first_difference(
+            &run_picture(&swung, 61, 61, &values)?,
+            &run_picture(&Params::default(), 61, 61, &values)?
+        )
+        .is_some()
+    );
+    Ok(())
+}
+
+/// The mean ink of the flat grey whose ink is `tone` over the pixels `inside` (their offset from the centre pixel, in px).
+fn ink_where(params: &Params, side: usize, tone: f32, inside: impl Fn(f32, f32) -> bool) -> Result<f32, Error> {
+    let out = red(params, side, side, &flat(side, side, 1.0 - tone))?;
+    let middle = (side / 2) as f32;
+    let (mut sum, mut count) = (0.0, 0.0);
+    for (index, value) in out.iter().enumerate() {
+        let (dx, dy) = ((index % side) as f32 - middle, (index / side) as f32 - middle);
+        if inside(dx, dy) {
+            sum += 1.0 - value;
+            count += 1.0;
+        }
+    }
+    Ok(sum / count)
+}
+
+/// Every geometry keeps the tone, as the grid does. Oracle: cell 20, feather 1, sigma 0, black on white, flat greys. With
+/// lines, the ink at a place is the share of the line's offset (the distance across a row, `v`) that is inked, and `v` is
+/// uniform over a row: over one period of a wave's rows (a whole picture of 12 cells high), a ring (each ring's cell is a
+/// ring), every circle of a spiral (`v = r - angle / 2 pi` is uniform round a circle) and every circle of rays (the angle
+/// alone sets the ink) that share is the tone, at any radius: so an annulus of whole cells, 5 to 9 cells out, where the
+/// cells are regular, holds the tone to within the edges' curvature: measured at most 0.0005 for lines and 0.0016 for dots (a wedge is wider than a cell by up to
+/// 1/(4 pi r) of it), bound 0.004, half the grid's 0.008, which a wave's dots need (a sheared dot's edge is longer: measured 0.0054). Near the centre the
+/// cells are wedges narrower than a pixel, which no pixel count measures.
+#[test]
+fn every_screen_geometry_keeps_the_tone() -> Result<(), Error> {
+    let side = 401; // the centre is the pixel 200; an annulus of 5 to 9 cells is within 180 px of it
+    let annulus = |dx: f32, dy: f32| (100.0..180.0).contains(&dx.hypot(dy));
+    for (name, screen) in [
+        ("rings", Screen::Rings),
+        ("spiral", Screen::Spiral),
+        ("rays", Screen::Rays),
+    ] {
+        for tone in [0.1, 0.25, 0.5, 0.75, 0.9] {
+            for shape in [Shape::Line, Shape::Dot] {
+                let ink = ink_where(&bent(screen, shape), side, tone, annulus)?;
+                assert!((ink - tone).abs() < 0.004, "{name} {shape:?} tone {tone}: ink {ink}");
+            }
+        }
+    }
+    // a wave's rows, over 240 rows of 12 whole periods
+    for tone in [0.1, 0.25, 0.5, 0.75, 0.9] {
+        for shape in [Shape::Line, Shape::Dot] {
+            let params = Params {
+                amplitude: 2.0,
+                wavelength: 7.0,
+                ..bent(Screen::Wave, shape)
+            };
+            let ink = ink_where(&params, 241, tone, |_, dy| dy.abs() < 120.0)?;
+            assert!((ink - tone).abs() < 0.008, "wave {shape:?} tone {tone}: ink {ink}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_rings_of_a_half_turn_about_their_centre_are_the_rings() -> Result<(), Error> {
+    let side = 201;
+    for shape in [Shape::Dot, Shape::Line] {
+        let params = Params {
+            x: 0.5,
+            y: 0.5,
+            ..bent(Screen::Rings, shape)
+        };
+        let out = red(&params, side, side, &flat(side, side, 0.7))?;
+        let turned: Vec<f32> = out.iter().rev().copied().collect();
+        // every pixel but those on a cell's edge, which a rounding may put in either cell: a few of a thousand
+        let different = out
+            .iter()
+            .zip(&turned)
+            .filter(|(one, other)| (*one - *other).abs() > 0.1)
+            .count();
+        assert!(
+            different * 200 < out.len(),
+            "{shape:?}: {different} of {} pixels differ",
+            out.len()
+        );
+        // and a screen that is not round differs: rings about another centre do not turn onto themselves
+        let moved = red(&Params { x: 0.3, ..params }, side, side, &flat(side, side, 0.7))?;
+        let moved_turned: Vec<f32> = moved.iter().rev().copied().collect();
+        let apart = moved
+            .iter()
+            .zip(&moved_turned)
+            .filter(|(one, other)| (*one - *other).abs() > 0.1)
+            .count();
+        assert!(apart * 20 > moved.len(), "{shape:?}: only {apart} pixels differ");
+    }
+    Ok(())
+}
+
+#[test]
+fn the_lines_of_rays_meet_at_the_centre() -> Result<(), Error> {
+    let side = 201;
+    let params = Params {
+        x: 0.5,
+        y: 0.5,
+        ..bent(Screen::Rays, Shape::Line)
+    };
+    let out = red(&params, side, side, &flat(side, side, 0.5))?;
+    let ink = |dx: f32, dy: f32| 1.0 - out[(100.0 + dy).round() as usize * side + (100.0 + dx).round() as usize];
+    // the cells are 20 px wide half way to the nearest edge (5.025 cells): 2 round(pi 5.025) = 32 rays, 11.25 degrees apart
+    let step = std::f32::consts::TAU / 32.0;
+    for ray in [0, 5, 11, 22, 27] {
+        let angle = (ray as f32 + 0.5) * step;
+        // the ray along the middle of a wedge, and the one opposite, are lines through the centre
+        for turn in [0.0, PI] {
+            for radius in [30.0, 60.0, 90.0] {
+                let (dx, dy) = ((angle + turn).cos() * radius, (angle + turn).sin() * radius);
+                assert!(ink(dx, dy) > 0.5, "ray {ray} turn {turn} at {radius}: {}", ink(dx, dy));
+            }
+        }
+        // between two rays the paper shows
+        let (dx, dy) = ((angle + step / 2.0).cos() * 60.0, (angle + step / 2.0).sin() * 60.0);
+        assert!(ink(dx, dy) < 0.5, "between rays {ray}: {}", ink(dx, dy));
     }
     Ok(())
 }

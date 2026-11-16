@@ -505,3 +505,43 @@ fn a_halftone_of_a_fractional_cell_gives_the_rows_of_the_whole_render_from_a_win
     }
     Ok(())
 }
+
+/// A halftone whose screen is bent about a centre on the canvas, which lies in a later band than the first, gives the rows of
+/// the whole render from a window: the centre is a fraction of the canvas, not of the band's picture.
+#[test]
+fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
+    let values = varied(SMALL.height, SMALL.width);
+    // the centre, at row 104 of 131 and column 5 of 19, lies in the last band of every cut but the whole
+    let at = |screen: &str| {
+        Recipe::new([Step::new("halftone")
+            .param("screen", screen)
+            .param("cell", 4.5)
+            .param("sigma", 0.4)
+            .param("amplitude", 1.5)
+            .param("wavelength", 4.0)
+            .param("x", 0.3)
+            .param("y", 0.8)])
+    };
+    for screen in ["wave", "rings", "spiral"] {
+        let recipe = at(screen);
+        let margin = recipe
+            .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
+            .ok_or("this halftone is banded")?;
+        assert_eq!(
+            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+            None,
+            "{screen}"
+        );
+    }
+    // rays widen with the distance from the centre, so a pixel may read from anywhere: no band is cleared ...
+    let recipe = at("rays");
+    assert_eq!(recipe.band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?, None);
+    // ... and the rays themselves, which a flat picture shows, are the same from a band that holds no more than its rows
+    let flat = vec![0.4; SMALL.height * SMALL.width * 3];
+    assert_eq!(
+        first_problem(SMALL, &flat, &recipe, 0, 0.0, Options::default())?,
+        None,
+        "rays"
+    );
+    Ok(())
+}

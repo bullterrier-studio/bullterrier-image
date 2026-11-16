@@ -9,11 +9,11 @@ use crate::ops::cast;
 use crate::ops::color::{luminance, vivid};
 use crate::ops::dither::{check_matrix, matrix_greys};
 use crate::ops::edge::EdgeOrConstant;
-use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, RGB_SCREEN_ANGLES, SPOT_SCREEN_STEP, Spot, shift};
+use crate::ops::inks::{CMYK_SCREEN_ANGLES, Geometry, Inks, MOST_INKS, RGB_SCREEN_ANGLES, SPOT_SCREEN_STEP, Spot, shift};
 use crate::ops::length::{float, whole};
 use crate::ops::par;
 use crate::params::{Choice, Color, Params, PictureName};
-use crate::{Error, Image, Inputs, Picture};
+use crate::{Error, Image, Inputs, Picture, Place};
 
 /// Where `halftone` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -36,15 +36,26 @@ pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
 /// What `halftone` reads around a pixel: the grid of dots is anchored at the picture's corner, so a row is not the same
 /// in another frame of reference.
 pub(crate) fn footprint(params: &Params) -> Footprint {
-    // A pixel shows the tone at the centre of its screen cell, at most half a cell diagonal away, and the tone is the
+    // A pixel shows the tone at the centre of its screen cell, at most `far` cells away, and the tone is the
     // blur of the picture there, which reaches `int(truncate x sigma x cell + 0.5)` pixels. `cell` is a length in working px, whole or not.
     // Half a pixel for rounding the centre to a pixel and half for the blur's `+ 0.5`; the margin adds the
     // interpolation rows.
     const HALF_DIAGONAL: f64 = std::f64::consts::FRAC_1_SQRT_2; // constant: a cell's corner is this many cells from its centre
+    // `far`: a grid's cell is half a diagonal across; a wave's pixel and cell centre are a sine apart besides, at most twice the
+    // amplitude; a ring's wedge and a spiral's cell, which are about a cell long and wide, measured over a million random
+    // places at three sizes, are at most 0.74 and 1.04 away, so the bounds are 1 and 1.5; rays widen with the distance
+    // from the centre, which the footprint does not know, so a ray's pixel may read from anywhere: the whole picture.
+    let far = match params.screen {
+        Screen::Grid => HALF_DIAGONAL,
+        Screen::Wave => HALF_DIAGONAL + 2.0 * f64::from(params.amplitude),
+        Screen::Rings => 1.0,
+        Screen::Spiral => 1.5,
+        Screen::Rays => return Footprint::Whole,
+    };
     let cell = f64::from(params.cell);
     let blur = f64::from(params.truncate) * f64::from(params.sigma);
     Footprint::reach(
-        (HALF_DIAGONAL + blur) * cell + 1.0,
+        (far + blur) * cell + 1.0,
         params.edge == EdgeOrConstant::Wrap && params.sigma > 0.0,
     )
     .transformed(params.sigma > 0.0 && is_fourier(cell * f64::from(params.sigma), f64::from(params.truncate)))
@@ -81,6 +92,27 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
+    /// How the rows of the screen run: 'grid' (straight, as the angle sets), 'wave' (each row a sine of `wavelength` cells
+    /// and `amplitude` cells high), 'rings' (round the centre `x`, `y`), 'spiral' (an Archimedean spiral about it, a cell
+    /// more each turn) or 'rays' (straight out from it, as many as make a cell about as wide as `cell` half way to the
+    /// nearest edge, wider beyond and narrower within). With shape 'line' these are wavy lines, rings, a spiral and a
+    /// sunburst; `angle` turns them. Every setting keeps the tone as a grid does.
+    #[param(default = Grid)]
+    pub screen: Screen,
+    /// With screen 'rings', 'spiral' or 'rays': the centre's horizontal position as a fraction of the way across the
+    /// picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. Ignored with 'grid' and 'wave'.
+    #[param(default = 0.5, unit = fraction, min = 0, max = 1, advanced)]
+    pub x: f32,
+    /// With screen 'rings', 'spiral' or 'rays': the centre's vertical position as a fraction of the way down the picture: 0 =
+    /// the first pixel row, 0.5 = the middle, 1 = the last. Ignored with 'grid' and 'wave'.
+    #[param(default = 0.5, unit = fraction, min = 0, max = 1, advanced)]
+    pub y: f32,
+    /// With screen 'wave': how far each row swings to either side, in cells; 0 = a grid.
+    #[param(default = 1.0, unit = ratio, min = 0, max = 10, advanced)]
+    pub amplitude: f32,
+    /// With screen 'wave': the distance along a row between two crests, in cells.
+    #[param(default = 6.0, unit = ratio, min = 1, max = 100, advanced)]
+    pub wavelength: f32,
     /// What a mark is: 'dot' (round), 'square', 'ellipse' (its axes in the ratio `aspect`), 'diamond' (a square turned 45
     /// degrees), 'euclidean' (round in highlights, a diamond at 50 %, a round hole in shadows), 'matrix' (the spot
     /// function of your picture `matrix`) or 'line' (a line per cell row). Each is as large as the ink needs, so every shape
@@ -163,6 +195,21 @@ pub struct Params {
     pub constant_value: f32,
 }
 
+/// How the rows of the screen run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
+pub enum Screen {
+    /// Straight rows, `angle` below the x axis.
+    Grid,
+    /// Rows swung sideways by a sine of `amplitude` and `wavelength` cells.
+    Wave,
+    /// Rows round the centre `x`, `y`.
+    Rings,
+    /// One row, an Archimedean spiral about the centre, a cell more each turn.
+    Spiral,
+    /// Rows straight out from the centre.
+    Rays,
+}
+
 /// What a mark of the screen is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum Shape {
@@ -196,10 +243,11 @@ pub enum Separation {
 }
 
 /// One ink's screen: the grid turned by an angle and moved from the origin.
-struct Screen {
+struct Turned {
     sin: f32,
     cos: f32,
     shift: [f32; 2],
+    geometry: Geometry,
 }
 
 /// The dot a pixel's screen cell stands for, remembered until the pixel leaves the cell.
@@ -216,8 +264,9 @@ fn pixel(value: f32, last: usize) -> usize {
     whole(f64::from(value)).min(last)
 }
 
-/// The screens of the inks: each turned by `angle` and the ink's own extra angle, and moved by its share of the offset.
-fn screens(params: &Params, count: usize) -> Vec<Screen> {
+/// The screens of the inks: each turned by `angle` and the ink's own extra angle, and moved by its share of the offset. The
+/// centre of the rings, spiral and rays is a fraction of the canvas, not of the band of it a picture may be.
+fn screens(params: &Params, place: Place, count: usize) -> Vec<Turned> {
     (0..count)
         .map(|ink| {
             let extra = match params.separation {
@@ -227,10 +276,31 @@ fn screens(params: &Params, count: usize) -> Vec<Screen> {
                 Separation::Spot => SPOT_SCREEN_STEP * float(ink),
             };
             let turn = (f64::from(params.angle) + extra).rem_euclid(360.0).to_radians(); // constant: a full turn in degrees
-            Screen {
-                sin: cast::single(turn.sin()),
-                cos: cast::single(turn.cos()),
-                shift: shift(params.offset, params.offset_angle, ink),
+            let (sin, cos) = (cast::single(turn.sin()), cast::single(turn.cos()));
+            let shift = shift(params.offset, params.offset_angle, ink);
+            // the centre as a pixel finds its place in the turned grid, in cells
+            let cell = params.cell;
+            let (px, py) = (
+                cast::single(f64::from(params.x) * float(place.canvas_width - 1)) - shift[0],
+                cast::single(f64::from(params.y) * float(place.canvas_height - 1)) - shift[1],
+            );
+            let centre = [(px * cos + py * sin) / cell, (py * cos - px * sin) / cell];
+            let geometry = match params.screen {
+                Screen::Grid => Geometry::Grid,
+                Screen::Wave => Geometry::Wave {
+                    amplitude: params.amplitude,
+                    wavelength: params.wavelength,
+                },
+                Screen::Rings => Geometry::Rings { centre },
+                Screen::Spiral => Geometry::Spiral { centre },
+                // a cell wide half way to the nearest edge of the canvas
+                Screen::Rays => Geometry::rays(centre, cast::single(float(place.canvas_width.min(place.canvas_height)) / 2.0) / cell),
+            };
+            Turned {
+                sin,
+                cos,
+                shift,
+                geometry,
             }
         })
         .collect()
@@ -286,7 +356,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         Separation::Spot => params.inks.len().min(MOST_INKS),
         Separation::Rgb => 3,
     };
-    let screens = screens(params, count);
+    let screens = screens(params, place, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;
     let spot = match params.shape {
         Shape::Dot => Spot::Round,
@@ -321,12 +391,15 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                     let (sin, cos) = (screen.sin, screen.cos);
                     let (px, py) = (x - screen.shift[0], y - screen.shift[1]);
                     // the pixel in the rotated grid, in cells, and the centre of the cell it belongs to
-                    let (u, v) = ((px * cos + py * sin) * inv_cell, (py * cos - px * sin) * inv_cell);
+                    let (u, v) = screen
+                        .geometry
+                        .forward((px * cos + py * sin) * inv_cell, (py * cos - px * sin) * inv_cell);
                     let (cu, cv) = (u.floor() + 0.5, v.floor() + 0.5);
                     if remembered.key != [cu.to_bits(), cv.to_bits()] {
                         // the tone at the centre, mapped back to the picture
-                        let column = pixel((cu * cos - cv * sin) * cell + screen.shift[0], width - 1);
-                        let row = pixel((cu * sin + cv * cos) * cell + screen.shift[1], canvas_last);
+                        let (gu, gv) = screen.geometry.back(cu, cv);
+                        let column = pixel((gu * cos - gv * sin) * cell + screen.shift[0], width - 1);
+                        let row = pixel((gu * sin + gv * cos) * cell + screen.shift[1], canvas_last);
                         // (a picture given fewer rows than the footprint says reads the nearest it has)
                         let row = row.clamp(place.first_row, place.first_row + height - 1) - place.first_row;
                         let sampled = smooth[row * width + column];

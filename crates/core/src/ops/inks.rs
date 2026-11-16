@@ -44,6 +44,91 @@ pub(crate) fn shift(offset: f32, angle: f32, ink: usize) -> [f32; 2] {
     [away * travel.cos(), away * travel.sin()].map(crate::ops::cast::single)
 }
 
+/// How the screen is bent: a map from a place of the turned grid, in cells, to the place the spot screen is laid on, and
+/// back from a cell's centre to the grid place whose tone it stands for. Every pixel of a cell maps into it, so the cells
+/// are the same whatever the map; the centres are in cells of the turned grid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum Geometry {
+    /// No bend.
+    Grid,
+    /// Rows displaced across by `amplitude` cells, a sine of `wavelength` cells along them.
+    Wave { amplitude: f32, wavelength: f32 },
+    /// Rows run round the centre: a cell is a wedge of one ring, `ring_cells` of them to the ring.
+    Rings { centre: [f32; 2] },
+    /// As rings, but the ring is one arm of an Archimedean spiral, a cell wider each turn.
+    Spiral { centre: [f32; 2] },
+    /// Rows run out from the centre: `count` rays, cells a cell long along them.
+    Rays { centre: [f32; 2], count: f32 },
+}
+
+const TURN: f32 = std::f32::consts::TAU;
+
+/// The cells of the ring or spiral arm that lies `radius` cells out on average: about one cell long each, and an even
+/// number so that a half turn maps a cell to a cell.
+fn ring_cells(radius: f32) -> f32 {
+    2.0 * (std::f32::consts::PI * radius).round().max(1.0)
+}
+
+impl Geometry {
+    /// Rays that are one cell wide `radius` cells from the centre (a cell wider or narrower elsewhere).
+    pub(crate) fn rays(centre: [f32; 2], radius: f32) -> Self {
+        Self::Rays {
+            centre,
+            count: ring_cells(radius),
+        }
+    }
+
+    /// The place of the grid place (`u`, `v`) on the screen.
+    pub(crate) fn forward(self, u: f32, v: f32) -> (f32, f32) {
+        match self {
+            Self::Grid => (u, v),
+            Self::Wave { amplitude, wavelength } => (u, v + amplitude * (TURN * u / wavelength).sin()),
+            Self::Rings { centre } => {
+                let (r, turns) = polar(centre, u, v);
+                (turns * ring_cells(r.floor() + 0.5), r)
+            }
+            Self::Spiral { centre } => {
+                let (r, turns) = polar(centre, u, v);
+                let arm = r - turns;
+                (turns * ring_cells(arm_radius(arm.floor())), arm)
+            }
+            Self::Rays { centre, count } => {
+                let (r, turns) = polar(centre, u, v);
+                (r, turns * count)
+            }
+        }
+    }
+
+    /// The grid place of the centre (`cu`, `cv`) of a cell of the screen.
+    pub(crate) fn back(self, cu: f32, cv: f32) -> (f32, f32) {
+        let at = |centre: [f32; 2], radius: f32, turns: f32| {
+            let angle = turns * TURN;
+            (centre[0] + radius * angle.cos(), centre[1] + radius * angle.sin())
+        };
+        match self {
+            Self::Grid => (cu, cv),
+            Self::Wave { amplitude, wavelength } => (cu, cv - amplitude * (TURN * cu / wavelength).sin()),
+            Self::Rings { centre } => at(centre, cv, cu / ring_cells(cv.floor() + 0.5)),
+            Self::Spiral { centre } => {
+                let turns = cu / ring_cells(arm_radius(cv.floor()));
+                at(centre, cv + turns, turns)
+            }
+            Self::Rays { centre, count } => at(centre, cu, cv / count),
+        }
+    }
+}
+
+/// The distance of (`u`, `v`) from `centre` and its angle about it in turns, 0 up to 1 (clockwise on screen from the u axis).
+fn polar(centre: [f32; 2], u: f32, v: f32) -> (f32, f32) {
+    let (du, dv) = (u - centre[0], v - centre[1]);
+    (du.hypot(dv), (dv.atan2(du) / TURN).rem_euclid(1.0))
+}
+
+/// The mean radius of the spiral arm `arm` (0 starts at the centre): one turn lies between `arm` and `arm + 2`.
+fn arm_radius(arm: f32) -> f32 {
+    (arm + 1.0).max(0.5)
+}
+
 /// How exactly the level of a round spot is solved, in cells (a pixel is at least 1/200 of a cell).
 const LEVEL_TOLERANCE: f64 = 1e-6; // constant: far below a pixel at the largest cell, not a look
 
