@@ -8,7 +8,7 @@ use crate::ops::blur::{gaussian_filter, is_fourier};
 use crate::ops::cast;
 use crate::ops::color::{luminance, vivid};
 use crate::ops::edge::EdgeOrConstant;
-use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, RGB_SCREEN_ANGLES, SPOT_SCREEN_STEP, shift};
+use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, RGB_SCREEN_ANGLES, SPOT_SCREEN_STEP, Spot, shift};
 use crate::ops::length::{float, whole};
 use crate::ops::par;
 use crate::params::{Choice, Color, Params};
@@ -47,16 +47,16 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 ///
 /// A rotated square grid of dots, `cell` px apart, turned `angle` degrees. Each dot looks up the picture, blurred by a
 /// Gaussian of `sigma` cells, at its centre, and is as large as the ink that tone needs: the area of a dot is
-/// proportional to the ink, so the screen keeps the picture's tones, dots touch at half tone and fill their cell at full
-/// tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The
+/// proportional to the ink, so the screen keeps the picture's tones: dots touch at about 78.5 % tone and fill their cell at
+/// full tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The
 /// dot's edge is a ramp `feather` px wide, centred on its radius and faded in with the dot so that a dot narrower than
 /// the ramp prints about its own area, and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the
 /// photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.
 ///
 /// `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink
 /// (a line as wide as `cell` fills it), so the screen keeps the tones the same way. `separation` prints several inks,
-/// each its own screen, subtractively over `paper` ('rgb' adds light instead) (inks overlap like transparent layers, so use a light `paper`; the
-/// default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black
+/// each its own screen, subtractively over `paper` ('rgb' adds light instead; inks overlap like transparent layers, so use a light
+/// `paper`, as the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black
 /// generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0
 /// and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four
 /// colours), finding how much of each makes the photo's colour (the nearest in optical density), with the screens
@@ -248,6 +248,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     };
     let screens = screens(params, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;
+    let spot = match params.shape {
+        Shape::Dot => Spot::Round,
+        Shape::Line => Spot::Line,
+    };
     let (inv_cell, inv_feather) = (1.0 / cell, 1.0 / params.feather);
     let mut pixels = vec![[0.0; 3]; height * width];
     par::rows(&mut pixels, width, |first, band| {
@@ -286,15 +290,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                     } else {
                         index
                     }];
-                    // the distance from the mark's centre, and its radius (half its width): a dot's area follows the
-                    // ink and a dot of full ink reaches the corners of its cell; a line of full ink fills its row
-                    let (distance, radius) = match params.shape {
-                        Shape::Dot => (
-                            ((u - cu) * (u - cu) + (v - cv) * (v - cv)).sqrt(),
-                            amount.sqrt() * std::f32::consts::FRAC_1_SQRT_2,
-                        ),
-                        Shape::Line => ((v - cv).abs(), amount * 0.5),
-                    };
+                    // the spot function's value here and its level for the ink: inked where the value is below the level
+                    let (distance, radius) = (spot.value(u - cu, v - cv), spot.level(amount));
                     let fade_in = (radius * cell * 2.0 * inv_feather).min(1.0); // constant: the ramp is half a feather on each side
                     coverages[index] = ((radius - distance) * cell * inv_feather + 0.5).clamp(0.0, 1.0) * fade_in; // constant: the ramp is centred on the edge
                 }

@@ -1,6 +1,5 @@
-//! `halftone`: tone becomes dot size. The oracles are the screen's geometry (a dot's area is its tone times the circle
-//! around its square cell, so the ink per tone of separate dots is pi / 2 of a cell's area), hand-worked colours, and
-//! comparisons between renders that must be alike or must differ.
+//! `halftone`: tone becomes dot size. The oracles are the screen's geometry (every shape keeps the tone: the mean ink of
+//! a flat tone is the tone), hand-worked colours, and comparisons between renders that must be alike or must differ.
 
 #![expect(
     clippy::cast_precision_loss,
@@ -73,29 +72,36 @@ fn white_is_nearly_all_dots_black_is_blank_and_paper_shows_exactly_where_no_ink_
     Ok(())
 }
 
-#[test]
-fn ink_grows_with_tone_and_is_pi_over_two_of_the_cell_per_tone_while_the_dots_stay_apart() -> Result<(), Error> {
-    // angle 0 and a size of whole cells: every dot is alike, so the mean over the picture is that of one cell
+/// The coverage oracle: black ink on white paper, `cell` 20, `feather` 1, no blur, a square screen of whole cells; the mean
+/// ink of the flat grey whose luminance is `1 - tone`. Later shapes reuse it.
+fn coverage(shape: Shape, tone: f32) -> Result<f32, Error> {
     let params = Params {
-        cell: 10,
+        shape,
+        cell: 20,
         angle: 0.0,
-        ..white_on_black()
+        sigma: 0.0,
+        feather: 1.0,
+        ink: Some(Color([0.0; 3])),
+        paper: Color([1.0; 3]),
+        ..Params::default()
     };
-    let tones = [0.0, 0.001, 0.01, 0.05, 0.1, 0.25, 0.45, 0.8, 1.0];
-    let inks: Vec<f32> = tones
-        .iter()
-        .map(|&tone| mean_ink(&params, 40, tone))
-        .collect::<Result<_, _>>()?;
-    assert!(inks[0].abs() < f32::EPSILON);
-    assert!(inks.windows(2).all(|pair| pair[0] < pair[1]), "{inks:?}");
-    // full tone is the circle around the square cell: pi / 2 of its area, so dots touch at half tone and fill the cell
-    for tone in [0.1, 0.25, 0.45] {
-        let ink = mean_ink(&params, 40, tone)?;
-        assert!(
-            (ink / tone - PI / 2.0).abs() < 0.04 * PI / 2.0,
-            "tone {tone}: {}",
-            ink / tone
-        );
+    Ok(1.0 - mean_ink(&params, 80, 1.0 - tone)?)
+}
+
+#[test]
+fn ink_grows_with_tone_and_every_shape_keeps_the_tone() -> Result<(), Error> {
+    for shape in [Shape::Dot, Shape::Line] {
+        let mut last = -1.0;
+        for tone in [0.0, 0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0] {
+            let ink = coverage(shape, tone)?;
+            assert!(ink > last, "{shape:?} {tone}: {ink} after {last}");
+            last = ink;
+        }
+        // the soft edge is centred on the dot's edge, so it keeps the area but for a curve's second-order gain
+        for tone in [0.1, 0.25, 0.5, 0.75, 0.9] {
+            let ink = coverage(shape, tone)?;
+            assert!((ink - tone).abs() < 0.008, "{shape:?} tone {tone}: ink {ink}");
+        }
     }
     Ok(())
 }
@@ -103,7 +109,7 @@ fn ink_grows_with_tone_and_is_pi_over_two_of_the_cell_per_tone_while_the_dots_st
 #[test]
 fn a_dot_prints_about_its_own_area_however_small() -> Result<(), Error> {
     // a soft edge one pixel wide adds at most pi / 12 px^2 to a dot (a linear ramp of width f on a circle's edge adds pi f^2 / 12);
-    // a dot of radius r has the tone 2 (r / cell)^2
+    // a dot of radius r has the tone pi (r / cell)^2
     let cell = 20;
     let params = Params {
         cell: cell as i32,
@@ -111,7 +117,7 @@ fn a_dot_prints_about_its_own_area_however_small() -> Result<(), Error> {
         ..white_on_black()
     };
     for radius in [0.1_f32, 0.25, 0.4, 0.5, 1.0, 2.0, 3.0] {
-        let tone = 2.0 * (radius / cell as f32).powi(2);
+        let tone = PI * (radius / cell as f32).powi(2);
         let ink = mean_ink(&params, 2 * cell, tone)? * (cell * cell) as f32;
         let area = PI * radius * radius;
         assert!(
@@ -454,7 +460,7 @@ fn feather_softens_the_dot_edges_without_changing_the_ink() -> Result<(), Error>
             },
             40,
             40,
-            &flat(40, 40, 0.25),
+            &flat(40, 40, 0.4), // a dot of radius 7 px: a ramp of width f adds pi f^2 / 12 px^2, 2.6 % at f = 4
         )
     };
     let soft_share =
@@ -873,23 +879,18 @@ fn a_flat_red_green_blue_or_white_lights_only_its_own_screens() -> Result<(), Er
 }
 
 #[test]
-fn each_channel_lights_the_fraction_of_the_picture_its_value_asks_while_dots_stay_apart() -> Result<(), Error> {
-    // a round dot of tone t covers t x pi / 2 of its cell while the dots stay apart (t <= 0.45); the screens are
-    // turned, so the cells at the border are cut: a relative bound of 8 % on a picture of 20 x 20 cells
+fn each_channel_lights_the_fraction_of_the_picture_its_value_asks() -> Result<(), Error> {
+    // a channel of value v covers v of the picture; the screens are turned, so the cells at the border are cut: a
+    // relative bound of 8 % on a picture of 20 x 20 cells
     let size = 200;
-    for tone in [0.1, 0.25, 0.4] {
+    for tone in [0.1, 0.25, 0.4, 0.7] {
         let out = run_picture(&rgb(), size, size, &colour(size, size, [tone, 1.0 - tone, tone * 0.5]))?;
         for (which, value) in [tone, 1.0 - tone, tone * 0.5].into_iter().enumerate() {
             let mean = channel(&out, which).iter().sum::<f32>() / (size * size) as f32;
-            let want = if value <= 0.45 { value * PI / 2.0 } else { f32::NAN };
-            if want.is_nan() {
-                assert!(mean > value, "tone {value}, channel {which}: {mean}");
-            } else {
-                assert!(
-                    (mean / want - 1.0).abs() < 0.08,
-                    "tone {value}, channel {which}: {mean} against {want}"
-                );
-            }
+            assert!(
+                (mean / value - 1.0).abs() < 0.08,
+                "tone {value}, channel {which}: {mean} against {value}"
+            );
         }
     }
     Ok(())

@@ -4,6 +4,8 @@
 //! layers and the optical density `-ln(channel / P)` adds up: `density = sum c_k * d_k`, with `d_k = -ln(I_k / P)` the
 //! density of the full ink. Unmixing is then a least-squares problem in density space with each coverage in 0..1.
 
+use super::cast;
+
 /// The most inks printed over one paper.
 pub(crate) const MOST_INKS: usize = 4; // constant: cyan, magenta, yellow and black; more inks on one paper cannot be told apart
 
@@ -39,6 +41,59 @@ pub(crate) fn shift(offset: f32, angle: f32, ink: usize) -> [f32; 2] {
     let travel = f64::from(angle).rem_euclid(360.0).to_radians(); // constant: a full turn in degrees
     let away = f64::from(offset) * crate::ops::length::float(ink);
     [away * travel.cos(), away * travel.sin()].map(crate::ops::cast::single)
+}
+
+/// How exactly the level of a round spot is solved, in cells (a pixel is at least 1/200 of a cell).
+const LEVEL_TOLERANCE: f64 = 1e-6; // constant: far below a pixel at the largest cell, not a look
+
+/// A mark's spot function on its cell: a value at each place of the cell (the offset from its centre, in cells), and the
+/// level of that value below which the cell's area equals a tone. A pixel is inked where its value is below the level,
+/// so every shape keeps the tone; a new shape is a new variant with these two methods.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Spot {
+    /// The distance from the centre: a round dot.
+    Round,
+    /// The distance from the row's centreline: a line across the cell.
+    Line,
+}
+
+impl Spot {
+    /// The spot function at the offset (`du`, `dv`) from the cell's centre.
+    pub(crate) fn value(self, du: f32, dv: f32) -> f32 {
+        match self {
+            Self::Round => (du * du + dv * dv).sqrt(),
+            Self::Line => dv.abs(),
+        }
+    }
+
+    /// The level whose area in the unit cell is `tone` (0 to 1); a feathered edge centred on it keeps that area.
+    pub(crate) fn level(self, tone: f32) -> f32 {
+        let tone = f64::from(tone.clamp(0.0, 1.0));
+        match self {
+            Self::Line => cast::single(tone / 2.0),
+            Self::Round if tone <= std::f64::consts::FRAC_PI_4 => cast::single((tone / std::f64::consts::PI).sqrt()),
+            Self::Round => {
+                // above pi / 4 the circle leaves the cell: bisect its clipped area between radius 1/2 and the corner
+                let (mut low, mut high) = (0.5, std::f64::consts::FRAC_1_SQRT_2);
+                while high - low > LEVEL_TOLERANCE {
+                    let middle = f64::midpoint(low, high);
+                    if clipped_circle(middle) < tone {
+                        low = middle;
+                    } else {
+                        high = middle;
+                    }
+                }
+                cast::single(f64::midpoint(low, high))
+            }
+        }
+    }
+}
+
+/// The area inside the unit square centred on a circle of radius `r` (0.5 to 1 / sqrt 2) around its centre: the circle
+/// less four caps beyond the sides, each `r^2 acos(1/2r) - 1/2 sqrt(r^2 - 1/4)`.
+fn clipped_circle(r: f64) -> f64 {
+    let cap = r * r * (0.5 / r).acos() - 0.5 * (r * r - 0.25).sqrt();
+    std::f64::consts::PI * r * r - 4.0 * cap
 }
 
 /// Up to four inks over a paper.
@@ -347,5 +402,29 @@ mod tests {
         assert_eq!(shift(5.0, 0.0, 2), [10.0, 0.0]);
         assert!(close(&shift(2.0, 90.0, 3), &[0.0, 6.0], 1e-5));
         assert_eq!(shift(5.0, 360.0, 1), shift(5.0, 0.0, 1));
+    }
+
+    #[test]
+    fn a_spots_level_cuts_the_cell_into_the_area_of_the_tone() {
+        // brute force: the share of a fine grid of the unit cell where the value is below the level
+        let grid: u16 = 400;
+        for spot in [Spot::Round, Spot::Line] {
+            for tone in [0.0, 0.1, 0.5, 0.7, 0.8, 0.9, 0.99, 1.0] {
+                let level = spot.level(tone);
+                let at = |index: u16| (f32::from(index) + 0.5) / f32::from(grid) - 0.5;
+                let inside = (0..grid)
+                    .flat_map(|row| (0..grid).map(move |column| (column, row)))
+                    .filter(|&(column, row)| spot.value(at(column), at(row)) < level)
+                    .count();
+                let share =
+                    f64::from(u32::try_from(inside).unwrap_or(0)) / f64::from(u32::from(grid) * u32::from(grid));
+                assert!(
+                    (share - f64::from(tone)).abs() < 0.004,
+                    "{spot:?} tone {tone}: level {level} cuts {share}"
+                );
+            }
+        }
+        // the round dot never passes the cell's corner, so a full tone fills the cell and the footprint holds
+        assert!(Spot::Round.level(1.0) <= std::f32::consts::FRAC_1_SQRT_2 + 1e-5);
     }
 }
