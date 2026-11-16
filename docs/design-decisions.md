@@ -819,6 +819,22 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   5.9 GB was measured across the process tree, so it is not directly comparable). Recipes with blurs do not band well:
   8 steps with two Gaussian blurs took 3.5 s whole, 16 s at `band=256` and 54 s at `band=64`, with no memory gain (the
   blur footprints at a 12 MP photo's scale exceed the band), so `band` is for pixel and small-footprint chains.
+- **Preview size and WebAssembly (spike, 2026-11-16; nothing changed in the library).** Aim: a live preview in the
+  browser (WASM) and the HD print from a native backend, one core for both. The core builds unchanged for
+  `wasm32-unknown-unknown` and `wasm32-wasip1`; only the optional `onnx` feature does not (`ort` loads its library with
+  dlopen), so the subject cut-out stays outside the browser build (a cut-out made on a server, a model run in the browser,
+  or a painted mask, each handed in as the `subject` map). A render of one thread spawns nothing, so it runs in WASM as it
+  is; more threads there need workers. Every effect at its defaults on a 1 MP photo, Rust calling `Photo::render`, median
+  of 5, on a heavily loaded M4 (figures good to perhaps 25 %): natively on one thread 80 of 90 effects take under 50 ms,
+  9 between 50 and 200 ms, and only `stipple` more (614 ms); on all cores only `stipple` and `focus_blur` stay above 50 ms.
+  WASM (Node's V8, one thread) is a median 1.9x slower than native: 1.0 to 1.6x for arithmetic per pixel, 2.1 to 2.9x for
+  the effects built on the sampler or the Fourier blur, so `radial_blur`, `light_rays`, `flow_warp`, `bloom` and
+  `focus_blur` exceed 200 ms there. WASM SIMD (`simd128`) changes nothing, which supports the open finding above that the
+  per-pixel loops are not vectorised. The image looks of a shirt-print demo as one recipe (grade, blue-noise dither,
+  outline, gradient, halftone, grain) take 105 ms native and 154 ms in WASM. The core's `.wasm` is 5.4 MB after
+  `wasm-opt`, 1.25 MB brotli. *Conclusion:* no GPU is needed for a live preview; the order is a smaller preview (about
+  0.5 MP) with a render on slider release for the slow class, then the missed vectorisation, the sampler and the Fourier
+  blur at preview size.
   Not measured: peak memory at 4K per effect and the pool-size sweep of the original spike; there is no standalone Rust
   binary yet (`crates/cli` is a library), so the cold start of the CLI is `python -m bullterrier_image` (113 ms).
 
