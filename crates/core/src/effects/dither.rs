@@ -154,7 +154,7 @@ pub enum Init {
 /// split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers
 /// printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`,
 /// `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no
-/// `separation`; `seed` also seeds the noise of `white_noise` with it. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
+/// `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
 /// misregistered on a press.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
