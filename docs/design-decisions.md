@@ -1549,3 +1549,8 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
 - **Separate inks are `separation="spot"` in `halftone` and `dither` (halftone batch, 2026-11-16).** `dither` said `"inks"`;
   the colour list is `inks` in both. *Reason:* one idea, one name; `"inks"` had no caller outside tests. *Consequence:* no
   alias before 1.0; `"inks"` is refused naming the choice; a spot render is the picture `"inks"` gave.
+- **`halftone` `separation="rgb"` adds light on black at 15, 45 and 75 degrees.** Three screens, each as large as its channel's
+  value (the coverage oracle holds per channel), their light added, so full channels make white; `paper` is ignored (always
+  black). *Reason for the angles:* the three most visible cmyk screens (cyan 15, black 45, magenta 75) are the classic 30
+  degrees apart, the most a square screen allows for three, and green, the brightest channel, takes 45 where a screen shows
+  least, as black does in cmyk. *Consequence:* the separation logic is `Inks::rgb` in `ops/inks.rs`, beside cmyk and spot.

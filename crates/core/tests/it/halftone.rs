@@ -809,3 +809,108 @@ fn the_offset_ink_reads_the_tone_where_its_dots_are() -> Result<(), Error> {
     }
     Ok(())
 }
+
+// ---- rgb ------------------------------------------------------------------------------------------------------------
+
+/// Red, green and blue light on black, `cell` 10, the coverage oracle's settings: no blur, a small feather.
+fn rgb() -> Params {
+    Params {
+        cell: 10,
+        separation: Separation::Rgb,
+        sigma: 0.0,
+        feather: 0.1,
+        ..Params::default()
+    }
+}
+
+/// The fraction of pixels of the channel `which` that are lit (above half).
+fn lit(out: &[f32], which: usize) -> f32 {
+    let values = channel(out, which);
+    values.iter().filter(|&&value| value > 0.5).count() as f32 / values.len() as f32
+}
+
+#[test]
+fn a_flat_red_green_blue_or_white_lights_only_its_own_screens() -> Result<(), Error> {
+    let size = 60;
+    let print = |colour_of: [f32; 3]| run_picture(&rgb(), size, size, &colour(size, size, colour_of));
+    for (name, photo, own) in [
+        ("red", [1.0, 0.0, 0.0], [true, false, false]),
+        ("green", [0.0, 1.0, 0.0], [false, true, false]),
+        ("blue", [0.0, 0.0, 1.0], [false, false, true]),
+        ("white", [1.0; 3], [true; 3]),
+    ] {
+        let out = print(photo)?;
+        for (which, &is_own) in own.iter().enumerate() {
+            let values = channel(&out, which);
+            if is_own {
+                // a full dot fills its cell but for the soft edge
+                assert!(
+                    lit(&out, which) > 0.97,
+                    "{name}: channel {which} lit {}",
+                    lit(&out, which)
+                );
+            } else {
+                assert!(values.iter().all(|&value| value == 0.0), "{name}: channel {which}");
+            }
+        }
+    }
+    // a channel is its own screen whatever the others show: white's red is red's red
+    let (red_only, white) = (print([1.0, 0.0, 0.0])?, print([1.0; 3])?);
+    assert_eq!(first_difference(&channel(&red_only, 0), &channel(&white, 0)), None);
+    // and the paper is always black: it is ignored
+    let on_white = Params {
+        paper: Color([1.0; 3]),
+        ..rgb()
+    };
+    assert_eq!(
+        first_difference(
+            &run_picture(&on_white, size, size, &colour(size, size, [0.2, 0.5, 0.8]))?,
+            &run_picture(&rgb(), size, size, &colour(size, size, [0.2, 0.5, 0.8]))?
+        ),
+        None
+    );
+    Ok(())
+}
+
+#[test]
+fn each_channel_lights_the_fraction_of_the_picture_its_value_asks_while_dots_stay_apart() -> Result<(), Error> {
+    // a round dot of tone t covers t x pi / 2 of its cell while the dots stay apart (t <= 0.45); the screens are
+    // turned, so the cells at the border are cut: a relative bound of 8 % on a picture of 20 x 20 cells
+    let size = 200;
+    for tone in [0.1, 0.25, 0.4] {
+        let out = run_picture(&rgb(), size, size, &colour(size, size, [tone, 1.0 - tone, tone * 0.5]))?;
+        for (which, value) in [tone, 1.0 - tone, tone * 0.5].into_iter().enumerate() {
+            let mean = channel(&out, which).iter().sum::<f32>() / (size * size) as f32;
+            let want = if value <= 0.45 { value * PI / 2.0 } else { f32::NAN };
+            if want.is_nan() {
+                assert!(mean > value, "tone {value}, channel {which}: {mean}");
+            } else {
+                assert!(
+                    (mean / want - 1.0).abs() < 0.08,
+                    "tone {value}, channel {which}: {mean} against {want}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_red_green_and_blue_screens_are_a_single_ink_screen_at_15_45_and_75_degrees() -> Result<(), Error> {
+    // a grey prints the same tone in all three channels: each is the one-ink white-on-black screen at its own angle
+    let size = 80;
+    let grey = colour(size, size, [0.3; 3]);
+    let out = run_picture(&Params { angle: 0.0, ..rgb() }, size, size, &grey)?;
+    for (which, angle) in [15.0, 45.0, 75.0].into_iter().enumerate() {
+        let alone = Params {
+            cell: 10,
+            angle,
+            sigma: 0.0,
+            feather: 0.1,
+            ..white_on_black()
+        };
+        let want = red(&alone, size, size, &grey)?;
+        assert_eq!(first_difference(&channel(&out, which), &want), None, "channel {which}");
+    }
+    Ok(())
+}

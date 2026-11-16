@@ -25,6 +25,10 @@ const PROCESS: [[f32; 3]; MOST_INKS] = [
 /// (Hunt, "The Reproduction of Colour").
 pub(crate) const CMYK_SCREEN_ANGLES: [f64; MOST_INKS] = [15.0, 75.0, 0.0, 45.0]; // constant: the classic CMYK screen angles
 
+/// The angles of the red, green and blue screens in degrees: the three most visible cmyk screens (cyan 15, black 45,
+/// magenta 75), 30 apart, with the brightest channel, green, at 45 where a screen shows least, as black does there.
+pub(crate) const RGB_SCREEN_ANGLES: [f64; 3] = [15.0, 45.0, 75.0]; // constant: cmyk's 15, 45 and 75, see above
+
 /// The step in degrees between the screens of spot inks: 30 apart, the largest spread of three screens over the
 /// 90 degrees after which a square grid repeats.
 pub(crate) const SPOT_SCREEN_STEP: f64 = 30.0; // constant: 90 / 3, see above
@@ -44,6 +48,8 @@ pub(crate) struct Inks {
     /// The density of each full ink, per channel.
     density: [[f32; 3]; MOST_INKS],
     count: usize,
+    /// Light added on black (red, green, blue) instead of ink laid over `paper`.
+    additive: bool,
 }
 
 /// The density `-ln(channel / paper)` of a colour, 0 where it is as light as the paper.
@@ -71,7 +77,12 @@ impl Inks {
         for (slot, colour) in density.iter_mut().zip(colours) {
             *slot = density_of(paper, *colour);
         }
-        Self { paper, density, count }
+        Self {
+            paper,
+            density,
+            count,
+            additive: false,
+        }
     }
 
     /// The cyan, magenta, yellow and black process inks over `paper`.
@@ -79,8 +90,27 @@ impl Inks {
         Self::new(paper, &PROCESS)
     }
 
-    /// The colour of `paper` under the inks at `coverages` (0..1 each, the first `count` are read).
+    /// Red, green and blue light added on black: [`Inks::print`] gives the coverages as the colour, white where all
+    /// three are full.
+    pub(crate) fn rgb() -> Self {
+        Self {
+            additive: true,
+            count: 3,
+            ..Self::new([0.0; 3], &[])
+        }
+    }
+
+    /// The red, green and blue amounts (0..1) of `colour`: its channels.
+    pub(crate) fn rgb_amounts(colour: [f32; 3]) -> [f32; MOST_INKS] {
+        [colour[0], colour[1], colour[2], 0.0].map(|channel| channel.clamp(0.0, 1.0))
+    }
+
+    /// The colour of `paper` under the inks at `coverages` (0..1 each, the first `count` are read), or with
+    /// [`Inks::rgb`] the light of the three screens.
     pub(crate) fn print(&self, coverages: &[f32; MOST_INKS]) -> [f32; 3] {
+        if self.additive {
+            return [coverages[0], coverages[1], coverages[2]];
+        }
         let mut total = [0.0; 3];
         for (coverage, density) in coverages.iter().zip(&self.density).take(self.count) {
             for channel in 0..3 {
@@ -300,6 +330,15 @@ mod tests {
         // half as light as the paper in red and blue, a quarter in green: black takes the common half, magenta the rest
         let found = inks.cmyk_amounts([PAPER[0] * 0.5, PAPER[1] * 0.25, PAPER[2] * 0.5]);
         assert!(close(&found, &[0.0, 0.5, 0.0, 0.5], 1e-5), "{found:?}");
+    }
+
+    #[test]
+    fn rgb_light_adds_on_black_and_full_screens_make_white() {
+        let inks = Inks::rgb();
+        assert_eq!(inks.print(&[1.0, 0.0, 0.0, 0.0]), [1.0, 0.0, 0.0]);
+        assert_eq!(inks.print(&[1.0, 1.0, 1.0, 0.0]), [1.0; 3]);
+        assert_eq!(inks.print(&[0.0; MOST_INKS]), [0.0; 3]);
+        assert_eq!(Inks::rgb_amounts([0.2, 1.5, -1.0]), [0.2, 1.0, 0.0, 0.0]);
     }
 
     #[test]

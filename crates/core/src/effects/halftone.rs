@@ -8,7 +8,7 @@ use crate::ops::blur::{gaussian_filter, is_fourier};
 use crate::ops::cast;
 use crate::ops::color::{luminance, vivid};
 use crate::ops::edge::EdgeOrConstant;
-use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, SPOT_SCREEN_STEP, shift};
+use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, RGB_SCREEN_ANGLES, SPOT_SCREEN_STEP, shift};
 use crate::ops::length::{float, whole};
 use crate::ops::par;
 use crate::params::{Choice, Color, Params};
@@ -55,13 +55,15 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 ///
 /// `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink
 /// (a line as wide as `cell` fills it), so the screen keeps the tones the same way. `separation` prints several inks,
-/// each its own screen, subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`; the
+/// each its own screen, subtractively over `paper` ('rgb' adds light instead) (inks overlap like transparent layers, so use a light `paper`; the
 /// default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black
 /// generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0
 /// and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four
 /// colours), finding how much of each makes the photo's colour (the nearest in optical density), with the screens
-/// `angle` + 30 degrees apart (45, 75, 105, 135 by default). `ink`, `ink_floor` and `paper_threshold` are used only
-/// with no `separation`. `offset` px moves the second ink's screen that far from the first along `offset_angle`, the
+/// `angle` + 30 degrees apart (45, 75, 105, 135 by default); 'rgb' adds red, green and blue light on black, one screen
+/// per channel (as large as the channel's value), at 15, 45 and 75 degrees added to `angle`, white where all three are
+/// full, and ignores `paper`. `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`. `offset` px
+/// moves the second ink's screen that far from the first along `offset_angle`, the
 /// third twice as far and the fourth three times, as a misregistered press does.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
@@ -69,8 +71,9 @@ pub struct Params {
     /// What a dot is: 'dot' (a round dot per cell), 'line' (a line per cell row, as wide as the ink needs).
     #[param(default = Dot)]
     pub shape: Shape,
-    /// How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta, yellow and black) or 'spot'
-    /// (the colours in `inks`). Several inks print over `paper` like transparent layers, each in its own screen.
+    /// How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta, yellow and black), 'spot'
+    /// (the colours in `inks`) or 'rgb' (red, green and blue light). Cmyk and spot print over `paper` like transparent
+    /// layers, each in its own screen; 'rgb' adds light on black and ignores `paper`.
     #[param(default = None)]
     pub separation: Separation,
     /// Distance between neighbouring dots in px (the screen's pitch). Larger = fewer, bigger dots, a coarser print.
@@ -90,7 +93,7 @@ pub struct Params {
     /// brightens dark colours more; 1 = colours as they are.
     #[param(default = 0.35, unit = fraction, min = 0.01, max = 1)]
     pub ink_floor: f32,
-    /// The paper colour between the dots. On a dark paper (Rec. 709 luminance below `paper_threshold`) bright tones get the
+    /// The paper colour between the dots; ignored with 'rgb' separation (always black). On a dark paper (Rec. 709 luminance below `paper_threshold`) bright tones get the
     /// ink; on a light one, dark tones.
     #[param(default = "#000000")]
     pub paper: Color,
@@ -103,7 +106,7 @@ pub struct Params {
     /// are offset and turned; ignored otherwise. Each pixel's colour is split into amounts of these inks.
     #[param(default = ["#ff4d6d", "#2b59ff"], min_length = 1, max_length = 4)]
     pub inks: Vec<Color>,
-    /// With 'cmyk' or 'spot' separation: how far in px the second ink's screen is moved from the first (the third twice
+    /// With 'cmyk', 'spot' or 'rgb' separation: how far in px the second ink's screen is moved from the first (the third twice
     /// as far, the fourth three times), as ink misregistered on a press; 0 = all screens in register.
     #[param(default = 0.0, unit = px, min = 0, max = 100)]
     pub offset: f32,
@@ -150,6 +153,8 @@ pub enum Separation {
     Cmyk,
     /// The `inks`, each at its own angle.
     Spot,
+    /// Red, green and blue light added on black, each at its own angle.
+    Rgb,
 }
 
 /// One ink's screen: the grid turned by an angle and moved from the origin.
@@ -178,6 +183,7 @@ fn screens(params: &Params, count: usize) -> Vec<Screen> {
             let extra = match params.separation {
                 Separation::None => 0.0,
                 Separation::Cmyk => CMYK_SCREEN_ANGLES[ink],
+                Separation::Rgb => RGB_SCREEN_ANGLES[ink],
                 Separation::Spot => SPOT_SCREEN_STEP * float(ink),
             };
             let turn = (f64::from(params.angle) + extra).rem_euclid(360.0).to_radians(); // constant: a full turn in degrees
@@ -204,6 +210,7 @@ fn amounts(params: &Params, inks: &Inks, ink_is_bright: bool, sampled: [f32; 3])
         }
         Separation::Cmyk => inks.cmyk_amounts(sampled),
         Separation::Spot => inks.coverages(sampled),
+        Separation::Rgb => Inks::rgb_amounts(sampled),
     }
 }
 
@@ -231,11 +238,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         Separation::None => Inks::new(paper, &[]),
         Separation::Cmyk => Inks::cmyk(paper),
         Separation::Spot => Inks::new(paper, &params.inks.iter().map(|ink| ink.0).collect::<Vec<_>>()),
+        Separation::Rgb => Inks::rgb(),
     };
     let count = match params.separation {
         Separation::None => 1,
         Separation::Cmyk => MOST_INKS,
         Separation::Spot => params.inks.len().min(MOST_INKS),
+        Separation::Rgb => 3,
     };
     let screens = screens(params, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;

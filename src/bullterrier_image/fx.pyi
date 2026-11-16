@@ -1650,18 +1650,19 @@ noise : Plain sensor noise: independent colour speckle of the same strength in s
     ...
 
 @_effect
-def halftone(*, shape: Literal['dot', 'line'] = 'dot', separation: Literal['none', 'cmyk', 'spot'] = 'none', cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), offset: float = 0.0, offset_angle: float = 0.0, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
-    """A print-style dot screen: tone becomes dot size.  A rotated square grid of dots, `cell` px apart, turned `angle` degrees. Each dot looks up the picture, blurred by a Gaussian of `sigma` cells, at its centre, and is as large as the ink that tone needs: the area of a dot is proportional to the ink, so the screen keeps the picture's tones, dots touch at half tone and fill their cell at full tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The dot's edge is a ramp `feather` px wide, centred on its radius and faded in with the dot so that a dot narrower than the ramp prints about its own area, and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.  `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink (a line as wide as `cell` fills it), so the screen keeps the tones the same way. `separation` prints several inks, each its own screen, subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`; the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0 and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four colours), finding how much of each makes the photo's colour (the nearest in optical density), with the screens `angle` + 30 degrees apart (45, 75, 105, 135 by default). `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`. `offset` px moves the second ink's screen that far from the first along `offset_angle`, the third twice as far and the fourth three times, as a misregistered press does.
+def halftone(*, shape: Literal['dot', 'line'] = 'dot', separation: Literal['none', 'cmyk', 'spot', 'rgb'] = 'none', cell: int = 14, angle: float = 45.0, ink: str | list[float] | tuple[float, float, float] | None = None, ink_floor: float = 0.35, paper: str | list[float] | tuple[float, float, float] = '#000000', paper_threshold: float = 0.5, inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), offset: float = 0.0, offset_angle: float = 0.0, sigma: float = 0.5, feather: float = 1.0, truncate: float = 4.0, edge: Literal['reflect', 'constant', 'nearest', 'mirror', 'wrap'] = 'reflect', constant_value: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """A print-style dot screen: tone becomes dot size.  A rotated square grid of dots, `cell` px apart, turned `angle` degrees. Each dot looks up the picture, blurred by a Gaussian of `sigma` cells, at its centre, and is as large as the ink that tone needs: the area of a dot is proportional to the ink, so the screen keeps the picture's tones, dots touch at half tone and fill their cell at full tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The dot's edge is a ramp `feather` px wide, centred on its radius and faded in with the dot so that a dot narrower than the ramp prints about its own area, and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.  `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink (a line as wide as `cell` fills it), so the screen keeps the tones the same way. `separation` prints several inks, each its own screen, subtractively over `paper` ('rgb' adds light instead) (inks overlap like transparent layers, so use a light `paper`; the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0 and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four colours), finding how much of each makes the photo's colour (the nearest in optical density), with the screens `angle` + 30 degrees apart (45, 75, 105, 135 by default); 'rgb' adds red, green and blue light on black, one screen per channel (as large as the channel's value), at 15, 45 and 75 degrees added to `angle`, white where all three are full, and ignores `paper`. `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`. `offset` px moves the second ink's screen that far from the first along `offset_angle`, the third twice as far and the fourth three times, as a misregistered press does.
 
 Parameters
 ----------
 shape : one of 'dot', 'line', default 'dot'
     What a dot is: 'dot' (a round dot per cell), 'line' (a line per cell row, as wide as
     the ink needs).
-separation : one of 'none', 'cmyk', 'spot', default 'none'
+separation : one of 'none', 'cmyk', 'spot', 'rgb', default 'none'
     How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta,
-    yellow and black) or 'spot' (the colours in `inks`). Several inks print over `paper`
-    like transparent layers, each in its own screen.
+    yellow and black), 'spot' (the colours in `inks`) or 'rgb' (red, green and blue
+    light). Cmyk and spot print over `paper` like transparent layers, each in its own
+    screen; 'rgb' adds light on black and ignores `paper`.
 cell : whole number, px, 1 to 200, default 14
     Distance between neighbouring dots in px (the screen's pitch). Larger = fewer,
     bigger dots, a coarser print.
@@ -1679,8 +1680,9 @@ ink_floor : number, fraction, 0.01 to 1, default 0.35
     `ink_floor` instead of up to full, so dark areas stay dark. Lowering it brightens
     dark colours more; 1 = colours as they are.
 paper : colour, default '#000000'
-    The paper colour between the dots. On a dark paper (Rec. 709 luminance below
-    `paper_threshold`) bright tones get the ink; on a light one, dark tones.
+    The paper colour between the dots; ignored with 'rgb' separation (always black). On
+    a dark paper (Rec. 709 luminance below `paper_threshold`) bright tones get the ink;
+    on a light one, dark tones.
 paper_threshold : number, fraction, 0 to 1, default 0.5
     The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (bright tones get
     the ink) rather than light (dark tones get it); 0.5 = mid grey. Raising it lets
@@ -1691,8 +1693,8 @@ inks : list of colours, default ('#ff4d6d', '#2b59ff')
     numbers 0..1), in the order they are offset and turned; ignored otherwise. Each
     pixel's colour is split into amounts of these inks.
 offset : number, px, 0 to 100, default 0.0
-    With 'cmyk' or 'spot' separation: how far in px the second ink's screen is moved
-    from the first (the third twice as far, the fourth three times), as ink
+    With 'cmyk', 'spot' or 'rgb' separation: how far in px the second ink's screen is
+    moved from the first (the third twice as far, the fourth three times), as ink
     misregistered on a press; 0 = all screens in register.
 offset_angle : number (cyclic), degrees, 0 to 360, default 0.0
     With an `offset`: the direction of the move, in degrees clockwise on screen from the
