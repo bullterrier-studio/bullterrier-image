@@ -9,12 +9,12 @@ use std::sync::Arc;
 
 use bullterrier_image::region::Bands;
 use bullterrier_image::{
-    Each, Entry, Footprint, Image, Input, Layer, Options, Photo, Picture, Presets, Recipe, Step, effect, effects,
+    Each, Entry, Footprint, Image, Input, Layer, Options, Photo, Picture, Presets, Recipe, Step, effect,
 };
 use serde_json::Value;
 
 use crate::banded::{FFT_BLURS, TOLERANCE};
-use crate::common::Outcome;
+use crate::common::{Outcome, core_effects};
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::{asset, varied};
 use crate::common::sweep::{Setting, variants};
@@ -79,10 +79,8 @@ fn every_effect_renders_the_box_of_a_grown_picture_as_it_renders_the_box_alone()
     let grown_values = grown(&values);
     let (mut problems, mut cases, mut boxed) = (Vec::new(), 0, 0);
     let mut unbounded = std::collections::BTreeSet::new();
-    for name in effects() {
-        let Ok(one) = effect(&name) else {
-            continue; // a double that another test unregistered since `effects()`
-        };
+    for name in core_effects()? {
+        let one = effect(&name)?;
         if one.inputs().contains(&Input::Partition) || !one.fields().is_empty() {
             continue; // they name a region: the chain tests below
         }

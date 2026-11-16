@@ -20,11 +20,11 @@ use bullterrier_image::frame::{Fit, Resample};
 use bullterrier_image::region::{Bands, ColorRange};
 use bullterrier_image::{
     Category, Each, Effect, Entry, Footprint, Frame, Image, Input, Inputs, Layer, Options, Photo, Picture, Presets,
-    Recipe, Step, effect, effects,
+    Recipe, Step, effect,
 };
 use serde_json::{Value, json};
 
-use crate::common::Outcome;
+use crate::common::{Outcome, core_effects};
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::{asset, varied};
 use crate::common::run::{Registered, unique};
@@ -157,7 +157,7 @@ fn band_matrix(bands: &[usize], sized_bands: &[usize]) -> Outcome {
     let values = varied(HEIGHT, WIDTH);
     let mut problems = Vec::new();
     let (mut banded_effects, mut cases) = (0, 0);
-    for name in effects() {
+    for name in core_effects()? {
         let one = effect(&name)?;
         let table = one.params();
         let partitioned = one.inputs().contains(&Input::Partition);
@@ -277,7 +277,7 @@ fn every_px_parameter_is_the_same_banded_at_every_size_of_picture() -> Outcome {
 fn px_sweep(sides: &[usize]) -> Outcome {
     let mut problems = Vec::new();
     let mut cases = 0;
-    for name in effects() {
+    for name in core_effects()? {
         let one = effect(&name)?;
         let table = one.params();
         let partitioned = one.inputs().contains(&Input::Partition);

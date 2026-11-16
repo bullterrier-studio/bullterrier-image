@@ -10,11 +10,11 @@ use std::sync::Arc;
 
 use bullterrier_image::region::Bands;
 use bullterrier_image::{
-    Each, Entry, Frame, Image, Input, Options, Photo, Picture, Presets, Recipe, Step, effect, effects,
+    Each, Entry, Frame, Image, Input, Options, Photo, Picture, Presets, Recipe, Step, effect,
 };
 use serde_json::Value;
 
-use crate::common::Outcome;
+use crate::common::{Outcome, core_effects};
 use crate::common::compare::{first_bit_difference, first_difference_within};
 use crate::common::pictures::{asset, varied};
 use crate::common::sweep::{Setting, awkward, fine, variants};
@@ -137,10 +137,8 @@ fn every_cleared_effect_over(
     let values = varied(canvas.height, canvas.width);
     let (mut problems, mut cleared) = (Vec::new(), 0);
     let longest = u32::try_from(canvas.height)?;
-    for name in effects() {
-        let Ok(one) = effect(&name) else {
-            continue; // a double that another test unregistered since `effects()`
-        };
+    for name in core_effects()? {
+        let one = effect(&name)?;
         if one.inputs().contains(&Input::Partition) || !one.fields().is_empty() {
             continue; // the recipe needs a region to name (the query answers none for it; the check refuses it without one)
         }

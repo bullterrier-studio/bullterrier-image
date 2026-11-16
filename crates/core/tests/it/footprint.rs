@@ -10,13 +10,13 @@
 
 use std::error::Error;
 
-use crate::common::Outcome;
+use crate::common::{Outcome, core_effects};
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::asset;
 use crate::common::sweep::{Setting, variants};
 use bullterrier_image::params::{Kind, Table};
 use bullterrier_image::{
-    Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect, effects,
+    Category, Effect, Footprint, Image, Input, Inputs, Labels, Layer, Picture, Place, effect,
 };
 use serde_json::{Value, json};
 
@@ -168,7 +168,7 @@ fn every_effect_that_says_it_reads_less_than_the_whole_picture_gives_the_same_ro
 -> Outcome {
     let mut found = Vec::new();
     let mut not_whole = 0;
-    for name in effects() {
+    for name in core_effects()? {
         let one = effect(&name)?;
         found.extend(problems(&*one)?);
         let defaults = one.params().check(&name, &Setting::new())?;

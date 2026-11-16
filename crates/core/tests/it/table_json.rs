@@ -4,8 +4,10 @@
 
 use std::path::Path;
 
+use crate::common::core_effects;
+
 use bullterrier_image::params::{Field, Table};
-use bullterrier_image::{Error, effect, effects};
+use bullterrier_image::{Error, effect};
 use serde_json::{Value, json};
 
 fn fixtures(name: &str) -> Result<Vec<(String, Value)>, Box<dyn std::error::Error>> {
@@ -47,7 +49,7 @@ fn every_invalid_fixture_of_the_format_is_refused() -> Result<(), Box<dyn std::e
 #[test]
 fn the_table_of_every_effect_the_core_declares_is_read_back_as_it_was() -> Result<(), Box<dyn std::error::Error>> {
     let mut seen = 0;
-    for name in effects() {
+    for name in core_effects()? {
         let table = effect(&name)?.params();
         if table.fields.is_empty() {
             continue;

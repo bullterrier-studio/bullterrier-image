@@ -22,3 +22,22 @@ pub(crate) mod sweep;
 pub(crate) mod yiq;
 
 pub(crate) type Outcome = Result<(), Box<dyn std::error::Error>>;
+
+/// The effects of the core, one for each file of `src/effects/` (the registry also holds the doubles that other tests of
+/// this binary register for a while, which would come and go during the run).
+pub(crate) fn core_effects() -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let folder = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("effects");
+    let mut names = Vec::new();
+    for entry in std::fs::read_dir(folder)? {
+        let path = entry?.path();
+        if path.extension().is_some_and(|extension| extension == "rs")
+            && let Some(name) = path.file_stem().and_then(|stem| stem.to_str())
+        {
+            names.push(name.to_owned());
+        }
+    }
+    assert!(names.len() > 80, "only {} effect files", names.len());
+    Ok(names)
+}
