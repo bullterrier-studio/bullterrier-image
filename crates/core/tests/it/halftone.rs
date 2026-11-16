@@ -12,18 +12,17 @@
 use std::f32::consts::PI;
 
 use bullterrier_image::effects::halftone::{Params, Screen, Separation, Shape};
-use bullterrier_image::params::{Color, Declared, PictureName};
-use bullterrier_image::{EdgeOrConstant, Error, Image, Inputs, Picture, apply};
-use serde_json::Value;
+use bullterrier_image::params::Color;
+use bullterrier_image::{EdgeOrConstant, Error, Image, Picture};
 
 use crate::common::compare::{assert_close, first_difference};
 use crate::common::pictures::varied;
 use crate::common::pixels::{is_pixel, run_picture};
 
-const WHITE: Color = Color([1.0; 3]);
+pub(crate) const WHITE: Color = Color([1.0; 3]);
 
 /// White dots on black paper.
-fn white_on_black() -> Params {
+pub(crate) fn white_on_black() -> Params {
     Params {
         ink: Some(WHITE),
         ..Params::default()
@@ -31,12 +30,12 @@ fn white_on_black() -> Params {
 }
 
 /// The picture of one grey `level`, `height` x `width`.
-fn flat(height: usize, width: usize, level: f32) -> Vec<f32> {
+pub(crate) fn flat(height: usize, width: usize, level: f32) -> Vec<f32> {
     vec![level; height * width * 3]
 }
 
 /// The red channel of the screen `params` print of `rgb`.
-fn red(params: &Params, height: usize, width: usize, rgb: &[f32]) -> Result<Vec<f32>, Error> {
+pub(crate) fn red(params: &Params, height: usize, width: usize, rgb: &[f32]) -> Result<Vec<f32>, Error> {
     Ok(run_picture(params, height, width, rgb)?
         .as_chunks::<3>()
         .0
@@ -46,7 +45,7 @@ fn red(params: &Params, height: usize, width: usize, rgb: &[f32]) -> Result<Vec<
 }
 
 /// The mean ink (red channel, white on black) of an even tone.
-fn mean_ink(params: &Params, size: usize, tone: f32) -> Result<f32, Error> {
+pub(crate) fn mean_ink(params: &Params, size: usize, tone: f32) -> Result<f32, Error> {
     let out = red(params, size, size, &flat(size, size, tone))?;
     Ok(out.iter().sum::<f32>() / out.len() as f32)
 }
@@ -74,7 +73,7 @@ fn white_is_nearly_all_dots_black_is_blank_and_paper_shows_exactly_where_no_ink_
 }
 
 /// The coverage oracle's screen: black ink on white paper, `cell` 20, `feather` 1, no blur, a square screen of whole cells.
-fn oracle(shape: Shape) -> Params {
+pub(crate) fn oracle(shape: Shape) -> Params {
     Params {
         shape,
         cell: 20.0,
@@ -88,7 +87,7 @@ fn oracle(shape: Shape) -> Params {
 }
 
 /// The ink of the oracle screen `params` at an even `tone`, one value per pixel of a picture of 80 x 80 (4 x 4 cells).
-fn ink_map(params: &Params, tone: f32) -> Result<Vec<f32>, Error> {
+pub(crate) fn ink_map(params: &Params, tone: f32) -> Result<Vec<f32>, Error> {
     Ok(red(params, 80, 80, &flat(80, 80, 1.0 - tone))?
         .into_iter()
         .map(|r| 1.0 - r)
@@ -96,12 +95,12 @@ fn ink_map(params: &Params, tone: f32) -> Result<Vec<f32>, Error> {
 }
 
 /// The coverage oracle: the mean ink of the flat grey whose luminance is `1 - tone`, for the screen `params`.
-fn coverage_with(params: &Params, tone: f32) -> Result<f32, Error> {
+pub(crate) fn coverage_with(params: &Params, tone: f32) -> Result<f32, Error> {
     let ink = ink_map(params, tone)?;
     Ok(ink.iter().sum::<f32>() / ink.len() as f32)
 }
 
-fn coverage(shape: Shape, tone: f32) -> Result<f32, Error> {
+pub(crate) fn coverage(shape: Shape, tone: f32) -> Result<f32, Error> {
     coverage_with(&oracle(shape), tone)
 }
 
@@ -390,14 +389,14 @@ fn each_dot_stands_for_the_tone_at_its_centre() -> Result<(), Error> {
 }
 
 /// A picture `width` wide, black left of `edge` and white from there on, 40 rows.
-fn half_and_half(width: usize, edge: usize) -> Vec<f32> {
+pub(crate) fn half_and_half(width: usize, edge: usize) -> Vec<f32> {
     (0..40 * width * 3)
         .map(|index| f32::from(index / 3 % width >= edge))
         .collect()
 }
 
 /// The mean red in the block of rows and columns of a 40-row, `width`-wide screen.
-fn mean_in(out: &[f32], width: usize, rows: std::ops::Range<usize>, columns: std::ops::Range<usize>) -> f32 {
+pub(crate) fn mean_in(out: &[f32], width: usize, rows: std::ops::Range<usize>, columns: std::ops::Range<usize>) -> f32 {
     let values: Vec<f32> = rows
         .flat_map(|row| columns.clone().map(move |column| out[row * width + column]))
         .collect();
@@ -509,22 +508,22 @@ fn a_full_turn_of_the_angle_is_no_turn() -> Result<(), Error> {
 }
 
 /// The picture of one colour, `height` x `width`.
-fn colour(height: usize, width: usize, rgb: [f32; 3]) -> Vec<f32> {
+pub(crate) fn colour(height: usize, width: usize, rgb: [f32; 3]) -> Vec<f32> {
     (0..height * width).flat_map(|_| rgb).collect()
 }
 
 /// The channel `channel` of every pixel of `out`.
-fn channel(out: &[f32], channel: usize) -> Vec<f32> {
+pub(crate) fn channel(out: &[f32], channel: usize) -> Vec<f32> {
     out.as_chunks::<3>().0.iter().map(|pixel| pixel[channel]).collect()
 }
 
 // inks no lighter than the paper in any channel: a lighter one cannot be printed on it
-const PINK: [f32; 3] = [0.9, 0.3, 0.45];
-const BLUE: [f32; 3] = [0.17, 0.35, 0.85];
-const PAPER: [f32; 3] = [0.95, 0.93, 0.88];
+pub(crate) const PINK: [f32; 3] = [0.9, 0.3, 0.45];
+pub(crate) const BLUE: [f32; 3] = [0.17, 0.35, 0.85];
+pub(crate) const PAPER: [f32; 3] = [0.95, 0.93, 0.88];
 
 /// Pink and blue spot inks on a light paper, the screens of the first at 45 degrees.
-fn spot() -> Params {
+pub(crate) fn spot() -> Params {
     Params {
         cell: 8.0,
         separation: Separation::Spot,
@@ -836,7 +835,7 @@ fn the_offset_ink_reads_the_tone_where_its_dots_are() -> Result<(), Error> {
 // ---- rgb ------------------------------------------------------------------------------------------------------------
 
 /// Red, green and blue light on black, `cell` 10, the coverage oracle's settings: no blur, a small feather.
-fn rgb() -> Params {
+pub(crate) fn rgb() -> Params {
     Params {
         cell: 10.0,
         separation: Separation::Rgb,
@@ -847,7 +846,7 @@ fn rgb() -> Params {
 }
 
 /// The fraction of pixels of the channel `which` that are lit (above half).
-fn lit(out: &[f32], which: usize) -> f32 {
+pub(crate) fn lit(out: &[f32], which: usize) -> f32 {
     let values = channel(out, which);
     values.iter().filter(|&&value| value > 0.5).count() as f32 / values.len() as f32
 }
@@ -938,7 +937,7 @@ fn the_red_green_and_blue_screens_are_a_single_ink_screen_at_15_45_and_75_degree
 
 /// The red channel of a one-ink black-on-white halftone of `recipe_cell` (a fractional length) over `values`, rendered at
 /// `size` (the longest side the recipe's px are written for 480 of).
-fn through_recipe(
+pub(crate) fn through_recipe(
     recipe_cell: f64,
     tone: f32,
     (height, width): (usize, usize),
@@ -991,7 +990,7 @@ fn a_fractional_cell_keeps_the_tone_within_what_its_soft_edge_adds() -> Result<(
 }
 
 /// The mean distance between the centres of the dots along the row of the screen's dots nearest `row`, in px.
-fn dot_pitch(red: &[f32], width: usize, row: usize) -> f32 {
+pub(crate) fn dot_pitch(red: &[f32], width: usize, row: usize) -> f32 {
     let line = &red[row * width..(row + 1) * width];
     let mut centres = Vec::new();
     let mut start = None;
@@ -1125,279 +1124,10 @@ fn a_whole_number_cell_written_in_a_recipe_file_still_loads() -> Result<(), Box<
     Ok(())
 }
 
-// ---- dot shapes -------------------------------------------------------------------------------------------------------
-
-/// The screens of every new shape, each as the coverage oracle runs it (the ellipse at aspect 2 and the matrix at a picture
-/// of its own, see `coverage_of_a_matrix`).
-fn new_shapes() -> Vec<(&'static str, Params)> {
-    vec![
-        ("square", oracle(Shape::Square)),
-        ("diamond", oracle(Shape::Diamond)),
-        ("euclidean", oracle(Shape::Euclidean)),
-        (
-            "ellipse 2",
-            Params {
-                aspect: 2.0,
-                ..oracle(Shape::Ellipse)
-            },
-        ),
-        (
-            "ellipse 4",
-            Params {
-                aspect: 4.0,
-                ..oracle(Shape::Ellipse)
-            },
-        ),
-    ]
-}
-
-#[test]
-fn ink_grows_with_tone_in_every_new_shape() -> Result<(), Error> {
-    for (name, params) in new_shapes() {
-        let mut last = -1.0;
-        for tone in [0.0, 0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0] {
-            let ink = coverage_with(&params, tone)?;
-            assert!(ink > last, "{name} {tone}: {ink} after {last}");
-            last = ink;
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn every_new_shape_keeps_the_tone() -> Result<(), Error> {
-    // A straight edge keeps its area (the ramp is centred on it and a pixel row samples it at whole pixels). A curve gains
-    // pi f^2 / 12 px^2 a dot at feather f = 1 where the ramp is a pixel wide (see `a_dot_prints_about_its_own_area_however_small`),
-    // 0.0013 of a cell of 20 px; a value that changes only 0.7 a cell at the edge (the diamond's diagonals, the cosine
-    // screen's) widens the ramp by 1 / 0.7 and so doubles that gain, 0.0026. The level is read off a grid of 65536 places, within
-    // 0.0003 of tone. About 0.003 together, and the cosine screen's flat saddles at the tips of its diamond, where the value does
-    // not change and the ramp spreads, add a little more (measured 0.0041 at most): the bound is 0.005.
-    for (name, params) in new_shapes() {
-        for tone in [0.1, 0.25, 0.5, 0.75, 0.9] {
-            let ink = coverage_with(&params, tone)?;
-            assert!((ink - tone).abs() < 0.005, "{name} tone {tone}: ink {ink}");
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn a_square_at_full_tone_fills_its_cell_and_at_a_quarter_is_a_centred_half_cell_square() -> Result<(), Error> {
-    let params = oracle(Shape::Square);
-    assert!(ink_map(&params, 1.0)?.iter().all(|&ink| ink > 1.0 - 1e-6));
-    // side sqrt(tone) cells: 10 px of a cell of 20 (pixels 5..15), its edges on whole pixels
-    let ink = ink_map(&params, 0.25)?;
-    for (x, y) in [(10, 10), (6, 6), (14, 14), (6, 14), (14, 6), (26, 26)] {
-        assert!(ink[y * 80 + x] > 0.99, "({x}, {y}) is inside");
-    }
-    for (x, y) in [(0, 0), (4, 10), (10, 4), (16, 10), (10, 16), (19, 19), (20, 20)] {
-        assert!(ink[y * 80 + x] < 0.01, "({x}, {y}) is outside");
-    }
-    Ok(())
-}
-
-#[test]
-fn a_diamond_at_half_tone_touches_its_neighbours_at_the_middle_of_the_cell_sides() -> Result<(), Error> {
-    // |du| + |dv| < 1 / 2 is a diamond of area 1 / 2 whose tips are the middles of the cell's sides: the diamond at (x, y)
-    // = (10, 10) has its right tip at (20, 10) where the next diamond's left tip is
-    let params = oracle(Shape::Diamond);
-    let touching = ink_map(&params, 0.5)?;
-    let apart = ink_map(&params, 0.4)?;
-    let past = ink_map(&params, 0.6)?;
-    let at = |map: &[f32], x: usize, y: usize| map[y * 80 + x];
-    // the tip pixels on the side between two cells (x = 19 is in the left cell, 20 in the right), and a corner
-    assert!(
-        at(&touching, 19, 10) > 0.9 && at(&touching, 20, 10) > 0.4,
-        "the tips meet"
-    );
-    assert!(at(&apart, 20, 10) < 0.01, "a smaller diamond leaves a gap");
-    assert!(
-        at(&past, 20, 10) > 0.99 && at(&past, 19, 10) > 0.99,
-        "a larger one overlaps"
-    );
-    assert!(
-        at(&touching, 20, 20) < 0.01 && at(&touching, 19, 19) < 0.01,
-        "the corners stay paper"
-    );
-    // and the centre is ink, the square's own side middle a little further out is the paper between diamonds
-    assert!(at(&touching, 10, 10) > 0.99);
-    Ok(())
-}
-
-#[test]
-fn an_ellipse_of_aspect_one_is_the_round_dot() -> Result<(), Error> {
-    let round = oracle(Shape::Dot);
-    let ellipse = Params {
-        aspect: 1.0,
-        ..oracle(Shape::Ellipse)
-    };
-    for tone in [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0] {
-        let (want, got) = (ink_map(&round, tone)?, ink_map(&ellipse, tone)?);
-        // a level read off a grid differs from the circle's by 0.0003 of tone, 0.0003 / (2 pi r) cells at a dot of radius
-        // r cells (the smallest here, 0.08): 0.0006 cells, 0.012 px, a coverage of that much
-        let worst = want.iter().zip(&got).map(|(a, b)| (a - b).abs()).fold(0.0, f32::max);
-        assert!(worst < 0.01, "tone {tone}: pixels differ by {worst}");
-    }
-    Ok(())
-}
-
-#[test]
-fn an_ellipse_is_aspect_times_as_long_along_the_rows_as_across_them() -> Result<(), Error> {
-    for aspect in [2.0_f32, 4.0] {
-        let params = Params {
-            aspect,
-            ..oracle(Shape::Ellipse)
-        };
-        // the centre cell's ink along its middle row and its middle column (pixels 10, centred on the dot at 10)
-        let ink = ink_map(&params, 0.05)?;
-        let along: f32 = (0..20).map(|x| ink[10 * 80 + x]).sum();
-        let across: f32 = (0..20).map(|y| ink[y * 80 + 10]).sum();
-        // axes r sqrt a and r / sqrt a; the ramp adds about a pixel to each length, so allow 1.2 px on the ratio's terms
-        let want = across * aspect;
-        assert!(
-            (along - want).abs() < 1.5 * aspect,
-            "aspect {aspect}: {along} along, {across} across"
-        );
-        assert!(along > across * 1.5, "aspect {aspect}");
-    }
-    Ok(())
-}
-
-#[test]
-fn a_euclidean_dot_is_round_in_highlights_half_the_cell_at_half_and_mirrors_about_half() -> Result<(), Error> {
-    let params = oracle(Shape::Euclidean);
-    // highlights: round but for the cosine's fourth-order squareness (the radius differs by about 10 % between axis and
-    // diagonal at this size), of the radius that holds the tone (0.1: 3.57 px of 20); inside 0.85 of it all ink, past 1.25 none
-    let ink = ink_map(&params, 0.1)?;
-    let radius = (0.1_f32 / PI).sqrt() * 20.0;
-    for y in 0..20 {
-        for x in 0..20 {
-            let distance = ((x as f32 - 10.0).powi(2) + (y as f32 - 10.0).powi(2)).sqrt();
-            if distance < 0.85 * radius {
-                assert!(ink[y * 80 + x] > 0.99, "({x}, {y}) inside");
-            } else if distance > 1.25 * radius {
-                assert!(ink[y * 80 + x] < 0.01, "({x}, {y}) outside");
-            }
-        }
-    }
-    // the ink lights half at 50 %
-    assert!((coverage_with(&params, 0.5)? - 0.5).abs() < 0.005);
-    // swapping ink and paper about 50 %: the picture of tone 1 - t is the paper of tone t, half a cell on in both ways
-    for tone in [0.1, 0.3, 0.5] {
-        let (a, b) = (ink_map(&params, tone)?, ink_map(&params, 1.0 - tone)?);
-        for y in 0..70 {
-            for x in 0..70 {
-                let (here, there) = (a[y * 80 + x], 1.0 - b[(y + 10) * 80 + x + 10]);
-                assert!(
-                    (here - there).abs() < 0.01,
-                    "tone {tone} ({x}, {y}): {here} against {there}"
-                );
-            }
-        }
-    }
-    Ok(())
-}
-
-/// The round dot's spot value at each pixel of one cell of `side` px: the picture whose ranking is the dot's, the
-/// centre brightest (the brightest cells are inked first).
-fn dot_matrix(side: usize) -> Result<Image, Error> {
-    let greys: Vec<f32> = (0..side * side)
-        .flat_map(|index| {
-            let (x, y) = (
-                (index % side) as f32 / side as f32 - 0.5,
-                (index / side) as f32 / side as f32 - 0.5,
-            );
-            let distance = (x * x + y * y).sqrt();
-            [1.0 - distance; 3]
-        })
-        .collect();
-    Image::new(side, side, &greys)
-}
-
-/// The ink map of the oracle screen with shape 'matrix' and the cell picture `matrix`.
-fn matrix_ink(matrix: &Image, tone: f32) -> Result<Vec<f32>, Error> {
-    let params = Params {
-        matrix: PictureName::new("m"),
-        ..oracle(Shape::Matrix)
-    };
-    let values = flat(80, 80, 1.0 - tone);
-    let out = apply(
-        "halftone",
-        &Picture::new(80, 80, &values)?,
-        &Value::Object(params.values()),
-        &Inputs::default().with_image("matrix", matrix),
-    )?;
-    Ok(out
-        .into_values()
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .map(|pixel| 1.0 - pixel[0])
-        .collect())
-}
-
-#[test]
-fn a_matrix_of_the_round_dots_values_reproduces_the_round_dot() -> Result<(), Error> {
-    // a picture of 20 x 20, one place a pixel of the cell, ranks the same pixels as the dot's own distance does; the dot
-    // inks the places nearer its centre than the radius, the matrix its k nearest of 400 (ties in reading order), and
-    // its soft edge is a ramp of 1 / 400 of tone a rank, 0.05 of a pixel's coverage: the two differ at the edge pixels
-    // alone (a ring about 2 pi r px, up to half a coverage each) and the tone each keeps is within 1 / 400
-    let matrix = dot_matrix(20)?;
-    let round = oracle(Shape::Dot);
-    for tone in [0.1, 0.25, 0.5, 0.75] {
-        let (want, got) = (ink_map(&round, tone)?, matrix_ink(&matrix, tone)?);
-        let mean = |map: &[f32]| map.iter().sum::<f32>() / map.len() as f32;
-        assert!(
-            (mean(&want) - mean(&got)).abs() < 0.005,
-            "tone {tone}: {} against {}",
-            mean(&want),
-            mean(&got)
-        );
-        let ring = 2.0 * PI * (tone / PI).sqrt() * 20.0; // px of edge a cell
-        let bound = 0.5 * ring / 400.0; // half a coverage each, at most
-        let mean_difference = want.iter().zip(&got).map(|(a, b)| (a - b).abs()).sum::<f32>() / want.len() as f32;
-        assert!(
-            mean_difference < bound,
-            "tone {tone}: pixels differ by {mean_difference} (bound {bound})"
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn a_matrix_inks_a_tone_of_k_of_its_n_places_brightest_first_with_ties_in_reading_order() -> Result<(), Error> {
-    // 2 x 2 places of a cell of 20 px: greys 0.2 0.9 / 0.5 0.5 rank (bright first) top right, then the two 0.5 in reading
-    // order (bottom left, bottom right), then the top left; a flat tone of k / 4 inks k places, whole blocks of 10 x 10 px
-    // but for the soft edge of 0.5 / 4 * 20 = 2.5 of coverage's ramp, so the middle pixel of each block is whole
-    let matrix = Image::new(
-        2,
-        2,
-        &[0.2, 0.9, 0.5, 0.5].iter().flat_map(|&g| [g; 3]).collect::<Vec<_>>(),
-    )?;
-    let block = |ink: &[f32], column: usize, row: usize| ink[(row * 10 + 5) * 80 + column * 10 + 5];
-    for (tone, inked) in [
-        (0.25, [[0, 1], [0, 0]]),
-        (0.5, [[0, 1], [1, 0]]),
-        (0.75, [[0, 1], [1, 1]]),
-        (1.0, [[1, 1], [1, 1]]),
-    ] {
-        let ink = matrix_ink(&matrix, tone)?;
-        for (row, line) in inked.iter().enumerate() {
-            for (column, &want) in line.iter().enumerate() {
-                assert!(
-                    (block(&ink, column, row) - want as f32).abs() < 0.01,
-                    "tone {tone} place ({column}, {row})"
-                );
-            }
-        }
-    }
-    Ok(())
-}
-
 // ---- the refusals of shape 'matrix' ----------------------------------------------------------------------------------
 
 /// `shape` 'matrix' of the picture `matrix` (none: not given) run as a recipe.
-fn matrix_run(matrix: Option<&Image>) -> Result<(), Error> {
+pub(crate) fn matrix_run(matrix: Option<&Image>) -> Result<(), Error> {
     use bullterrier_image::{Options, Photo, Presets, Recipe, Step};
     let step = Step::new("halftone").param("shape", "matrix");
     let step = if matrix.is_some() {
@@ -1462,14 +1192,14 @@ fn the_ink_of_every_shape_reaches_a_full_tone_without_a_jump() -> Result<(), Err
 // --- screen geometry --------------------------------------------------------------------------------------------------
 
 /// The oracle's lines on the screen `screen`, a picture of `side` x `side` px (odd, so that the centre is a pixel).
-fn bent(screen: Screen, shape: Shape) -> Params {
+pub(crate) fn bent(screen: Screen, shape: Shape) -> Params {
     Params {
         screen,
         ..oracle(shape)
     }
 }
 
-fn varied_grey(side: usize) -> Vec<f32> {
+pub(crate) fn varied_grey(side: usize) -> Vec<f32> {
     varied(side, side)
 }
 
@@ -1510,7 +1240,12 @@ fn a_wave_of_no_amplitude_is_the_grid() -> Result<(), Error> {
 }
 
 /// The mean ink of the flat grey whose ink is `tone` over the pixels `inside` (their offset from the centre pixel, in px).
-fn ink_where(params: &Params, side: usize, tone: f32, inside: impl Fn(f32, f32) -> bool) -> Result<f32, Error> {
+pub(crate) fn ink_where(
+    params: &Params,
+    side: usize,
+    tone: f32,
+    inside: impl Fn(f32, f32) -> bool,
+) -> Result<f32, Error> {
     let out = red(params, side, side, &flat(side, side, 1.0 - tone))?;
     let middle = (side / 2) as f32;
     let (mut sum, mut count) = (0.0, 0.0);
@@ -1672,204 +1407,6 @@ fn a_waves_line_stands_for_the_tone_where_it_is() -> Result<(), Error> {
         assert!(
             (thickness - tone).abs() < 0.03,
             "line at row {middle}: {thickness} cells, tone there {tone}"
-        );
-    }
-    Ok(())
-}
-
-// ---- print realism ------------------------------------------------------------------------------------------------------
-
-/// Black ink on white paper at square marks (a full tone inks every pixel), a cell of 20 and no blur.
-fn press() -> Params {
-    oracle(Shape::Square)
-}
-
-/// The ink map of `params` at an even `tone` on a `size` x `size` picture.
-fn ink_at(params: &Params, size: usize, tone: f32) -> Result<Vec<f32>, Error> {
-    Ok(red(params, size, size, &flat(size, size, 1.0 - tone))?
-        .into_iter()
-        .map(|r| 1.0 - r)
-        .collect())
-}
-
-fn mean(values: &[f32]) -> f32 {
-    values.iter().sum::<f32>() / values.len() as f32
-}
-
-#[test]
-fn print_realism_at_zero_is_the_clean_screen_whatever_the_seed_and_speck_size() -> Result<(), Error> {
-    let rgb = varied(60, 70);
-    for separation in [Separation::None, Separation::Cmyk, Separation::Spot, Separation::Rgb] {
-        let clean = Params {
-            separation,
-            ..Params::default()
-        };
-        let zeroed = Params {
-            seed: 77,
-            speck_size: 9.0,
-            ..clean.clone()
-        };
-        assert_eq!(
-            run_picture(&zeroed, 60, 70, &rgb)?,
-            run_picture(&clean, 60, 70, &rgb)?,
-            "{separation:?}"
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn dot_gain_is_its_value_at_half_tone_and_follows_the_curve_elsewhere() -> Result<(), Error> {
-    // a' = a + 4 g a (1 - a): at a = 1/2 it is 0.5 + g; the screen keeps the area within 0.015
-    for (gain, tone) in [
-        (0.25, 0.5),
-        (0.1, 0.5),
-        (0.25, 0.2),
-        (0.2, 0.8),
-        (0.25, 0.0),
-        (0.25, 1.0),
-    ] {
-        let params = Params {
-            dot_gain: gain,
-            ..press()
-        };
-        let want = tone + 4.0 * gain * tone * (1.0 - tone);
-        let got = mean(&ink_at(&params, 80, tone)?);
-        assert!(
-            (got - want).abs() < 0.015,
-            "gain {gain} tone {tone}: ink {got}, formula {want}"
-        );
-    }
-    // more gain, more ink, at every tone
-    for tone in [0.1, 0.3, 0.5, 0.7, 0.9] {
-        let mut last = -1.0;
-        for gain in [0.0, 0.05, 0.1, 0.15, 0.2, 0.25] {
-            let params = Params {
-                dot_gain: gain,
-                ..press()
-            };
-            let ink = mean(&ink_at(&params, 80, tone)?);
-            assert!(ink > last, "tone {tone} gain {gain}: {ink} after {last}");
-            last = ink;
-        }
-    }
-    Ok(())
-}
-
-#[test]
-fn ink_noise_is_seeded_uneven_and_keeps_the_mean_ink() -> Result<(), Error> {
-    let noisy = |seed| Params {
-        ink_noise: 1.0,
-        seed,
-        ..press()
-    };
-    let (a, a_again, b) = (
-        ink_at(&noisy(1), 400, 0.5)?,
-        ink_at(&noisy(1), 400, 0.5)?,
-        ink_at(&noisy(2), 400, 0.5)?,
-    );
-    assert_eq!(a, a_again);
-    assert_ne!(a, b);
-    let clean = ink_at(&press(), 400, 0.5)?;
-    assert_ne!(a, clean);
-    // 400 cells, each straying by up to 0.25 either way: the mean's spread is about 0.007
-    assert!(
-        (mean(&a) - mean(&clean)).abs() < 0.03,
-        "{} vs {}",
-        mean(&a),
-        mean(&clean)
-    );
-    // some cells are inked more and some less than the even screen: the dots differ from one another
-    let (high, low) = (
-        a.iter().zip(&clean).filter(|(n, c)| **n > **c + 0.05).count(),
-        a.iter().zip(&clean).filter(|(n, c)| **n < **c - 0.05).count(),
-    );
-    assert!(high > 20_000 && low > 20_000, "{high} more, {low} less"); // of 160000 pixels
-    // a paper or full ink cell does not stray
-    for tone in [0.0, 1.0] {
-        assert_eq!(ink_at(&noisy(1), 80, tone)?, ink_at(&press(), 80, tone)?, "tone {tone}");
-    }
-    Ok(())
-}
-
-/// The number of 4-connected groups of paper (red above a half) in `ink` (1 minus red), `size` pixels a side.
-fn specks_in(ink: &[f32], size: usize) -> usize {
-    let mut seen = vec![false; ink.len()];
-    let mut count = 0;
-    for start in 0..ink.len() {
-        if seen[start] || ink[start] > 0.5 {
-            continue;
-        }
-        count += 1;
-        let mut open = vec![start];
-        seen[start] = true;
-        while let Some(at) = open.pop() {
-            let (row, column) = (at / size, at % size);
-            let near = [
-                (row > 0).then(|| at - size),
-                (row + 1 < size).then(|| at + size),
-                (column > 0).then(|| at - 1),
-                (column + 1 < size).then(|| at + 1),
-            ];
-            for next in near.into_iter().flatten() {
-                if !seen[next] && ink[next] <= 0.5 {
-                    seen[next] = true;
-                    open.push(next);
-                }
-            }
-        }
-    }
-    count
-}
-
-#[test]
-fn specks_bare_the_paper_in_ink_and_only_there_and_their_density_is_the_parameter() -> Result<(), Error> {
-    // a full tone is ink everywhere, so every speck shows as a group of paper pixels; 2 per 1000 px^2 of 300 x 300 = 180
-    let specked = |specks, speck_size, seed| Params {
-        specks,
-        speck_size,
-        seed,
-        ..press()
-    };
-    let full = ink_at(&specked(2.0, 3.0, 5), 300, 1.0)?;
-    let found = specks_in(&full, 300);
-    // 180 expected, give or take about 13 (a Poisson count's spread) and a few merging
-    assert!((145..=215).contains(&found), "{found} specks of 180");
-    // the same look at twice the size in design px: the scaled parameters are a quarter the density and twice the size
-    let double = ink_at(&specked(0.5, 6.0, 5), 600, 1.0)?;
-    let found_double = specks_in(&double, 600);
-    assert!((145..=215).contains(&found_double), "{found_double} specks of 180");
-    assert_eq!(specks_in(&ink_at(&specked(0.0, 3.0, 5), 300, 1.0)?, 300), 0);
-    // another seed another specks; the same seed the same ones
-    assert_eq!(full, ink_at(&specked(2.0, 3.0, 5), 300, 1.0)?);
-    assert_ne!(full, ink_at(&specked(2.0, 3.0, 6), 300, 1.0)?);
-    // no ink, no specks; in a mid tone a speck only takes ink away
-    assert_eq!(ink_at(&specked(5.0, 10.0, 5), 100, 0.0)?, ink_at(&press(), 100, 0.0)?);
-    let (with, without) = (ink_at(&specked(5.0, 4.0, 5), 200, 0.5)?, ink_at(&press(), 200, 0.5)?);
-    assert!(with.iter().zip(&without).all(|(w, wo)| *w <= *wo + 1e-6));
-    assert!(with.iter().zip(&without).any(|(w, wo)| *w < *wo - 0.5));
-    Ok(())
-}
-
-#[test]
-fn print_realism_works_with_every_separation() -> Result<(), Error> {
-    let rgb = varied(80, 90);
-    for separation in [Separation::None, Separation::Cmyk, Separation::Spot, Separation::Rgb] {
-        let clean = Params {
-            separation,
-            paper: Color([1.0; 3]),
-            ..Params::default()
-        };
-        let real = Params {
-            dot_gain: 0.2,
-            ink_noise: 0.5,
-            specks: 5.0,
-            ..clean.clone()
-        };
-        assert_ne!(
-            run_picture(&real, 80, 90, &rgb)?,
-            run_picture(&clean, 80, 90, &rgb)?,
-            "{separation:?}"
         );
     }
     Ok(())

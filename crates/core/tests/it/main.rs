@@ -66,6 +66,8 @@ mod gradient_map;
 mod grain;
 mod grid_shift;
 mod halftone;
+mod halftone_realism;
+mod halftone_shapes;
 mod highpass;
 mod hsv;
 mod hue_range;

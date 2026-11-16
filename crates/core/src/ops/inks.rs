@@ -324,6 +324,7 @@ fn quantile(values: &[f32], tone: f64) -> f32 {
 /// The area inside the unit square centred on a circle of radius `r` (0.5 to 1 / sqrt 2) around its centre: the circle
 /// less four caps beyond the sides, each `r^2 acos(1/2r) - 1/2 sqrt(r^2 - 1/4)`.
 fn clipped_circle(r: f64) -> f64 {
+    // constant: the unit square's half side 0.5 and its square 0.25, and its four sides, in the cap formula above
     let cap = r * r * (0.5 / r).acos() - 0.5 * (r * r - 0.25).sqrt();
     std::f64::consts::PI * r * r - 4.0 * cap
 }
@@ -382,7 +383,7 @@ impl Inks {
     pub(crate) fn rgb() -> Self {
         Self {
             additive: true,
-            count: 3,
+            count: 3, // constant: red, green and blue
             ..Self::new([0.0; 3], &[])
         }
     }

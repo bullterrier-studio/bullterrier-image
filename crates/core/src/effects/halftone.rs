@@ -436,7 +436,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         Separation::None => 1,
         Separation::Cmyk => MOST_INKS,
         Separation::Spot => params.inks.len().min(MOST_INKS),
-        Separation::Rgb => 3,
+        Separation::Rgb => 3, // constant: red, green and blue
     };
     let screens = screens(params, place, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;
@@ -494,7 +494,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                     let ramp = ((radius - distance) * cell * inv_feather + 0.5).clamp(0.0, 1.0) * fade_in; // constant: the ramp is centred on the edge
                     // as a dot narrower than the ramp fades in, the paper between marks narrower than it fades out, so
                     // the ink reaches the full tone without a jump (the ramp alone leaves the cell's edge half paper)
-                    let fade_out = ((1.0 - remembered.amounts[which].min(1.0)) * cell * 4.0 * inv_feather).min(1.0);
+                    let fade_out = ((1.0 - remembered.amounts[which].min(1.0)) * cell * 4.0 * inv_feather).min(1.0); // constant: the paper between marks fades over two feathers each side
                     coverages[index] = 1.0 - (1.0 - ramp) * fade_out;
                 }
                 let printed = if params.separation != Separation::None {
