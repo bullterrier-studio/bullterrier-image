@@ -1232,7 +1232,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   pixels and printed over `paper`; `palette` and `custom` are not reused for inks. *Reason:* a palette is colours to choose
   between, inks are layers that overlap, and one more `separation` mode ('spot', as in `halftone`) keeps the two effects reading alike without a
   shared parameter set. *Consequence:* the pixels are the 2^n combinations of the inks over the paper; the layers are
-  dithered one after another in ink order, so the result does not depend on the thread count.
+  dithered one after another in ink order, so the result does not depend on the thread count. *Tone with several inks:* the
+  mix prints as itself only where the layers overlap independently. `white_noise` draws each ink's thresholds from `seed` +
+  the ink's number and `blue_noise` moves its tile a third of its side per ink: a 0.5/0.5 mix of two inks (green target
+  0.439) prints 0.438 and 0.439 (bayer, clustered, gameboy_camera: 0.553 with one tile; floyd_steinberg 0.418 on a 240 px picture); within 0.02 on 0.3/0.4 and 0.6/0.1. The ordered matrices keep one tile (a half-tile shift made 0.5/0.5 either
+  coincide or complement, 0.553 or 0.325, for a periodic tile has no independent shift) and error diffusion keeps its layers
+  (each diffused alone, they avoid one another): with two or more inks these print off-tone (later item: joint multi-ink
+  diffusion). One ink is tone-true with every method, and its pictures are as before.
 - **`dither` has one `method` list; `serpentine` is its own parameter.** Every look is a `method` value: the row-scanned
   diffusion kernels (`floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`,
   `sierra_lite`, `stevenson_arce`, `ostromoukhov`), other diffusion (`dot_diffusion`, `riemersma`), and ordered

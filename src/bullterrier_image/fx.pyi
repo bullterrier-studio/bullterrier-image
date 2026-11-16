@@ -890,7 +890,12 @@ pattern : number, fraction, 0 to 1, default 1.0
     colours with no pattern, whatever the method.
 separation : one of 'none', 'spot', default 'none'
     How the colours are chosen: 'none' (from `palette`) or 'spot' (one layer of dots per
-    colour of `inks`, printed over `paper` like transparent layers).
+    colour of `inks`, printed over `paper` like transparent layers). One ink keeps the
+    tone with every `method`; several inks keep it with `white_noise` and `blue_noise`
+    (each ink's layer has its own noise), not with the ordered matrices (`bayer`,
+    `clustered`, `gameboy_camera`, `matrix`: one tile, so the layers nest or avoid each
+    other) or error diffusion (the layers are not independent), which print a mix of
+    inks off-tone.
 inks : list of colours, default ('#ff4d6d', '#2b59ff')
     With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three
     numbers 0..1), in the order they are offset; ignored otherwise. Each pixel's colour

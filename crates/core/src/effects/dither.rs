@@ -240,7 +240,10 @@ pub struct Params {
     #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
     pub seed: u32,
     /// How the colours are chosen: 'none' (from `palette`) or 'spot' (one layer of dots per colour of `inks`, printed over
-    /// `paper` like transparent layers).
+    /// `paper` like transparent layers). One ink keeps the tone with every `method`; several inks keep it with `white_noise` and
+    /// `blue_noise` (each ink's layer has its own noise), not with the ordered matrices (`bayer`, `clustered`, `gameboy_camera`,
+    /// `matrix`: one tile, so the layers nest or avoid each other) or error diffusion (the layers are not independent), which
+    /// print a mix of inks off-tone.
     #[param(default = None)]
     pub separation: Separation,
     /// With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three numbers 0..1), in the order they are
@@ -421,6 +424,7 @@ fn pattern(
     palette: &[Point],
     params: &Params,
     inputs: &Inputs<'_>,
+    ink: usize,
 ) -> Vec<u8> {
     let (amount, serpentine) = (params.pattern, params.serpentine);
     // an ink plane holds its coverage in the first channel, whatever the space
@@ -449,10 +453,10 @@ fn pattern(
         Method::Bayer => tiled(Tile::Bayer),
         Method::Clustered => tiled(Tile::Clustered),
         Method::Clustered45 => tiled(Tile::Clustered45),
-        Method::BlueNoise => tiled(Tile::BlueNoise),
-        Method::WhiteNoise => ordered(values, size, palette, &noise(params.seed), amount),
+        Method::BlueNoise => ordered(values, size, palette, &Tile::BlueNoise.thresholds().for_ink(ink), amount),
+        Method::WhiteNoise => ordered(values, size, palette, &noise(params.seed).for_ink(ink), amount),
         Method::GameboyCamera => tiled(Tile::GameboyCamera),
-        Method::Matrix => ordered(values, size, palette, &matrix_of(inputs), amount),
+        Method::Matrix => ordered(values, size, palette, &matrix_of(inputs).for_ink(ink), amount),
     }
 }
 
@@ -512,7 +516,7 @@ fn printed(
             for (value, coverage) in plane.iter_mut().zip(&needed) {
                 value[0] = coverage[ink];
             }
-            pattern(params.method, &plane, (rows, columns), &[none, full], params, inputs)
+            pattern(params.method, &plane, (rows, columns), &[none, full], params, inputs, ink)
         })
         .collect();
     // the print of every combination of inks, by the bits of the inks that land
@@ -565,7 +569,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let palette = colours(&dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
     let size = (rows, columns);
-    let chosen = pattern(params.method, &matched, size, &matched_palette, params, inputs);
+    let chosen = pattern(params.method, &matched, size, &matched_palette, params, inputs, 0);
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {

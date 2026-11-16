@@ -1414,3 +1414,24 @@ fn dither_spot_prints_the_tone_of_what_the_inks_can_mix() -> Result<(), Error> {
     }
     Ok(())
 }
+
+#[test]
+fn dither_spot_noise_methods_mix_several_inks_at_the_tone_of_their_areas() -> Result<(), Error> {
+    // two inks at half each: independent layers print `(1 - a (1 - pink)) (1 - b (1 - blue))`; layers under one threshold nest
+    let inks = [PINK, BLUE];
+    let want = [0, 1, 2].map(|c| (0..2).fold(1.0, |light, i| light * (1.0 - 0.5 * (1.0 - inks[i][c].min(1.0)))));
+    for method in [Method::WhiteNoise, Method::BlueNoise] {
+        let params = Params {
+            cell: 2.0,
+            paper: Color(WHITE),
+            ..inked(method, &inks)
+        };
+        let out = run_picture(&params, 200, 200, &want.repeat(200 * 200))?;
+        let got = [0, 1, 2].map(|c| out.as_chunks::<3>().0.iter().map(|pixel| pixel[c]).sum::<f32>() / 40_000.0);
+        assert!(
+            (0..3).all(|c| (got[c] - want[c]).abs() < 0.03),
+            "{method:?}: {got:?} against {want:?}"
+        );
+    }
+    Ok(())
+}

@@ -640,10 +640,45 @@ pub(crate) enum Thresholds<'a> {
     Noise { seed: u32 },
 }
 
+/// How far each later ink's blue-noise tile moves, per ink, as (rows, columns) over a divisor of the tile's sides.
+const TILE_STEP: (usize, usize, usize) = (1, 1, 3); // constant: a third of the tile each way: blue noise's levels are alike at any shift, and a third keeps two layers apart
+
 /// The ranks of white noise: a pixel's rank is one of this many levels.
 const NOISE_LEVELS: usize = 1 << 16; // constant: a rank is 16 bits
 
 impl Thresholds<'_> {
+    /// The thresholds of the layer of ink number `ink` (0 first): the first ink's are these; each later ink's tile is moved
+    /// by `ink` times a fraction of its sides ([`TILE_STEP`], used for the blue-noise tile) and its noise drawn from the next seed, so that the layers of
+    /// several inks overlap as independent ones do, instead of nesting under one threshold.
+    pub(crate) fn for_ink(&self, ink: usize) -> Thresholds<'static> {
+        match self {
+            Self::Tiled {
+                ranks,
+                rows,
+                columns,
+                count,
+            } => {
+                let (down, right) = (
+                    ink * rows * TILE_STEP.0 / TILE_STEP.2,
+                    ink * columns * TILE_STEP.1 / TILE_STEP.2,
+                );
+                Thresholds::Tiled {
+                    ranks: Cow::Owned(
+                        (0..rows * columns)
+                            .map(|at| ranks[(at / columns + down) % rows * columns + (at % columns + right) % columns])
+                            .collect(),
+                    ),
+                    rows: *rows,
+                    columns: *columns,
+                    count: *count,
+                }
+            }
+            Self::Noise { seed } => Thresholds::Noise {
+                seed: seed.wrapping_add(u32::try_from(ink).unwrap_or_default()),
+            },
+        }
+    }
+
     fn count(&self) -> usize {
         match self {
             Self::Tiled { count, .. } => *count,
