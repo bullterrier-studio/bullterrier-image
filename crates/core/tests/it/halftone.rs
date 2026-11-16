@@ -1436,3 +1436,25 @@ fn shape_matrix_with_no_picture_or_one_too_large_is_refused_naming_the_matrix() 
     assert!(red(&oracle(Shape::Square), 20, 20, &flat(20, 20, 0.5)).is_ok());
     Ok(())
 }
+
+#[test]
+fn the_ink_of_every_shape_reaches_a_full_tone_without_a_jump() -> Result<(), Error> {
+    // the ramp is centred on a mark's edge, so where the paper between marks is narrower than the ramp it fades out: a tone
+    // a hair under 1 prints (all but) fully, as 1 does
+    for shape in [Shape::Dot, Shape::Line, Shape::Square, Shape::Diamond, Shape::Euclidean] {
+        for (cell, angle) in [(20.0, 0.0), (14.0, 45.0), (7.0, 17.0)] {
+            let params = Params {
+                cell,
+                angle,
+                ..oracle(shape)
+            };
+            let (almost, full) = (coverage_with(&params, 0.9999)?, coverage_with(&params, 1.0)?);
+            assert!(full > 1.0 - 1e-6, "{shape:?} {cell} {angle}: tone 1 prints {full}");
+            assert!(
+                full - almost < 0.002,
+                "{shape:?} {cell} {angle}: {almost} at 0.9999, {full} at 1"
+            );
+        }
+    }
+    Ok(())
+}

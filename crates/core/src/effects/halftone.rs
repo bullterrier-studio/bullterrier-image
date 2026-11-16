@@ -62,7 +62,7 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 /// proportional to the ink, so the screen keeps the picture's tones: dots touch at about 78.5 % tone and fill their cell at
 /// full tone. Ink is the Rec. 709 luminance on a dark `paper` (below `paper_threshold`) and its complement on a light one. The
 /// dot's edge is a ramp `feather` px wide, centred on its radius and faded in with the dot so that a dot narrower than
-/// the ramp prints about its own area, and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the
+/// the ramp prints about its own area (and paper between dots narrower than it fades out, so near-full tones fill), and bare paper for zero ink. A dot is `ink`, or with no `ink` the colour of the
 /// photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.
 ///
 /// `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink
@@ -343,7 +343,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                     // the spot function's value here and its level for the ink: inked where the value is below the level
                     let (distance, radius) = (spot.value(u - cu, v - cv), remembered.levels[which]);
                     let fade_in = (radius * cell * 2.0 * inv_feather).min(1.0); // constant: the ramp is half a feather on each side
-                    coverages[index] = ((radius - distance) * cell * inv_feather + 0.5).clamp(0.0, 1.0) * fade_in; // constant: the ramp is centred on the edge
+                    let ramp = ((radius - distance) * cell * inv_feather + 0.5).clamp(0.0, 1.0) * fade_in; // constant: the ramp is centred on the edge
+                    // as a dot narrower than the ramp fades in, the paper between marks narrower than it fades out, so
+                    // the ink reaches the full tone without a jump (the ramp alone leaves the cell's edge half paper)
+                    let fade_out = ((1.0 - remembered.amounts[which].min(1.0)) * cell * 4.0 * inv_feather).min(1.0);
+                    coverages[index] = 1.0 - (1.0 - ramp) * fade_out;
                 }
                 *out = if params.separation != Separation::None {
                     inks.print(&coverages)
