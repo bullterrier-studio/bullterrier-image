@@ -47,10 +47,10 @@ pub(crate) const SPOT_SCREEN_STEP: f64 = 30.0; // constant: 90 / 3, see above
 /// How far, in cells, each further ink's centre is from the previous one's on rings, spiral and rays, and the direction
 /// (degrees clockwise on screen from the x axis). Inks that share a centre share their rows, so they nest instead of
 /// overlapping and a mix prints off-tone; their own centres make the rows cross. Measured over the reviewer's two inks, five
-/// area pairs, dot and line, on all three screens (240 px, cell 12): the error of a channel is 0.003 to 0.005 for dots from 3.3
-/// cells up and not lower for any step, but 2.5 cells and fewer leave fringes too wide for the picture to average (0.005 and
-/// more, 0.02 at 1.5); the direction made no difference (0 and 90 degrees alike), so the diagonal, which no row of the
-/// picture follows. 4 cells: in the plateau, and small enough that four inks stay within 12 cells of the centre.
+/// area pairs, dot and line, on all three screens (240 px, cell 12): the error of a channel is 0.003 to 0.006 for dots and
+/// 0.013 to 0.016 for lines from 3.3 cells up; 2.5
+/// cells and fewer leave fringes too wide for the picture to average (0.005 for dots, 0.02 at 1.5); the direction made no
+/// difference (0 and 90 degrees alike), so the diagonal, which no row of the picture follows. 4 cells: in the plateau, and small enough that four inks stay within 12 cells of the centre.
 pub(crate) const CONCENTRIC_STEP: f32 = 4.0; // constant: measured, see above
 pub(crate) const CONCENTRIC_DIRECTION: f32 = 45.0; // constant: measured, see above
 

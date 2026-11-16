@@ -1618,8 +1618,8 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   0.439: rings line 0.538, spiral 0.515, rays 0.340, rings dot 0.474). Ink k's centre is moved from (`x`, `y`) by k x 4 cells
   along 45 degrees (`CONCENTRIC_STEP`, `CONCENTRIC_DIRECTION` in `ops/inks.rs`); one ink never moves, and the centre is still a
   fraction of the canvas, so a band equals the whole. *Reason:* measured on five area pairs, dot and line, three screens: a
-  channel's error is 0.003 to 0.005 (dot) from 3.3 cells up, wider fringes than the picture averages below that, and the
-  direction made no difference. *Consequence:* the tone holds within 0.02 (the grid's bound) for every combination.
+  channel's error is 0.003 to 0.006 (dot) and 0.013 to 0.016 (line, rays 0.001) from 3.3 cells up; wider fringes than the
+  picture averages below that; the direction made no difference. *Consequence:* the tone holds within 0.02 (the grid's bound) for every combination.
 - **`rays` merge in pairs towards the centre (halftone tone batch, 2026-11-16).** The count was fixed (62 at 401 px, cell 20),
   so near the centre a ray was narrower than a pixel (1 to 1.5 cells out, a line at tones 0.25 and 0.75 printed 0.2665 and
   0.7335; 62 rays on a circle 9.4 cells round at 1.5 cells). Now, at the middle radius of a cell's ring, the count is halved
