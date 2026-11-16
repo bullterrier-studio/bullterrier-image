@@ -511,6 +511,34 @@ fn blend_at_its_largest_scale_and_margin_sizes_only_what_shows_and_one_past_is_r
 }
 
 #[test]
+fn a_dither_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() -> Result<(), Error> {
+    // the ranks of the matrix are 16 bits: 256 x 256 cells is the most they hold
+    let pixels = vec![0.5; 20 * 20 * 3];
+    let step = || {
+        Step::new("dither")
+            .param("method", "matrix")
+            .param("matrix", "m")
+            .param("palette", "custom")
+    };
+    let render = |rows: usize, columns: usize| {
+        let matrix = Arc::new(Image::new(rows, columns, &vec![0.4; rows * columns * 3])?);
+        Photo::new(Picture::new(20, 20, &pixels)?)
+            .with_image("m", matrix)
+            .render(&Recipe::new([step()]), &Presets::new(), Options::default())
+            .map(drop)
+    };
+    for (rows, columns) in [(256, 256), (1, 256), (256, 1)] {
+        let most = render(rows, columns);
+        assert!(most.is_ok(), "{rows} x {columns}: {most:?}");
+    }
+    for (rows, columns) in [(257, 1), (1, 257)] {
+        let past = render(rows, columns);
+        assert!(refused(&past, &["matrix", "257"]), "{rows} x {columns}: {past:?}");
+    }
+    Ok(())
+}
+
+#[test]
 fn shatter_at_its_most_pieces_finishes_in_both_shapes_and_one_more_is_refused() -> Outcome {
     // the points are drawn, the triangles found and the pieces' means kept for each: the work follows `pieces`
     let pixels = vec![0.5; 120 * 120 * 3];

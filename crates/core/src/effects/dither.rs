@@ -9,16 +9,17 @@ use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start};
 use crate::ops::colorspace::rgb_to_oklab;
+use crate::ops::color::luminance;
 use crate::ops::dither::{
     ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW, STEVENSON_ARCE,
-    STUCKI, Tile, diffuse, ordered,
+    STUCKI, Thresholds, Tile, diffuse, from_greys, noise, ordered,
 };
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
 use crate::ops::par;
 use crate::palette::{self, Search};
-use crate::params::{Choice, Color, Params};
-use crate::{Image, Inputs, Picture};
+use crate::params::{Choice, Color, Params, PictureName};
+use crate::{Error, Image, Inputs, Picture};
 
 /// Where `dither` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -59,10 +60,24 @@ pub enum Method {
     SierraLite,
     /// A wide hexagonal kernel on twelve pixels (Stevenson and Arce, 1985): a fine, even grain.
     StevensonArce,
-    /// A regular crosshatch of an 8 x 8 matrix.
+    /// A regular crosshatch of Bayer's 2 x 2 matrix: coarse, four levels.
+    Bayer2,
+    /// A regular crosshatch of Bayer's 4 x 4 matrix.
+    Bayer4,
+    /// A regular crosshatch of Bayer's 8 x 8 matrix.
     Bayer,
+    /// Round dots in a square grid, as a halftone screen (an 8 x 8 clustered-dot matrix): dots grow with the tone.
+    Clustered,
+    /// Round dots in a grid turned 45 degrees, as a newspaper screen (an 8 x 8 clustered-dot matrix).
+    Clustered45,
     /// An even, grainless scatter from a repeating 64 x 64 tile.
     BlueNoise,
+    /// A random threshold for every pixel (`seed`): grain with no structure, noisier than blue noise.
+    WhiteNoise,
+    /// The Game Boy Camera's 4 x 4 dither matrix, a fine crosshatch as the camera draws it.
+    GameboyCamera,
+    /// A pattern of your own, the picture `matrix`: its grey values, ranked, are the thresholds.
+    Matrix,
 }
 
 /// Where the colours come from.
@@ -129,8 +144,8 @@ pub enum Init {
 /// colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours
 /// split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers
 /// printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`,
-/// `custom`, `colors`, `space`, `init`, `iterations`, `tolerance`, `sample` and `seed` are used only with no
-/// `separation`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
+/// `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no
+/// `separation`; `seed` also seeds the noise of `white_noise` with it. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
 /// misregistered on a press.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
@@ -139,9 +154,13 @@ pub struct Params {
     /// 'sierra', `sierra_two_row`, `sierra_lite` and `stevenson_arce` pass each pixel's error on to its neighbours
     /// (organic grain; they differ in how many pixels and how far the error goes: wider kernels are smoother, narrower ones
     /// sharper and faster; all keep every tone except Atkinson, which drops a quarter of the error, so highlights and
-    /// shadows go clean and the contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix. `blue_noise` is an even,
-    /// grainless scatter from a repeating 64 x 64 tile, the one with no visible pattern. Both of those mix colours of any
-    /// palette, in steps of a sixteenth.
+    /// shadows go clean and the contrast is higher). The rest are ordered: a repeating matrix of thresholds decides each
+    /// pixel. `bayer2`, `bayer4` and 'bayer' are regular crosshatches of Bayer's 2 x 2, 4 x 4 and 8 x 8 matrices;
+    /// 'clustered' and `clustered_45` are halftone screens (8 x 8, dots in a square grid or turned 45 degrees);
+    /// `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile, the one with no visible pattern;
+    /// `white_noise` is a random threshold for every pixel (`seed`); `gameboy_camera` is the Game Boy Camera's 4 x 4
+    /// matrix; 'matrix' uses the picture `matrix`. The ordered methods mix colours of any palette, in steps of a
+    /// sixteenth, or of one over the cells of a matrix of fewer than 16 (`bayer2` mixes in quarters).
     #[param(default = FloydSteinberg)]
     pub method: Method,
     /// Scan odd rows right to left, with the kernel mirrored, so the grain does not slant one way (`floyd_steinberg`,
@@ -149,6 +168,13 @@ pub struct Params {
     /// `stevenson_arce`; the other methods have no scan direction). Off, every row is scanned left to right.
     #[param(default = false)]
     pub serpentine: bool,
+    /// With method 'matrix': the picture whose grey values are the thresholds, the path of an image file in a recipe file
+    /// (relative to the file) or in `fx`, or, in Python, a Picture or an array; in Rust, the name of a picture the photo
+    /// was given or the path of an image file. At most 256 x 256 pixels, a side of any length; it repeats across the
+    /// picture from its top left corner. Its cells are ranked by brightness and the brightest are lit first, equal ones
+    /// in reading order (a flat grey at k of the n levels of a matrix of n cells lights k cells). Ignored with any other method; none is refused with 'matrix'.
+    #[param()]
+    pub matrix: PictureName,
     /// Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' (the 4 greens
     /// widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8'
     /// (the 16 PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2 to 6 evenly spaced levels
@@ -160,7 +186,7 @@ pub struct Params {
     #[param(default = ["#000000", "#ffffff"], min_length = 2, max_length = 256)]
     pub custom: Vec<Color>,
     /// How many colours to find when `palette` is 'photo' (ignored for any other palette). Raising it keeps more detail and
-    /// gradation; fewer than this many are used if the picture has fewer distinct colours. 'bayer' and `blue_noise` take
+    /// gradation; fewer than this many are used if the picture has fewer distinct colours. The ordered methods take
     /// longer with more colours.
     #[param(default = 8, unit = count, min = 2, max = 256)]
     pub colors: i32,
@@ -171,7 +197,7 @@ pub struct Params {
     #[param(default = 0.0, unit = px, min = 0, max = 48)]
     pub cell: f32,
     /// How much of the dot pattern is used: 1 = the method as designed; lower passes less error on (the error-diffusion
-    /// methods) or mixes fewer colours per dot (bayer, `blue_noise`), so flatter areas; 0 gives each dot its nearest palette
+    /// methods) or mixes fewer colours per dot (the ordered methods), so flatter areas; 0 gives each dot its nearest palette
     /// colour, plain flat colours with no pattern, whatever the method.
     #[param(default = 1.0, unit = fraction, min = 0, max = 1)]
     pub pattern: f32,
@@ -198,8 +224,9 @@ pub struct Params {
     /// may miss small areas of colour.
     #[param(default = 10000, unit = count, min = 1, max = 1000000, advanced)]
     pub sample: i32,
-    /// Random seed for the choice of sample dots and starting colours when `palette` is 'photo': the same seed always gives
-    /// the same picture, another seed may find slightly different colours.
+    /// Random seed for the choice of sample dots and starting colours when `palette` is 'photo', and for the thresholds of
+    /// `white_noise`: the same seed always gives the same picture, another seed finds slightly different colours or other
+    /// noise.
     #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
     pub seed: u32,
     /// How the colours are chosen: 'none' (from `palette`) or 'inks' (one layer of dots per colour of `inks`, printed over
@@ -359,9 +386,17 @@ fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
 }
 
 /// The `chosen` method on `values` (`size` dots), as a pattern of palette indices.
-fn pattern(method: Method, values: &[Point], size: (usize, usize), palette: &[Point], params: &Params) -> Vec<u8> {
+fn pattern(
+    method: Method,
+    values: &[Point],
+    size: (usize, usize),
+    palette: &[Point],
+    params: &Params,
+    inputs: &Inputs<'_>,
+) -> Vec<u8> {
     let (amount, serpentine) = (params.pattern, params.serpentine);
     let by = |kernel| diffuse(values, size, palette, kernel, amount, serpentine);
+    let tiled = |tile: Tile| ordered(values, size, palette, &tile.thresholds(), amount);
     match method {
         Method::FloydSteinberg => by(&FLOYD_STEINBERG),
         Method::Atkinson => by(&ATKINSON),
@@ -372,9 +407,53 @@ fn pattern(method: Method, values: &[Point], size: (usize, usize), palette: &[Po
         Method::SierraTwoRow => by(&SIERRA_TWO_ROW),
         Method::SierraLite => by(&SIERRA_LITE),
         Method::StevensonArce => by(&STEVENSON_ARCE),
-        Method::Bayer => ordered(values, size, palette, Tile::Bayer, amount),
-        Method::BlueNoise => ordered(values, size, palette, Tile::BlueNoise, amount),
+        Method::Bayer2 => tiled(Tile::Bayer2),
+        Method::Bayer4 => tiled(Tile::Bayer4),
+        Method::Bayer => tiled(Tile::Bayer),
+        Method::Clustered => tiled(Tile::Clustered),
+        Method::Clustered45 => tiled(Tile::Clustered45),
+        Method::BlueNoise => tiled(Tile::BlueNoise),
+        Method::WhiteNoise => ordered(values, size, palette, &noise(params.seed), amount),
+        Method::GameboyCamera => tiled(Tile::GameboyCamera),
+        Method::Matrix => ordered(values, size, palette, &matrix_of(inputs), amount),
     }
+}
+
+/// The most pixels along a side of a caller's `matrix`.
+const MATRIX_SIDE: usize = 256; // constant: 256 x 256 cells are 65536 ranks, the most a 16-bit rank holds
+
+/// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
+///
+/// # Errors
+/// [`Error::Recipe`] naming `matrix`.
+pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
+    if params.method != Method::Matrix {
+        return Ok(());
+    }
+    let Some(image) = inputs.image("matrix") else {
+        return Err(Error::Recipe(
+            "dither: `matrix` is needed with method 'matrix': a picture name or path".to_owned(),
+        ));
+    };
+    if image.height() > MATRIX_SIDE || image.width() > MATRIX_SIDE {
+        return Err(Error::Recipe(format!(
+            "dither: `matrix` is {} x {} pixels, at most {MATRIX_SIDE} x {MATRIX_SIDE}",
+            image.width(),
+            image.height()
+        )));
+    }
+    Ok(())
+}
+
+/// The thresholds of the picture `matrix`, which `check` has seen.
+fn matrix_of(inputs: &Inputs<'_>) -> Thresholds<'static> {
+    inputs.image("matrix").map_or_else(
+        || from_greys(&[0.0], (1, 1)),
+        |image| {
+            let greys: Vec<f32> = image.as_picture().pixels().iter().map(|&pixel| luminance(pixel)).collect();
+            from_greys(&greys, (image.height(), image.width()))
+        },
+    )
 }
 
 /// The inks printed: each ink's coverage of the dots is dithered to a layer of 0 and 1 (the layers in the order of the
@@ -385,6 +464,7 @@ fn printed(
     cell: usize,
     (height, width): (usize, usize),
     params: &Params,
+    inputs: &Inputs<'_>,
 ) -> Image {
     let colours: Vec<[f32; 3]> = params.inks.iter().map(|ink| ink.0).collect();
     let inks = Inks::new(params.paper.0, &colours);
@@ -403,7 +483,7 @@ fn printed(
             for (value, coverage) in plane.iter_mut().zip(&needed) {
                 value[0] = coverage[ink];
             }
-            pattern(params.method, &plane, (rows, columns), &[none, full], params)
+            pattern(params.method, &plane, (rows, columns), &[none, full], params, inputs)
         })
         .collect();
     // the print of every combination of inks, by the bits of the inks that land
@@ -440,19 +520,19 @@ fn printed(
 }
 
 /// The picture redrawn.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
     let cell = whole(f64::from(params.cell)).max(1);
     let (rows, columns) = (height.div_ceil(cell), width.div_ceil(cell));
     let dots = averaged(picture.pixels(), (height, width), cell);
     if params.separation == Separation::Inks {
-        return printed(&dots, (rows, columns), cell, (height, width), params);
+        return printed(&dots, (rows, columns), cell, (height, width), params, inputs);
     }
     let matched = in_space(&dots, params.space);
     let palette = colours(&dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
     let size = (rows, columns);
-    let chosen = pattern(params.method, &matched, size, &matched_palette, params);
+    let chosen = pattern(params.method, &matched, size, &matched_palette, params, inputs);
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {

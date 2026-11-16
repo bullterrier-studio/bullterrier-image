@@ -4,12 +4,13 @@
 //! shifts each pixel by a repeating pattern ([`Tile`]) before choosing. Both return the index of the chosen palette colour
 //! per pixel (a palette has at most 256 colours); the caller paints them.
 
+use std::borrow::Cow;
 use std::sync::OnceLock;
 
 use crate::ops::cluster::{Point, nearest_one};
 use crate::ops::length::whole;
 use crate::ops::par;
-use crate::ops::random::Rng;
+use crate::ops::random::{Rng, mix};
 
 /// Where an error-diffusion kernel sends a pixel's error: (columns right, rows down, weight) for the pixels it reaches,
 /// and the weights' divisor. Every tap lies after the pixel in reading order.
@@ -197,14 +198,121 @@ pub(crate) fn diffuse(
 /// The repeating pattern of an ordered dither.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Tile {
+    /// The 2 x 2 matrix of Bayer's recursive construction.
+    Bayer2,
+    /// The 4 x 4 matrix of Bayer's recursive construction.
+    Bayer4,
     /// The 8 x 8 matrix of Bayer's recursive construction, a regular crosshatch.
     Bayer,
+    /// An 8 x 8 clustered-dot matrix, dots in a square grid.
+    Clustered,
+    /// An 8 x 8 clustered-dot matrix, dots on a 45 degree grid.
+    Clustered45,
     /// A 64 x 64 void-and-cluster tile: the points below any level are spread evenly, with no clumps or lines.
     BlueNoise,
+    /// The Game Boy Camera's 4 x 4 matrix.
+    GameboyCamera,
 }
 
-/// Bayer's matrix side.
-const BAYER_SIDE: usize = 8; // constant: Bayer (1973), the 8 x 8 matrix, 64 levels
+/// The ranks of the straight clustered-dot matrix, 8 x 8, row after row: ImageMagick's `h8x8o` (`config/thresholds.xml`,
+/// from Gernot Hoffmann's "Dithering & Halftoning"), levels 1 to 64 turned round (63 - level + 1) so that the cell lit last
+/// is the dot's centre, as `ordered` lights the highest rank first.
+// constant: ImageMagick h8x8o, https://github.com/ImageMagick/ImageMagick/blob/main/config/thresholds.xml
+const CLUSTERED: [u16; 64] = [
+    57, 43, 31, 21, 28, 45, 55, 60,
+    48, 37, 13, 9, 15, 35, 50, 53,
+    33, 17, 7, 3, 5, 19, 29, 41,
+    23, 11, 4, 0, 2, 12, 24, 26,
+    27, 20, 6, 1, 8, 18, 34, 42,
+    49, 36, 16, 10, 14, 38, 47, 54,
+    56, 46, 30, 22, 32, 44, 58, 62,
+    59, 51, 39, 25, 40, 52, 61, 63,
+];
+
+/// The ranks of the 45 degree clustered-dot matrix, 8 x 8, row after row: the Go dither library's
+/// `ClusteredDotDiagonal8x8` (from the libcaca study, part 2), turned round (63 - rank) as `CLUSTERED` is.
+// constant: https://github.com/makeworld-the-better-one/dither/blob/master/ordered_ditherers.go, http://caca.zoy.org/study/part2.html
+const CLUSTERED_45: [u16; 64] = [
+    39, 53, 51, 37, 28, 16, 14, 26,
+    55, 63, 61, 49, 18, 4, 2, 12,
+    41, 57, 59, 47, 20, 6, 0, 10,
+    33, 43, 45, 35, 30, 22, 8, 24,
+    29, 17, 15, 27, 38, 52, 50, 36,
+    19, 5, 3, 13, 54, 62, 60, 48,
+    21, 7, 1, 11, 40, 56, 58, 46,
+    31, 23, 9, 25, 32, 42, 44, 34,
+];
+
+/// The Game Boy Camera's matrix, 4 x 4, row after row: the order of the 16 cells' thresholds (all three levels order them
+/// alike), as the camera's registers A006 on hold them (cell x + 4 y at 3 registers a cell); the camera lights the lowest
+/// threshold first, so the ranks are turned round (15 - order).
+// constant: https://github.com/HerrZatacke/dither-pattern-gen/blob/master/reference/patterns.mjs (first Low Light pattern), the DashBoy camera's SD/config.json
+const GAMEBOY_CAMERA: [u16; 16] = [
+    15, 3, 12, 0,
+    7, 11, 4, 8,
+    13, 1, 14, 2,
+    5, 9, 6, 10,
+];
+
+/// The thresholds of an ordered dither: a rank for every pixel, out of `count` ranks, the highest lit first.
+pub(crate) enum Thresholds<'a> {
+    /// A tile of `rows` x `columns` ranks, row after row, repeating from the picture's top left corner.
+    Tiled {
+        ranks: Cow<'a, [u16]>,
+        rows: usize,
+        columns: usize,
+        count: usize,
+    },
+    /// A rank drawn for each pixel from `seed` and the pixel's place, `row * width + column`.
+    Noise { seed: u32 },
+}
+
+/// The ranks of white noise: a pixel's rank is one of this many levels.
+const NOISE_LEVELS: usize = 1 << 16; // constant: a rank is 16 bits
+
+impl Thresholds<'_> {
+    fn count(&self) -> usize {
+        match self {
+            Self::Tiled { count, .. } => *count,
+            Self::Noise { .. } => NOISE_LEVELS,
+        }
+    }
+
+    fn rank(&self, (row, column): (usize, usize), width: usize) -> usize {
+        match self {
+            Self::Tiled {
+                ranks, rows, columns, ..
+            } => usize::from(ranks[(row % rows) * columns + column % columns]),
+            Self::Noise { seed } => {
+                // the top 16 bits of the word hashed from the seed and the pixel's place
+                usize::try_from(mix(*seed, &[u64::try_from(row * width + column).unwrap_or_default()]) >> 48).unwrap_or_default()
+            }
+        }
+    }
+}
+
+/// A caller's matrix as thresholds: `greys` (`rows` x `columns`, row after row) ranked, the brightest cell highest and so
+/// lit first; of equal cells the earlier in reading order is lit first.
+pub(crate) fn from_greys(greys: &[f32], (rows, columns): (usize, usize)) -> Thresholds<'static> {
+    let mut order: Vec<usize> = (0..greys.len()).collect();
+    order.sort_by(|&a, &b| greys[b].total_cmp(&greys[a]));
+    let mut ranks = vec![0_u16; greys.len()];
+    for (place, &cell) in order.iter().enumerate() {
+        ranks[cell] = u16::try_from(greys.len() - 1 - place).unwrap_or(u16::MAX);
+    }
+    Thresholds::Tiled {
+        ranks: Cow::Owned(ranks),
+        rows,
+        columns,
+        count: greys.len(),
+    }
+}
+
+/// White noise from `seed`.
+pub(crate) const fn noise(seed: u32) -> Thresholds<'static> {
+    Thresholds::Noise { seed }
+}
+
 /// The blue-noise tile's side.
 const BLUE_SIDE: usize = 64; // constant: Ulichney (1993), void-and-cluster: 64 x 64, so 4096 levels
 /// The standard deviation in px of the Gaussian that measures how crowded a spot is.
@@ -215,30 +323,32 @@ const BLUE_START: usize = 10; // constant: Ulichney (1993): the first pattern ho
 const BLUE_SEED: u32 = 0; // constant: any fixed seed makes the same tile everywhere
 
 impl Tile {
-    /// The tile's side.
-    const fn side(self) -> usize {
-        match self {
-            Self::Bayer => BAYER_SIDE,
-            Self::BlueNoise => BLUE_SIDE,
-        }
-    }
-
-    /// The tile's ranks, 0 to side x side - 1 each once, row after row. Built once.
-    fn ranks(self) -> &'static [u16] {
-        static BAYER: OnceLock<Vec<u16>> = OnceLock::new();
+    /// The tile's thresholds, its ranks 0 to cells - 1 each once. Blue noise is built once.
+    pub(crate) fn thresholds(self) -> Thresholds<'static> {
         static BLUE: OnceLock<Vec<u16>> = OnceLock::new();
-        match self {
-            Self::Bayer => BAYER.get_or_init(bayer),
-            Self::BlueNoise => BLUE.get_or_init(blue_noise),
+        let (ranks, side): (Cow<'static, [u16]>, usize) = match self {
+            Self::Bayer2 => (Cow::Owned(bayer(2)), 2), // constant: a 2 x 2 matrix
+            Self::Bayer4 => (Cow::Owned(bayer(4)), 4), // constant: a 4 x 4 matrix
+            Self::Bayer => (Cow::Owned(bayer(8)), 8),  // constant: Bayer (1973), the 8 x 8 matrix, 64 levels
+            Self::Clustered => (Cow::Borrowed(&CLUSTERED), 8), // constant: an 8 x 8 matrix
+            Self::Clustered45 => (Cow::Borrowed(&CLUSTERED_45), 8), // constant: an 8 x 8 matrix
+            Self::BlueNoise => (Cow::Borrowed(BLUE.get_or_init(blue_noise).as_slice()), BLUE_SIDE),
+            Self::GameboyCamera => (Cow::Borrowed(&GAMEBOY_CAMERA), 4), // constant: a 4 x 4 matrix
+        };
+        Thresholds::Tiled {
+            count: side * side,
+            ranks,
+            rows: side,
+            columns: side,
         }
     }
 }
 
-/// The ranks of the 8 x 8 Bayer matrix: from [[0]], each doubling is [[4M, 4M + 2], [4M + 3, 4M + 1]].
-fn bayer() -> Vec<u16> {
+/// The ranks of the `side` x `side` Bayer matrix: from [[0]], each doubling is [[4M, 4M + 2], [4M + 3, 4M + 1]].
+fn bayer(wanted: usize) -> Vec<u16> {
     let mut side = 1; // constant: Bayer (1973) starts from the 1 x 1 matrix [[0]]
     let mut ranks = vec![0_u16];
-    while side < BAYER_SIDE {
+    while side < wanted {
         let mut doubled = vec![0; 4 * side * side]; // constant: a doubling has four quarters
         for row in 0..side {
             for column in 0..side {
@@ -380,16 +490,16 @@ const CANDIDATES: usize = 16; // constant: the common form of Knoll's mixing use
 /// mixing; the error is what the colours chosen for it still owe it). There are n candidates, n = 1 + round(15 `amount`)
 /// with `amount` from 0 to 1: 16 at the full pattern, fewer for a weaker one, and at `amount` 0 only the first, the palette
 /// colour nearest to the value. The candidates are put in order of the first channel (ties by palette order) and the
-/// `tile`, repeating across the picture from its top left corner, picks one of them: a pixel with level T takes the
+/// `thresholds` (a repeating tile, or a rank for every pixel) pick one of them: a pixel with level T takes the
 /// candidate at position floor(n T), the level of a rank being (rank + 0.5) / count.
 pub(crate) fn ordered(
     values: &[Point],
     (height, width): (usize, usize),
     palette: &[Point],
-    tile: Tile,
+    thresholds: &Thresholds<'_>,
     amount: f32,
 ) -> Vec<u8> {
-    let (side, ranks) = (tile.side(), tile.ranks());
+    let count = thresholds.count();
     #[expect(clippy::cast_precision_loss, reason = "a small constant")]
     let extra = (CANDIDATES - 1) as f64;
     let steps = 1 + whole(f64::from(amount) * extra);
@@ -419,8 +529,8 @@ pub(crate) fn ordered(
                 }
                 mix[..steps].sort_unstable();
                 // floor(steps x (rank + 0.5) / count), worked in whole numbers
-                let rank = usize::from(ranks[(row % side) * side + column % side]);
-                let position = (2 * rank + 1) * steps / (2 * side * side);
+                let rank = thresholds.rank((row, column), width);
+                let position = (2 * rank + 1) * steps / (2 * count);
                 *pick = darkest_first[usize::from(mix[position])];
             }
         }

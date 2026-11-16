@@ -3,7 +3,10 @@
 //! fixed palettes typed in the test, and properties: only palette colours appear, each pixel takes the nearest one, a
 //! flat area keeps its mean, an ordered pattern repeats.
 
-use bullterrier_image::Error;
+use std::sync::Arc;
+
+use bullterrier_image::{Error, Image, Options, Photo, Picture, Presets, Recipe, Step};
+use serde_json::{Value, json};
 use bullterrier_image::effects::dither::{Init, Method, Palette, Params, Separation, Space};
 use bullterrier_image::params::Color;
 
@@ -285,9 +288,16 @@ fn atkinson_drops_a_quarter_of_the_error_so_a_light_grey_comes_out_lighter_than_
 /// The rank of the 8 x 8 Bayer matrix at (`row`, `column`) from its closed form: bit k of `row ^ column` is bit 2 (2 - k) + 1
 /// of the rank, bit k of `row` bit 2 (2 - k).
 fn bayer_rank(row: usize, column: usize) -> usize {
+    bayer_rank_of(3, row, column)
+}
+
+/// The rank of the Bayer matrix of side 2^`bits` at (`row`, `column`), by the same closed form.
+fn bayer_rank_of(bits: usize, row: usize, column: usize) -> usize {
     let mixed = row ^ column;
-    (0..3)
-        .map(|bit| (((mixed >> bit) & 1) << (2 * (2 - bit) + 1)) | (((row >> bit) & 1) << (2 * (2 - bit))))
+    (0..bits)
+        .map(|bit| {
+            (((mixed >> bit) & 1) << (2 * (bits - 1 - bit) + 1)) | (((row >> bit) & 1) << (2 * (bits - 1 - bit)))
+        })
         .sum()
 }
 
@@ -541,6 +551,219 @@ fn blue_noise_uses_every_level_of_its_tile_once_so_a_grey_of_k_sixteenths_lights
         assert_eq!(lit, usize::from(whites) * 256, "{whites}/16");
     }
     Ok(())
+}
+
+// ---- threshold matrices -------------------------------------------------------------------------------------------------
+
+/// The lit (white) pixels of a flat grey `grey` painted by `method` on a `side` x `side` picture, row after row.
+fn lit_on_flat(method: Method, grey: f32, side: usize) -> Result<Vec<bool>, Error> {
+    let flat = (side, side, vec![grey; side * side * 3]);
+    Ok(reds(&run(&ink(method, 1.0), &flat)?).iter().map(|&v| v > 0.5).collect())
+}
+
+#[test]
+fn every_ordered_matrix_lights_a_grey_of_k_levels_in_exactly_k_cells_of_its_n() -> Result<(), Error> {
+    // each rank once: a grey of k/n lights exactly k n-ths of the cells. n is 16 (the candidates), or 4 for the 2 x 2.
+    let cases = [
+        (Method::Bayer2, 2, 4_usize),
+        (Method::Bayer4, 4, 16),
+        (Method::Bayer, 8, 16),
+        (Method::Clustered, 8, 16),
+        (Method::Clustered45, 8, 16),
+        (Method::GameboyCamera, 4, 16),
+    ];
+    for (method, side, levels) in cases {
+        for k in 1..levels {
+            #[expect(clippy::cast_precision_loss, reason = "a small count")]
+            let grey = k as f32 / levels as f32;
+            let lit = lit_on_flat(method, grey, side)?.iter().filter(|&&on| on).count();
+            assert_eq!(lit, k * side * side / levels, "{method:?} {k}/{levels}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_small_bayer_matrices_light_the_pixels_of_the_closed_form_in_the_top_share() -> Result<(), Error> {
+    for (method, bits, levels) in [(Method::Bayer2, 1_usize, 4_usize), (Method::Bayer4, 2, 16)] {
+        let side = 1 << bits;
+        let cells = side * side;
+        for k in 1..levels {
+            #[expect(clippy::cast_precision_loss, reason = "a small count")]
+            let out = lit_on_flat(method, k as f32 / levels as f32, side)?;
+            for (at, &on) in out.iter().enumerate() {
+                // a rank is lit when the share of the cells at or above it is within the grey's: the top k n-ths
+                assert_eq!(on, bayer_rank_of(bits, at / side, at % side) >= cells - k * cells / levels, "{method:?} {k}");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_game_boy_camera_matrix_lights_its_cells_in_the_order_of_their_register_thresholds() -> Result<(), Error> {
+    // the thresholds of the first of the camera's dither patterns (registers A006 on, the lowest of each cell's three, a
+    // cell x + 4 y), as dither-pattern-gen's reference/patterns.mjs lists them; a cell with a lower threshold is lit sooner
+    let thresholds = [
+        128_u16, 143, 131, 146, 138, 133, 141, 136, 130, 145, 129, 144, 140, 135, 139, 134,
+    ];
+    for k in 1..16_usize {
+        #[expect(clippy::cast_precision_loss, reason = "a small count")]
+        let out = lit_on_flat(Method::GameboyCamera, k as f32 / 16.0, 4)?;
+        let mut sorted = thresholds;
+        sorted.sort_unstable();
+        for (at, &on) in out.iter().enumerate() {
+            assert_eq!(on, thresholds[at] <= sorted[k - 1], "{k}/16 at {at}");
+        }
+    }
+    Ok(())
+}
+
+/// The lit set at `k` of 16 levels of `method`'s 8 x 8 tile, as (row, column) cells.
+fn lit_cells(method: Method, k: usize) -> Result<Vec<(usize, usize)>, Error> {
+    #[expect(clippy::cast_precision_loss, reason = "a small count")]
+    let out = lit_on_flat(method, k as f32 / 16.0, 8)?;
+    Ok((0..64).filter(|&at| out[at]).map(|at| (at / 8, at % 8)).collect())
+}
+
+/// How many pieces `cells` fall into on the wrapped 8 x 8 tile, cells touching along a side being one piece.
+fn pieces(cells: &[(usize, usize)]) -> usize {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut count = 0;
+    for &start in cells {
+        if seen.contains(&start) {
+            continue;
+        }
+        count += 1;
+        let mut stack = vec![start];
+        while let Some((row, column)) = stack.pop() {
+            if !seen.insert((row, column)) {
+                continue;
+            }
+            for (down, right) in [(1, 0), (7, 0), (0, 1), (0, 7)] {
+                let next = ((row + down) % 8, (column + right) % 8);
+                if cells.contains(&next) && !seen.contains(&next) {
+                    stack.push(next);
+                }
+            }
+        }
+    }
+    count
+}
+
+#[test]
+fn clustered_dots_keep_every_lit_pixel_lit_and_stay_in_one_dot_per_cluster() -> Result<(), Error> {
+    // the lit pixels at a level stay lit at every higher one, and they gather: one dot in the square screen, two (one
+    // each way along the diagonal) in the 45 degree one
+    for (method, most_dots) in [(Method::Clustered, 1), (Method::Clustered45, 2)] {
+        let mut before: Vec<(usize, usize)> = Vec::new();
+        for k in 1..16 {
+            let lit = lit_cells(method, k)?;
+            assert!(before.iter().all(|cell| lit.contains(cell)), "{method:?} {k}: a lit pixel went out");
+            let dots = pieces(&lit);
+            assert!((1..=most_dots).contains(&dots), "{method:?} {k}/16: {dots} dots");
+            before = lit;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn white_noise_lights_the_share_of_its_tone_changes_with_the_seed_and_keeps_with_it() -> Result<(), Error> {
+    let tone = 5.0_f32 / 16.0;
+    let flat = (128, 128, vec![tone; 128 * 128 * 3]);
+    let with = |seed| Params {
+        seed,
+        ..ink(Method::WhiteNoise, 1.0)
+    };
+    let first = run(&with(3), &flat)?;
+    let lit = reds(&first).iter().filter(|&&v| v > 0.5).count();
+    #[expect(clippy::cast_precision_loss, reason = "a count below 16384")]
+    let share = lit as f32 / (128.0 * 128.0);
+    assert!((share - tone).abs() < 0.02, "{share} lit of {tone}");
+    assert_eq!(run(&with(3), &flat)?, first, "the same seed, the same picture");
+    assert_ne!(run(&with(4), &flat)?, first, "another seed, another picture");
+    Ok(())
+}
+
+/// `method` (with `extra` parameters) on `picture`, black and white in sRGB, given the picture `matrix` as `"m"`.
+fn with_matrix(
+    method: &str,
+    matrix: Option<&Image>,
+    extra: &[(&str, Value)],
+    picture: &(usize, usize, Vec<f32>),
+) -> Result<Vec<f32>, Error> {
+    let mut step = Step::new("dither")
+        .param("method", method)
+        .param("palette", "custom")
+        .param("custom", json!(["#000000", "#ffffff"]))
+        .param("space", "rgb");
+    for (key, value) in extra {
+        step = step.param(*key, value.clone());
+    }
+    let mut photo = Photo::new(Picture::new(picture.0, picture.1, &picture.2)?);
+    if let Some(matrix) = matrix {
+        photo = photo.with_image("m", Arc::new(matrix.clone()));
+    }
+    Ok(photo
+        .render(&Recipe::new([step]), &Presets::new(), Options::default())?
+        .into_values())
+}
+
+/// A grey picture of `rows` x `columns` whose cells are `greys`, row after row.
+fn grey_matrix(rows: usize, columns: usize, greys: &[f32]) -> Result<Image, Error> {
+    Image::new(rows, columns, &greys.iter().flat_map(|&grey| [grey; 3]).collect::<Vec<_>>())
+}
+
+#[test]
+fn a_matrix_that_is_bayer_four_gives_the_picture_of_bayer4() -> Result<(), Error> {
+    #[expect(clippy::cast_precision_loss, reason = "a rank below 16")]
+    let greys: Vec<f32> = (0..16)
+        .map(|at| (bayer_rank_of(2, at / 4, at % 4) as f32 + 0.5) / 16.0)
+        .collect();
+    let matrix = grey_matrix(4, 4, &greys)?;
+    let picture = (13, 11, varied(13, 11));
+    let theirs = with_matrix("matrix", Some(&matrix), &[("matrix", json!("m"))], &picture)?;
+    assert_eq!(theirs, with_matrix("bayer4", None, &[], &picture)?);
+    Ok(())
+}
+
+#[test]
+fn a_matrix_lights_a_grey_of_k_levels_in_k_cells_brightest_first_with_ties_in_reading_order() -> Result<(), Error> {
+    // 2 x 2: the brightest cell (0, 1) is lit first, then the tied ones in reading order, (1, 0) before (1, 1), the
+    // dimmest (0, 0) last
+    let matrix = grey_matrix(2, 2, &[0.0, 0.9, 0.5, 0.5])?;
+    let lit_at = |k: f32| -> Result<Vec<bool>, Error> {
+        let flat = (2, 2, vec![k / 4.0; 12]);
+        Ok(with_matrix("matrix", Some(&matrix), &[("matrix", json!("m"))], &flat)?
+            .chunks(3)
+            .map(|pixel| pixel[0] > 0.5)
+            .collect())
+    };
+    assert_eq!(lit_at(1.0)?, [false, true, false, false]);
+    assert_eq!(lit_at(2.0)?, [false, true, true, false]);
+    assert_eq!(lit_at(3.0)?, [false, true, true, true]);
+    // 4 x 4 (a non-Bayer one: ranks by reading order): k of 16 lit
+    let ramp: Vec<f32> = (0..16).map(|at| f32::from(u8::try_from(at).unwrap_or(0)) / 16.0).collect();
+    let matrix = grey_matrix(4, 4, &ramp)?;
+    for k in 1..16_u8 {
+        let flat = (4, 4, vec![f32::from(k) / 16.0; 48]);
+        let out = with_matrix("matrix", Some(&matrix), &[("matrix", json!("m"))], &flat)?;
+        assert_eq!(out.chunks(3).filter(|pixel| pixel[0] > 0.5).count(), usize::from(k), "{k}/16");
+    }
+    Ok(())
+}
+
+#[test]
+fn method_matrix_with_no_matrix_or_an_empty_name_is_refused_naming_matrix() {
+    let picture = (4, 4, vec![0.5_f32; 48]);
+    for extra in [vec![], vec![("matrix", json!(""))]] {
+        let refused = with_matrix("matrix", None, &extra, &picture);
+        assert!(
+            matches!(&refused, Err(error) if error.to_string().contains("matrix")),
+            "{extra:?}: {refused:?}"
+        );
+    }
 }
 
 // ---- inks ---------------------------------------------------------------------------------------------------------------

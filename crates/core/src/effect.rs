@@ -263,7 +263,7 @@ pub(crate) struct Meta {
 }
 
 /// An effect written in Rust, in a file of `src/effects/`: its `META`, its `Params` (read from the parameters), its
-/// `footprint`, its `spread` if it paints outward and its `render`. The build script makes one for each file.
+/// `footprint`, its `spread` if it paints outward, its `check` if it refuses runs the table cannot, and its `render`. The build script makes one for each file.
 pub(crate) struct Native<P> {
     name: &'static str,
     meta: &'static Meta,
@@ -272,6 +272,9 @@ pub(crate) struct Native<P> {
     footprint: fn(&P) -> Footprint,
     spread: Option<fn(&P) -> Spread>,
     render: fn(&Picture<'_>, &P, &Inputs<'_>) -> Image,
+    /// What the effect refuses of a step's parameters taken with its inputs, which the table cannot say (a picture that
+    /// must be given when another parameter has a value).
+    check: Option<fn(&P, &Inputs<'_>) -> Result<(), Error>>,
 }
 
 impl<P: Declared> Native<P> {
@@ -297,7 +300,14 @@ impl<P: Declared> Native<P> {
             footprint,
             spread,
             render,
+            check: None,
         }
+    }
+
+    /// The effect, refusing a run for which `check` fails (see `check` in `src/effects/`).
+    pub(crate) fn checked(mut self, check: fn(&P, &Inputs<'_>) -> Result<(), Error>) -> Self {
+        self.check = Some(check);
+        self
     }
 }
 
@@ -346,7 +356,11 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
     }
 
     fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {
-        Ok((self.render)(picture, &self.read(params)?, inputs))
+        let params = self.read(params)?;
+        if let Some(check) = self.check {
+            check(&params, inputs)?;
+        }
+        Ok((self.render)(picture, &params, inputs))
     }
 }
 
