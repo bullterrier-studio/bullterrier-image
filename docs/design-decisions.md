@@ -1611,7 +1611,7 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   fraction of the canvas, never of a band's picture, so a band equals the whole. Footprint rule per geometry (how far a pixel
   is from its cell's centre, in cells): `wave` 1 / sqrt 2 + 2 x `amplitude`; `rings` 1 (measured 0.74); `spiral` 1.5 (measured
   1.04); `rays` `Whole`, since a ray's cells widen with the distance and a bound would be the far corner. *Known limit:*
-  near the centre of `rays` a wedge is narrower than a pixel, so with `shape` line the rays crowd (fixed: next entries).
+  near the centre of `rays` a wedge is narrower than a pixel, so with `shape` line the rays crowd (fixed: the entry after next).
 - **Each ink of a concentric screen has its own centre (halftone tone batch, 2026-11-16).** On `rings`, `spiral` and `rays` a
   row depends on the distance (or angle) from the centre, so with one centre `angle` moved none of the inks' rows: they
   nested instead of overlapping independently and a separation printed off-tone (0.5/0.5 of `#ff4d6d`, `#2b59ff`, green target
@@ -1620,6 +1620,17 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   fraction of the canvas, so a band equals the whole. *Reason:* measured on five area pairs, dot and line, three screens: a
   channel's error is 0.003 to 0.005 (dot) from 3.3 cells up, wider fringes than the picture averages below that, and the
   direction made no difference. *Consequence:* the tone holds within 0.02 (the grid's bound) for every combination.
+- **`rays` merge in pairs towards the centre (halftone tone batch, 2026-11-16).** The count was fixed (62 at 401 px, cell 20),
+  so near the centre a ray was narrower than a pixel (1 to 1.5 cells out, a line at tones 0.25 and 0.75 printed 0.2665 and
+  0.7335; 62 rays on a circle 9.4 cells round at 1.5 cells). Now, at the middle radius of a cell's ring, the count is halved
+  (`ray_wedges`, `ops/inks.rs`) until a ray is at least `NARROWEST_RAY` = 0.5 cell wide, so the spacing is half a cell to a
+  cell inside the radius where it was one cell, and the rays that end merge into their neighbours (every other boundary
+  persists: nothing jumps sideways). A count that is not a multiple of the power of two (62 / 4 = 15.5) leaves one narrower
+  last ray, stretched to a full cell, so its tone is exact. *Reason:* half a cell is the narrowest the screen resolves at a
+  fine cell (the feather alone is a pixel); the brief's other reading (halve below one cell) leaves rays 1 to 2 cells wide.
+  *Consequence:* the picture beyond the radius where a ray is one cell wide is byte-equal (hash of the pixels 10 cells and
+  more from the centre: equal); the tone holds within 0.004 in every ring from 2 cells out (a line from 1 cell); a dot's rings
+  under 2 cells (a few curved cells) are off by up to 0.03, as before. `rays` stays `Whole`.
 - **`halftone` print realism is one shared implementation (halftone batch, 2026-11-16).** `dot_gain` is the gain at 50 % tone,
   coverage a' = a + 4 g a (1 - a) (exact at 50 %, monotone while g <= 0.25, its maximum); `ink_noise`, `specks`, `speck_size`
   and `seed` draw from the position-numbered noise (`ops/realism.rs`), so windows and bands agree; `dither`'s `spot` separation

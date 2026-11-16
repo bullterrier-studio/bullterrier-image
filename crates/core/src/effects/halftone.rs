@@ -101,7 +101,7 @@ pub struct Params {
     /// How the rows of the screen run: 'grid' (straight, as the angle sets), 'wave' (each row a sine of `wavelength` cells
     /// and `amplitude` cells high), 'rings' (round the centre `x`, `y`), 'spiral' (an Archimedean spiral about it, a cell
     /// more each turn) or 'rays' (straight out from it, as many as make a cell about as wide as `cell` half way to the
-    /// nearest edge, wider beyond and narrower within). With shape 'line' these are wavy lines, rings, a spiral and a
+    /// nearest edge, wider beyond; inside, rays merge in pairs so that none is narrower than half a `cell`). With shape 'line' these are wavy lines, rings, a spiral and a
     /// sunburst; `angle` turns them. Every ink keeps the tone on every screen; with a `separation`
     /// each ink's rings, spiral or rays have a centre of their own, 4 cells further along the diagonal than the last, so that
     /// the inks overlap independently.

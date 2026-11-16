@@ -75,7 +75,7 @@ pub(crate) enum Geometry {
     Rings { centre: [f32; 2] },
     /// As rings, but the ring is one arm of an Archimedean spiral, a cell wider each turn.
     Spiral { centre: [f32; 2] },
-    /// Rows run out from the centre: `count` rays, cells a cell long along them.
+    /// Rows run out from the centre: `count` rays, cells a cell long along them; nearer the centre fewer, see [`ray_wedges`].
     Rays { centre: [f32; 2], count: f32 },
 }
 
@@ -99,6 +99,35 @@ const TURN: f32 = std::f32::consts::TAU;
 /// number so that a half turn maps a cell to a cell.
 fn ring_cells(radius: f32) -> f32 {
     2.0 * (std::f32::consts::PI * radius).round().max(1.0)
+}
+
+/// The narrowest a ray may be, in cells, at the middle radius of its cell: the rays of `count` merge in pairs (a power of two
+/// at a time) until none is narrower than this, so the spacing is half a cell to a cell inside the radius where it is one.
+const NARROWEST_RAY: f32 = 0.5; // constant: below it a ray is about a pixel wide at the finest cell, the moire blob
+
+/// The rays at radius `radius` cells (a cell's middle): `count` of them one cell wide far out, merged in pairs `n` times
+/// (`step` = 2^n old rays to one) so that none is narrower than [`NARROWEST_RAY`]. The wedges are `count / step` (not
+/// whole when `count` is not a multiple of `step`: the last is narrower, and is stretched to a cell like the rest).
+fn ray_wedges(count: f32, radius: f32) -> f32 {
+    let mut step = 1.0;
+    while step < count && TURN * radius * step / count < NARROWEST_RAY {
+        step *= 2.0;
+    }
+    count / step
+}
+
+/// The place (in wedges, along the ray's cell axis) of the angle `turns`, and back: wedge `i` starts `i` wedges in, the last of
+/// `wedges` ends the turn and fills its cell however narrow.
+fn wedge_place(wedges: f32, turns: f32) -> f32 {
+    let last = wedges.ceil() - 1.0;
+    let place = turns * wedges;
+    if place < last { place } else { last + (place - last) / (wedges - last) }
+}
+
+fn wedge_turns(wedges: f32, place: f32) -> f32 {
+    let last = wedges.ceil() - 1.0;
+    let at = if place < last { place } else { last + (place - last) * (wedges - last) };
+    at / wedges
 }
 
 impl Geometry {
@@ -126,7 +155,7 @@ impl Geometry {
             }
             Self::Rays { centre, count } => {
                 let (r, turns) = polar(centre, u, v);
-                (r, turns * count)
+                (r, wedge_place(ray_wedges(count, r.floor() + 0.5), turns))
             }
         }
     }
@@ -145,7 +174,7 @@ impl Geometry {
                 let turns = cu / ring_cells(arm_radius(cv.floor()));
                 at(centre, cv + turns, turns)
             }
-            Self::Rays { centre, count } => at(centre, cu, cv / count),
+            Self::Rays { centre, count } => at(centre, cu, wedge_turns(ray_wedges(count, cu.floor() + 0.5), cv)),
         }
     }
 }
@@ -712,6 +741,32 @@ mod tests {
             };
             let found = furthest(wave, 0.02, 300);
             assert!(found <= wave_reach(3.0), "wave of {wavelength} cells: {found} cells");
+        }
+    }
+
+    /// Rays out to 12 cells, 62 of them at 10 cells (merged in pairs inside): a pixel is no further than a cell from its cell's
+    /// centre, so a merged ray's cells (a cell long, up to a cell wide) read the tone where they are, in every ring of radius.
+    #[test]
+    fn rays_that_merge_towards_the_centre_reach_no_further_than_a_cell() {
+        let rays = Geometry::rays([0.3, -0.2], 10.0);
+        for (step, count) in [(0.05, 240), (0.004, 1000)] {
+            let found = furthest(rays, step, count);
+            assert!(found <= 1.0, "rays: {found} cells");
+        }
+    }
+
+    /// The wedges of a ray ring fill their cells from the first to the last, however narrow the last: an angle and its place
+    /// map back and forth, and the turn's end is the cells' end.
+    #[test]
+    fn the_last_ray_of_a_merged_ring_is_stretched_to_a_cell() {
+        for wedges in [31.0_f32, 15.5, 7.75, 3.875, 1.9375] {
+            for tenth in 0..10_u8 {
+                let turns = f32::from(tenth) / 10.0 + 0.003;
+                let back = wedge_turns(wedges, wedge_place(wedges, turns));
+                assert!((back - turns).abs() < 1e-5, "{wedges} wedges, turn {turns}: {back}");
+            }
+            let end = wedge_place(wedges, 0.999_999);
+            assert!((end - wedges.ceil()).abs() < 1e-3, "{wedges} wedges end at {end}");
         }
     }
 

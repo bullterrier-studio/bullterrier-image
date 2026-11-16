@@ -1679,11 +1679,12 @@ screen : one of 'grid', 'wave', 'rings', 'spiral', 'rays', default 'grid'
     row a sine of `wavelength` cells and `amplitude` cells high), 'rings' (round the
     centre `x`, `y`), 'spiral' (an Archimedean spiral about it, a cell more each turn)
     or 'rays' (straight out from it, as many as make a cell about as wide as `cell` half
-    way to the nearest edge, wider beyond and narrower within). With shape 'line' these
-    are wavy lines, rings, a spiral and a sunburst; `angle` turns them. Every ink keeps
-    the tone on every screen; with a `separation` each ink's rings, spiral or rays have
-    a centre of their own, 4 cells further along the diagonal than the last, so that the
-    inks overlap independently.
+    way to the nearest edge, wider beyond; inside, rays merge in pairs so that none is
+    narrower than half a `cell`). With shape 'line' these are wavy lines, rings, a
+    spiral and a sunburst; `angle` turns them. Every ink keeps the tone on every screen;
+    with a `separation` each ink's rings, spiral or rays have a centre of their own, 4
+    cells further along the diagonal than the last, so that the inks overlap
+    independently.
 shape : one of 'dot', 'line', 'square', 'ellipse', 'diamond', 'euclidean', 'matrix', default 'dot'
     What a mark is: 'dot' (round), 'square', 'ellipse' (its axes in the ratio `aspect`),
     'diamond' (a square turned 45 degrees), 'euclidean' (round in highlights, a diamond

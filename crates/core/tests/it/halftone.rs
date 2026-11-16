@@ -1349,7 +1349,8 @@ fn the_lines_of_rays_meet_at_the_centre() -> Result<(), Error> {
         let angle = (ray as f32 + 0.5) * step;
         // the ray along the middle of a wedge, and the one opposite, are lines through the centre
         for turn in [0.0, PI] {
-            for radius in [30.0, 60.0, 90.0] {
+            // (from 3.5 cells out; inside, rays merge in pairs, see `halftone_concentric.rs`)
+            for radius in [80.0, 90.0] {
                 let (dx, dy) = ((angle + turn).cos() * radius, (angle + turn).sin() * radius);
                 assert!(ink(dx, dy) > 0.5, "ray {ray} turn {turn} at {radius}: {}", ink(dx, dy));
             }
