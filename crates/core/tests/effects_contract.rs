@@ -147,9 +147,15 @@ fn run(
     let layer = cone(height, width)?;
     let pieces = halves(&layer)?;
     let asset = asset();
+    // a strip of tiles is a whole number of its own height wide: two squares
+    let strip = bullterrier_image::Image::new(
+        4,
+        8,
+        &(0..4_u8 * 8 * 3).map(|at| f32::from(at % 7) / 6.0).collect::<Vec<_>>(),
+    )?;
     let mut inputs = Inputs::default();
     for field in table.fields.iter().filter(|field| field.kind == Kind::Picture) {
-        inputs = inputs.with_image(field.name, &asset);
+        inputs = inputs.with_image(field.name, if field.name == "tiles" { &strip } else { &asset });
     }
     for field in table.fields.iter().filter(|field| field.kind == Kind::Field) {
         inputs = inputs.with_field(field.name, &layer);
