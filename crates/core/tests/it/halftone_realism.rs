@@ -36,6 +36,7 @@ fn print_realism_at_zero_is_the_clean_screen_whatever_the_seed_and_speck_size() 
     for separation in [Separation::None, Separation::Cmyk, Separation::Spot, Separation::Rgb] {
         let clean = Params {
             separation,
+            paper: Color([1.0; 3]),
             ..Params::default()
         };
         let zeroed = Params {

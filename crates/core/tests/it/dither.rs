@@ -1471,3 +1471,100 @@ fn dither_spot_keeps_the_tone_of_every_method_with_several_inks_and_with_one_bla
     }
     Ok(())
 }
+
+/// The mean per channel of a picture of `rgb` values.
+fn channel_means(rgb: &[f32]) -> [f32; 3] {
+    let count = f32::from(u16::try_from(rgb.len() / 3).unwrap_or(u16::MAX)); // the pictures here have under 65536 pixels
+    [0, 1, 2].map(|c| rgb.as_chunks::<3>().0.iter().map(|pixel| pixel[c]).sum::<f32>() / count)
+}
+
+/// Every ordered and noise method prints the exact share of every overprint: two inks at one half each print the
+/// independent-overlap mix (the default inks over white give green 0.439), where a mix in sixteenths gave 0.410. Shares of
+/// a quarter are whole cells of every matrix (2 x 2 or larger); 128 is a multiple of every tile side, 0.01 the noise's
+/// sampling spread.
+#[test]
+fn dither_spot_ordered_and_noise_methods_print_the_exact_mix_of_the_inks() -> Result<(), Error> {
+    let (pink, blue) = (rgb(0xff_4d6d), rgb(0x2b_59ff));
+    let want = [0, 1, 2].map(|c| 0.25 * 1.0 + 0.25 * pink[c] + 0.25 * blue[c] + 0.25 * pink[c] * blue[c]);
+    let matrix = grey_matrix(
+        4,
+        4,
+        &[
+            0.9, 0.1, 0.5, 0.3, 0.7, 0.2, 0.8, 0.4, 0.0, 0.6, 0.15, 0.95, 0.35, 0.55, 0.25, 0.75,
+        ],
+    )?;
+    let picture = (128, 128, want.repeat(128 * 128));
+    for method in [
+        "bayer2",
+        "bayer4",
+        "bayer",
+        "clustered",
+        "clustered45",
+        "blue_noise",
+        "white_noise",
+        "gameboy_camera",
+        "matrix",
+    ] {
+        let extra = [
+            ("separation", json!("spot")),
+            ("paper", json!("#ffffff")),
+            ("matrix", json!("m")),
+        ];
+        let out = with_matrix(method, Some(&matrix), &extra, &picture)?;
+        let got = channel_means(&out);
+        assert!(
+            (0..3).all(|c| (got[c] - want[c]).abs() < 0.01),
+            "{method}: {got:?} against {want:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn dither_spot_ordered_and_noise_methods_print_one_black_ink_at_its_grey() -> Result<(), Error> {
+    // a matrix of n cells holds a share only to 1 / n: the bound adds half of that
+    for (method, cells) in [
+        ("bayer2", 4.0_f32),
+        ("bayer", 64.0),
+        ("clustered45", 64.0),
+        ("blue_noise", 4096.0),
+        ("white_noise", 65536.0),
+        ("gameboy_camera", 16.0),
+    ] {
+        for grey in [0.2_f32, 0.5, 0.8] {
+            let extra = [
+                ("separation", json!("spot")),
+                ("paper", json!("#ffffff")),
+                ("inks", json!(["#000000"])),
+            ];
+            let out = with_matrix(method, None, &extra, &(128, 128, vec![grey; 128 * 128 * 3]))?;
+            let got = channel_means(&out);
+            assert!(
+                got.iter().all(|c| (c - grey).abs() < 0.01 + 0.5 / cells),
+                "{method} grey {grey}: {got:?}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn dither_spot_refuses_a_dark_paper_naming_paper_and_prints_on_a_light_one() {
+    let picture = (4, 4, vec![0.5_f32; 48]);
+    let spot = |paper: &str| {
+        with_matrix(
+            "bayer",
+            None,
+            &[("separation", json!("spot")), ("paper", json!(paper))],
+            &picture,
+        )
+    };
+    let refused = spot("#000000");
+    assert!(
+        matches!(&refused, Err(error) if error.to_string().contains("paper")),
+        "{refused:?}"
+    );
+    assert!(spot("#f0f0f0").is_ok());
+    // no separation does not look at the paper
+    assert!(with_matrix("bayer", None, &[("paper", json!("#000000"))], &picture).is_ok());
+}

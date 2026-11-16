@@ -498,6 +498,7 @@ fn a_halftone_with_print_realism_gives_the_rows_of_the_whole_render_from_a_windo
             let recipe = Recipe::new([Step::new("halftone")
                 .param("cell", 9.5)
                 .param("separation", separation)
+                .param("paper", "#ffffff")
                 .param("dot_gain", gain)
                 .param("ink_noise", noise)
                 .param("specks", specks)
@@ -547,6 +548,7 @@ fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a
             .param("amplitude", 3.0)
             .param("wavelength", wavelength)
             .param("separation", "spot")
+            .param("paper", "#ffffff")
             .param("inks", ["#ff4d6d", "#2b59ff"]) // each ink has its own centre on the concentric screens
             .param("x", 0.3)
             .param("y", 0.8)])

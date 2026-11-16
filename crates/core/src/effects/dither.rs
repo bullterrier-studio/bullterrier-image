@@ -8,11 +8,12 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start};
+use crate::ops::color::luminance;
 use crate::ops::colorspace::rgb_to_oklab;
 use crate::ops::dither::{
     ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, OSTROMOUKHOV, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW,
     STEVENSON_ARCE, STUCKI, Thresholds, Tile, check_matrix, diffuse, dot_diffusion, from_greys, matrix_greys, noise,
-    ordered, riemersma,
+    ordered, riemersma, shared,
 };
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
@@ -39,6 +40,9 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
 pub(crate) fn spread(_params: &Params) -> crate::Spread {
     crate::Spread::Unbounded
 }
+
+/// The Rec. 709 luminance below which a `paper` is dark: the same mid grey as `halftone`'s default `paper_threshold`.
+const DARK_PAPER: f32 = 0.5; // constant: mid grey, halftone's default paper_threshold
 
 /// How tones become a pattern of dots.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
@@ -431,7 +435,9 @@ fn pattern(
         [1.0, 0.0, 0.0]
     };
     let by = |kernel| diffuse(values, size, palette, kernel, amount, serpentine, lightness);
-    let tiled = |tile: Tile| ordered(values, size, palette, &tile.thresholds(), amount);
+    if let Some(thresholds) = thresholds(method, params, inputs) {
+        return ordered(values, size, palette, &thresholds, amount);
+    }
     match method {
         Method::FloydSteinberg => by(&FLOYD_STEINBERG),
         Method::Atkinson => by(&ATKINSON),
@@ -444,24 +450,38 @@ fn pattern(
         Method::StevensonArce => by(&STEVENSON_ARCE),
         Method::Ostromoukhov => by(&OSTROMOUKHOV),
         Method::DotDiffusion => dot_diffusion(values, size, palette, amount),
-        Method::Riemersma => riemersma(values, size, palette, amount),
-        Method::Bayer2 => tiled(Tile::Bayer2),
-        Method::Bayer4 => tiled(Tile::Bayer4),
-        Method::Bayer => tiled(Tile::Bayer),
-        Method::Clustered => tiled(Tile::Clustered),
-        Method::Clustered45 => tiled(Tile::Clustered45),
-        Method::BlueNoise => ordered(values, size, palette, &Tile::BlueNoise.thresholds(), amount),
-        Method::WhiteNoise => ordered(values, size, palette, &noise(params.seed), amount),
-        Method::GameboyCamera => tiled(Tile::GameboyCamera),
-        Method::Matrix => ordered(values, size, palette, &matrix_of(inputs), amount),
+        _ => riemersma(values, size, palette, amount), // the ordered methods returned above
     }
 }
 
-/// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
+/// The thresholds of an ordered or noise `method`; none for a method that passes error on.
+fn thresholds(method: Method, params: &Params, inputs: &Inputs<'_>) -> Option<Thresholds<'static>> {
+    Some(match method {
+        Method::Bayer2 => Tile::Bayer2.thresholds(),
+        Method::Bayer4 => Tile::Bayer4.thresholds(),
+        Method::Bayer => Tile::Bayer.thresholds(),
+        Method::Clustered => Tile::Clustered.thresholds(),
+        Method::Clustered45 => Tile::Clustered45.thresholds(),
+        Method::BlueNoise => Tile::BlueNoise.thresholds(),
+        Method::WhiteNoise => noise(params.seed),
+        Method::GameboyCamera => Tile::GameboyCamera.thresholds(),
+        Method::Matrix => matrix_of(inputs),
+        _ => return None,
+    })
+}
+
+/// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high; 'spot' separation
+/// on a dark `paper`, where ink printed over black stays black.
 ///
 /// # Errors
-/// [`Error::Recipe`] naming `matrix`.
+/// [`Error::Recipe`] naming `matrix` or `paper`.
 pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
+    if params.separation == Separation::Spot && luminance(params.paper.0) < DARK_PAPER {
+        return Err(Error::Recipe(
+            "dither: `paper` is dark, and `separation` 'spot' prints the inks subtractively, so ink on it stays black: use a light paper"
+                .into(),
+        ));
+    }
     if params.method != Method::Matrix {
         return Ok(());
     }
@@ -496,32 +516,36 @@ fn printed(
         speck_size: params.speck_size,
         seed: params.seed,
     };
-    let mut target = vec![[0.0; 3]; dots.len()];
-    par::rows(&mut target, 1, |first, band| {
+    let mut amounts = vec![[0.0; MOST_INKS]; dots.len()];
+    par::rows(&mut amounts, 1, |first, band| {
         for (offset, (out, dot)) in band.iter_mut().zip(&dots[first..]).enumerate() {
             let at = first + offset;
             let cell = [(at / columns) as u64, (at % columns) as u64]; // constant: a usize is at most 64 bits wide here, so it fits
-            let mut amounts = inks.coverages(*dot);
-            for (ink, amount) in amounts.iter_mut().enumerate() {
+            *out = inks.coverages(*dot);
+            for (ink, amount) in out.iter_mut().enumerate() {
                 *amount = real.coverage(*amount, ink, cell);
             }
-            *out = inks.print(&amounts);
         }
     });
     // the print of every combination of inks, by the bits of the inks that land: the overprint palette
     let table: Vec<[f32; 3]> = (0..1_usize << count)
         .map(|mask| inks.print(&std::array::from_fn(|ink| if mask >> ink & 1 == 1 { 1.0 } else { 0.0 })))
         .collect();
-    // in sRGB, where the print model mixes: distances in Oklab would pull the mean of the dots off the mix of the inks
-    let layers = pattern(
-        params.method,
-        &target,
-        (rows, columns),
-        &table,
-        params,
-        inputs,
-        Space::Rgb,
-    );
+    let layers = if let Some(thresholds) = thresholds(params.method, params, inputs) {
+        shared(&amounts, count, (rows, columns), &thresholds, params.pattern)
+    } else {
+        let target: Vec<[f32; 3]> = amounts.iter().map(|amounts| inks.print(amounts)).collect();
+        // in sRGB, where the print model mixes: distances in Oklab would pull the mean of the dots off the mix of the inks
+        pattern(
+            params.method,
+            &target,
+            (rows, columns),
+            &table,
+            params,
+            inputs,
+            Space::Rgb,
+        )
+    };
     // whole pixels: the nearest to the move
     let whole_move = |away: f32| {
         let pixels = whole(f64::from(away.abs())).cast_signed();

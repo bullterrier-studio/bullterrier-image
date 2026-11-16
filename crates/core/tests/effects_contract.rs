@@ -333,7 +333,12 @@ fn every_choice_works_and_any_other_name_or_parameter_is_refused() -> Outcome {
         let mut problems = Vec::new();
         for field in choice_fields(table) {
             for choice in field.choices {
-                let out = small(one, table, &setting(&[(field.name, json!(choice))]))?;
+                let mut given = setting(&[(field.name, json!(choice))]);
+                if one.name() == "halftone" && field.name == "separation" {
+                    // the subtractive separations are refused on its default black paper
+                    given.insert("paper".to_owned(), json!("#ffffff"));
+                }
+                let out = small(one, table, &given)?;
                 if let Some(fault) = picture_fault(&out, 24 * 32 * 3) {
                     problems.push(format!("{}.{} = {choice}: {fault}", one.name(), field.name));
                 }

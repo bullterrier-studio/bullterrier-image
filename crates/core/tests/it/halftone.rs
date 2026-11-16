@@ -1490,3 +1490,35 @@ fn cmyk_prints_greys_at_their_level_in_the_shadows_too() -> Result<(), Error> {
     }
     Ok(())
 }
+
+#[test]
+fn subtractive_separations_refuse_a_dark_paper_naming_paper_and_print_on_a_light_one() {
+    let photo = flat(16, 16, 0.5);
+    for separation in [Separation::Cmyk, Separation::Spot] {
+        let on = |paper: [f32; 3]| {
+            run_picture(
+                &Params {
+                    separation,
+                    paper: Color(paper),
+                    ..spot()
+                },
+                16,
+                16,
+                &photo,
+            )
+        };
+        let refused = on([0.0; 3]);
+        assert!(
+            matches!(&refused, Err(error) if error.to_string().contains("paper")),
+            "{separation:?}: {refused:?}"
+        );
+        assert!(on(PAPER).is_ok(), "{separation:?}");
+    }
+    // rgb adds light on black and ignores the paper
+    let rgb = Params {
+        separation: Separation::Rgb,
+        paper: Color([0.0; 3]),
+        ..spot()
+    };
+    assert!(run_picture(&rgb, 16, 16, &photo).is_ok());
+}

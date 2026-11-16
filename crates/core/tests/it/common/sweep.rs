@@ -63,11 +63,16 @@ pub(crate) fn variants(table: &Table) -> Vec<Setting> {
             .iter()
             .filter(|other| other.kind == Kind::Picture && field.kind == Kind::Choice)
             .map(|other| (other.name.to_owned(), json!("asset")));
-        cases.extend(
-            values.into_iter().map(|value| {
-                Setting::from_iter(std::iter::once((field.name.to_owned(), value)).chain(pictures.clone()))
-            }),
-        );
+        // a separation that prints inks over the paper is refused on a dark one, halftone's default: give it a light one
+        let light = (field.name == "separation" && table.fields.iter().any(|other| other.name == "paper"))
+            .then(|| ("paper".to_owned(), json!("#ffffff")));
+        cases.extend(values.into_iter().map(|value| {
+            Setting::from_iter(
+                std::iter::once((field.name.to_owned(), value))
+                    .chain(pictures.clone())
+                    .chain(light.clone()),
+            )
+        }));
     }
     cases
 }

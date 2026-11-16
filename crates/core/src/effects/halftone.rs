@@ -26,11 +26,18 @@ pub(crate) const META: Meta = Meta {
     inputs: &[Input::Place],
 };
 
-/// What `halftone` refuses: shape 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
+/// What `halftone` refuses: shape 'matrix' with no `matrix`, or one more than 256 pixels wide or high; 'cmyk' or 'spot'
+/// separation on a dark `paper` (below `paper_threshold`), where ink printed over black stays black.
 ///
 /// # Errors
-/// [`Error::Recipe`] naming `matrix`.
+/// [`Error::Recipe`] naming `matrix` or `paper`.
 pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
+    if matches!(params.separation, Separation::Cmyk | Separation::Spot) && luminance(params.paper.0) < params.paper_threshold {
+        return Err(Error::Recipe(
+            "halftone: `paper` is dark, and `separation` 'cmyk' and 'spot' print the inks subtractively, so ink on it stays black: use a light paper"
+                .into(),
+        ));
+    }
     if params.shape != Shape::Matrix {
         return Ok(());
     }

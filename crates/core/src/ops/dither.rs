@@ -9,6 +9,7 @@ use std::sync::OnceLock;
 
 use crate::ops::cluster::{Point, nearest_one};
 use crate::ops::color::luminance;
+use crate::ops::inks::MOST_INKS;
 use crate::ops::length::whole;
 use crate::ops::par;
 use crate::ops::random::{Rng, mix};
@@ -651,6 +652,12 @@ impl Thresholds<'_> {
         }
     }
 
+    /// The pixel's level in 0..1, (rank + 0.5) / count: each rank once per tile, so a share s of the levels is below s.
+    fn level(&self, at: (usize, usize), width: usize) -> f64 {
+        let (twice, whole) = (2 * self.rank(at, width) + 1, 2 * self.count());
+        f64::from(u32::try_from(twice).unwrap_or(u32::MAX)) / f64::from(u32::try_from(whole).unwrap_or(u32::MAX))
+    }
+
     fn rank(&self, (row, column): (usize, usize), width: usize) -> usize {
         match self {
             Self::Tiled {
@@ -952,6 +959,52 @@ pub(crate) fn ordered(
                 let rank = thresholds.rank((row, column), width);
                 let position = (2 * rank + 1) * steps / (2 * count);
                 *pick = darkest_first[usize::from(mix[position])];
+            }
+        }
+    });
+    chosen
+}
+
+/// A pattern of overprints with their exact shares. `amounts` holds each pixel's coverage of its first `inks` inks; the
+/// inks overlap independently, so the overprint of the set S (bit k of the index is ink k) covers
+/// `prod_(k in S) a_k prod_(k not in S) (1 - a_k)` of the pixel. The pixel's own level (its rank in the `thresholds`, or its
+/// noise) picks the overprint whose cumulative share holds it, in index order: exact in expectation for noise and per tile
+/// for a matrix, where `ordered` mixes in sixteenths. With `pattern` below 1 the level takes only `1 + round(15 pattern)`
+/// steps, as `ordered`'s candidates do, so the dot is flatter; at 0 it is the middle one.
+pub(crate) fn shared(
+    amounts: &[[f32; MOST_INKS]],
+    inks: usize,
+    (height, width): (usize, usize),
+    thresholds: &Thresholds<'_>,
+    pattern: f32,
+) -> Vec<u8> {
+    #[expect(clippy::cast_precision_loss, reason = "a small constant")]
+    let steps = 1 + whole(f64::from(pattern) * (CANDIDATES - 1) as f64);
+    let steps_f = f64::from(u32::try_from(steps).unwrap_or(u32::MAX));
+    let mut chosen = vec![0; height * width];
+    par::rows(&mut chosen, width, |first_row, band| {
+        for (offset, line) in band.chunks_exact_mut(width).enumerate() {
+            let row = first_row + offset;
+            for (column, pick) in line.iter_mut().enumerate() {
+                let level = thresholds.level((row, column), width);
+                let level = if steps < CANDIDATES {
+                    ((level * steps_f).floor() + 0.5) / steps_f
+                } else {
+                    level
+                };
+                let a = &amounts[row * width + column];
+                let (mut below, mut last) = (0.0, 0);
+                for mask in 0..1_usize << inks {
+                    let share: f64 = (0..inks)
+                        .map(|k| f64::from(if mask >> k & 1 == 1 { a[k] } else { 1.0 - a[k] }))
+                        .product();
+                    below += share;
+                    last = mask;
+                    if level < below {
+                        break;
+                    }
+                }
+                *pick = u8::try_from(last).unwrap_or(u8::MAX);
             }
         }
     });
