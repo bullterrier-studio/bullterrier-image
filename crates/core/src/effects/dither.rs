@@ -416,6 +416,34 @@ fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
         .collect()
 }
 
+/// The thresholds of the layer of ink number `ink` (0 first, as `thresholds`): each later ink's white noise is drawn from the
+/// next seed and its blue-noise tile is moved a third of its side down and right per ink, so that the layers of several inks
+/// overlap as independent ones do instead of nesting under one threshold. The other tiles are kept: a periodic tile has no
+/// shift that makes two layers independent.
+fn layer(thresholds: Thresholds<'static>, ink: usize) -> Thresholds<'static> {
+    match thresholds {
+        Thresholds::Noise { seed } => noise(seed.wrapping_add(u32::try_from(ink).unwrap_or_default())),
+        Thresholds::Tiled {
+            ranks,
+            rows,
+            columns,
+            count,
+        } => {
+            // constant: a third of the blue-noise tile's side per ink
+            let (down, right) = (ink * rows / 3, ink * columns / 3);
+            let moved = (0..rows * columns)
+                .map(|at| ranks[(at / columns + down) % rows * columns + (at % columns + right) % columns])
+                .collect();
+            Thresholds::Tiled {
+                ranks: Cow::Owned(moved),
+                rows,
+                columns,
+                count,
+            }
+        }
+    }
+}
+
 /// The `chosen` method on `values` (`size` dots), as a pattern of palette indices.
 fn pattern(
     method: Method,
@@ -453,14 +481,8 @@ fn pattern(
         Method::Bayer => tiled(Tile::Bayer),
         Method::Clustered => tiled(Tile::Clustered),
         Method::Clustered45 => tiled(Tile::Clustered45),
-        Method::BlueNoise => ordered(
-            values,
-            size,
-            palette,
-            &Tile::BlueNoise.thresholds().for_ink(ink),
-            amount,
-        ),
-        Method::WhiteNoise => ordered(values, size, palette, &noise(params.seed).for_ink(ink), amount),
+        Method::BlueNoise => ordered(values, size, palette, &layer(Tile::BlueNoise.thresholds(), ink), amount),
+        Method::WhiteNoise => ordered(values, size, palette, &layer(noise(params.seed), ink), amount),
         Method::GameboyCamera => tiled(Tile::GameboyCamera),
         Method::Matrix => ordered(values, size, palette, &matrix_of(inputs), amount),
     }
