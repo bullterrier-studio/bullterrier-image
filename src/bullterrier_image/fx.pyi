@@ -3639,6 +3639,26 @@ sparkle : Scattered glitter: small white four-pointed glints on a random few of 
     ...
 
 @_effect
+def stipple(*, radius: float = 1.5, iterations: int = 10, color: str | list[float] | tuple[float, float, float] = '#000000', paper: str | list[float] | tuple[float, float, float] = '#ffffff', seed: int = 0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
+    """The picture as dots of ink on paper, as a pen-and-ink stipple drawing.  Dots of `radius` px in `color` on `paper`. Darkness is how far a pixel's luminance lies from the `paper`'s towards the `color`'s, and the number of dots is the picture's total darkness over the area of one dot, so the ink covers the tone (the mean ink is the tone) until the dots crowd: they cannot pack past about 0.9 of the area (hexagonal packing), so a tone darker than that prints at it. The dots start scattered at random in proportion to darkness, from `seed`, and `iterations` rounds of Lloyd relaxation (Secord's weighted version) move each dot to the darkness-weighted centre of the pixels nearer to it than to any other dot, which spreads them evenly and keeps them dense where the picture is dark. More rounds make an evener, more regular pattern; 0 leaves the random scatter, clumped. A dot's edge is a ramp one px wide; a dot in the border is cut by it.
+
+Parameters
+----------
+radius : number, px, 1 to 20, default 1.5
+    Radius of every dot in px. Larger = fewer, bigger dots for the same tone.
+iterations : whole number, count, 0 to 50, default 10
+    Rounds of Lloyd relaxation: 0 = the random scatter, more = dots spread more evenly.
+    Work grows with it.
+color : colour, default '#000000'
+    The ink.
+paper : colour, default '#ffffff'
+    The paper between dots. Tones darker than it get ink.
+seed : whole number, count, 0 to 4294967295, default 0
+    Random seed for where the dots start: the same seed always gives the same dots,
+    another seed a different pattern."""
+    ...
+
+@_effect
 def stretch(*, axis: Literal['vertical', 'horizontal'] = 'vertical', at: float = 0.5, span: float = 72.0, side: Literal['both', 'after', 'before'] = 'both', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None) -> Step:
     """A pixel stretch: one line of the picture repeated over the lines beside it, the way a glitched file smears.  Repeat one row (or column) of the picture over the `span` of rows (columns) beside it. The line sits at `at` and keeps its place; the lines within `span` of it on the chosen `side` become copies of it, the rest of the picture is untouched. Every output pixel is an input pixel, so no colour is invented.
 

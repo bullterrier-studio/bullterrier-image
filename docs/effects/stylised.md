@@ -16,6 +16,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | <img src="../gallery/quadtree.jpg" width="160" alt="quadtree"> | `quadtree` | Redraw the picture as flat cells that split only where it varies: large in even areas, small at edges. | `threshold=0.06` `max_cell=60.0` `min_cell=5.0` `gap=1.0` `gap_color='#000000'` `rounding=0.0` | [quadtree.toml](../../examples/effects/quadtree.toml) |
 | <img src="../gallery/reaction_diffusion.jpg" width="160" alt="reaction_diffusion"> | `reaction_diffusion` | Grow a Gray-Scott reaction-diffusion pattern (spots, worms, mazes) from the picture's bright parts. | `feed=0.037` `kill=0.06` `steps=300` `cell=8.0` `threshold=0.6` `colors=('#12002b', '#6a1bff', '#ff2bd6', '#ffd84a')` +2 advanced | [reaction_diffusion.toml](../../examples/effects/reaction_diffusion.toml) |
 | <img src="../gallery/seams.jpg" width="160" alt="seams"> | `seams` | Draw a solid line or band along every border between the pieces of a partition. | `width=2.0` `color='#ffffff'` | [seams.toml](../../examples/effects/seams.toml) |
+| <img src="../gallery/stipple.jpg" width="160" alt="stipple"> | `stipple` | The picture as dots of ink on paper, as a pen-and-ink stipple drawing. | `radius=1.5` `iterations=10` `color='#000000'` `paper='#ffffff'` `seed=0` | [stipple.toml](../../examples/effects/stipple.toml) |
 | <img src="../gallery/topographic.jpg" width="160" alt="topographic"> | `topographic` | Draw contour lines where the smoothed `field` crosses `levels` evenly spaced heights. | `field='light'` `levels=8` `thickness=1.5` `line='#ffffff'` `fill='none'` `colors=('#16324f', '#3f7d6a', '#d9c97a', '#9c6b43', '#f4f1ea')` `smoothing=5.0` +2 advanced | [topographic.toml](../../examples/effects/topographic.toml) |
 
 ### `crosshatch`
@@ -227,6 +228,16 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- | --- | --- | --- | --- |
 | `width` | number | px | 0 to 48 | `2.0` | Width of the line in px at the recipe's size, centred on each border: 0 draws nothing, 1 is a hairline, 10 or more a band. Raising it widens the line. |
 | `color` | colour |  |  | `'#ffffff'` | Colour of the line, solid: '#rrggbb', '#rgb' or three numbers from 0 to 1. |
+
+### `stipple`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `radius` | number | px | 1 to 20 | `1.5` | Radius of every dot in px. Larger = fewer, bigger dots for the same tone. |
+| `iterations` | whole number | count | 0 to 50 | `10` | Rounds of Lloyd relaxation: 0 = the random scatter, more = dots spread more evenly. Work grows with it. |
+| `color` | colour |  |  | `'#000000'` | The ink. |
+| `paper` | colour |  |  | `'#ffffff'` | The paper between dots. Tones darker than it get ink. |
+| `seed` | whole number | count | 0 to 4294967295 | `0` | Random seed for where the dots start: the same seed always gives the same dots, another seed a different pattern. |
 
 ### `topographic`
 
