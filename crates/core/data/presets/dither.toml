@@ -37,9 +37,10 @@ block_group = 8
 
 [msx]
 description = "MSX (TMS9918A, screen 2): 256 x 192 dots, every 8 x 1 run of dots has two colours from the 15 of the chip."
-# Palette: the TMS9918A's 15 colours (colour 0 is transparent), as listed in the Wikipedia article "Texas Instruments TMS9918"
-# (the commonly quoted RGB values); screen 2 gives each row of 8 dots its own foreground and background colour
-# (Wikipedia, "MSX"; MSX2 Technical Handbook, graphic mode 2).
+# Palette: the TMS9918A's 15 colours (colour 0 is transparent) as the widely circulated RGB set that emulators and palette
+# collections use (no source is official: the chip's output is analogue, so openMSX derives its own from the analog levels);
+# screen 2 gives each row of 8 dots its own foreground and background colour (Wikipedia, "MSX"; MSX2 Technical Handbook,
+# graphic mode 2).
 method = "bayer"
 palette = "custom"
 custom = [
