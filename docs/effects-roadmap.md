@@ -93,10 +93,10 @@ Planned additions to `dither` and `halftone`, new screen and line looks, presets
 | `quadtree` ✓ | Cells split only where the picture has detail: fine blocks on faces and edges, large flat ones elsewhere. Optional `gap` and rounded corners; fine detail only on the subject is two steps, one masked. | `fx.quadtree(threshold=0.09, max_cell=96, min_cell=5.75)` |
 | `dither` ✓ | Twenty-one methods (error diffusion from Floyd-Steinberg and Atkinson to Stucki, Sierra and Ostromoukhov, dot diffusion, Riemersma, ordered Bayer, clustered-dot, blue and white noise, Game Boy Camera, or your own `matrix` picture; `serpentine` scans rows both ways) to a palette found in the photo, a named one (`gameboy`, `cga`, `ega`, `pico8`) or your own (`palette="custom"`), on a grid of any size, or one to four spot `inks` printed as dither layers over a `paper` (`separation="spot"`, with `offset` misregistration); `pattern=0` is plain palette reduction; presets `posterize` (each channel snapped to a few levels: `cube2` to `cube6` palettes matched in `space="rgb"`) and `threshold` (black and white; set the level with `grade` before it). | `fx.dither(method="blue_noise", palette="custom", custom=["#0b1026", "#ff5a36", "#f7e7c6"], cell=4)` |
 | `edges` ✓ | Edge lines by Sobel, Canny or difference of Gaussians, in `color` on `background`; screened over the picture they light up the edges, in a dark `color` on light they are line art. | `fx.edges(method="dog", radius=2)` |
-| `crosshatch` (planned, [dither-and-print.md](dither-and-print.md)) | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
+| `crosshatch` ✓ | Layers of hatch lines by tone. | `fx.crosshatch(layers=4, angle=45)` |
 | line and CMYK screens ✓ (on `halftone`) | `shape` = dot, square, ellipse, diamond, euclidean, matrix or line (each keeps the tone); `screen` = grid, wave, rings, spiral or rays; `dot_gain`, `ink_noise`, `specks`; `separation` = none, cmyk (four process inks at the classic screen angles), spot (up to four `inks`, unmixed from the photo) or rgb (red, green and blue light on black, at 15, 45 and 75 degrees); `offset` and `offset_angle` misregister the inks. Replaces `line_halftone` and `cmyk_halftone`. | `fx.halftone(shape="line", cell=8, angle=30)`, `fx.halftone(separation="cmyk", paper="#ffffff", angle=0, cell=9, offset=1.5)`, `fx.halftone(separation="spot", inks=["#ff4d6d", "#2b59ff"], paper="#f4efe4")` |
-| `engraving` (planned, [dither-and-print.md](dither-and-print.md)) | Banknote-style flowing lines. | `fx.engraving(spacing=5)` |
-| `stipple` (planned, [dither-and-print.md](dither-and-print.md)) | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
+| `engraving` ✓ | Banknote-style flowing lines. | `fx.engraving(spacing=5)` |
+| `stipple` ✓ | Dots whose density carries tone (weighted Voronoi). | `fx.stipple(dots=20000, seed=1)` |
 | `voronoi_mosaic` ✓ (the look `stained-glass`: `shatter` with `fill` and `detail`) | Stained-glass cells that gather along the picture's edges, each one flat colour, leaded. [Look](../crates/core/data/looks/stained-glass.toml). | `fx.shatter(pieces=420, offset=0, angle=0, detail=0.85, fill=1, gap=2)` |
 | `low_poly` ✓ (the look `low-poly`: `shatter` with `shape="triangles"`) | Delaunay triangles, one colour each, more of them where the picture has edges. [Look](../crates/core/data/looks/low-poly.toml). | `fx.shatter(shape="triangles", pieces=480, offset=0, angle=0, detail=0.7, fill=1)` |
 | `risograph` ✓ ([recipe](../examples/recipes/risograph.toml)) | Spot-colour layers, misregistration, grain: `halftone` with spot inks, each offset, then paper texture and `grain`. | `fx.halftone(separation="spot", inks=["#ff4d6d","#2b59ff"], paper="#f4efe4", offset=2.5)` |
@@ -324,7 +324,7 @@ Each item is built only when video or scene needs it.
   `subject-and-depth.md` that SAM 2's matte can be softer, with holes, than Apple Vision's on the same photo.
 - **Effects, in this order of value.** `distance_field`; glass, then emboss and bevel (new rows); `dissolve`;
   `denoise`. `stipple`, `engraving` and
-  `crosshatch` are planned in [dither-and-print.md](dither-and-print.md).
+  `crosshatch` are built.
 - **Input depth (a watch item).** A 16-bit input is read as sRGB. Colour management beyond sRGB (CMYK, ICC output) is not
   image's job.
 - **Speed and memory.** `.superpowers/todos/performance.md` (what was measured, what is left), `banded-render-optimisation.md`

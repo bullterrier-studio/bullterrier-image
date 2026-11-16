@@ -61,7 +61,7 @@ Documented with the DPI write option, no parameter.
 |---|---|
 | ~~`modulation`~~ **Done** (2026-11-16) | Rows (or columns, or diagonals) of dashes whose length or pitch carries tone: one-dimensional error diffusion along each row. `sway` bends the rows, `weave` alternates their direction, `dash` sets a length. Its parameters mean nothing to the 2-D methods, so not a `dither` method. |
 | `mosaic` | The picture rebuilt from caller-given tile pictures, each cell the tile nearest in mean colour (Oklab), optionally tinted. No tile art is bundled (design decision): tiles are a `picture` list or folder. |
-| `stipple`, `crosshatch`, `engraving` | Rows in [effects-roadmap.md](effects-roadmap.md) ("Stylised looks"), moved from "On demand" to planned here. |
+| ~~`stipple`, `crosshatch`, `engraving`~~ **Done** (2026-11-16) | Rows in [effects-roadmap.md](effects-roadmap.md) ("Stylised looks"), moved from "On demand" to planned here. |
 
 Photocopy is a look, not an effect: `grade` contrast, `dither` threshold, `grain`, `displace`, `dust_scratches`.
 
@@ -96,7 +96,7 @@ It gives data; drawing the boxes is vector's and scene's, following them over a 
 
 1. ~~`dither` methods and matrices; `serpentine`.~~ **Done** (2026-11-16); open: Guo-Liu and Mese matrices, Peano curve, the four-shade camera set.
 2. ~~`halftone` dot shapes, screen geometry, RGB separation, print realism.~~ **Done** (2026-11-16); open: see the later items under `halftone`.
-3. ~~`modulation`; attribute cells, pattern tiles, `phase`.~~ **Done** (2026-11-16, batch A); open: `stipple`, `crosshatch`, `engraving` (batch B).
+3. ~~`modulation`; attribute cells, pattern tiles, `phase`.~~ **Done** (2026-11-16, batch A); batch B (`stipple`, `crosshatch`, `engraving`) **Done** (2026-11-16).
 4. Presets: gradient maps, palettes as data, tone curves.
 5. Data beside the picture, when scene's plates or vector's tracing is built.
 6. `mosaic`, the detector.
