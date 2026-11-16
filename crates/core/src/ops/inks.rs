@@ -11,8 +11,8 @@ use super::dither::rank_greys;
 /// The most inks printed over one paper.
 pub(crate) const MOST_INKS: usize = 4; // constant: cyan, magenta, yellow and black; more inks on one paper cannot be told apart
 
-/// The lowest `ink / paper` ratio kept, so that the density of a black ink stays finite (about 9.2, optical density 4).
-const LOWEST_RATIO: f32 = 1e-4; // constant: numerical floor of the logarithm, not a look
+/// The lowest `ink / paper` ratio kept, so that an ink or paper channel of exactly 0 never divides by 0.
+const LOWEST_RATIO: f32 = 1e-4; // constant: numerical floor of a division, not a look
 
 /// Sweeps of the coordinate descent that unmixes the inks.
 const SWEEPS: usize = 64; // constant: a fixed count keeps the result deterministic; the error of well-separated inks is far below 1e-4 by then
@@ -515,6 +515,16 @@ mod tests {
         for a in [0.0, 0.25, 0.8, 1.0] {
             assert!(close(&one.coverages(one.print(&[a, 0.0, 0.0, 0.0]))[..1], &[a], 1e-4));
         }
+    }
+
+    #[test]
+    fn a_colour_the_descent_from_none_misses_is_found_from_full() {
+        // two near-parallel inks on a light paper: descending from no ink stops at amounts [0.77, 0], the colour is in gamut
+        let paper = [0.886, 0.846, 0.785];
+        let inks = Inks::new(paper, &[[0.026, 0.526, 0.582], [0.164, 0.764, 0.682]]);
+        let colour = inks.print(&[0.065, 0.996, 0.0, 0.0]);
+        let found = inks.print(&inks.coverages(colour));
+        assert!(close(&found, &colour, 5e-3), "{found:?} against {colour:?}");
     }
 
     #[test]
