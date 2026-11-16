@@ -326,7 +326,7 @@ fn quantile(values: &[f32], tone: f64) -> f32 {
 fn clipped_circle(r: f64) -> f64 {
     // constant: the unit square's half side 0.5 and its square 0.25, and its four sides, in the cap formula above
     let cap = r * r * (0.5 / r).acos() - 0.5 * (r * r - 0.25).sqrt();
-    std::f64::consts::PI * r * r - 4.0 * cap
+    std::f64::consts::PI * r * r - 4.0 * cap // constant: a circle less its four caps
 }
 
 /// Up to four inks over a paper.

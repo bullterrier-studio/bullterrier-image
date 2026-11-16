@@ -50,7 +50,7 @@ impl Realism {
         let chance = f64::from(self.specks) * side * side / 1000.0; // constant: density counts marks per 1000 px^2
         let (px, py) = (float(x) + 0.5, float(y) + 0.5); // constant: the pixel's centre
         let (cx, cy) = ((px / side).floor(), (py / side).floor());
-        let mut covered = 0.0_f64; // constant: none yet
+        let mut covered: f64 = 0.0; // constant: no speck covers the pixel yet
         for (dx, dy) in (-1..=1).flat_map(|dx| (-1..=1).map(move |dy| (dx, dy))) {
             let (sx, sy) = (cx + f64::from(dx), cy + f64::from(dy));
             let at = |part: u64| mix(self.seed, &[SPECK_STREAM, sx.to_bits(), sy.to_bits(), part]);
