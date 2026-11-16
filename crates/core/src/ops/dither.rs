@@ -471,8 +471,8 @@ const MEMORY: usize = 16; // constant: Riemersma (1998), "a list of 16 as a mini
 const MEMORY_RATIO: f32 = 16.0; // constant: Riemersma (1998), his program's MAX
 
 /// Calls `visit(row, column)` for every cell of a `height` x `width` rectangle once, along the generalized Hilbert curve
-/// ("gilbert"): each step goes to an adjacent cell, in O(`height` x `width`) steps, and on a power-of-two square it is the
-/// Hilbert curve (first down, then right, from the top left corner).
+/// ("gilbert"): each step goes to a neighbouring cell (a diagonal one at some odd sizes), in O(`height` x `width`) steps,
+/// and on a power-of-two square it is the Hilbert curve (first down, then right, from the top left corner).
 ///
 /// Reimplemented from Jakub Cervený's `gilbert2d` (BSD-2-Clause, <https://github.com/jakubcerveny/gilbert>): the algorithm
 /// only, no code or dependency taken. It splits the rectangle in two or three and recurses, to a depth of log2 of the
