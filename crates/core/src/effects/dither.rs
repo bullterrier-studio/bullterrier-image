@@ -453,10 +453,16 @@ fn pattern(
         Method::Bayer => tiled(Tile::Bayer),
         Method::Clustered => tiled(Tile::Clustered),
         Method::Clustered45 => tiled(Tile::Clustered45),
-        Method::BlueNoise => ordered(values, size, palette, &Tile::BlueNoise.thresholds().for_ink(ink), amount),
+        Method::BlueNoise => ordered(
+            values,
+            size,
+            palette,
+            &Tile::BlueNoise.thresholds().for_ink(ink),
+            amount,
+        ),
         Method::WhiteNoise => ordered(values, size, palette, &noise(params.seed).for_ink(ink), amount),
         Method::GameboyCamera => tiled(Tile::GameboyCamera),
-        Method::Matrix => ordered(values, size, palette, &matrix_of(inputs).for_ink(ink), amount),
+        Method::Matrix => ordered(values, size, palette, &matrix_of(inputs), amount),
     }
 }
 
@@ -516,7 +522,15 @@ fn printed(
             for (value, coverage) in plane.iter_mut().zip(&needed) {
                 value[0] = coverage[ink];
             }
-            pattern(params.method, &plane, (rows, columns), &[none, full], params, inputs, ink)
+            pattern(
+                params.method,
+                &plane,
+                (rows, columns),
+                &[none, full],
+                params,
+                inputs,
+                ink,
+            )
         })
         .collect();
     // the print of every combination of inks, by the bits of the inks that land
