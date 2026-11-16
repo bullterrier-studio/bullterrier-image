@@ -77,7 +77,7 @@ fn white_is_nearly_all_dots_black_is_blank_and_paper_shows_exactly_where_no_ink_
 fn coverage(shape: Shape, tone: f32) -> Result<f32, Error> {
     let params = Params {
         shape,
-        cell: 20,
+        cell: 20.0,
         angle: 0.0,
         sigma: 0.0,
         feather: 1.0,
@@ -112,7 +112,7 @@ fn a_dot_prints_about_its_own_area_however_small() -> Result<(), Error> {
     // a dot of radius r has the tone pi (r / cell)^2
     let cell = 20;
     let params = Params {
-        cell: cell as i32,
+        cell: cell as f32,
         angle: 0.0,
         ..white_on_black()
     };
@@ -178,7 +178,7 @@ fn on_a_light_paper_dark_tones_get_the_ink_and_paper_threshold_decides_what_is_l
 fn with_one_ink_every_pixel_is_a_mix_of_the_ink_and_the_paper() -> Result<(), Error> {
     let (ink, paper) = ([1.0_f32, 0.5, 0.0], [0.0_f32, 0.0, 0.25]);
     let params = Params {
-        cell: 6,
+        cell: 6.0,
         ink: Some(Color(ink)),
         paper: Color(paper),
         ..Params::default()
@@ -201,7 +201,7 @@ fn with_no_ink_the_dots_take_the_photo_colour_brightened_by_at_most_one_over_the
     let red_photo: Vec<f32> = (0..24 * 24).flat_map(|_| [0.8, 0.0, 0.0]).collect();
     let out = run_picture(
         &Params {
-            cell: 8,
+            cell: 8.0,
             ..Params::default()
         },
         24,
@@ -224,7 +224,7 @@ fn with_no_ink_the_dots_take_the_photo_colour_brightened_by_at_most_one_over_the
     for (ink_floor, ink) in [(0.25, [0.8, 0.4, 0.16]), (1.0, [0.2, 0.1, 0.04])] {
         let by_floor = run_picture(
             &Params {
-                cell: 8,
+                cell: 8.0,
                 ink_floor,
                 ..Params::default()
             },
@@ -234,7 +234,7 @@ fn with_no_ink_the_dots_take_the_photo_colour_brightened_by_at_most_one_over_the
         )?;
         let by_ink = run_picture(
             &Params {
-                cell: 8,
+                cell: 8.0,
                 ink: Some(Color(ink)),
                 ..Params::default()
             },
@@ -252,7 +252,7 @@ fn with_no_ink_the_dots_take_the_photo_colour_brightened_by_at_most_one_over_the
 fn an_upright_screen_repeats_every_cell_and_not_every_half_cell() -> Result<(), Error> {
     let (size, cell) = (48, 12);
     let params = Params {
-        cell: cell as i32,
+        cell: cell as f32,
         angle: 0.0,
         ..white_on_black()
     };
@@ -282,7 +282,7 @@ fn a_quarter_turn_gives_the_same_square_grid_and_other_angles_do_not() -> Result
     let screen = |angle: f32| {
         red(
             &Params {
-                cell: 12,
+                cell: 12.0,
                 angle,
                 ..white_on_black()
             },
@@ -311,7 +311,7 @@ fn rows_of_dots_run_the_angle_clockwise_on_screen() -> Result<(), Error> {
     let (size, cell) = (100, 20);
     for angle in [20.0_f32, 340.0, 65.0] {
         let params = Params {
-            cell,
+            cell: cell as f32,
             angle,
             ..white_on_black()
         };
@@ -357,7 +357,7 @@ fn each_dot_stands_for_the_tone_at_its_centre() -> Result<(), Error> {
         })
         .collect();
     let params = Params {
-        cell: cell as i32,
+        cell: cell as f32,
         angle: 0.0,
         sigma: 0.0,
         ..Params::default()
@@ -391,7 +391,7 @@ fn mean_in(out: &[f32], width: usize, rows: std::ops::Range<usize>, columns: std
 fn sigma_and_truncate_set_how_far_tone_spreads_into_neighbouring_cells() -> Result<(), Error> {
     // cells of 10 px, white from column 60 of 120: the black cells at columns 20 to 30 are 30 to 40 px from the white
     let base = Params {
-        cell: 10,
+        cell: 10.0,
         angle: 0.0,
         ..white_on_black()
     };
@@ -430,7 +430,7 @@ fn edge_and_constant_value_set_what_lies_beyond_the_picture() -> Result<(), Erro
     let picture = flat(40, 40, 0.0);
     let ink = |edge, constant_value| -> Result<f32, Error> {
         let params = Params {
-            cell: 10,
+            cell: 10.0,
             angle: 0.0,
             sigma: 2.0,
             edge,
@@ -453,7 +453,7 @@ fn feather_softens_the_dot_edges_without_changing_the_ink() -> Result<(), Error>
     let screen = |feather: f32| {
         red(
             &Params {
-                cell: 20,
+                cell: 20.0,
                 angle: 0.0,
                 feather,
                 ..white_on_black()
@@ -478,7 +478,7 @@ fn a_full_turn_of_the_angle_is_no_turn() -> Result<(), Error> {
     let screen = |angle| {
         run_picture(
             &Params {
-                cell: 12,
+                cell: 12.0,
                 angle,
                 ..Params::default()
             },
@@ -509,7 +509,7 @@ const PAPER: [f32; 3] = [0.95, 0.93, 0.88];
 /// Pink and blue spot inks on a light paper, the screens of the first at 45 degrees.
 fn spot() -> Params {
     Params {
-        cell: 8,
+        cell: 8.0,
         separation: Separation::Spot,
         inks: vec![Color(PINK), Color(BLUE)],
         paper: Color(PAPER),
@@ -521,7 +521,7 @@ fn spot() -> Params {
 fn a_line_screen_keeps_the_tone_as_the_area_of_its_lines() -> Result<(), Error> {
     // a line as wide as the ink needs: a share `tone` of each row of cells, but for the soft edge
     let params = Params {
-        cell: 10,
+        cell: 10.0,
         angle: 0.0,
         shape: Shape::Line,
         ..white_on_black()
@@ -539,7 +539,7 @@ fn lines_run_along_the_screen_rows_at_the_angle() -> Result<(), Error> {
     let screen = |angle: f32| {
         red(
             &Params {
-                cell: 10,
+                cell: 10.0,
                 angle,
                 shape: Shape::Line,
                 ..white_on_black()
@@ -563,7 +563,7 @@ fn lines_run_along_the_screen_rows_at_the_angle() -> Result<(), Error> {
 #[test]
 fn cmyk_prints_no_ink_for_paper_black_alone_for_black_and_cyan_alone_for_a_paper_relative_cyan() -> Result<(), Error> {
     let params = Params {
-        cell: 8,
+        cell: 8.0,
         angle: 0.0,
         separation: Separation::Cmyk,
         paper: Color(PAPER),
@@ -729,7 +729,7 @@ fn the_four_cmyk_screens_each_have_their_own_angle() -> Result<(), Error> {
     // half of each ink alone against the paper (cyan takes away half the red, magenta of the green, yellow of the blue,
     // black of all) makes separate dots; where they print is the mask of that ink's screen
     let params = Params {
-        cell: 8,
+        cell: 8.0,
         angle: 0.0,
         separation: Separation::Cmyk,
         paper: Color(PAPER),
@@ -785,7 +785,7 @@ fn the_offset_ink_reads_the_tone_where_its_dots_are() -> Result<(), Error> {
     };
     let params = Params {
         sigma: 0.0,
-        cell,
+        cell: cell as f32,
         ..spot()
     };
     for (angle, along) in [(0.0, (slide, 0)), (90.0, (0, slide))] {
@@ -821,7 +821,7 @@ fn the_offset_ink_reads_the_tone_where_its_dots_are() -> Result<(), Error> {
 /// Red, green and blue light on black, `cell` 10, the coverage oracle's settings: no blur, a small feather.
 fn rgb() -> Params {
     Params {
-        cell: 10,
+        cell: 10.0,
         separation: Separation::Rgb,
         sigma: 0.0,
         feather: 0.1,
@@ -904,7 +904,7 @@ fn the_red_green_and_blue_screens_are_a_single_ink_screen_at_15_45_and_75_degree
     let out = run_picture(&Params { angle: 0.0, ..rgb() }, size, size, &grey)?;
     for (which, angle) in [15.0, 45.0, 75.0].into_iter().enumerate() {
         let alone = Params {
-            cell: 10,
+            cell: 10.0,
             angle,
             sigma: 0.0,
             feather: 0.1,
@@ -912,6 +912,100 @@ fn the_red_green_and_blue_screens_are_a_single_ink_screen_at_15_45_and_75_degree
         };
         let want = red(&alone, size, size, &grey)?;
         assert_eq!(first_difference(&channel(&out, which), &want), None, "channel {which}");
+    }
+    Ok(())
+}
+
+// A recipe's `cell` is a length in px, scaled to the picture's size as a float: the screen's pitch is what the recipe asks
+// for, never a whole count. These go through `Recipe` so they hold for the field whatever its type.
+
+/// The red channel of a one-ink black-on-white halftone of `recipe_cell` (a fractional length) over `values`, rendered at
+/// `size` (the longest side the recipe's px are written for 480 of).
+fn through_recipe(
+    recipe_cell: f64,
+    tone: f32,
+    (height, width): (usize, usize),
+    size: Option<u32>,
+) -> Result<(Vec<f32>, usize), Box<dyn std::error::Error>> {
+    use bullterrier_image::{Options, Photo, Picture, Presets, Recipe, Step};
+    let step = Step::new("halftone")
+        .param("cell", recipe_cell)
+        .param("angle", 0.0)
+        .param("sigma", 0.0)
+        .param("feather", 1.0)
+        .param("ink", "#000000")
+        .param("paper", "#ffffff");
+    let values = flat(height, width, 1.0 - tone);
+    let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
+    let image =
+        Photo::new(Picture::new(height, width, &values)?).render(&Recipe::new([step]), &Presets::new(), options)?;
+    let wide = image.width();
+    let red = image
+        .into_values()
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|pixel| pixel[0])
+        .collect();
+    Ok((red, wide))
+}
+
+#[test]
+fn a_fractional_cell_keeps_the_tone_within_what_its_soft_edge_adds() -> Result<(), Box<dyn std::error::Error>> {
+    // The ink is the dots' area plus what the one pixel soft edge adds: pi f^2 / 12 px^2 a dot (f = 1), a share
+    // pi / (12 cell^2) of its cell. Allow twice that, as a dot of a pixel or two is not a clean disc, and 0.01 for the
+    // partial cells at the picture's edge (a picture of 480 px at size 480, so the cell is the recipe's).
+    for cell in [2.7_f64, 13.3] {
+        let bound = 2.0 * std::f64::consts::PI / (12.0 * cell * cell) + 0.01;
+        for tone in [0.1_f32, 0.25, 0.5, 0.75, 0.9] {
+            let (red, _) = through_recipe(cell, tone, (480, 480), Some(480))?;
+            let ink = 1.0 - f64::from(red.iter().sum::<f32>()) / red.len() as f64;
+            assert!(
+                (ink - f64::from(tone)).abs() < bound,
+                "cell {cell} tone {tone}: ink {ink} (bound {bound})"
+            );
+        }
+    }
+    Ok(())
+}
+
+/// The mean distance between the centres of the dots along the row of the screen's dots nearest `row`, in px.
+fn dot_pitch(red: &[f32], width: usize, row: usize) -> f32 {
+    let line = &red[row * width..(row + 1) * width];
+    let mut centres = Vec::new();
+    let mut start = None;
+    for (column, value) in line.iter().enumerate() {
+        match (start, *value < 0.5) {
+            (None, true) => start = Some(column),
+            (Some(from), false) => {
+                centres.push((from + column - 1) as f32 / 2.0);
+                start = None;
+            }
+            _ => {}
+        }
+    }
+    (centres[centres.len() - 1] - centres[0]) / (centres.len() - 1) as f32
+}
+
+#[test]
+fn a_recipe_screen_scales_with_the_picture_without_jumps() -> Result<(), Box<dyn std::error::Error>> {
+    // `cell` px at 480 is `cell x size / 480` px at `size`: a whole cell of 5 is 13.33 at 1280, not 13
+    for cell in [5.0_f64, 7.0] {
+        let (small, small_width) = through_recipe(cell, 0.3, (24, 480), Some(480))?;
+        let (large, large_width) = through_recipe(cell, 0.3, (24, 480), Some(1280))?;
+        // a row through the middle of a row of dots: the centres of the dots in row 2 of the screen
+        let row = |pitch: f32| (pitch * 2.5).round() as usize;
+        let at_480 = dot_pitch(&small, small_width, row(cell as f32));
+        let at_1280 = dot_pitch(&large, large_width, row(cell as f32 * 1280.0 / 480.0));
+        assert!(
+            (at_480 - cell as f32).abs() < 0.03,
+            "cell {cell}: pitch {at_480} at 480"
+        );
+        let want = cell as f32 * 1280.0 / 480.0;
+        assert!(
+            (at_1280 - want).abs() < 0.03,
+            "cell {cell}: pitch {at_1280} at 1280, wanted {want}"
+        );
     }
     Ok(())
 }

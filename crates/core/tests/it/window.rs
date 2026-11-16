@@ -470,3 +470,20 @@ fn echo_is_cleared_for_a_distance_a_row_can_carry_and_not_for_a_finer_one() {
         problems.join("\n")
     );
 }
+
+#[test]
+fn a_halftone_of_a_fractional_cell_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
+    let values = varied(SMALL.height, SMALL.width);
+    for (cell, sigma) in [(13.3, 0.0), (2.7, 1.5), (7.5, 0.3)] {
+        let recipe = Recipe::new([Step::new("halftone").param("cell", cell).param("sigma", sigma)]);
+        let margin = recipe
+            .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
+            .ok_or("halftone is banded")?;
+        assert_eq!(
+            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+            None,
+            "cell {cell} sigma {sigma}"
+        );
+    }
+    Ok(())
+}

@@ -369,6 +369,8 @@ fn combinations() -> Vec<(&'static str, Value)> {
         ("halftone", json!({"cell": 3, "sigma": 5, "truncate": 1})), // a small screen, a long blur
         ("halftone", json!({"cell": 12, "sigma": 0.2, "truncate": 1})), // a large screen, a short blur
         ("halftone", json!({"cell": 4, "sigma": 1, "truncate": 3})),
+        ("halftone", json!({"cell": 13.3, "sigma": 0.5, "truncate": 2})), // a fractional pitch
+        ("halftone", json!({"cell": 2.7, "sigma": 3, "truncate": 1.5})),
         ("halftone", json!({"cell": 40, "sigma": 0, "angle": 0})), // aligned: a pixel reads the centre of a tall cell
         ("liquid_metal", json!({"smoothing": 2, "truncate": 10})),
         ("liquid_metal", json!({"smoothing": 12, "truncate": 1})),

@@ -25,7 +25,7 @@ pub(crate) const META: Meta = Meta {
 /// in another frame of reference.
 pub(crate) fn footprint(params: &Params) -> Footprint {
     // A pixel shows the tone at the centre of its screen cell, at most half a cell diagonal away, and the tone is the
-    // blur of the picture there, which reaches `int(truncate x sigma x cell + 0.5)` pixels. `cell` is whole working px.
+    // blur of the picture there, which reaches `int(truncate x sigma x cell + 0.5)` pixels. `cell` is a length in working px, whole or not.
     // Half a pixel for rounding the centre to a pixel and half for the blur's `+ 0.5`; the margin adds the
     // interpolation rows.
     const HALF_DIAGONAL: f64 = std::f64::consts::FRAC_1_SQRT_2; // constant: a cell's corner is this many cells from its centre
@@ -76,9 +76,9 @@ pub struct Params {
     /// layers, each in its own screen; 'rgb' adds light on black and ignores `paper`.
     #[param(default = None)]
     pub separation: Separation,
-    /// Distance between neighbouring dots in px (the screen's pitch). Larger = fewer, bigger dots, a coarser print.
-    #[param(default = 14, unit = px, min = 1, max = 200)]
-    pub cell: i32,
+    /// Distance between neighbouring dots in px (the screen's pitch), not necessarily a whole number. Larger = fewer, bigger dots, a coarser print.
+    #[param(default = 14.0, unit = px, min = 1, max = 200)]
+    pub cell: f32,
     /// Rotation of the dot grid in degrees, clockwise on screen: rows of dots run that many degrees below the x axis (340
     /// tilts them 20 degrees above it). The grid is square, so 90 degrees on looks the same; 45 is the classic screen
     /// angle for one ink.
@@ -289,7 +289,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                         remembered.amounts = amounts(params, &inks, ink_is_bright, sampled);
                         remembered.levels = remembered.amounts.map(|amount| spot.level(amount));
                     }
-                    let which = if params.separation == Separation::None { 0 } else { index };
+                    let which = if params.separation == Separation::None {
+                        0
+                    } else {
+                        index
+                    };
                     // the spot function's value here and its level for the ink: inked where the value is below the level
                     let (distance, radius) = (spot.value(u - cu, v - cv), remembered.levels[which]);
                     let fade_in = (radius * cell * 2.0 * inv_feather).min(1.0); // constant: the ramp is half a feather on each side
