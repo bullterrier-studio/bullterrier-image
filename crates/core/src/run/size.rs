@@ -201,7 +201,8 @@ impl Options {
     /// `canvas_height` from canvas row `first_row`, in px of that picture. It makes a render of a band of a larger
     /// canvas the same pixels as the same rows of the render of the whole: an effect's place (a vignette's distance
     /// from the middle, noise numbered by position, a gradient, a screen's lattice) is its place on the canvas, and the
-    /// design scale follows the canvas, as for [`with_canvas`](Self::with_canvas) (which a window replaces).
+    /// design scale follows the window's canvas unless [`with_canvas`](Self::with_canvas) is given: then that canvas fixes
+    /// the scale and the window only the place.
     ///
     /// To make rows `top` to `bottom` of a picture whose effects reach `margin` rows (see
     /// [`Recipe::band_margin`](crate::Recipe::band_margin)), hand the render the rows `top - margin` to `bottom + margin` (fewer where the picture
