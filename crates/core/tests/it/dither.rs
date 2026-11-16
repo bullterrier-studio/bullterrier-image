@@ -1300,7 +1300,7 @@ fn ink_of(params: &Params, size: usize, coverage: f32) -> Result<Vec<f32>, Error
 }
 
 fn mean_of(values: &[f32]) -> f32 {
-    values.iter().sum::<f32>() / values.len() as f32
+    values.iter().sum::<f32>() / f32::from(u16::try_from(values.len()).unwrap_or(u16::MAX)) // the pictures here have under 65536 pixels
 }
 
 #[test]
@@ -1372,9 +1372,9 @@ fn dither_spot_specks_bare_the_paper_only_in_ink_and_their_density_is_the_parame
     };
     // a full tone is ink everywhere: the specks are the paper
     let full = ink_of(&specked(2.0, 3.0), 300, 1.0)?;
-    let paper_pixels = full.iter().filter(|&&ink| ink < 0.5).count() as f32;
+    let paper_pixels = full.iter().filter(|&&ink| ink < 0.5).count();
     // each speck of 3 px diameter covers about pi x 1.5^2 = 7 px (the ramp's half pixel adds a little), 180 of them
-    assert!((900.0..=1500.0).contains(&paper_pixels), "{paper_pixels}");
+    assert!((900..=1500).contains(&paper_pixels), "{paper_pixels}");
     // no ink, no specks
     assert_eq!(ink_of(&specked(5.0, 10.0), 100, 0.0)?, ink_of(&black_ink(), 100, 0.0)?);
     // a speck only takes ink away
