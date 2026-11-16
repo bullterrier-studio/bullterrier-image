@@ -345,6 +345,12 @@ fn conditional() -> Vec<Conditional> {
             field: "custom",
             with: vec![("palette", json!("custom"))],
         },
+        // the picture of a matrix is read by method 'matrix' alone, which refuses to run without one
+        Conditional {
+            effect: "dither",
+            field: "matrix",
+            with: vec![("method", json!("matrix"))],
+        },
         // the inks, the paper and the offset matter only while the inks print
         Conditional {
             effect: "dither",
@@ -1094,7 +1100,13 @@ fn changes(
     let side = side_of(effect.name());
     let values = picture_values(side);
     let picture = Picture::new(side.into(), side.into(), &values)?;
-    let baseline = render(effect, table, context, &picture)?;
+    // a parameter the context cannot run without is read when giving it makes the run possible
+    let baseline = match render(effect, table, context, &picture) {
+        Err(error) if matches!(error.downcast_ref::<CoreError>(), Some(CoreError::Recipe(why)) if why.contains(field.name)) => {
+            None
+        }
+        other => Some(other?),
+    };
     for candidate in candidates(field) {
         let mut given = context.clone();
         given.insert(field.name.to_owned(), candidate);
@@ -1113,7 +1125,7 @@ fn changes(
             }
             other => other?,
         };
-        if differs(&baseline, &result) {
+        if baseline.as_ref().is_none_or(|baseline| differs(baseline, &result)) {
             return Ok(true);
         }
     }
