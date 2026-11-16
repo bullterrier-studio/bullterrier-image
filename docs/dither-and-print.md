@@ -18,7 +18,7 @@ or `method` plus `matrix`) is the batch's decision. How much of the pattern show
 | Ostromoukhov | Diffusion whose weights change with the tone (Ostromoukhov, 2001): fewer artefacts in mid-tones. |
 | Dot diffusion | Error passed in the order of a class matrix (Knuth, 1987; Guo-Liu and Mese matrices): parallel, no worms. |
 | Riemersma | Diffusion along a space-filling curve (Hilbert; Peano) with a short error memory. |
-| Threshold matrices | Bayer 2 x 2 and 4 x 4 (8 x 8 today), clustered dot (straight and 45 degrees), white noise, a four-shade camera set (the Game Boy Camera look; the `gameboy` palette exists), and a caller's matrix as a `picture` parameter. |
+| Camera four-shade set | The Game Boy Camera's three thresholds per cell (four shades from one matrix, at its sixteen contrast settings). `gameboy_camera` uses the cell order only, as a black-and-white matrix. |
 
 ## `dither`: modes
 

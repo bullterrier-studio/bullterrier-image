@@ -824,27 +824,41 @@ scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges bre
     ...
 
 @_effect
-def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'bayer', 'blue_noise'] = 'floyd_steinberg', serpentine: bool = False, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'inks'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
-    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'inks' prints the `inks` instead (one to four colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance`, `sample` and `seed` are used only with no `separation`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
+def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'inks'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
+    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'inks' prints the `inks` instead (one to four colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no `separation`; `seed` also seeds the noise of `white_noise` with it. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
 
 Parameters
 ----------
-method : one of 'floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'bayer', 'blue_noise', default 'floyd_steinberg'
+method : one of 'floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', default 'floyd_steinberg'
     How tones become a pattern of dots. `floyd_steinberg`, 'atkinson',
     `jarvis_judice_ninke`, 'stucki', 'burkes', 'sierra', `sierra_two_row`, `sierra_lite`
     and `stevenson_arce` pass each pixel's error on to its neighbours (organic grain;
     they differ in how many pixels and how far the error goes: wider kernels are
     smoother, narrower ones sharper and faster; all keep every tone except Atkinson,
     which drops a quarter of the error, so highlights and shadows go clean and the
-    contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix.
-    `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile, the one
-    with no visible pattern. Both of those mix colours of any palette, in steps of a
-    sixteenth.
+    contrast is higher). The rest are ordered: a repeating matrix of thresholds decides
+    each pixel. `bayer2`, `bayer4` and 'bayer' are regular crosshatches of Bayer's 2 x
+    2, 4 x 4 and 8 x 8 matrices; 'clustered' and `clustered_45` are halftone screens (8
+    x 8, dots in a square grid or turned 45 degrees); `blue_noise` is an even, grainless
+    scatter from a repeating 64 x 64 tile, the one with no visible pattern;
+    `white_noise` is a random threshold for every pixel (`seed`); `gameboy_camera` is
+    the Game Boy Camera's 4 x 4 matrix; 'matrix' uses the picture `matrix`. The ordered
+    methods mix colours of any palette, in steps of a sixteenth, or of one over the
+    cells of a matrix of fewer than 16 (`bayer2` mixes in quarters).
 serpentine : true or false, default False
     Scan odd rows right to left, with the kernel mirrored, so the grain does not slant
     one way (`floyd_steinberg`, 'atkinson', `jarvis_judice_ninke`, 'stucki', 'burkes',
     'sierra', `sierra_two_row`, `sierra_lite` and `stevenson_arce`; the other methods
     have no scan direction). Off, every row is scanned left to right.
+matrix : picture or none, default None
+    With method 'matrix': the picture whose grey values are the thresholds, the path of
+    an image file in a recipe file (relative to the file) or in `fx`, or, in Python, a
+    Picture or an array; in Rust, the name of a picture the photo was given or the path
+    of an image file. At most 256 x 256 pixels, a side of any length; it repeats across
+    the picture from its top left corner. Its cells are ranked by brightness and the
+    brightest are lit first, equal ones in reading order (a flat grey at k of the n
+    levels of a matrix of n cells lights k cells). Ignored with any other method; none
+    is refused with 'matrix'.
 palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom', default 'photo'
     Where the colours come from. 'photo' finds `colors` colours in the picture itself
     (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
@@ -858,7 +872,7 @@ custom : list of colours, default ('#000000', '#ffffff')
 colors : whole number, count, 2 to 256, default 8
     How many colours to find when `palette` is 'photo' (ignored for any other palette).
     Raising it keeps more detail and gradation; fewer than this many are used if the
-    picture has fewer distinct colours. 'bayer' and `blue_noise` take longer with more
+    picture has fewer distinct colours. The ordered methods take longer with more
     colours.
 cell : number, px, 0 to 48, default 0.0
     The size of one dot in px at the recipe's size (rounded to whole pixels): the
@@ -868,9 +882,9 @@ cell : number, px, 0 to 48, default 0.0
     look. Raising it gives coarser, larger dots.
 pattern : number, fraction, 0 to 1, default 1.0
     How much of the dot pattern is used: 1 = the method as designed; lower passes less
-    error on (the error-diffusion methods) or mixes fewer colours per dot (bayer,
-    `blue_noise`), so flatter areas; 0 gives each dot its nearest palette colour, plain
-    flat colours with no pattern, whatever the method.
+    error on (the error-diffusion methods) or mixes fewer colours per dot (the ordered
+    methods), so flatter areas; 0 gives each dot its nearest palette colour, plain flat
+    colours with no pattern, whatever the method.
 separation : one of 'none', 'inks', default 'none'
     How the colours are chosen: 'none' (from `palette`) or 'inks' (one layer of dots per
     colour of `inks`, printed over `paper` like transparent layers).
@@ -917,8 +931,8 @@ sample : whole number, count, 1 to 1000000, default 10000
     areas of colour.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed for the choice of sample dots and starting colours when `palette` is
-    'photo': the same seed always gives the same picture, another seed may find slightly
-    different colours.
+    'photo', and for the thresholds of `white_noise`: the same seed always gives the
+    same picture, another seed finds slightly different colours or other noise.
 
 Presets
 -------
