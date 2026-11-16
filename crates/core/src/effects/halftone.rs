@@ -90,14 +90,14 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 /// `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink
 /// (a line as wide as `cell` fills it), so the screen keeps the tones the same way; 'square', 'ellipse', 'diamond', 'euclidean'
 /// and 'matrix' are other marks that fill their cell the same way, as large as the ink needs. `separation` prints several inks,
-/// each its own screen, subtractively over `paper` ('rgb' adds light instead; inks overlap like transparent layers, so use a light
-/// `paper`, as the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black
+/// each its own screen, subtractively over `paper` ('rgb' adds light instead; inks overlap like transparent layers, so 'cmyk' and 'spot' refuse a dark
+/// `paper`, below `paper_threshold`, as ink over black stays black: set a light one): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black
 /// generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0
 /// and 45 degrees added to `angle` (set `angle` to 0 for the classic angles); 'spot' prints the `inks` (one to four
 /// colours), finding how much of each makes the photo's colour (least squares on the colour relative to the paper, each amount 0 to 1), with the screens
 /// `angle` + 30 degrees apart (45, 75, 105, 135 by default); 'rgb' adds red, green and blue light on black, one screen
 /// per channel (as large as the channel's value), at 15, 45 and 75 degrees added to `angle`, white where all three are
-/// full, and ignores `paper`. `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`; a separation keeps the tone on 'grid' and
+/// full, and ignores `paper`. `ink` and `ink_floor` are used only with no `separation`; a separation keeps the tone on 'grid' and
 /// 'wave' screens only (see `screen`). `offset` px
 /// moves the second ink's screen that far from the first along `offset_angle`, the
 /// third twice as far and the fourth three times, as a misregistered press does. `dot_gain`, `ink_noise` and `specks` (with
@@ -149,7 +149,7 @@ pub struct Params {
     pub matrix: PictureName,
     /// How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta, yellow and black), 'spot'
     /// (the colours in `inks`) or 'rgb' (red, green and blue light). Cmyk and spot print over `paper` like transparent
-    /// layers, each in its own screen; 'rgb' adds light on black and ignores `paper`. The inks keep the picture's tone with `screen`
+    /// layers, each in its own screen, and are refused on a dark `paper` (ink on black stays black: use a light one); 'rgb' adds light on black and ignores `paper`. The inks keep the picture's tone with `screen`
     /// 'grid' and 'wave'; on 'rings', 'spiral' and 'rays' their rows coincide and a separation prints off-tone.
     #[param(default = None)]
     pub separation: Separation,
@@ -171,11 +171,11 @@ pub struct Params {
     #[param(default = 0.35, unit = fraction, min = 0.01, max = 1, advanced)]
     pub ink_floor: f32,
     /// The paper colour between the dots; ignored with 'rgb' separation (always black). On a dark paper (Rec. 709 luminance below `paper_threshold`) bright tones get the
-    /// ink; on a light one, dark tones.
+    /// ink; on a light one, dark tones. With 'cmyk' or 'spot' separation a dark paper is refused: those inks print subtractively, so use a light paper.
     #[param(default = "#000000")]
     pub paper: Color,
-    /// With no `separation`: the Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (bright tones get the ink) rather than light
-    /// (dark tones get it); 0.5 = mid grey. Raising it lets lighter paper count as dark: 0 treats every paper as light, 1
+    /// The Rec. 709 luminance, 0 to 1, below which `paper` counts as dark (with no `separation` bright tones get the ink, with 'cmyk' or
+    /// 'spot' it is refused) rather than light (dark tones get it); 0.5 = mid grey. Raising it lets lighter paper count as dark: 0 treats every paper as light, 1
     /// every paper but white as dark.
     #[param(default = 0.5, unit = fraction, min = 0, max = 1, advanced)]
     pub paper_threshold: f32,

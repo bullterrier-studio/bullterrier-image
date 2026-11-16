@@ -156,7 +156,7 @@ pub enum Init {
 /// the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat
 /// colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four
 /// colours): the photo's colours are split into amounts of the inks (as in `halftone`), mixed
-/// back as printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`), and dithered
+/// back as printed subtractively over `paper` (inks overlap like transparent layers, so a dark `paper` is refused), and dithered
 /// once with `method` and `cell` against the paper, each ink and every overlap. `palette`,
 /// `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no
 /// `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
@@ -168,13 +168,15 @@ pub struct Params {
     /// 'sierra', `sierra_two_row`, `sierra_lite`, `stevenson_arce` and `ostromoukhov` pass each pixel's error on to its neighbours
     /// (organic grain; they differ in how many pixels and how far the error goes: wider kernels are smoother, narrower ones
     /// sharper and faster; all keep every tone except Atkinson, which drops a quarter of the error, so highlights and
-    /// shadows go clean and the contrast is higher). `dot_diffusion` (Knuth's 8 x 8 class matrix sets the order, pixels of one class independent) and `riemersma` (a Hilbert curve and a memory of the last 16 errors) pass error on in an order of their own. The rest are ordered: a repeating matrix of thresholds decides each
+    /// shadows go clean and the contrast is higher; with several `inks` too, as with one, a quarter of the error is dropped, so
+    /// highlights and shadows clip and an ink mix prints off-tone: two inks at one half each print green 0.366 where 0.439 is the mix). `dot_diffusion` (Knuth's 8 x 8 class matrix sets the order, pixels of one class independent) and `riemersma` (a Hilbert curve and a memory of the last 16 errors) pass error on in an order of their own. The rest are ordered: a repeating matrix of thresholds decides each
     /// pixel. `bayer2`, `bayer4` and 'bayer' are regular crosshatches of Bayer's 2 x 2, 4 x 4 and 8 x 8 matrices;
     /// 'clustered' and `clustered45` are halftone screens (8 x 8, dots in a square grid or turned 45 degrees);
     /// `blue_noise` is an even, grainless scatter from a repeating 64 x 64 tile, the one with no visible pattern;
     /// `white_noise` is a random threshold for every pixel (`seed`); `gameboy_camera` is the Game Boy Camera's 4 x 4
     /// matrix; 'matrix' uses the picture `matrix`. The ordered methods mix colours of any palette, in steps of a
-    /// sixteenth, or of one over the cells of a matrix of fewer than 16 (`bayer2` mixes in quarters).
+    /// sixteenth, or of one over the cells of a matrix of fewer than 16 (`bayer2` mixes in quarters); with 'spot' separation they
+    /// give each overprint its exact share of the pixel, to one over the cells of the matrix.
     #[param(default = FloydSteinberg)]
     pub method: Method,
     /// Scan odd rows right to left, with the kernel mirrored, so the grain does not slant one way (`floyd_steinberg`,
@@ -244,16 +246,17 @@ pub struct Params {
     #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
     pub seed: u32,
     /// How the colours are chosen: 'none' (from `palette`) or 'spot' (the `inks` printed over
-    /// `paper` like transparent layers). Every `method` keeps the tone of the inks' mix: the picture's colour is mixed from the inks and dithered once against
-    /// the paper, each ink and every overlap.
+    /// `paper` like transparent layers). The ordered and noise methods print each overprint (paper, each ink and every overlap) in its exact
+    /// share of the pixel, picked by the pixel's own threshold; the error-diffusion ones dither the colour mixed from the inks once against the overprints (Atkinson
+    /// passes on only three quarters of the error, with several inks as with one, so highlights and shadows clip).
     #[param(default = None)]
     pub separation: Separation,
     /// With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three numbers 0..1), in the order they are
     /// offset; ignored otherwise. Each pixel's colour is split into amounts of these inks.
     #[param(default = ["#ff4d6d", "#2b59ff"], min_length = 1, max_length = 4)]
     pub inks: Vec<Color>,
-    /// With 'spot' separation: the paper colour the inks are printed over, where no ink lands. Use a light one: inks only
-    /// darken it.
+    /// With 'spot' separation: the paper colour the inks are printed over, where no ink lands. A dark one (Rec. 709 luminance below 0.5) is refused with 'spot'
+    /// separation: the inks print subtractively and only darken the paper, so use a light one.
     #[param(default = "#ffffff")]
     pub paper: Color,
     /// With 'spot' separation: how far in px the second ink's layer is moved from the first (the third twice as far, the
