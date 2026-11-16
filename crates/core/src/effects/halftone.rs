@@ -158,9 +158,9 @@ pub struct Params {
     /// colour of the photo under it, brightened so small dots stay visible (by at most 1 / `ink_floor`).
     #[param(advanced)]
     pub ink: Option<Color>,
-    /// With no `ink`: the most a dot's colour is brightened, as a floor 0.01 to 1 on its strongest channel: a colour whose
-    /// strongest channel is below it is scaled by 1 / `ink_floor` instead of up to full, so dark areas stay dark. Lowering it
-    /// brightens dark colours more; 1 = colours as they are.
+    /// With no `separation` and no `ink`: the most a dot's colour is brightened, as a floor 0.01 to 1 on its strongest
+    /// channel: a colour whose strongest channel is below it is scaled by 1 / `ink_floor` instead of up to full, so dark
+    /// areas stay dark. Lowering it brightens dark colours more; 1 = colours as they are.
     #[param(default = 0.35, unit = fraction, min = 0.01, max = 1, advanced)]
     pub ink_floor: f32,
     /// The paper colour between the dots; ignored with 'rgb' separation (always black). On a dark paper (Rec. 709 luminance below `paper_threshold`) bright tones get the

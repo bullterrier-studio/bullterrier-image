@@ -422,7 +422,8 @@ fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
 /// shift that makes two layers independent.
 fn layer(thresholds: Thresholds<'static>, ink: usize) -> Thresholds<'static> {
     match thresholds {
-        Thresholds::Noise { seed } => noise(seed.wrapping_add(u32::try_from(ink).unwrap_or_default())),
+        #[expect(clippy::cast_possible_truncation, reason = "an ink's index is below MOST_INKS")]
+        Thresholds::Noise { seed } => noise(seed.wrapping_add(ink as u32)),
         Thresholds::Tiled {
             ranks,
             rows,

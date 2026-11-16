@@ -1754,10 +1754,10 @@ ink : colour or none, default None
     numbers 0..1); leave it out to give each dot the colour of the photo under it,
     brightened so small dots stay visible (by at most 1 / `ink_floor`).
 ink_floor : number, fraction, 0.01 to 1, default 0.35
-    With no `ink`: the most a dot's colour is brightened, as a floor 0.01 to 1 on its
-    strongest channel: a colour whose strongest channel is below it is scaled by 1 /
-    `ink_floor` instead of up to full, so dark areas stay dark. Lowering it brightens
-    dark colours more; 1 = colours as they are.
+    With no `separation` and no `ink`: the most a dot's colour is brightened, as a floor
+    0.01 to 1 on its strongest channel: a colour whose strongest channel is below it is
+    scaled by 1 / `ink_floor` instead of up to full, so dark areas stay dark. Lowering
+    it brightens dark colours more; 1 = colours as they are.
 paper_threshold : number, fraction, 0 to 1, default 0.5
     With no `separation`: the Rec. 709 luminance, 0 to 1, below which `paper` counts as
     dark (bright tones get the ink) rather than light (dark tones get it); 0.5 = mid
