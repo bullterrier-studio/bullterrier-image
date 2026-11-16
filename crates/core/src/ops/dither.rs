@@ -470,32 +470,88 @@ const MEMORY: usize = 16; // constant: Riemersma (1998), "a list of 16 as a mini
 /// The weight of the newest error in memory against the oldest.
 const MEMORY_RATIO: f32 = 16.0; // constant: Riemersma (1998), his program's MAX
 
-/// The (row, column) of the `step`th point of the Hilbert curve over an `extent` x `extent` square (a power of two), from the top
-/// left corner, as Riemersma's program walks it (first down, then right).
-fn hilbert(extent: usize, step: usize) -> (usize, usize) {
-    let (mut x, mut y, mut left, mut span) = (0, 0, step, 1);
-    while span < extent {
-        let right = 1 & (left / 2);
-        let down = 1 & (left ^ right);
-        if down == 0 {
-            if right == 1 {
-                x = span - 1 - x;
-                y = span - 1 - y;
+/// Calls `visit(row, column)` for every cell of a `height` x `width` rectangle once, along the generalized Hilbert curve
+/// ("gilbert"): each step goes to an adjacent cell, in O(`height` x `width`) steps, and on a power-of-two square it is the
+/// Hilbert curve (first down, then right, from the top left corner).
+///
+/// Reimplemented from Jakub Cervený's `gilbert2d` (BSD-2-Clause, <https://github.com/jakubcerveny/gilbert>): the algorithm
+/// only, no code or dependency taken. It splits the rectangle in two or three and recurses, to a depth of log2 of the
+/// longer side.
+fn gilbert(height: usize, width: usize, visit: &mut impl FnMut(usize, usize)) {
+    type Vector = (isize, isize); // (column, row)
+    // `origin` is the corner, `along` the long edge and `across` the other.
+    fn walk(origin: Vector, along: Vector, across: Vector, visit: &mut impl FnMut(usize, usize)) {
+        let (x, y) = origin;
+        let (long, short) = (along.0.abs() + along.1.abs(), across.0.abs() + across.1.abs());
+        let (along_unit, across_unit) = (
+            (along.0.signum(), along.1.signum()),
+            (across.0.signum(), across.1.signum()),
+        );
+        if short == 1 || long == 1 {
+            let (unit, count) = if short == 1 {
+                (along_unit, long)
+            } else {
+                (across_unit, short)
+            };
+            for step in 0..count {
+                visit((y + step * unit.1).unsigned_abs(), (x + step * unit.0).unsigned_abs());
             }
-            std::mem::swap(&mut x, &mut y);
+            return;
         }
-        x += span * right;
-        y += span * down;
-        left /= 4; // constant: structural, a Hilbert curve divides by four per level, not tunable
-        span *= 2;
+        // floor halves, as the original's `//`
+        let mut half_along = (along.0.div_euclid(2), along.1.div_euclid(2));
+        let mut half_across = (across.0.div_euclid(2), across.1.div_euclid(2));
+        let (long_half, short_half) = (
+            half_along.0.abs() + half_along.1.abs(),
+            half_across.0.abs() + half_across.1.abs(),
+        );
+        if 2 * long > 3 * short {
+            if long_half % 2 == 1 && long > 2 {
+                half_along = (half_along.0 + along_unit.0, half_along.1 + along_unit.1);
+            }
+            walk(origin, half_along, across, visit);
+            walk(
+                (x + half_along.0, y + half_along.1),
+                (along.0 - half_along.0, along.1 - half_along.1),
+                across,
+                visit,
+            );
+        } else {
+            if short_half % 2 == 1 && short > 2 {
+                half_across = (half_across.0 + across_unit.0, half_across.1 + across_unit.1);
+            }
+            walk(origin, half_across, half_along, visit);
+            walk(
+                (x + half_across.0, y + half_across.1),
+                along,
+                (across.0 - half_across.0, across.1 - half_across.1),
+                visit,
+            );
+            walk(
+                (
+                    x + (along.0 - along_unit.0) + (half_across.0 - across_unit.0),
+                    y + (along.1 - along_unit.1) + (half_across.1 - across_unit.1),
+                ),
+                (-half_across.0, -half_across.1),
+                (-(along.0 - half_along.0), -(along.1 - half_along.1)),
+                visit,
+            );
+        }
     }
-    (y, x)
+    let (width, height) = (
+        isize::try_from(width).unwrap_or_default(),
+        isize::try_from(height).unwrap_or_default(),
+    );
+    if width >= height {
+        walk((0, 0), (width, 0), (0, height), visit);
+    } else {
+        walk((0, 0), (0, height), (width, 0), visit);
+    }
 }
 
 /// The palette colour chosen for each pixel of `values` (`height` x `width`, row after row) by Riemersma's dither (1998).
 ///
-/// The pixels are taken along a Hilbert curve over the smallest square of a power-of-two side that holds the picture, the
-/// points outside the picture skipped. A pixel gets the palette colour closest to its value plus `amount` (0 to 1) of the
+/// The pixels are taken along the generalized Hilbert curve over the picture (`gilbert`). A pixel gets the palette colour closest to its value plus `amount` (0 to 1) of the
 /// weighted sum of the last 16 errors, the newest weighing 1 and each older one less by the same factor, down to 1/16; its
 /// own error is its value (without the sum) less the colour chosen.
 pub(crate) fn riemersma(values: &[Point], (height, width): (usize, usize), palette: &[Point], amount: f32) -> Vec<u8> {
@@ -504,14 +560,9 @@ pub(crate) fn riemersma(values: &[Point], (height, width): (usize, usize), palet
     // the weights from the oldest error to the newest
     let weights: [f32; MEMORY] =
         std::array::from_fn(|age| fall.powi(i32::try_from(MEMORY - 1 - age).unwrap_or_default()));
-    let side = height.max(width).next_power_of_two();
     let mut recent = [[0.0_f32; 3]; MEMORY]; // the oldest first
     let mut chosen = vec![0; height * width];
-    for step in 0..side * side {
-        let (row, column) = hilbert(side, step);
-        if row >= height || column >= width {
-            continue;
-        }
+    gilbert(height, width, &mut |row, column| {
         let pixel = values[row * width + column];
         let value = [0, 1, 2].map(|channel| {
             let sum: f32 = recent
@@ -525,7 +576,7 @@ pub(crate) fn riemersma(values: &[Point], (height, width): (usize, usize), palet
         chosen[row * width + column] = pick;
         recent.rotate_left(1);
         recent[MEMORY - 1] = settle(pixel, &[palette[usize::from(pick)]]).1;
-    }
+    });
     chosen
 }
 

@@ -1240,3 +1240,25 @@ fn riemersma_weighs_older_errors_less_by_a_steady_factor_down_to_a_sixteenth() -
     assert_eq!(bits(&out, 2), "11 10");
     Ok(())
 }
+
+#[test]
+fn riemersma_walks_a_rectangle_step_to_step_and_decides_every_pixel_of_long_thin_pictures() -> Result<(), Error> {
+    // A 2 x 3 picture 0.2 0.2 0.2 / 0.2 0.2 0.6. The curve covers the rectangle itself, each step to a neighbour:
+    // (0,0) (1,0) (1,1) (1,2) (0,2) (0,1). Errors weigh 1, 0.8313, 0.6911, 0.5745, 0.4776 from the newest back.
+    // (0,0) 0.2 black, error 0.2. (1,0) 0.2 + 0.2 = 0.4 black, error 0.2. (1,1) 0.2 + 0.2 + 0.2 x 0.8313 = 0.5663 white,
+    // error -0.8. (1,2) 0.6 - 0.8 + 0.1663 + 0.1382 = 0.1045 black, error 0.6. (0,2) 0.2 + 0.6 - 0.665 + 0.1382 + 0.1149
+    // = 0.3881 black, error 0.2. (0,1) 0.2 + 0.2 + 0.4988 - 0.5529 + 0.1149 + 0.0955 = 0.5563 white. A curve over the
+    // next power-of-two square with the outside points skipped jumps from (1,0) to (1,2) and lights (1,1) too soon.
+    let out = run(&ink(Method::Riemersma, 1.0), &greys(&[0.2, 0.2, 0.2, 0.2, 0.2, 0.6], 3))?;
+    assert_eq!(bits(&out, 3), "010 010");
+    // On pure white nothing is diffused, so every pixel must be the second colour: none is skipped or decided twice.
+    for (height, width) in [(1, 1000), (1000, 1), (997, 3), (3, 997)] {
+        let white = run(&ink(Method::Riemersma, 1.0), &greys(&vec![1.0; height * width], width))?;
+        assert_eq!(white.len(), height * width * 3);
+        assert!(
+            pixels(&white).iter().all(|&pixel| near(pixel, WHITE)),
+            "{height} x {width}"
+        );
+    }
+    Ok(())
+}
