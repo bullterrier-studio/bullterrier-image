@@ -629,8 +629,8 @@ const CLUSTERED_45: [u16; 64] = [
 // constant: https://github.com/HerrZatacke/dither-pattern-gen/blob/master/reference/patterns.mjs (first Low Light pattern), the DashBoy camera's SD/config.json
 const GAMEBOY_CAMERA: [u16; 16] = [15, 3, 12, 0, 7, 11, 4, 8, 13, 1, 14, 2, 5, 9, 6, 10];
 
-/// The thresholds of an ordered dither: a rank for every pixel, out of `count` ranks, the highest lit first.
-pub(crate) enum Thresholds<'a> {
+/// Where a pixel's rank comes from.
+enum Source<'a> {
     /// A tile of `rows` x `columns` ranks, row after row, repeating from the picture's top left corner.
     Tiled {
         ranks: Cow<'a, [u16]>,
@@ -638,8 +638,16 @@ pub(crate) enum Thresholds<'a> {
         columns: usize,
         count: usize,
     },
-    /// A rank drawn for each pixel from `seed` and the pixel's place, `row * width + column`.
-    Noise { seed: u32 },
+    /// A rank drawn for each pixel from `seed` and the pixel's row and column, which wrap at the picture's `size`
+    /// (`height`, `width`).
+    Noise { seed: u32, size: (usize, usize) },
+}
+
+/// The thresholds of an ordered dither: a rank for every pixel, out of `count` ranks, the highest lit first, the pattern
+/// moved right and down by `shift` (rows, columns) dots.
+pub(crate) struct Thresholds<'a> {
+    source: Source<'a>,
+    shift: (usize, usize),
 }
 
 /// The ranks of white noise: a pixel's rank is one of this many levels.
@@ -647,28 +655,51 @@ const NOISE_LEVELS: usize = 1 << 16; // constant: a rank is 16 bits
 
 impl Thresholds<'_> {
     fn count(&self) -> usize {
-        match self {
-            Self::Tiled { count, .. } => *count,
-            Self::Noise { .. } => NOISE_LEVELS,
+        match &self.source {
+            Source::Tiled { count, .. } => *count,
+            Source::Noise { .. } => NOISE_LEVELS,
         }
     }
 
+    /// The pattern moved right and down by `phase` (0 to 1) of its side, rounded down to whole dots: of the tile, or, for
+    /// noise, which has none, of the picture. A shift of a whole side is none. The one place a pattern is shifted, for every method that
+    /// reads thresholds.
+    pub(crate) fn phased(mut self, phase: f32) -> Self {
+        let (rows, columns) = match &self.source {
+            Source::Tiled { rows, columns, .. } => (*rows, *columns),
+            Source::Noise { size, .. } => *size,
+        };
+        let by = |side: usize| whole((f64::from(phase) * crate::ops::length::float(side)).floor());
+        self.shift = (by(rows), by(columns));
+        self
+    }
+
     /// The pixel's level in 0..1, (rank + 0.5) / count: each rank once per tile, so a share s of the levels is below s.
-    fn level(&self, at: (usize, usize), width: usize) -> f64 {
-        let (twice, whole) = (2 * self.rank(at, width) + 1, 2 * self.count());
+    fn level(&self, at: (usize, usize)) -> f64 {
+        let (twice, whole) = (2 * self.rank(at) + 1, 2 * self.count());
         f64::from(u32::try_from(twice).unwrap_or(u32::MAX)) / f64::from(u32::try_from(whole).unwrap_or(u32::MAX))
     }
 
-    fn rank(&self, (row, column): (usize, usize), width: usize) -> usize {
-        match self {
-            Self::Tiled {
+    fn rank(&self, (row, column): (usize, usize)) -> usize {
+        // the pattern moved by `shift`: the rank here is the one that many dots up and to the left, round the edges
+        let back = |at: usize, shift: usize, side: usize| (at + side - shift) % side;
+        match &self.source {
+            Source::Tiled {
                 ranks, rows, columns, ..
-            } => usize::from(ranks[(row % rows) * columns + column % columns]),
-            Self::Noise { seed } => {
-                // constant: a rank is the top 16 bits of the 64-bit hash
-                // the top 16 bits of the word hashed from the seed and the pixel's place
-                usize::try_from(mix(*seed, &[u64::try_from(row * width + column).unwrap_or_default()]) >> 48)
-                    .unwrap_or_default()
+            } => usize::from(ranks[back(row, self.shift.0, *rows) * columns + back(column, self.shift.1, *columns)]),
+            Source::Noise { seed, size } => {
+                let place = |at: usize| u64::try_from(at).unwrap_or_default();
+                // constant: a rank is the top 16 bits of the 64-bit hash of the seed and the pixel's row and column
+                usize::try_from(
+                    mix(
+                        *seed,
+                        &[
+                            place(back(row, self.shift.0, size.0)),
+                            place(back(column, self.shift.1, size.1)),
+                        ],
+                    ) >> 48,
+                )
+                .unwrap_or_default()
             }
         }
     }
@@ -728,17 +759,23 @@ pub(crate) fn rank_greys(greys: &[f32]) -> Vec<u16> {
 
 /// A caller's matrix as thresholds: `greys` (`rows` x `columns`, row after row) ranked by [`rank_greys`].
 pub(crate) fn from_greys(greys: &[f32], (rows, columns): (usize, usize)) -> Thresholds<'static> {
-    Thresholds::Tiled {
-        ranks: Cow::Owned(rank_greys(greys)),
-        rows,
-        columns,
-        count: greys.len(),
+    Thresholds {
+        source: Source::Tiled {
+            ranks: Cow::Owned(rank_greys(greys)),
+            rows,
+            columns,
+            count: greys.len(),
+        },
+        shift: (0, 0),
     }
 }
 
-/// White noise from `seed`.
-pub(crate) const fn noise(seed: u32) -> Thresholds<'static> {
-    Thresholds::Noise { seed }
+/// White noise from `seed` over a picture of `size` (`height`, `width`) dots.
+pub(crate) const fn noise(seed: u32, size: (usize, usize)) -> Thresholds<'static> {
+    Thresholds {
+        source: Source::Noise { seed, size },
+        shift: (0, 0),
+    }
 }
 
 impl Tile {
@@ -757,11 +794,14 @@ impl Tile {
             ),
             Self::GameboyCamera => (Cow::Borrowed(&GAMEBOY_CAMERA), 4), // constant: a 4 x 4 matrix
         };
-        Thresholds::Tiled {
-            count: side * side,
-            ranks,
-            rows: side,
-            columns: side,
+        Thresholds {
+            source: Source::Tiled {
+                count: side * side,
+                ranks,
+                rows: side,
+                columns: side,
+            },
+            shift: (0, 0),
         }
     }
 }
@@ -840,7 +880,7 @@ pub(crate) fn ordered(
                 }
                 mix[..steps].sort_unstable();
                 // floor(steps x (rank + 0.5) / count), worked in whole numbers
-                let rank = thresholds.rank((row, column), width);
+                let rank = thresholds.rank((row, column));
                 let position = (2 * rank + 1) * steps / (2 * count);
                 *pick = darkest_first[usize::from(mix[position])];
             }
@@ -870,7 +910,7 @@ pub(crate) fn shared(
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
             let row = first_row + offset;
             for (column, pick) in line.iter_mut().enumerate() {
-                let level = thresholds.level((row, column), width);
+                let level = thresholds.level((row, column));
                 let level = if steps < CANDIDATES {
                     ((level * steps_f).floor() + 0.5) / steps_f
                 } else {

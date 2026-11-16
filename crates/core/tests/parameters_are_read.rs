@@ -396,6 +396,12 @@ fn conditional() -> Vec<Conditional> {
             field: "matrix",
             with: vec![("method", json!("matrix"))],
         },
+        // the error-diffusion methods have no tile to shift
+        Conditional {
+            effect: "dither",
+            field: "phase",
+            with: vec![("method", json!("bayer"))],
+        },
         // the inks, the paper and the offset matter only while the inks print
         Conditional {
             effect: "dither",

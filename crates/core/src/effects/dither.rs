@@ -187,6 +187,13 @@ pub struct Params {
     /// in reading order (a flat grey at k of the n levels of a matrix of n cells lights k cells). Ignored with any other method; none is refused with 'matrix'.
     #[param()]
     pub matrix: PictureName,
+    /// Where the pattern sits: the tile of an ordered method, of 'matrix' or of the noise is shifted by this share of its
+    /// side (rounded down to whole dots), right and down, so 0 and 1 are the same picture; `white_noise`, which has no
+    /// tile, shifts by a share of the picture and wraps. The tone of every area stays the same, only where the dots fall
+    /// moves. Used by the ordered, noise and 'matrix' methods, with 'spot' separation too; the error-diffusion methods
+    /// (`floyd_steinberg` and the other kernels, `dot_diffusion`, `riemersma`) ignore it.
+    #[param(default = 0.0, unit = cycles, min = 0, max = 1, drivable)]
+    pub phase: f32,
     /// Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' (the 4 greens
     /// widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8'
     /// (the 16 PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2 to 6 evenly spaced levels
@@ -434,7 +441,7 @@ fn pattern(
         [1.0, 0.0, 0.0]
     };
     let by = |kernel| diffuse(values, size, palette, kernel, amount, serpentine, lightness);
-    if let Some(thresholds) = thresholds(method, params, inputs) {
+    if let Some(thresholds) = thresholds(method, params, size, inputs) {
         return ordered(values, size, palette, &thresholds, amount);
     }
     match method {
@@ -453,20 +460,27 @@ fn pattern(
     }
 }
 
-/// The thresholds of an ordered or noise `method`; none for a method that passes error on.
-fn thresholds(method: Method, params: &Params, inputs: &Inputs<'_>) -> Option<Thresholds<'static>> {
-    Some(match method {
+/// The thresholds of an ordered or noise `method` on a picture of `size` dots, moved by `phase`; none for a method that
+/// passes error on.
+fn thresholds(
+    method: Method,
+    params: &Params,
+    size: (usize, usize),
+    inputs: &Inputs<'_>,
+) -> Option<Thresholds<'static>> {
+    let thresholds = match method {
         Method::Bayer2 => Tile::Bayer2.thresholds(),
         Method::Bayer4 => Tile::Bayer4.thresholds(),
         Method::Bayer => Tile::Bayer.thresholds(),
         Method::Clustered => Tile::Clustered.thresholds(),
         Method::Clustered45 => Tile::Clustered45.thresholds(),
         Method::BlueNoise => Tile::BlueNoise.thresholds(),
-        Method::WhiteNoise => noise(params.seed),
+        Method::WhiteNoise => noise(params.seed, size),
         Method::GameboyCamera => Tile::GameboyCamera.thresholds(),
         Method::Matrix => matrix_of(inputs),
         _ => return None,
-    })
+    };
+    Some(thresholds.phased(params.phase))
 }
 
 /// What `dither` refuses: method 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
@@ -523,7 +537,7 @@ fn printed(
     let table: Vec<[f32; 3]> = (0..1_usize << count)
         .map(|mask| inks.print(&std::array::from_fn(|ink| if mask >> ink & 1 == 1 { 1.0 } else { 0.0 })))
         .collect();
-    let layers = if let Some(thresholds) = thresholds(params.method, params, inputs) {
+    let layers = if let Some(thresholds) = thresholds(params.method, params, (rows, columns), inputs) {
         shared(&amounts, count, (rows, columns), &thresholds, params.pattern)
     } else {
         let target: Vec<[f32; 3]> = amounts.iter().map(|amounts| inks.print(amounts)).collect();

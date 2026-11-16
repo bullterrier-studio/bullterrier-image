@@ -32,6 +32,7 @@ mod dehaze;
 mod disperse;
 mod displace;
 mod dither;
+mod dither_phase;
 mod dither_spot;
 mod documentation;
 mod drop_shadow;
