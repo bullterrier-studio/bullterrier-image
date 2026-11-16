@@ -10,8 +10,8 @@ use crate::ops::color::{luminance, vivid};
 use crate::ops::dither::{check_matrix, matrix_greys};
 use crate::ops::edge::EdgeOrConstant;
 use crate::ops::inks::{
-    CMYK_SCREEN_ANGLES, CONCENTRIC_DIRECTION, CONCENTRIC_STEP, Geometry, Inks, MOST_INKS, RGB_SCREEN_ANGLES, RINGS_REACH, SPIRAL_REACH, SPOT_SCREEN_STEP,
-    Spot, shift, wave_reach,
+    CMYK_SCREEN_ANGLES, CONCENTRIC_DIRECTION, CONCENTRIC_STEP, Geometry, Inks, MOST_INKS, RGB_SCREEN_ANGLES,
+    RINGS_REACH, SPIRAL_REACH, SPOT_SCREEN_STEP, Spot, shift, wave_reach,
 };
 use crate::ops::length::{float, whole};
 use crate::ops::par;

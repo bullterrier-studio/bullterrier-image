@@ -121,12 +121,20 @@ fn ray_wedges(count: f32, radius: f32) -> f32 {
 fn wedge_place(wedges: f32, turns: f32) -> f32 {
     let last = wedges.ceil() - 1.0;
     let place = turns * wedges;
-    if place < last { place } else { last + (place - last) / (wedges - last) }
+    if place < last {
+        place
+    } else {
+        last + (place - last) / (wedges - last)
+    }
 }
 
 fn wedge_turns(wedges: f32, place: f32) -> f32 {
     let last = wedges.ceil() - 1.0;
-    let at = if place < last { place } else { last + (place - last) * (wedges - last) };
+    let at = if place < last {
+        place
+    } else {
+        last + (place - last) * (wedges - last)
+    };
     at / wedges
 }
 

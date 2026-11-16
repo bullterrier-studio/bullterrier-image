@@ -73,7 +73,9 @@ fn rays_round(ink: &[f32], radius: f32) -> usize {
         let (x, y) = (200.0 + px * angle.cos(), 200.0 + px * angle.sin());
         ink[y.round() as usize * 401 + x.round() as usize] > 0.5
     };
-    (0..samples).filter(|&k| at(k) && !at((k + samples - 1) % samples)).count()
+    (0..samples)
+        .filter(|&k| at(k) && !at((k + samples - 1) % samples))
+        .count()
 }
 
 /// The spacing of neighbouring rays on the circle of a cell's middle radius is from half a cell up to a cell (62 rays at
@@ -85,7 +87,10 @@ fn rays_are_never_closer_than_half_a_cell() -> Result<(), Error> {
     let ink = rays_ink(Shape::Line, 0.5)?;
     for radius in [1.5_f32, 2.5, 3.5, 4.5, 6.5, 8.5, 9.5] {
         let rays = rays_round(&ink, radius);
-        let (fewest, most) = (std::f32::consts::TAU * radius, 2.0 * std::f32::consts::TAU * radius + 1.0);
+        let (fewest, most) = (
+            std::f32::consts::TAU * radius,
+            2.0 * std::f32::consts::TAU * radius + 1.0,
+        );
         assert!(
             (fewest..=most).contains(&(rays as f32)),
             "radius {radius}: {rays} rays, wanted {fewest:.1} to {most:.1}"
