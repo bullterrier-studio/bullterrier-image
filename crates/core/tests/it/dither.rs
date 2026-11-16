@@ -1415,23 +1415,59 @@ fn dither_spot_prints_the_tone_of_what_the_inks_can_mix() -> Result<(), Error> {
     Ok(())
 }
 
+/// The mean of the output of `params` on a flat `photo` of 240 x 240, per channel.
+fn flat_mean(params: &Params, photo: [f32; 3]) -> Result<[f32; 3], Error> {
+    let out = run_picture(params, 240, 240, &photo.repeat(240 * 240))?;
+    Ok([0, 1, 2].map(|c| out.as_chunks::<3>().0.iter().map(|pixel| pixel[c]).sum::<f32>() / 57_600.0))
+}
+
+/// Every method that dithers keeps the tone of what the inks mix: the output's mean against the print model
+/// `paper x prod (1 - a (1 - ink / paper))` of the amounts. The bound is the ordered mixing's step, a sixteenth of the
+/// distance between two palette colours (at most 1 per channel): Knoll's mixing of 16 candidates leaves at most one
+/// palette distance of error owed, spread over the 16, so a channel's mean is within 1/16.
 #[test]
-fn dither_spot_noise_methods_mix_several_inks_at_the_tone_of_their_areas() -> Result<(), Error> {
-    // two inks at half each: independent layers print `(1 - a (1 - pink)) (1 - b (1 - blue))`; layers under one threshold nest
+fn dither_spot_keeps_the_tone_of_every_method_with_several_inks_and_with_one_black_ink() -> Result<(), Error> {
+    let bound = 1.0 / 16.0;
+    let methods = [
+        Method::Bayer,
+        Method::Clustered,
+        Method::BlueNoise,
+        Method::WhiteNoise,
+        Method::FloydSteinberg,
+        Method::Riemersma,
+        Method::DotDiffusion,
+        Method::Ostromoukhov,
+        Method::GameboyCamera,
+    ];
     let inks = [PINK, BLUE];
-    let want = [0, 1, 2].map(|c| (0..2).fold(1.0, |light, i| light * (1.0 - 0.5 * (1.0 - inks[i][c].min(1.0)))));
-    for method in [Method::WhiteNoise, Method::BlueNoise] {
-        let params = Params {
-            cell: 2.0,
-            paper: Color(WHITE),
-            ..inked(method, &inks)
-        };
-        let out = run_picture(&params, 200, 200, &want.repeat(200 * 200))?;
-        let got = [0, 1, 2].map(|c| out.as_chunks::<3>().0.iter().map(|pixel| pixel[c]).sum::<f32>() / 40_000.0);
-        assert!(
-            (0..3).all(|c| (got[c] - want[c]).abs() < 0.03),
-            "{method:?}: {got:?} against {want:?}"
-        );
+    let two = [0, 1, 2].map(|c| (0..2).fold(1.0, |light, i| light * (1.0 - 0.5 * (1.0 - inks[i][c].min(1.0)))));
+    for method in methods {
+        for space in [Space::Oklab, Space::Rgb] {
+            let params = Params {
+                cell: 2.0,
+                paper: Color(WHITE),
+                space,
+                ..inked(method, &inks)
+            };
+            let got = flat_mean(&params, two)?;
+            assert!(
+                (0..3).all(|c| (got[c] - two[c]).abs() < bound),
+                "{method:?} {space:?}: {got:?} against {two:?}"
+            );
+            for grey in [0.2, 0.5, 0.8] {
+                let params = Params {
+                    cell: 2.0,
+                    paper: Color(WHITE),
+                    space,
+                    ..inked(method, &[BLACK])
+                };
+                let got = flat_mean(&params, [grey; 3])?;
+                assert!(
+                    got.iter().all(|c| (c - grey).abs() < bound),
+                    "{method:?} {space:?} black on grey {grey}: {got:?}"
+                );
+            }
+        }
     }
     Ok(())
 }

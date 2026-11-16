@@ -1227,18 +1227,21 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   first: four spot inks are for flat art, use `cmyk` for four tones); the offset needs no random misregistration, which
   would be a hidden tunable and break determinism, and a direction with a distance is what a loose press plate does.
   *Consequence:* ink 0 is the reference and never moves; `cmyk` screens are the classic 15, 75, 0 and 45 added to `angle`.
-- **`dither` prints inks as binary layers, with its own `separation` ('none', 'spot'), `inks`, `paper`, `offset`, `offset_angle`.** Each ink's
-  coverage plane (`Inks::coverages`) is dithered to 0 and 1 with the chosen `method`, `cell` and `pattern`, shifted by whole
-  pixels and printed over `paper`; `palette` and `custom` are not reused for inks. *Reason:* a palette is colours to choose
-  between, inks are layers that overlap, and one more `separation` mode ('spot', as in `halftone`) keeps the two effects reading alike without a
-  shared parameter set. *Consequence:* the pixels are the 2^n combinations of the inks over the paper; the layers are
-  dithered one after another in ink order, so the result does not depend on the thread count. *Tone with several inks:* the
-  mix prints as itself only where the layers overlap independently. `white_noise` draws each ink's thresholds from `seed` +
-  the ink's number and `blue_noise` moves its tile a third of its side per ink: a 0.5/0.5 mix of two inks (green target
-  0.439) prints 0.438 and 0.439 (bayer, clustered, gameboy_camera: 0.553 with one tile; floyd_steinberg 0.418 on a 240 px picture); within 0.02 on 0.3/0.4 and 0.6/0.1. The ordered matrices keep one tile (a half-tile shift made 0.5/0.5 either
-  coincide or complement, 0.553 or 0.325, for a periodic tile has no independent shift) and error diffusion keeps its layers
-  (each diffused alone, they avoid one another): with two or more inks these print off-tone (later item: joint multi-ink
-  diffusion). One ink is tone-true with every method, and its pictures are as before.
+- **`dither` prints inks by one dither against the overprint palette, with its own `separation` ('none', 'spot'), `inks`, `paper`, `offset`, `offset_angle`.**
+  Each pixel's colour is split into ink amounts (`Inks::coverages`); after `dot_gain` and `ink_noise` the amounts are mixed in the
+  print model into one target colour per dot, and that is dithered once, with the chosen `method`, `cell` and `pattern`,
+  against the 2^n colours of the paper and every combination of inks (each from `Inks::print`); the bits of the colour chosen
+  are the inks that land, each shifted by whole pixels by its share of the offset, and `specks` bare the paper on inked pixels.
+  `palette` and `custom` are not reused for inks. *Reason:* layers dithered one per ink were independent only for the noise
+  methods: bayer and clustered printed green 0.553 and floyd_steinberg 0.418 against the target 0.439 (a half-tile shift made
+  0.5/0.5 coincide or complement, 0.553 or 0.325), the structural defect being that no method saw the mix it was making; one
+  dither of the mix is what a palette dither already does, so every method keeps the tone as it does for a palette.
+  *Consequence:* the dither runs in sRGB whatever `space` says (as before, `space` is ignored with a separation): the print
+  model mixes in sRGB, and in Oklab the same dither measured green 0.325 against 0.439 (bayer) and 0.306 for one black ink on a
+  0.2 grey, because the mean of Oklab values is not the mean of sRGB values. Measured on 240 x 240 flats, within 1/16 per channel
+  for every method (the bound of Knoll's 16 candidates). One ink's pictures change only where a method read the plane: `ostromoukhov`
+  takes its level from the print's luma, and the black ink's tiny floor ratio shifts ties of the ordered and noise methods;
+  `floyd_steinberg`, `atkinson`, `dot_diffusion`, `riemersma` and every method on a coloured ink are byte-equal on a test picture.
 - **`dither` has one `method` list; `serpentine` is its own parameter.** Every look is a `method` value: the row-scanned
   diffusion kernels (`floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`,
   `sierra_lite`, `stevenson_arce`, `ostromoukhov`), other diffusion (`dot_diffusion`, `riemersma`), and ordered

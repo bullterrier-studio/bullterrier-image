@@ -122,7 +122,7 @@ pub enum Palette {
 pub enum Separation {
     /// From `palette`.
     None,
-    /// One layer of dots per ink in `inks`, printed over `paper`.
+    /// The `inks` printed over `paper`, dithered once against their overprints.
     Spot,
 }
 
@@ -151,9 +151,9 @@ pub enum Init {
 /// the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in
 /// the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat
 /// colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four
-/// colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours
-/// split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers
-/// printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`,
+/// colours): the photo's colours are split into amounts of the inks (as in `halftone`), mixed
+/// back as printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`), and dithered
+/// once with `method` and `cell` against the paper, each ink and every overlap. `palette`,
 /// `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no
 /// `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink
 /// misregistered on a press.
@@ -239,11 +239,9 @@ pub struct Params {
     /// noise.
     #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
     pub seed: u32,
-    /// How the colours are chosen: 'none' (from `palette`) or 'spot' (one layer of dots per colour of `inks`, printed over
-    /// `paper` like transparent layers). One ink keeps the tone with every `method`; several inks keep it with `white_noise` and
-    /// `blue_noise` (each ink's layer has its own noise), not with the ordered matrices (`bayer`, `clustered`, `gameboy_camera`,
-    /// `matrix`: one tile, so the layers nest or avoid each other) or error diffusion (the layers are not independent), which
-    /// print a mix of inks off-tone.
+    /// How the colours are chosen: 'none' (from `palette`) or 'spot' (the `inks` printed over
+    /// `paper` like transparent layers). Every `method` keeps the tone of the inks' mix: the picture's colour is mixed from the inks and dithered once against
+    /// the paper, each ink and every overlap.
     #[param(default = None)]
     pub separation: Separation,
     /// With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three numbers 0..1), in the order they are
@@ -255,7 +253,7 @@ pub struct Params {
     #[param(default = "#ffffff")]
     pub paper: Color,
     /// With 'spot' separation: how far in px the second ink's layer is moved from the first (the third twice as far, the
-    /// fourth three times), as ink misregistered on a press; 0 = all layers in register.
+    /// fourth three times), as ink misregistered on a press; 0 = all inks in register.
     #[param(default = 0.0, unit = px, min = 0, max = 100)]
     pub offset: f32,
     /// With an `offset`: the direction of the move, in degrees clockwise on screen from the x axis (90 is downward).
@@ -416,35 +414,6 @@ fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
         .collect()
 }
 
-/// The thresholds of the layer of ink number `ink` (0 first, as `thresholds`): each later ink's white noise is drawn from the
-/// next seed and its blue-noise tile is moved a third of its side down and right per ink, so that the layers of several inks
-/// overlap as independent ones do instead of nesting under one threshold. The other tiles are kept: a periodic tile has no
-/// shift that makes two layers independent.
-fn layer(thresholds: Thresholds<'static>, ink: usize) -> Thresholds<'static> {
-    match thresholds {
-        #[expect(clippy::cast_possible_truncation, reason = "an ink's index is below MOST_INKS")]
-        Thresholds::Noise { seed } => noise(seed.wrapping_add(ink as u32)),
-        Thresholds::Tiled {
-            ranks,
-            rows,
-            columns,
-            count,
-        } => {
-            // constant: a third of the blue-noise tile's side per ink
-            let (down, right) = (ink * rows / 3, ink * columns / 3);
-            let moved = (0..rows * columns)
-                .map(|at| ranks[(at / columns + down) % rows * columns + (at % columns + right) % columns])
-                .collect();
-            Thresholds::Tiled {
-                ranks: Cow::Owned(moved),
-                rows,
-                columns,
-                count,
-            }
-        }
-    }
-}
-
 /// The `chosen` method on `values` (`size` dots), as a pattern of palette indices.
 fn pattern(
     method: Method,
@@ -453,11 +422,10 @@ fn pattern(
     palette: &[Point],
     params: &Params,
     inputs: &Inputs<'_>,
-    ink: usize,
+    space: Space,
 ) -> Vec<u8> {
     let (amount, serpentine) = (params.pattern, params.serpentine);
-    // an ink plane holds its coverage in the first channel, whatever the space
-    let lightness = if params.space == Space::Rgb && params.separation == Separation::None {
+    let lightness = if space == Space::Rgb {
         [0.2126, 0.7152, 0.0722] // constant: Rec. 709 luma weights, ITU-R BT.709
     } else {
         [1.0, 0.0, 0.0]
@@ -482,8 +450,8 @@ fn pattern(
         Method::Bayer => tiled(Tile::Bayer),
         Method::Clustered => tiled(Tile::Clustered),
         Method::Clustered45 => tiled(Tile::Clustered45),
-        Method::BlueNoise => ordered(values, size, palette, &layer(Tile::BlueNoise.thresholds(), ink), amount),
-        Method::WhiteNoise => ordered(values, size, palette, &layer(noise(params.seed), ink), amount),
+        Method::BlueNoise => ordered(values, size, palette, &Tile::BlueNoise.thresholds(), amount),
+        Method::WhiteNoise => ordered(values, size, palette, &noise(params.seed), amount),
         Method::GameboyCamera => tiled(Tile::GameboyCamera),
         Method::Matrix => ordered(values, size, palette, &matrix_of(inputs), amount),
     }
@@ -506,8 +474,10 @@ fn matrix_of(inputs: &Inputs<'_>) -> Thresholds<'static> {
     from_greys(&greys, size)
 }
 
-/// The inks printed: each ink's coverage of the dots is dithered to a layer of 0 and 1 (the layers in the order of the
-/// inks), moved by its share of the offset, and every pixel gets the print of the inks that land on it.
+/// The inks printed: the dots' colours are split into amounts of the inks (after the press's dot gain and uneven ink), mixed
+/// in the print model into one target colour per dot, and that is dithered once with `method` against the overprint palette,
+/// the print of every combination of inks. The inks of the colour chosen for a pixel (the bits of its index) are moved by their
+/// share of the offset, and every pixel gets the print of the inks that land on it.
 fn printed(
     dots: &[Point],
     (rows, columns): (usize, usize),
@@ -526,40 +496,32 @@ fn printed(
         speck_size: params.speck_size,
         seed: params.seed,
     };
-    let mut needed = vec![[0.0; MOST_INKS]; dots.len()];
-    par::rows(&mut needed, 1, |first, band| {
+    let mut target = vec![[0.0; 3]; dots.len()];
+    par::rows(&mut target, 1, |first, band| {
         for (offset, (out, dot)) in band.iter_mut().zip(&dots[first..]).enumerate() {
             let at = first + offset;
             let cell = [(at / columns) as u64, (at % columns) as u64]; // constant: a usize is at most 64 bits wide here, so it fits
-            *out = inks.coverages(*dot);
-            for (ink, amount) in out.iter_mut().enumerate() {
+            let mut amounts = inks.coverages(*dot);
+            for (ink, amount) in amounts.iter_mut().enumerate() {
                 *amount = real.coverage(*amount, ink, cell);
             }
+            *out = inks.print(&amounts);
         }
     });
-    // an ink is the first channel of a dot; its two choices are no ink and full ink
-    let (none, full) = ([0.0; 3], [1.0, 0.0, 0.0]);
-    let mut plane = vec![none; dots.len()];
-    let layers: Vec<Vec<u8>> = (0..count)
-        .map(|ink| {
-            for (value, coverage) in plane.iter_mut().zip(&needed) {
-                value[0] = coverage[ink];
-            }
-            pattern(
-                params.method,
-                &plane,
-                (rows, columns),
-                &[none, full],
-                params,
-                inputs,
-                ink,
-            )
-        })
-        .collect();
-    // the print of every combination of inks, by the bits of the inks that land
+    // the print of every combination of inks, by the bits of the inks that land: the overprint palette
     let table: Vec<[f32; 3]> = (0..1_usize << count)
         .map(|mask| inks.print(&std::array::from_fn(|ink| if mask >> ink & 1 == 1 { 1.0 } else { 0.0 })))
         .collect();
+    // in sRGB, where the print model mixes: distances in Oklab would pull the mean of the dots off the mix of the inks
+    let layers = pattern(
+        params.method,
+        &target,
+        (rows, columns),
+        &table,
+        params,
+        inputs,
+        Space::Rgb,
+    );
     // whole pixels: the nearest to the move
     let whole_move = |away: f32| {
         let pixels = whole(f64::from(away.abs())).cast_signed();
@@ -574,12 +536,12 @@ fn printed(
             let y = first_row + offset;
             for (x, pixel) in line.iter_mut().enumerate() {
                 let mut mask = 0; // constant: no ink has landed yet
-                for (ink, (layer, by)) in layers.iter().zip(&moves).enumerate() {
+                for (ink, by) in moves.iter().enumerate() {
                     // where the layer comes from; none where that is off the picture
                     let from =
                         |at: usize, away: isize, size: usize| at.checked_add_signed(-away).filter(|&at| at < size);
                     if let (Some(row), Some(column)) = (from(y, by[1], height), from(x, by[0], width)) {
-                        mask |= usize::from(layer[row / cell * columns + column / cell]) << ink;
+                        mask |= (usize::from(layers[row / cell * columns + column / cell]) >> ink & 1) << ink;
                     }
                 }
                 *pixel = if mask == 0 {
@@ -606,7 +568,15 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let palette = colours(&dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
     let size = (rows, columns);
-    let chosen = pattern(params.method, &matched, size, &matched_palette, params, inputs, 0);
+    let chosen = pattern(
+        params.method,
+        &matched,
+        size,
+        &matched_palette,
+        params,
+        inputs,
+        params.space,
+    );
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {

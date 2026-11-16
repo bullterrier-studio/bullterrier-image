@@ -50,7 +50,7 @@ euclidean, matrix or line; `separation` none, cmyk, spot or rgb; offset misregis
 
 One idea, one name: both effects call separate inks `separation="spot"` (`dither` said `"inks"`; renamed). **Done** (2026-11-16).
 
-Open, later: "Tone moves the line" (above); joint multi-ink diffusion (`dither` `separation` 'spot' with two or more inks prints off-tone with error diffusion and the ordered matrices; `white_noise` and `blue_noise` are tone-true); decorrelate the inks of a concentric screen (on `rings`, `spiral` and `rays` every ink's rows coincide, so a separation prints off-tone; `grid` and `wave` keep the tone); a separation-aware default `paper` (the default black paper makes cmyk and spot print black); `rays` with `shape` line crowds into a moire blob near the centre, where a ray is narrower than a pixel.
+Open, later: "Tone moves the line" (above); decorrelate the inks of a concentric screen (on `rings`, `spiral` and `rays` every ink's rows coincide, so a separation prints off-tone; `grid` and `wave` keep the tone); a separation-aware default `paper` (the default black paper makes cmyk and spot print black); `rays` with `shape` line crowds into a moire blob near the centre, where a ray is narrower than a pixel.
 
 A ruling in lines per inch is a size question: `cell` px = the print's DPI over the ruling, scaled to the recipe's size.
 Documented with the DPI write option, no parameter.

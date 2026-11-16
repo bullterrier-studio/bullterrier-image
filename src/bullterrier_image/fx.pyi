@@ -825,7 +825,7 @@ scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges bre
 
 @_effect
 def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'spot'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, dot_gain: float = 0.0, ink_noise: float = 0.0, specks: float = 0.0, speck_size: float = 3.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize'] | None = None) -> Step:
-    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four colours): each ink is a layer of dots that cover the picture as much as the ink is needed there (the photo's colours split into amounts of the inks, as in `halftone`), each layer dithered with `method` and `cell`, and the layers printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`). `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
+    """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four colours): the photo's colours are split into amounts of the inks (as in `halftone`), mixed back as printed subtractively over `paper` (inks overlap like transparent layers, so use a light `paper`), and dithered once with `method` and `cell` against the paper, each ink and every overlap. `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
 
 Parameters
 ----------
@@ -889,13 +889,10 @@ pattern : number, fraction, 0 to 1, default 1.0
     methods), so flatter areas; 0 gives each dot its nearest palette colour, plain flat
     colours with no pattern, whatever the method.
 separation : one of 'none', 'spot', default 'none'
-    How the colours are chosen: 'none' (from `palette`) or 'spot' (one layer of dots per
-    colour of `inks`, printed over `paper` like transparent layers). One ink keeps the
-    tone with every `method`; several inks keep it with `white_noise` and `blue_noise`
-    (each ink's layer has its own noise), not with the ordered matrices (`bayer`,
-    `clustered`, `gameboy_camera`, `matrix`: one tile, so the layers nest or avoid each
-    other) or error diffusion (the layers are not independent), which print a mix of
-    inks off-tone.
+    How the colours are chosen: 'none' (from `palette`) or 'spot' (the `inks` printed
+    over `paper` like transparent layers). Every `method` keeps the tone of the inks'
+    mix: the picture's colour is mixed from the inks and dithered once against the
+    paper, each ink and every overlap.
 inks : list of colours, default ('#ff4d6d', '#2b59ff')
     With 'spot' separation: the one to four ink colours ('#rrggbb', '#rgb' or three
     numbers 0..1), in the order they are offset; ignored otherwise. Each pixel's colour
@@ -906,7 +903,7 @@ paper : colour, default '#ffffff'
 offset : number, px, 0 to 100, default 0.0
     With 'spot' separation: how far in px the second ink's layer is moved from the first
     (the third twice as far, the fourth three times), as ink misregistered on a press; 0
-    = all layers in register.
+    = all inks in register.
 offset_angle : number (cyclic), degrees, 0 to 360, default 0.0
     With an `offset`: the direction of the move, in degrees clockwise on screen from the
     x axis (90 is downward).
