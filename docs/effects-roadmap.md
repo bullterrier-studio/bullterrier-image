@@ -382,8 +382,8 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
 - **A keyline helper:** grow a cut-out into an outline as alpha only (a stroke without its host picture). *Why:* a poster
   keyline needs the stroke alone. *Evidence:* the Conan poster used `fx.outline(field="subject")` on a second picture with
   `lighten` (`bullterrier-demos/feedback/scene-conan.md`, 6): it works and is awkward.
-- **`Path` in the star export.** `from bullterrier_image import *` shadows `pathlib.Path` with the region `Path`. *Why:* a
-  script that imports both breaks quietly. *Wanted:* a name that does not collide, or `Path` left out of `__all__`.
+- **Done: `Path` in the star export.** `Path` (the region) is out of `__all__`, so `from bullterrier_image import *` no longer
+  shadows `pathlib.Path`; `from bullterrier_image import Path` and `bullterrier_image.Path` still work.
 - **A WebAssembly build proof.** `cargo check -p bullterrier-image --target wasm32-unknown-unknown` with default features
   compiles in about 10 s (measured 2026-11-14); no browser has run it. Open: rayon threads (`wasm-bindgen-rayon` or a
   single-thread fallback), `std::fs`, `glob` and the clock, and the AI finders (subject, depth, SAM 2), which are native

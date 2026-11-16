@@ -121,6 +121,18 @@ def test_dir_of_the_package_shows_its_public_names_not_its_machinery():
     assert {"TYPE_CHECKING", "import_module"}.isdisjoint(shown)
 
 
+def test_a_star_import_leaves_pathlib_path_alone_and_the_region_path_stays_reachable_by_name():
+    ns: dict[str, object] = {"Path": Path}
+    exec("from bullterrier_image import *", ns)  # noqa: S102
+    assert ns["Path"] is Path  # the region Path must not shadow pathlib.Path
+    assert "Recipe" in ns  # the rest of the surface is still exported
+    region = bullterrier_image.Path
+    assert region is not Path
+    ns2: dict[str, object] = {}
+    exec("from bullterrier_image import Path", ns2)  # noqa: S102
+    assert ns2["Path"] is region
+
+
 def test_a_recipe_is_framed_with_a_framing_from_the_public_names():
     framing = bullterrier_image.Framing(aspect=1.0, transparent="circle")
     assert bullterrier_image.Recipe([fx.grade()], name="look", frame=framing).frame is framing

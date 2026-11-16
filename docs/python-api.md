@@ -73,7 +73,8 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   made from are needed (found by the default finders only then); no step runs. A partition or an unknown name is a
   `RecipeError` listing the selections and the nearest. Example: [`examples/python_api.py`](../examples/python_api.py).
 - **Shapes.** `Path.rect(x, y, w, h)` and `Path.ellipse(cx, cy, rx, ry)` are `Path` regions (`samples=` as for `Path`) for the
-  common shapes: `regions={"box": Path.rect(0.1, 0.2, 0.5, 0.3)}`. All numbers are shares of the frame (0 to 1 across and down),
+  common shapes: `regions={"box": Path.rect(0.1, 0.2, 0.5, 0.3)}`. `Path` is not in `__all__` (so `import *` keeps `pathlib.Path`): write
+  `from bullterrier_image import Path` or `bullterrier_image.Path`. All numbers are shares of the frame (0 to 1 across and down),
   so an ellipse is a circle only in a square frame (in a 3:2 frame, `Path.ellipse(0.5, 0.5, 0.2, 0.3)` is a circle). A size
   that is not above 0 is a `RecipeError` naming it.
 - **ColorRange.** `ColorRange(target="#8a3b2e", tolerance=0.1, feather=0.05)` selects the pixels near a colour (Oklab distance; read

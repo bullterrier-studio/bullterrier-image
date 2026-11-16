@@ -142,6 +142,7 @@ def _installed_version() -> str:
         return "0+unknown"
 
 
+# The region `Path` is reached by name (`bullterrier_image.Path`); it is left out so `import *` keeps `pathlib.Path`.
 __all__ = [
     "RECIPE_FORMATS",
     "BackendUnavailableError",
@@ -171,7 +172,6 @@ __all__ = [
     "MapNotFoundError",
     "NonFiniteImageError",
     "Parameter",
-    "Path",
     "Pick",
     "Picture",
     "Project",
