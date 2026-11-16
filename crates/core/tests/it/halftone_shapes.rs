@@ -1,12 +1,6 @@
 //! `halftone`'s dot shapes: every shape keeps the tone, and each has its own geometry. See `halftone.rs` for the oracles.
 
-#![expect(
-    clippy::cast_precision_loss,
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss,
-    reason = "small picture sizes and indices"
-)]
+#![expect(clippy::cast_precision_loss, reason = "small picture sizes")]
 
 use std::f32::consts::PI;
 
