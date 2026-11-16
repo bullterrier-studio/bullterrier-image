@@ -151,6 +151,18 @@ fn conditional() -> Vec<Conditional> {
                 ("offset", json!(5.0)),
             ],
         },
+        // the ellipse's axes and the matrix's picture are read by their shapes alone (a matrix shape refuses to run without
+        // one); `shape` itself changes the picture alone at the defaults, so it has no row
+        Conditional {
+            effect: "halftone",
+            field: "aspect",
+            with: vec![("shape", json!("ellipse"))],
+        },
+        Conditional {
+            effect: "halftone",
+            field: "matrix",
+            with: vec![("shape", json!("matrix"))],
+        },
         // a table that is none is the identity, which the amount mixes in without change
         Conditional {
             effect: "lut",

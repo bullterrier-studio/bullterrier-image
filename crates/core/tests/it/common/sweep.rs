@@ -1,5 +1,5 @@
 //! The parameter settings an effect is tried with across the integration tests: the defaults, then each parameter alone
-//! at each end of its range.
+//! at each end of its range (a choice together with the pictures the table names, which one of its choices may need).
 
 use bullterrier_image::params::{Kind, Scalar, Table, Unit};
 use serde_json::{Map, Value, json};
@@ -58,10 +58,15 @@ pub(crate) fn variants(table: &Table) -> Vec<Setting> {
             Kind::Picture => vec![json!("asset")],
             _ => Vec::new(),
         };
+        let pictures = table
+            .fields
+            .iter()
+            .filter(|other| other.kind == Kind::Picture && field.kind == Kind::Choice)
+            .map(|other| (other.name.to_owned(), json!("asset")));
         cases.extend(
-            values
-                .into_iter()
-                .map(|value| Setting::from_iter([(field.name.to_owned(), value)])),
+            values.into_iter().map(|value| {
+                Setting::from_iter(std::iter::once((field.name.to_owned(), value)).chain(pictures.clone()))
+            }),
         );
     }
     cases

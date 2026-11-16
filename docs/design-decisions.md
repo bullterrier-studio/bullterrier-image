@@ -1566,3 +1566,19 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   scene pieces with halftone change (scene sees it at its next image pin); the dots touch at 78.5 % tone, not at half (that
   is `euclidean`'s). The coverage oracle (black on white, `cell` 20, `feather` 1, `sigma` 0, flat greys at 0.1 to 0.9)
   now holds within 0.008 for `dot` and `line`.
+- **`halftone` shapes `square`, `ellipse`, `diamond`, `euclidean` and `matrix` are spot variants, each with a level (halftone
+  batch, 2026-11-16).** The screen code is unchanged: each is a `Spot` with its own `value` and `level`. `square` (the larger
+  offset, level `sqrt(a) / 2`) and `diamond` (the distance along the diagonals, level `sqrt(a / 2)` then `1 - sqrt((1 - a) / 2)`
+  after 50 %, when it touches its neighbours at the middles of the cell's sides, over `sqrt 2`) have closed forms. `ellipse`
+  (`aspect`, the ratio of the long axis, along the rows, to the short; 1 to 8) takes the distance across the short axis, so the
+  ramp is a feather wide across the long sides, and `euclidean` is the cosine spot function `(cos 2 pi du + cos 2 pi dv) / 2`
+  as a distance (round in highlights, a diamond at 50 %, a round hole in shadows; a tone and its complement are the same
+  screen half a cell on); their level is a quantile of the values on a 256 x 256 grid of the cell, sorted once per render
+  (area within 0.0003 of the tone). `matrix` is a caller's picture of one cell, its places ranked as `dither`'s `matrix` is
+  (the one `rank_greys`, brightest inked first, ties in reading order; the refusal is dither's, `check_matrix`, 256 pixels a
+  side) and looked up by nearest place: its value is the place's rank as a share, so its level is the tone, and a tone of k / n
+  inks k of n places. A full tone has a level past every value, so it fills the cell, exact edges too (the round dot's corner
+  pixel was half covered). `aspect` and `matrix` are `advanced` (decision 7). *Reason for the cosine form:* the PostScript
+  Euclidean function is discontinuous where its two halves meet, which leaves a diamond edge with no ramp; the cosine form
+  has the same three regimes and is smooth. *Consequence:* the coverage oracle holds within 0.005 for each new shape;
+  `matrix` keeps its places' blocks (no smoothing), and its ramp is in ranks, not px, so a fine picture has a sharp edge.

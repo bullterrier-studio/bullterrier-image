@@ -5,6 +5,7 @@
 //! density of the full ink. Unmixing is then a least-squares problem in density space with each coverage in 0..1.
 
 use super::cast;
+use super::dither::rank_greys;
 
 /// The most inks printed over one paper.
 pub(crate) const MOST_INKS: usize = 4; // constant: cyan, magenta, yellow and black; more inks on one paper cannot be told apart
@@ -46,31 +47,108 @@ pub(crate) fn shift(offset: f32, angle: f32, ink: usize) -> [f32; 2] {
 /// How exactly the level of a round spot is solved, in cells (a pixel is at least 1/200 of a cell).
 const LEVEL_TOLERANCE: f64 = 1e-6; // constant: far below a pixel at the largest cell, not a look
 
+/// The level of a full tone: past every value of a cell (the largest is a corner of the cell, 1 / sqrt 2), so a full tone
+/// inks every pixel of the cell, its exact edges too.
+const FULL: f32 = 2.0; // constant: any level above 1 / sqrt 2
+
+/// The grid of places a sampled spot function is read at, on a side of the unit cell: its level is a quantile of 65536 values.
+const SAMPLES: usize = 256; // constant: puts a level's area within about 1/256^1.5 = 0.0003 of the tone, with a sort of 65536 values once per render
+
 /// A mark's spot function on its cell: a value at each place of the cell (the offset from its centre, in cells), and the
 /// level of that value below which the cell's area equals a tone. A pixel is inked where its value is below the level,
-/// so every shape keeps the tone; a new shape is a new variant with these two methods.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// so every shape keeps the tone; a new shape is a new variant with these two methods. Each value changes by about 1 a
+/// cell across the edge, so the feather's ramp is about as wide as it says.
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Spot {
     /// The distance from the centre: a round dot.
     Round,
     /// The distance from the row's centreline: a line across the cell.
     Line,
+    /// The larger offset along either side: a square with its sides along the rows.
+    Square,
+    /// The distance from the centre along the diagonals: a square turned 45 degrees.
+    Diamond,
+    /// The distance across an ellipse whose axes are in the ratio `aspect`, the long one along the rows; `levels` are the
+    /// values of the cell, sorted.
+    Ellipse { aspect: f32, levels: Vec<f32> },
+    /// The cosine spot function of print screens, as a distance: round at the centre, a diamond at half the cell, a
+    /// round hole at the corners; `levels` are the values of the cell, sorted.
+    Euclidean { levels: Vec<f32> },
+    /// A caller's picture of `rows` x `columns` places, `ranks` (see `ops::dither::rank_greys`) row after row: the
+    /// place's turn to be inked.
+    Matrix {
+        ranks: Vec<u16>,
+        rows: usize,
+        columns: usize,
+    },
 }
 
 impl Spot {
-    /// The spot function at the offset (`du`, `dv`) from the cell's centre.
-    pub(crate) fn value(self, du: f32, dv: f32) -> f32 {
+    /// An ellipse whose axes are in the ratio `aspect` (1 or more), the long one along the rows.
+    pub(crate) fn ellipse(aspect: f32) -> Self {
+        Self::Ellipse {
+            aspect,
+            levels: sorted_values(|du, dv| ellipse_value(aspect, du, dv)),
+        }
+    }
+
+    /// The cosine screen.
+    pub(crate) fn euclidean() -> Self {
+        Self::Euclidean {
+            levels: sorted_values(euclidean_value),
+        }
+    }
+
+    /// The picture of `greys` (row after row, `rows` x `columns`, at least one) as a spot function: its brightest
+    /// places are inked first, as `dither`'s `matrix` lights them.
+    pub(crate) fn matrix(greys: &[f32], (rows, columns): (usize, usize)) -> Self {
+        Self::Matrix {
+            ranks: rank_greys(greys),
+            rows,
+            columns,
+        }
+    }
+
+    /// The spot function at the offset (`du`, `dv`) from the cell's centre, each in -0.5..0.5.
+    pub(crate) fn value(&self, du: f32, dv: f32) -> f32 {
         match self {
             Self::Round => (du * du + dv * dv).sqrt(),
             Self::Line => dv.abs(),
+            Self::Square => du.abs().max(dv.abs()),
+            Self::Diamond => (du.abs() + dv.abs()) * std::f32::consts::FRAC_1_SQRT_2,
+            Self::Ellipse { aspect, .. } => ellipse_value(*aspect, du, dv),
+            Self::Euclidean { .. } => euclidean_value(du, dv),
+            Self::Matrix { ranks, rows, columns } => {
+                // the place's rank, from the inked-first end: the middle of its share of 0..1
+                let (row, column) = (place(dv, *rows), place(du, *columns));
+                let count = crate::ops::length::float(ranks.len());
+                cast::single((count - f64::from(ranks[row * columns + column]) - 0.5) / count)
+            }
         }
     }
 
     /// The level whose area in the unit cell is `tone` (0 to 1); a feathered edge centred on it keeps that area.
-    pub(crate) fn level(self, tone: f32) -> f32 {
+    pub(crate) fn level(&self, tone: f32) -> f32 {
         let tone = f64::from(tone.clamp(0.0, 1.0));
+        if tone >= 1.0 {
+            return FULL;
+        }
         match self {
             Self::Line => cast::single(tone / 2.0),
+            // a square of side s has area s^2; its side is twice its level
+            Self::Square => cast::single(tone.sqrt() / 2.0),
+            // a diamond |du| + |dv| < l has area 2 l^2 up to l = 1/2 (touching its neighbours) and then 1 - 2 (1 - l)^2: the
+            // value is the distance to its centre along the diagonal, l / sqrt 2
+            Self::Diamond => {
+                let reach = if tone <= 0.5 {
+                    (tone / 2.0).sqrt()
+                } else {
+                    1.0 - ((1.0 - tone) / 2.0).sqrt()
+                };
+                cast::single(reach * std::f64::consts::FRAC_1_SQRT_2)
+            }
+            Self::Ellipse { levels, .. } | Self::Euclidean { levels } => quantile(levels, tone),
+            Self::Matrix { .. } => cast::single(tone),
             Self::Round if tone <= std::f64::consts::FRAC_PI_4 => cast::single((tone / std::f64::consts::PI).sqrt()),
             Self::Round => {
                 // above pi / 4 the circle leaves the cell: bisect its clipped area between radius 1/2 and the corner
@@ -87,6 +165,61 @@ impl Spot {
             }
         }
     }
+}
+
+/// How far a cell coordinate may fall short of a place's start, in places, from the rounding of single precision: a
+/// pixel a whole number of places in sits on the start, and must stay in that place.
+const PLACE_SLACK: f64 = 1e-3; // constant: single precision's error in a coordinate is below 1e-5 of a place at 256 places
+
+/// The index of the place of `count` that the offset `d` (-0.5 up to 0.5) is in.
+fn place(d: f32, count: usize) -> usize {
+    let at = (f64::from(d) + 0.5) * crate::ops::length::float(count) + PLACE_SLACK;
+    crate::ops::length::whole(at.floor()).min(count - 1)
+}
+
+/// The distance across an ellipse of axes in the ratio `aspect`, its long axis along `du`: 1 a cell across the long sides
+/// (the most of its edge) and `1 / aspect` along the ends.
+fn ellipse_value(aspect: f32, du: f32, dv: f32) -> f32 {
+    (du * du / (aspect * aspect) + dv * dv).sqrt()
+}
+
+/// The cosine screen's distance. The spot function `s = (cos 2 pi du + cos 2 pi dv) / 2` is 1 at the centre, 0 on the
+/// diamond `|du| + |dv| = 1/2` and -1 at the corners; its distance is `sqrt(1 - s) / pi` (the radius near the centre, where
+/// `1 - s` is `pi^2 r^2`), mirrored about `s = 0` (a diamond, `1/pi`) as `2/pi` less the same at the corners, so a tone and
+/// its complement are the same screen half a cell on.
+fn euclidean_value(du: f32, dv: f32) -> f32 {
+    use std::f32::consts::{FRAC_1_PI, TAU};
+    let s = ((TAU * du).cos() + (TAU * dv).cos()) / 2.0; // constant: the mean of two cosines, a period a cell
+    if s >= 0.0 {
+        (1.0 - s).sqrt() * FRAC_1_PI
+    } else {
+        (2.0 - (1.0 + s).sqrt()) * FRAC_1_PI
+    }
+}
+
+/// The values of `value` at the middle of each square of a `SAMPLES` x `SAMPLES` grid of the unit cell, in order.
+fn sorted_values(value: impl Fn(f32, f32) -> f32) -> Vec<f32> {
+    let at = |index: usize| {
+        cast::single((crate::ops::length::float(index) + 0.5) / crate::ops::length::float(SAMPLES) - 0.5)
+    };
+    let mut values: Vec<f32> = (0..SAMPLES * SAMPLES)
+        .map(|index| value(at(index % SAMPLES), at(index / SAMPLES)))
+        .collect();
+    values.sort_by(f32::total_cmp);
+    values
+}
+
+/// The level that `tone` of the sorted `values` lie below, read between the two nearest (the value `i` stands for the
+/// tone `(i + 1/2) / n`); 0 for no tone.
+fn quantile(values: &[f32], tone: f64) -> f32 {
+    if tone <= 0.0 {
+        return 0.0;
+    }
+    let at =
+        (tone * crate::ops::length::float(values.len()) - 0.5).clamp(0.0, crate::ops::length::float(values.len() - 1));
+    let below = crate::ops::length::whole(at.floor());
+    let above = (below + 1).min(values.len() - 1);
+    cast::single(f64::from(values[below]) + at.fract() * (f64::from(values[above]) - f64::from(values[below])))
 }
 
 /// The area inside the unit square centred on a circle of radius `r` (0.5 to 1 / sqrt 2) around its centre: the circle
@@ -405,10 +538,24 @@ mod tests {
     }
 
     #[test]
-    fn a_spots_level_cuts_the_cell_into_the_area_of_the_tone() {
+    fn a_spots_level_cuts_the_cell_into_the_area_of_the_tone_and_a_full_tone_is_the_whole_cell() {
         // brute force: the share of a fine grid of the unit cell where the value is below the level
         let grid: u16 = 400;
-        for spot in [Spot::Round, Spot::Line] {
+        let ramp: Vec<f32> = (0..400_u16).map(|place| f32::from(place) / 400.0).collect();
+        for (which, spot) in [
+            Spot::Round,
+            Spot::Line,
+            Spot::Square,
+            Spot::Diamond,
+            Spot::ellipse(1.0),
+            Spot::ellipse(3.0),
+            Spot::ellipse(8.0),
+            Spot::euclidean(),
+            Spot::matrix(&ramp, (20, 20)),
+        ]
+        .iter()
+        .enumerate()
+        {
             for tone in [0.0, 0.1, 0.5, 0.7, 0.8, 0.9, 0.99, 1.0] {
                 let level = spot.level(tone);
                 let at = |index: u16| (f32::from(index) + 0.5) / f32::from(grid) - 0.5;
@@ -420,11 +567,9 @@ mod tests {
                     f64::from(u32::try_from(inside).unwrap_or(0)) / f64::from(u32::from(grid) * u32::from(grid));
                 assert!(
                     (share - f64::from(tone)).abs() < 0.004,
-                    "{spot:?} tone {tone}: level {level} cuts {share}"
+                    "spot {which} tone {tone}: level {level} cuts {share}"
                 );
             }
         }
-        // the round dot never passes the cell's corner, so a full tone fills the cell and the footprint holds
-        assert!(Spot::Round.level(1.0) <= std::f32::consts::FRAC_1_SQRT_2 + 1e-5);
     }
 }

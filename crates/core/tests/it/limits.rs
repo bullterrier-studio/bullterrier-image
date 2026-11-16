@@ -538,6 +538,28 @@ fn a_dither_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() 
 }
 
 #[test]
+fn a_halftone_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
+    // the same ranks as dither's matrix: 256 x 256 places is the most
+    let pixels = vec![0.5; 20 * 20 * 3];
+    let step = || Step::new("halftone").param("shape", "matrix").param("matrix", "m");
+    let render = |rows: usize, columns: usize| {
+        let matrix = Image::new(rows, columns, &vec![0.4; rows * columns * 3]).map(Arc::new)?;
+        Photo::new(Picture::new(20, 20, &pixels)?)
+            .with_image("m", matrix)
+            .render(&Recipe::new([step()]), &Presets::new(), Options::default())
+            .map(drop)
+    };
+    for (rows, columns) in [(256, 256), (1, 256), (256, 1)] {
+        let most = render(rows, columns);
+        assert!(most.is_ok(), "{rows} x {columns}: {most:?}");
+    }
+    for (rows, columns) in [(257, 1), (1, 257)] {
+        let past = render(rows, columns);
+        assert!(refused(&past, &["matrix", "257"]), "{rows} x {columns}: {past:?}");
+    }
+}
+
+#[test]
 fn shatter_at_its_most_pieces_finishes_in_both_shapes_and_one_more_is_refused() -> Outcome {
     // the points are drawn, the triangles found and the pieces' means kept for each: the work follows `pieces`
     let pixels = vec![0.5; 120 * 120 * 3];

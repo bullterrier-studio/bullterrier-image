@@ -9,15 +9,13 @@ use std::error::Error;
 use std::sync::Arc;
 
 use bullterrier_image::region::Bands;
-use bullterrier_image::{
-    Each, Entry, Frame, Image, Input, Options, Photo, Picture, Presets, Recipe, Step, effect,
-};
+use bullterrier_image::{Each, Entry, Frame, Image, Input, Options, Photo, Picture, Presets, Recipe, Step, effect};
 use serde_json::Value;
 
-use crate::common::{Outcome, core_effects};
 use crate::common::compare::{first_bit_difference, first_difference_within};
 use crate::common::pictures::{asset, varied};
 use crate::common::sweep::{Setting, awkward, fine, variants};
+use crate::common::{Outcome, core_effects};
 
 /// A canvas: its sides, and the rows of the bands it is cut into: one, a prime, one that does not divide the height, half
 /// of it, and all of it.
@@ -467,6 +465,28 @@ fn echo_is_cleared_for_a_distance_a_row_can_carry_and_not_for_a_finer_one() {
         problems.len(),
         problems.join("\n")
     );
+}
+
+#[test]
+fn a_halftone_of_every_shape_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
+    // a sampled spot function (the cosine screen, an ellipse) and a closed one (the diamond) read the same cell tone as the dot
+    let values = varied(SMALL.height, SMALL.width);
+    for shape in ["euclidean", "ellipse", "diamond"] {
+        let recipe = Recipe::new([Step::new("halftone")
+            .param("shape", shape)
+            .param("aspect", 2.5)
+            .param("cell", 9.5)
+            .param("sigma", 0.4)]);
+        let margin = recipe
+            .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
+            .ok_or("halftone is banded")?;
+        assert_eq!(
+            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+            None,
+            "{shape}"
+        );
+    }
+    Ok(())
 }
 
 #[test]

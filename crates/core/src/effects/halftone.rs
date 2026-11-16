@@ -6,13 +6,14 @@ use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::blur::{gaussian_filter, is_fourier};
 use crate::ops::cast;
+use crate::ops::dither::{check_matrix, matrix_greys};
 use crate::ops::color::{luminance, vivid};
 use crate::ops::edge::EdgeOrConstant;
 use crate::ops::inks::{CMYK_SCREEN_ANGLES, Inks, MOST_INKS, RGB_SCREEN_ANGLES, SPOT_SCREEN_STEP, Spot, shift};
 use crate::ops::length::{float, whole};
 use crate::ops::par;
-use crate::params::{Choice, Color, Params};
-use crate::{Image, Inputs, Picture};
+use crate::params::{Choice, Color, Params, PictureName};
+use crate::{Error, Image, Inputs, Picture};
 
 /// Where `halftone` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -20,6 +21,17 @@ pub(crate) const META: Meta = Meta {
     opacity: 1.0,
     inputs: &[Input::Place],
 };
+
+/// What `halftone` refuses: shape 'matrix' with no `matrix`, or one more than 256 pixels wide or high.
+///
+/// # Errors
+/// [`Error::Recipe`] naming `matrix`.
+pub(crate) fn check(params: &Params, inputs: &Inputs<'_>) -> Result<(), Error> {
+    if params.shape != Shape::Matrix {
+        return Ok(());
+    }
+    check_matrix("halftone", "shape 'matrix'", inputs)
+}
 
 /// What `halftone` reads around a pixel: the grid of dots is anchored at the picture's corner, so a row is not the same
 /// in another frame of reference.
@@ -54,7 +66,8 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 /// photo under it, scaled up until its strongest channel is full but by at most 1 / `ink_floor`.
 ///
 /// `shape` 'line' draws parallel lines `cell` px apart instead of dots, along the screen's rows, whose width is the ink
-/// (a line as wide as `cell` fills it), so the screen keeps the tones the same way. `separation` prints several inks,
+/// (a line as wide as `cell` fills it), so the screen keeps the tones the same way; 'square', 'ellipse', 'diamond', 'euclidean'
+/// and 'matrix' are other marks that fill their cell the same way, as large as the ink needs. `separation` prints several inks,
 /// each its own screen, subtractively over `paper` ('rgb' adds light instead; inks overlap like transparent layers, so use a light
 /// `paper`, as the default black paper prints black): 'cmyk' prints cyan, magenta, yellow and black, found from the photo by black
 /// generation (black is how dark the colour is, the rest is split between the three), with the screens at 15, 75, 0
@@ -68,9 +81,24 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
-    /// What a dot is: 'dot' (a round dot per cell), 'line' (a line per cell row, as wide as the ink needs).
+    /// What a mark is: 'dot' (round), 'square', 'ellipse' (its axes in the ratio `aspect`), 'diamond' (a square turned 45
+    /// degrees), 'euclidean' (round in highlights, a diamond at 50 %, a round hole in shadows), 'matrix' (the spot
+    /// function of your picture `matrix`) or 'line' (a line per cell row). Each is as large as the ink needs, so every shape
+    /// keeps the tone.
     #[param(default = Dot)]
     pub shape: Shape,
+    /// With shape 'ellipse': the ratio of the ellipse's long axis (along the screen's rows) to its short one; 1 = a round
+    /// dot. The area stays the tone's. Ignored with any other shape.
+    #[param(default = 1.0, unit = ratio, min = 1, max = 8, advanced)]
+    pub aspect: f32,
+    /// With shape 'matrix': the picture of one cell whose grey values are the thresholds at each place of it, the path of
+    /// an image file in a recipe file (relative to the file) or in `fx`, or, in Python, a Picture or an array; in Rust,
+    /// the name of a picture the photo was given or the path of an image file. At most 256 x 256 pixels, a side of any
+    /// length. Its places are ranked by brightness and the brightest get ink first, equal ones in reading order (as
+    /// `dither`'s `matrix`), so a picture of n places at tone k / n inks k of them. Ignored with any other shape; none
+    /// is refused with 'matrix'.
+    #[param(advanced)]
+    pub matrix: PictureName,
     /// How many inks: 'none' (one ink, `ink` or the photo's colour), 'cmyk' (cyan, magenta, yellow and black), 'spot'
     /// (the colours in `inks`) or 'rgb' (red, green and blue light). Cmyk and spot print over `paper` like transparent
     /// layers, each in its own screen; 'rgb' adds light on black and ignores `paper`.
@@ -142,6 +170,16 @@ pub enum Shape {
     Dot,
     /// A line in each row of cells, wider where more ink is needed.
     Line,
+    /// A square in each cell, whose sides run along the screen's rows.
+    Square,
+    /// An ellipse in each cell, its long axis along the screen's rows, in the ratio `aspect` to its short one.
+    Ellipse,
+    /// A diamond in each cell: a square turned 45 degrees, touching its neighbours at 50 % tone.
+    Diamond,
+    /// A round dot in highlights, a diamond at 50 % and a round hole in shadows, as the cosine spot function of print screens.
+    Euclidean,
+    /// The spot function of your picture `matrix`.
+    Matrix,
 }
 
 /// How many inks the screen prints.
@@ -253,6 +291,14 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let spot = match params.shape {
         Shape::Dot => Spot::Round,
         Shape::Line => Spot::Line,
+        Shape::Square => Spot::Square,
+        Shape::Ellipse => Spot::ellipse(params.aspect),
+        Shape::Diamond => Spot::Diamond,
+        Shape::Euclidean => Spot::euclidean(),
+        Shape::Matrix => {
+            let (greys, size) = matrix_greys(inputs);
+            Spot::matrix(&greys, size)
+        }
     };
     let (inv_cell, inv_feather) = (1.0 / cell, 1.0 / params.feather);
     let mut pixels = vec![[0.0; 3]; height * width];
