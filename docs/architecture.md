@@ -104,6 +104,8 @@ longest_side) -> Result<Spread, Error>` is the room of a whole recipe, in px of 
 to whole pixels (top, right, bottom, left). **A caller that grows the picture by that room** renders it with `Options::with_room(top, right, bottom, left)` (below), so that the effects that
 place themselves by the picture (the vignette, a `x`/`y` centre, `Place`-numbered noise, `frame`, a statistic of the whole picture) take the original box, not the grown picture, as theirs.
 
+**Check:** An optional `pub(crate) fn check(&Params, &Inputs) -> Result<(), Error>` in the effect's file (the build script finds it, as it finds `spread`) refuses a run with an error naming the parameter, for what the parameter table cannot hold: a picture parameter's size or presence (`dither`'s `matrix`).
+
 **Room:** `Options::with_room(top, right, bottom, left)` says the picture handed to `render` is the box grown by that room, and the render is of the box. The design scale
 follows the box's longest side (the window's canvas less the room, else the picture less it). A *boxed* step is run on the box alone, as on a picture without room, and the
 room round it is left as the step received it (`run/step.rs`, `Prepared::apply`, `Origin::part`): an `each` step, a driven step, an effect whose `Footprint` is `Whole`

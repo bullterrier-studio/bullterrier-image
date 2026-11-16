@@ -1223,16 +1223,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   dithered one after another in ink order, so the result does not depend on the thread count.
 - **`dither` has one `method` list; `serpentine` is its own parameter.** Every look is a `method` value: the row-scanned
   diffusion kernels (`floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`,
-  `sierra_lite`, `stevenson_arce`, later `ostromoukhov`), other diffusion (`dot_diffusion`, `riemersma`), and ordered
+  `sierra_lite`, `stevenson_arce`, `ostromoukhov`), other diffusion (`dot_diffusion`, `riemersma`), and ordered
   (`bayer2`, `bayer4`, `bayer`, `clustered`, `clustered_45`, `blue_noise`, `white_noise`, `gameboy_camera`, `matrix`);
   `bayer` stays the 8 x 8. *Reason:* a method-family parameter beside `method` would be ignored by every diffusion
   method, and a look extends an effect only while every parameter still matters for every look; one list is one menu in
   an interface. A recipe's `format` tracks structure, not choices, so new values need no format change. `serpentine`
-  (odd rows scanned right to left, kernel mirrored; default off, so today's pictures are unchanged) and the later
-  `matrix` (only for `method = "matrix"`) matter for some methods only; `seed` will also seed `white_noise`.
+  (odd rows scanned right to left, kernel mirrored; default off, so today's pictures are unchanged) and
+  `matrix` (only for `method = "matrix"`) matter for some methods only; `seed` also seeds `white_noise`.
   *Consequence:* all kernels are weight tables on the one `diffuse` loop. `serpentine` has no `conditional` row in
   `parameters_are_read.rs`: the default method is a diffusion one, so the parameter changes the picture alone (a row would
-  fail as stale); a behaviour test covers that it changes every diffusion method and no ordered one.
+  fail as stale); a behaviour test covers that it changes every row-scanned kernel and no other method (`dot_diffusion` and `riemersma` ignore it).
 
 ## Fixing defects
 

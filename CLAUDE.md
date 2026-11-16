@@ -195,7 +195,7 @@ hue, temperature, tint, angle, spacing, opacity, blend, octaves, persistence, la
 
 Developer tasks (`tools/dev.py` via `poe`), not part of `bt-image`. The template in `src/bullterrier_image/effects/_template/`
 defines the shape; `grade` (`crates/core/src/effects/grade.rs`) is the worked example. An effect that
-works from a map declares a `FieldName` parameter and reads its `Layer` from `Inputs` (`focus_blur`).
+works from a map declares a `FieldName` parameter and reads its `Layer` from `Inputs` (`focus_blur`). An optional `pub(crate) fn check(&Params, &Inputs) -> Result<(), Error>` in the effect's file (the build script finds it, as it finds `spread`) refuses a run with an error naming the parameter, for what the parameter table cannot hold: a picture parameter's size or presence (`dither`'s `matrix`).
 1. **Scaffold:** `uv run poe new-effect <name> --category <category>` writes the Rust kernel `crates/core/src/effects/<name>.rs` (`META` with the
    category, a public `Params` with one example field, `render`) and
    `examples/effects/<name>.toml`; no Python file and no Python test. The effect exists once the extension is rebuilt with the kernel (`uv run` and `uv sync`
