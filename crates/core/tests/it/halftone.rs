@@ -1009,3 +1009,68 @@ fn a_recipe_screen_scales_with_the_picture_without_jumps() -> Result<(), Box<dyn
     }
     Ok(())
 }
+
+#[test]
+fn a_fractional_cells_dot_stands_for_the_pixel_nearest_its_centre() -> Result<(), Error> {
+    // cells of 7.5 px: the cell of column x is floor(x / 7.5) and its centre is at (k + 0.5) x 7.5, rounded to a pixel
+    let (size, cell) = (28, 7.5_f64);
+    let photo = varied(size, size);
+    let at_centre = |index: usize| (((index as f64 / cell).floor() + 0.5) * cell).round() as usize;
+    let cells: Vec<f32> = (0..size * size)
+        .flat_map(|pixel| {
+            let source = (at_centre(pixel / size) * size + at_centre(pixel % size)) * 3;
+            photo[source..source + 3].to_vec()
+        })
+        .collect();
+    let params = Params {
+        cell: cell as f32,
+        angle: 0.0,
+        sigma: 0.0,
+        ..Params::default()
+    };
+    assert_eq!(
+        first_difference(
+            &run_picture(&params, size, size, &photo)?,
+            &run_picture(&params, size, size, &cells)?
+        ),
+        None
+    );
+    Ok(())
+}
+
+#[test]
+fn the_tone_blur_is_sigma_times_the_fractional_cell_in_px() -> Result<(), Error> {
+    use bullterrier_image::effects::gaussian_blur;
+    // a halftone blurring by sigma cells equals a gaussian blur of sigma x cell px, then a halftone that does not blur
+    let (height, width) = (24, 200);
+    let photo = varied(height, width);
+    let (cell, sigma) = (10.4_f32, 0.5_f32);
+    let blurred = run_picture(
+        &gaussian_blur::Params {
+            radius: cell * sigma,
+            truncate: 4.0,
+            ..gaussian_blur::Params::default()
+        },
+        height,
+        width,
+        &photo,
+    )?;
+    let screen = Params {
+        cell,
+        angle: 0.0,
+        ..white_on_black()
+    };
+    let whole = run_picture(
+        &Params {
+            sigma,
+            truncate: 4.0,
+            ..screen.clone()
+        },
+        height,
+        width,
+        &photo,
+    )?;
+    let after = run_picture(&Params { sigma: 0.0, ..screen }, height, width, &blurred)?;
+    assert_close(&whole, &after, 1e-5, "blur of sigma x cell px");
+    Ok(())
+}
