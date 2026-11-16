@@ -9,6 +9,7 @@ Looks that redraw the picture in a printing or drawing style, such as halftone.
 | <img src="../gallery/crosshatch.jpg" width="160" alt="crosshatch"> | `crosshatch` | Layers of straight lines whose weight carries tone: pen hatching in ink on paper. | `layers=4` `angle=45.0` `spacing=6.0` `thickness=0.5` `color='#000000'` `paper='#ffffff'` | [crosshatch.toml](../../examples/effects/crosshatch.toml) |
 | <img src="../gallery/dither.jpg" width="160" alt="dither"> | `dither` | Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`. | `method='floyd_steinberg'` `serpentine=False` `matrix=None` `tiles=None` `phase=0.0` `block=0` `block_height=8` `block_group=0` `palette='photo'` `custom=('#000000', '#ffffff')` `colors=8` `cell=0.0` `pattern=1.0` `separation='none'` `inks=('#ff4d6d', '#2b59ff')` `paper='#ffffff'` `offset=0.0` `offset_angle=0.0` +10 advanced | [dither.toml](../../examples/effects/dither.toml) |
 | <img src="../gallery/edges.jpg" width="160" alt="edges"> | `edges` | Edge detection and sketch ink lines in `color` on `background`, by Sobel, Canny or difference of Gaussians. | `method='canny'` `radius=1.5` `threshold=0.1` `softness=0.5` `color='#ffffff'` `background='#000000'` +2 advanced | [edges.toml](../../examples/effects/edges.toml) |
+| <img src="../gallery/engraving.jpg" width="160" alt="engraving"> | `engraving` | Lines whose width carries tone and whose course follows the picture's forms, as on a banknote. | `angle=20.0` `spacing=5.0` `bend=8.0` `smooth=6.0` `color='#000000'` `paper='#ffffff'` | [engraving.toml](../../examples/effects/engraving.toml) |
 | <img src="../gallery/halftone.jpg" width="160" alt="halftone"> | `halftone` | A print-style dot screen: tone becomes dot size. | `screen='grid'` `shape='dot'` `separation='none'` `cell=14.0` `angle=45.0` `paper='#000000'` `sigma=0.5` `feather=1.0` +20 advanced | [halftone.toml](../../examples/effects/halftone.toml) |
 | <img src="../gallery/liquid_metal.jpg" width="160" alt="liquid_metal"> | `liquid_metal` | Chrome that follows the picture's brightness: its relief, `relief` px tall, mirrors a sky above a ground. | `smoothing=3.0` `relief=35.0` `horizon=0.65` `tint='#c9d6ff'` +2 advanced | [liquid_metal.toml](../../examples/effects/liquid_metal.toml) |
 | <img src="../gallery/modulation.jpg" width="160" alt="modulation"> | `modulation` | Rows of dashes whose length carries tone. | `angle=0.0` `spacing=8.0` `dash=4.0` `thickness=0.5` `color='#000000'` `paper='#ffffff'` +3 advanced | [modulation.toml](../../examples/effects/modulation.toml) |
@@ -98,6 +99,17 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the gradient see beyond the picture's border: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated) or 'wrap' (the opposite edge). |
 
 </details>
+
+### `engraving`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `angle` | number (cyclic) | degrees | 0 to 360 | `20.0` | Direction of the lines in degrees, clockwise on screen from the x axis (90 is downward). |
+| `spacing` | number | px | 2 to 100 | `5.0` | Distance between neighbouring lines in px. Larger = fewer, coarser lines. |
+| `bend` | number | px | 0 to 100 | `8.0` | How far in px the lines are moved across their course for a luminance of 1 (none for 0): 0 = straight lines; larger = lines flowing more strongly round the forms. |
+| `smooth` | number | px | 0 to 100 | `6.0` | With a `bend`: the sigma in px of the Gaussian that smooths the luminance the lines flow by. Larger = lines follow the large shapes only; 0 = every pixel's own luminance. |
+| `color` | colour |  |  | `'#000000'` | The ink. |
+| `paper` | colour |  |  | `'#ffffff'` | The paper between lines. Tones darker than it get ink. |
 
 ### `halftone`
 
