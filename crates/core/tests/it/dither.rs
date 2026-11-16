@@ -855,8 +855,11 @@ fn every_pixel_is_the_paper_under_some_combination_of_the_full_inks() -> Result<
 #[test]
 fn the_share_of_pixels_an_ink_lands_on_is_its_unmixed_coverage() -> Result<(), Error> {
     // 0.3 of pink and 0.6 of blue, printed as the flat colour to redraw
-    let flat =
-        [0, 1, 2].map(|c| PAPER[c] * (PINK[c] / PAPER[c]).min(1.0).powf(0.3) * (BLUE[c] / PAPER[c]).min(1.0).powf(0.6));
+    let flat = [0, 1, 2].map(|c| {
+        PAPER[c]
+            * (1.0 - 0.3 * (1.0 - (PINK[c] / PAPER[c]).min(1.0)))
+            * (1.0 - 0.6 * (1.0 - (BLUE[c] / PAPER[c]).min(1.0)))
+    });
     let picture = (64, 64, flat.repeat(64 * 64));
     // Atkinson drops a quarter of the error, so it is left out: its tones are lighter or darker by design. The ordered
     // methods work in sixteenths, so they are off by up to a thirty-second.
@@ -1287,10 +1290,10 @@ fn black_ink() -> Params {
     }
 }
 
-/// The ink of an even picture that a black ink at coverage `coverage` prints on white paper: its colour is the ink's
-/// ratio to the paper (the floor 1e-4, see `ops::inks`) to the power of the coverage.
+/// The ink of an even picture that a black ink at coverage `coverage` prints on white paper: its colour is the paper
+/// less the coverage (the ink's ratio to the paper is the floor 1e-4, see `ops::inks`).
 fn ink_of(params: &Params, size: usize, coverage: f32) -> Result<Vec<f32>, Error> {
-    let values = vec![1e-4_f32.powf(coverage); size * size * 3];
+    let values = vec![1.0 - coverage * (1.0 - 1e-4); size * size * 3];
     Ok(run_picture(params, size, size, &values)?
         .as_chunks::<3>()
         .0
@@ -1381,5 +1384,33 @@ fn dither_spot_specks_bare_the_paper_only_in_ink_and_their_density_is_the_parame
     let (with, without) = (ink_of(&specked(5.0, 4.0), 150, 0.5)?, ink_of(&black_ink(), 150, 0.5)?);
     assert!(with.iter().zip(&without).all(|(w, wo)| *w <= *wo + 1e-6));
     assert!(with.iter().zip(&without).any(|(w, wo)| *w < *wo - 0.5));
+    Ok(())
+}
+
+#[test]
+fn dither_spot_prints_the_tone_of_what_the_inks_can_mix() -> Result<(), Error> {
+    // fine cells, error diffused: the share of pixels each ink lands on is its amount, the layers overlap independently
+    let mean = |inks: &[[f32; 3]], photo: [f32; 3]| -> Result<[f32; 3], Error> {
+        let params = Params {
+            paper: Color(WHITE),
+            ..inked(Method::FloydSteinberg, inks)
+        };
+        let out = run_picture(&params, 100, 100, &photo.repeat(100 * 100))?;
+        Ok([0, 1, 2].map(|c| out.as_chunks::<3>().0.iter().map(|pixel| pixel[c]).sum::<f32>() / 10_000.0))
+    };
+    for grey in [0.2, 0.5, 0.8] {
+        let got = mean(&[BLACK], [grey; 3])?;
+        assert!(got.iter().all(|c| (c - grey).abs() < 0.03), "grey {grey}: {got:?}");
+    }
+    let inks = [PINK, BLUE];
+    for areas in [[0.3_f32, 0.4], [0.6, 0.1]] {
+        let want =
+            [0, 1, 2].map(|c| (0..2).fold(1.0, |light, i| light * (1.0 - areas[i] * (1.0 - inks[i][c].min(1.0)))));
+        let got = mean(&inks, want)?;
+        assert!(
+            (0..3).all(|c| (got[c] - want[c]).abs() < 0.03),
+            "areas {areas:?}: {got:?} against {want:?}"
+        );
+    }
     Ok(())
 }

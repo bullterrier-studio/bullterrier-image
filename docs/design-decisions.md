@@ -1205,11 +1205,20 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   dark side of an edge and on dark strokes, which is one ink line, the sketch look, and unlike Sobel and Canny.
   *Consequence:* the line sits about one radius beside the edge, on its dark side; 'dog' still uses `threshold` and
   `softness` like the other methods.
-- **Inks (`ops/inks.rs`) mix and unmix in log density.** A channel under ink at coverage `c` is `paper * (ink/paper)^c`, so
-  the density `-ln(channel/paper)` of overlapping inks adds up. *Reason:* the inverse (how much of each ink makes a colour)
-  is then least squares with each coverage in 0..1, exact for one and two inks, and printing then unmixing returns the
-  coverages; an additive RGB mix has no such inverse. *Consequence:* inks lighter than the paper in a channel add no density
-  there; the unmix of three or four inks is a fixed count of sweeps, never a convergence test, so it is deterministic.
+- **Inks (`ops/inks.rs`) mix as screen areas and unmix in that model (halftone batch, 2026-11-16).** A screen prints an ink as
+  an area (a dot's area is its amount `a`) and the screens of different inks overlap independently, so a channel is
+  `paper * prod_k (1 - a_k (1 - I_k / paper))`: Murray-Davies for each ink, the Neugebauer independent-overlap rule across
+  inks (Yule-Nielsen's n is 1: no optical gain beyond `dot_gain`). `Inks::print` is that formula, also for the fractional
+  coverage of a soft edge. `coverages` and `cmyk_amounts` solve the `a_k` in it, least squares on the colour relative to
+  the paper, each amount in 0..1 (exact coordinate steps, 64 sweeps from none, from full and, for cmyk, from the black
+  generation; the best wins; an amount within 0.001 of 0 or 1 is 0 or 1). *Reason:* the earlier model (log density, amounts
+  as continuous layers) solved amounts that a screen then printed as areas: one black ink printed a 0.5 grey at 0.889 and
+  cmyk 0.2 at 0.316. *Consequence:* amounts are tone-true (a flat colour the inks can mix prints as itself within the
+  dot's own error); out-of-gamut colours get the nearest reachable print; spot and cmyk pictures change (darker, nearer the
+  photo: demo 06's two-ink poster too). cmyk keeps its black generation (black = darkness `1 - max(r, g, b)` of the
+  colour relative to the paper), scaled up by what the black ink reaches (`#231f20` lets some light through, which was the
+  shadow error), cyan, magenta and yellow fitted to the rest; a colour as dark as the black ink gets is black alone, not a
+  rich black.
 - **Spot screens are `angle` + 30 degrees apart; the offset is `k * offset` along `offset_angle`.** *Reason:* 30 is a third
   of the 90 degrees after which a square screen repeats, the largest spread for three screens (the fourth repeats the
   first: four spot inks are for flat art, use `cmyk` for four tones); the offset needs no random misregistration, which

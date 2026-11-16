@@ -1411,3 +1411,76 @@ fn a_waves_line_stands_for_the_tone_where_it_is() -> Result<(), Error> {
     }
     Ok(())
 }
+
+// ---- separations keep the tone ------------------------------------------------------------------------------------------
+
+/// The colour of `paper` under inks of `colours` at screen areas `areas`: a pixel is inked where its screens overlap, the
+/// screens do not line up, so each channel is `paper * prod (1 - area * (1 - ink / paper))` (Murray-Davies per ink).
+pub(crate) fn mixed(paper: [f32; 3], colours: &[[f32; 3]], areas: &[f32]) -> [f32; 3] {
+    [0, 1, 2].map(|c| {
+        colours.iter().zip(areas).fold(paper[c], |light, (ink, area)| {
+            light * (1.0 - area * (1.0 - (ink[c] / paper[c]).min(1.0)))
+        })
+    })
+}
+
+/// The mean colour of `params` printing a flat `rgb` over 240 x 240 px.
+pub(crate) fn mean_colour(params: &Params, rgb: [f32; 3]) -> Result<[f32; 3], Error> {
+    let out = run_picture(params, 240, 240, &colour(240, 240, rgb))?;
+    let pixels = out.as_chunks::<3>().0;
+    Ok([0, 1, 2].map(|c| pixels.iter().map(|pixel| pixel[c]).sum::<f32>() / pixels.len() as f32))
+}
+
+fn separated(separation: Separation, inks: &[[f32; 3]]) -> Params {
+    Params {
+        cell: 12.0,
+        sigma: 0.0,
+        feather: 1.0,
+        separation,
+        inks: inks.iter().map(|&ink| Color(ink)).collect(),
+        paper: WHITE,
+        ..Params::default()
+    }
+}
+
+fn assert_mean(params: &Params, photo: [f32; 3], want: [f32; 3], tolerance: f32) -> Result<(), Error> {
+    let got = mean_colour(params, photo)?;
+    assert!(
+        (0..3).all(|c| (got[c] - want[c]).abs() <= tolerance),
+        "photo {photo:?}: printed {got:?}, wanted {want:?} within {tolerance}"
+    );
+    Ok(())
+}
+
+// The bound: a dot's area is its ink amount within 0.01 (a cell's soft edge and pixel grid, see the shape tests), and a
+// channel of the mix moves by at most the sum of the areas' errors, so 0.02 for one or two inks.
+
+#[test]
+fn one_black_spot_ink_prints_a_grey_at_its_own_level() -> Result<(), Error> {
+    let params = separated(Separation::Spot, &[[0.0; 3]]);
+    for grey in [0.2, 0.5, 0.8] {
+        assert_mean(&params, [grey; 3], [grey; 3], 0.02)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn two_spot_inks_print_the_colours_they_can_mix_at_those_colours() -> Result<(), Error> {
+    let inks = [PINK, BLUE];
+    let params = separated(Separation::Spot, &inks);
+    let paper = [1.0; 3];
+    for areas in [[0.3, 0.4], [0.6, 0.1], [0.2, 0.7]] {
+        let photo = mixed(paper, &inks, &areas);
+        assert_mean(&params, photo, photo, 0.02)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn cmyk_prints_greys_at_their_level_in_the_shadows_too() -> Result<(), Error> {
+    let params = separated(Separation::Cmyk, &[]);
+    for grey in [0.2, 0.5, 0.8] {
+        assert_mean(&params, [grey; 3], [grey; 3], 0.03)?;
+    }
+    Ok(())
+}
