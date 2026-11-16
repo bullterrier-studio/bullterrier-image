@@ -61,7 +61,7 @@ pub enum Method {
     /// A wide hexagonal kernel on twelve pixels (Stevenson and Arce, 1985): a fine, even grain.
     StevensonArce,
     /// Weights that change with the pixel's level (Ostromoukhov, 2001), tuned for an even grain at every grey; the level is
-    /// taken from the first channel (red, or lightness in Oklab); the paper scans serpentine (see `serpentine`).
+    /// taken from the pixel's lightness (Oklab) or Rec. 709 luma (rgb); the paper scans serpentine (see `serpentine`).
     Ostromoukhov,
     /// A regular crosshatch of Bayer's 2 x 2 matrix: coarse, four levels.
     Bayer2,
@@ -398,7 +398,13 @@ fn pattern(
     inputs: &Inputs<'_>,
 ) -> Vec<u8> {
     let (amount, serpentine) = (params.pattern, params.serpentine);
-    let by = |kernel| diffuse(values, size, palette, kernel, amount, serpentine);
+    // an ink plane holds its coverage in the first channel, whatever the space
+    let lightness = if params.space == Space::Rgb && params.separation == Separation::None {
+        [0.2126, 0.7152, 0.0722] // constant: ITU-R BT.709
+    } else {
+        [1.0, 0.0, 0.0]
+    };
+    let by = |kernel| diffuse(values, size, palette, kernel, amount, serpentine, lightness);
     let tiled = |tile: Tile| ordered(values, size, palette, &tile.thresholds(), amount);
     match method {
         Method::FloydSteinberg => by(&FLOYD_STEINBERG),

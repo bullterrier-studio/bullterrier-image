@@ -159,7 +159,7 @@ pub(crate) const STEVENSON_ARCE: Kernel = Kernel {
 };
 
 /// Ostromoukhov (2001), variable coefficients: the weights of the right, below-left and below pixels depend on the level of
-/// the pixel (its value plus the error passed to it, in the first channel: red, or lightness in Oklab; clamped to 0 to 1
+/// the pixel (its value plus the error passed to it, as lightness in Oklab or the Rec. 709 luma in rgb; clamped to 0 to 1
 /// and taken in 256 levels), from the paper's appendix table for levels 0 to 127, mirrored for 128 to 255.
 pub(crate) const OSTROMOUKHOV: Kernel = Kernel {
     taps: &[(1, 0, 0.0), (-1, 1, 0.0), (0, 1, 0.0)], // constant: Ostromoukhov (2001), the weights come from `levels`
@@ -318,12 +318,18 @@ fn folded_level(value: f32) -> usize {
     if level > 127 { 255 - level } else { level }
 }
 
+/// The level of `value` (before folding): its channels weighted by `lightness`.
+fn level_of(value: [f32; 3], lightness: [f32; 3]) -> f32 {
+    value.iter().zip(lightness).map(|(channel, weight)| channel * weight).sum()
+}
+
 /// The palette colour chosen for each pixel of `values` (`height` x `width`, row after row) by error diffusion: indices
 /// into `palette`.
 ///
 /// Pixels are taken in reading order; each gets the palette colour closest to its value plus the error passed to it, and
 /// `amount` (0 to 1) of the difference between the two is passed on by `kernel`. An error that falls off the picture is
-/// lost. With `serpentine`, odd rows are taken right to left and the kernel is mirrored for them.
+/// lost. With `serpentine`, odd rows are taken right to left and the kernel is mirrored for them. A kernel whose weights
+/// depend on the pixel's level takes it as the sum of the value's channels times `lightness`.
 pub(crate) fn diffuse(
     values: &[Point],
     (height, width): (usize, usize),
@@ -331,6 +337,7 @@ pub(crate) fn diffuse(
     kernel: &Kernel,
     amount: f32,
     serpentine: bool,
+    lightness: [f32; 3],
 ) -> Vec<u8> {
     let stride = width + 2 * REACH;
     // the errors waiting for the rows from the current one down; a row's slot is cleared once it is read
@@ -347,7 +354,7 @@ pub(crate) fn diffuse(
             let pick = nearest_one(&value, palette);
             chosen[row * width + column] = pick;
             let colour = palette[usize::from(pick)];
-            let level = kernel.levels.map(|table| table[folded_level(value[0])].map(f32::from));
+            let level = kernel.levels.map(|table| table[folded_level(level_of(value, lightness))].map(f32::from));
             let scale = level.map_or(fixed_scale, |row| amount / row.iter().sum::<f32>());
             let error = [0, 1, 2].map(|channel| (value[channel] - colour[channel]) * scale);
             for (tap, &(right, down, weight)) in kernel.taps.iter().enumerate() {

@@ -1123,3 +1123,19 @@ fn ostromoukhov_reads_the_row_of_exactly_the_pixels_level_and_its_mirror_above_1
     assert_eq!(run_pair(0.748, 0.5003)?, [true, true]);
     Ok(())
 }
+
+#[test]
+fn in_rgb_ostromoukhov_takes_the_level_from_the_luma_not_from_red() -> Result<(), Error> {
+    // Level 64 of the paper's table passes nothing to the pixel below ((11, 10, 0)). A green 0.3508 has Rec. 709 luma
+    // 0.7152 x 0.3508 = 0.2509, level 64, though its red is 0 (level 0, which passes 5/18 down). With black and green as the
+    // palette the top pixel is black and leaves its whole 0.3508 as error; the pixel below, 0.45 green, stays black when
+    // nothing is passed to it and would be lit (0.45 + 0.0974 > 0.5) if it were.
+    let picture = (2, 1, vec![0.0, 0.3508, 0.0, 0.0, 0.45, 0.0]);
+    let params = Params {
+        custom: vec![Color(BLACK), Color([0.0, 1.0, 0.0])],
+        ..ink(Method::Ostromoukhov, 1.0)
+    };
+    let out = run(&params, &picture)?;
+    assert_eq!(out[3..], [0.0, 0.0, 0.0]);
+    Ok(())
+}
