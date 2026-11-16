@@ -1,0 +1,12 @@
+# Tone as banknote lines: fine ink lines that swell with the dark and bow round the forms.
+name = "engraving"
+size = 480
+
+[[step]]
+effect = "engraving"
+angle = 15
+spacing = 5
+bend = 10
+smooth = 7
+color = "#1d2a4a"
+paper = "#f3eee0"

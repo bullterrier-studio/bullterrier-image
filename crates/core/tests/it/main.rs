@@ -46,6 +46,7 @@ mod each_weights;
 mod echo;
 mod edges;
 mod effect;
+mod engraving;
 mod error;
 mod files_icc;
 mod files_read;

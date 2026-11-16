@@ -629,6 +629,24 @@ fn crosshatch_at_its_least_spacing_and_most_layers_works_and_past_them_is_refuse
 }
 
 #[test]
+fn engraving_at_its_least_spacing_works_and_less_is_refused() {
+    let pixels = vec![0.5; 60 * 60 * 3];
+    let render = |value: f64| {
+        Photo::new(Picture::new(60, 60, &pixels)?)
+            .render(
+                &Recipe::new([Step::new("engraving").param("spacing", value)]),
+                &Presets::new(),
+                Options::default(),
+            )
+            .map(drop)
+    };
+    let works = render(2.0);
+    assert!(works.is_ok(), "{works:?}");
+    let past = render(1.9);
+    assert!(refused(&past, &["spacing"]), "{past:?}");
+}
+
+#[test]
 fn a_halftone_matrix_of_its_most_pixels_on_a_side_works_and_one_more_is_refused() {
     // the same ranks as dither's matrix: 256 x 256 places is the most
     let pixels = vec![0.5; 20 * 20 * 3];
