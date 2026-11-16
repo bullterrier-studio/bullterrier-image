@@ -1273,3 +1273,96 @@ fn separation_inks_is_refused_naming_the_choice_and_spot_prints_the_inks() {
     );
     assert!(with_matrix("floyd_steinberg", None, &[("separation", json!("spot"))], &picture).is_ok());
 }
+
+// ---- print realism (spot separation) ------------------------------------------------------------------------------------
+
+/// One black ink on white paper, error diffused, `cell` 1: the mean ink of a flat grey is its coverage.
+fn black_ink() -> Params {
+    Params {
+        method: Method::FloydSteinberg,
+        separation: Separation::Spot,
+        inks: vec![Color(BLACK)],
+        paper: Color(WHITE),
+        ..Params::default()
+    }
+}
+
+/// The ink of an even picture that a black ink at coverage `coverage` prints on white paper: its colour is the ink's
+/// ratio to the paper (the floor 1e-4, see `ops::inks`) to the power of the coverage.
+fn ink_of(params: &Params, size: usize, coverage: f32) -> Result<Vec<f32>, Error> {
+    let values = vec![1e-4_f32.powf(coverage); size * size * 3];
+    Ok(run_picture(params, size, size, &values)?
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|pixel| 1.0 - pixel[0])
+        .collect())
+}
+
+fn mean_of(values: &[f32]) -> f32 {
+    values.iter().sum::<f32>() / values.len() as f32
+}
+
+#[test]
+fn dither_spot_print_realism_at_zero_is_the_clean_picture() -> Result<(), Error> {
+    let rgb = varied(40, 50);
+    let clean = inked(Method::Bayer, &[PINK, BLUE]);
+    let zeroed = Params {
+        speck_size: 8.0,
+        ..clean.clone()
+    };
+    assert_eq!(run_picture(&zeroed, 40, 50, &rgb)?, run_picture(&clean, 40, 50, &rgb)?);
+    Ok(())
+}
+
+#[test]
+fn dither_spot_dot_gain_raises_the_ink_to_the_curve() -> Result<(), Error> {
+    for (gain, tone) in [(0.25, 0.5), (0.1, 0.5), (0.25, 0.2), (0.2, 0.8)] {
+        let params = Params {
+            dot_gain: gain,
+            ..black_ink()
+        };
+        let want = tone + 4.0 * gain * tone * (1.0 - tone);
+        let got = mean_of(&ink_of(&params, 100, tone)?);
+        assert!((got - want).abs() < 0.02, "gain {gain} tone {tone}: ink {got}, formula {want}");
+    }
+    Ok(())
+}
+
+#[test]
+fn dither_spot_ink_noise_is_seeded_and_keeps_the_mean() -> Result<(), Error> {
+    let noisy = |seed| Params {
+        ink_noise: 1.0,
+        seed,
+        cell: 4.0,
+        ..black_ink()
+    };
+    let (a, again, b) = (ink_of(&noisy(1), 200, 0.5)?, ink_of(&noisy(1), 200, 0.5)?, ink_of(&noisy(2), 200, 0.5)?);
+    assert_eq!(a, again);
+    assert_ne!(a, b);
+    assert_ne!(a, ink_of(&Params { ink_noise: 0.0, ..noisy(1) }, 200, 0.5)?);
+    assert!((mean_of(&a) - 0.5).abs() < 0.03, "{}", mean_of(&a));
+    Ok(())
+}
+
+#[test]
+fn dither_spot_specks_bare_the_paper_only_in_ink_and_their_density_is_the_parameter() -> Result<(), Error> {
+    let specked = |specks, speck_size| Params {
+        specks,
+        speck_size,
+        seed: 3,
+        ..black_ink()
+    };
+    // a full tone is ink everywhere: the specks are the paper
+    let full = ink_of(&specked(2.0, 3.0), 300, 1.0)?;
+    let paper_pixels = full.iter().filter(|&&ink| ink < 0.5).count() as f32;
+    // each speck of 3 px diameter covers about pi x 1.5^2 = 7 px (the ramp's half pixel adds a little), 180 of them
+    assert!((900.0..=1500.0).contains(&paper_pixels), "{paper_pixels}");
+    // no ink, no specks
+    assert_eq!(ink_of(&specked(5.0, 10.0), 100, 0.0)?, ink_of(&black_ink(), 100, 0.0)?);
+    // a speck only takes ink away
+    let (with, without) = (ink_of(&specked(5.0, 4.0), 150, 0.5)?, ink_of(&black_ink(), 150, 0.5)?);
+    assert!(with.iter().zip(&without).all(|(w, wo)| *w <= *wo + 1e-6));
+    assert!(with.iter().zip(&without).any(|(w, wo)| *w < *wo - 0.5));
+    Ok(())
+}

@@ -41,6 +41,7 @@ pub(crate) mod quadtree;
 pub(crate) mod radial;
 pub(crate) mod ramp;
 pub(crate) mod random;
+pub(crate) mod realism;
 pub(crate) mod rank;
 pub(crate) mod raster;
 pub(crate) mod reaction;

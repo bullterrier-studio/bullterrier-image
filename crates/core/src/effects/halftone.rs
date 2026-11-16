@@ -15,6 +15,7 @@ use crate::ops::inks::{
 };
 use crate::ops::length::{float, whole};
 use crate::ops::par;
+use crate::ops::realism::Realism;
 use crate::params::{Choice, Color, Params, PictureName};
 use crate::{Error, Image, Inputs, Picture, Place};
 
@@ -91,7 +92,8 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
 /// per channel (as large as the channel's value), at 15, 45 and 75 degrees added to `angle`, white where all three are
 /// full, and ignores `paper`. `ink`, `ink_floor` and `paper_threshold` are used only with no `separation`. `offset` px
 /// moves the second ink's screen that far from the first along `offset_angle`, the
-/// third twice as far and the fourth three times, as a misregistered press does.
+/// third twice as far and the fourth three times, as a misregistered press does. `dot_gain`, `ink_noise` and `specks` (with
+/// `speck_size` and `seed`) print as a press does: fatter dots, uneven dots and bare specks in the ink; all 0 prints the clean screen.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
@@ -188,6 +190,27 @@ pub struct Params {
     /// slower.
     #[param(default = 4.0, unit = ratio, min = 1, max = 10, advanced)]
     pub truncate: f32,
+    /// How much the press fattens dots, as presses quote it: the gain at 50 % tone, in tone (0.2 = a 50 % tint prints as 70 %).
+    /// A tone `a` prints as `a + 4 x dot_gain x a x (1 - a)`: the simplest curve through 0 and 1 that is symmetric and
+    /// gains `dot_gain` at 50 % (ISO 12647-2 quotes dot gain at 50 %; real presses gain 10 to 25 %), so highlights and
+    /// shadows gain less. 0 = none.
+    #[param(default = 0.0, unit = fraction, min = 0, max = 0.25, advanced)]
+    pub dot_gain: f32,
+    /// How uneven the ink is from dot to dot: each dot's coverage strays by a random share, up to this one, of the nearer of
+    /// its ink and its paper (so a pure paper or full ink cell does not stray, and the mean ink stays the same). 0 = even.
+    /// It varies the coverage of each dot, not each pixel: a press leaves one dot fat and the next thin, not grain.
+    #[param(default = 0.0, unit = fraction, min = 0, max = 1, advanced)]
+    pub ink_noise: f32,
+    /// Specks of bare paper in the ink: marks per 1000 design px², so any picture size looks alike; they show only where
+    /// there is ink. 0 = none.
+    #[param(default = 0.0, unit = density, min = 0, max = 5, advanced)]
+    pub specks: f32,
+    /// The diameter in px of a paper speck.
+    #[param(default = 3.0, unit = px, min = 1, max = 10, advanced)]
+    pub speck_size: f32,
+    /// Random seed of `ink_noise` and `specks`: the same seed always gives the same picture, another seed another.
+    #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
+    pub seed: u32,
     /// What the tone blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored
     /// about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge), 'constant'
     /// (`constant_value`).
@@ -381,6 +404,18 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let screens = screens(params, place, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;
     let spot = spot_of(params, inputs);
+    let real = Realism {
+        dot_gain: params.dot_gain,
+        ink_noise: params.ink_noise,
+        specks: params.specks,
+        speck_size: params.speck_size,
+        seed: params.seed,
+    };
+    let bare = if params.separation == Separation::None {
+        paper
+    } else {
+        inks.print(&[0.0; MOST_INKS])
+    };
     let (inv_cell, inv_feather) = (1.0 / cell, 1.0 / params.feather);
     let mut pixels = vec![[0.0; 3]; height * width];
     par::rows(&mut pixels, width, |first, band| {
@@ -416,7 +451,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                         let sampled = smooth[row * width + column];
                         remembered.key = [cu.to_bits(), cv.to_bits()];
                         remembered.sampled = sampled;
-                        remembered.amounts = amounts(params, &inks, ink_is_bright, sampled);
+                        let cell = [u64::from(cu.to_bits()), u64::from(cv.to_bits())];
+                        let mut wanted = amounts(params, &inks, ink_is_bright, sampled);
+                        for (ink, amount) in wanted.iter_mut().enumerate() {
+                            *amount = real.coverage(*amount, ink, cell);
+                        }
+                        remembered.amounts = wanted;
                         remembered.levels = remembered.amounts.map(|amount| spot.level(amount));
                     }
                     let which = if params.separation == Separation::None {
@@ -433,7 +473,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                     let fade_out = ((1.0 - remembered.amounts[which].min(1.0)) * cell * 4.0 * inv_feather).min(1.0);
                     coverages[index] = 1.0 - (1.0 - ramp) * fade_out;
                 }
-                *out = if params.separation != Separation::None {
+                let printed = if params.separation != Separation::None {
                     inks.print(&coverages)
                 } else if coverages[0] > 0.0 {
                     let sampled = cells[0].sampled;
@@ -442,6 +482,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                 } else {
                     paper
                 };
+                // a speck bares the paper where there is ink
+                let speck = if coverages.iter().any(|&coverage| coverage > 0.0) {
+                    real.speck(column, place.first_row + first + offset)
+                } else {
+                    0.0
+                };
+                *out = Realism::specked(printed, bare, speck);
             }
         }
     });

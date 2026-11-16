@@ -490,6 +490,33 @@ fn a_halftone_of_every_shape_gives_the_rows_of_the_whole_render_from_a_window() 
 }
 
 #[test]
+fn a_halftone_with_print_realism_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
+    // each of gain, uneven ink and specks (a speck lattice square and a cell straddle a band's edge), alone and together
+    let values = varied(SMALL.height, SMALL.width);
+    for (gain, noise, specks) in [(0.2, 0.0, 0.0), (0.0, 0.8, 0.0), (0.0, 0.0, 4.0), (0.25, 1.0, 5.0)] {
+        for separation in ["none", "cmyk"] {
+            let recipe = Recipe::new([Step::new("halftone")
+                .param("cell", 9.5)
+                .param("separation", separation)
+                .param("dot_gain", gain)
+                .param("ink_noise", noise)
+                .param("specks", specks)
+                .param("speck_size", 6.0)
+                .param("seed", 4)]);
+            let margin = recipe
+                .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
+                .ok_or("halftone is banded")?;
+            assert_eq!(
+                first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+                None,
+                "gain {gain} noise {noise} specks {specks} {separation}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn a_halftone_of_a_fractional_cell_gives_the_rows_of_the_whole_render_from_a_window() -> Outcome {
     let values = varied(SMALL.height, SMALL.width);
     for (cell, sigma) in [(13.3, 0.0), (2.7, 1.5), (7.5, 0.3)] {

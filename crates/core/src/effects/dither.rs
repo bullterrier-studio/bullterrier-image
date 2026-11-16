@@ -17,6 +17,7 @@ use crate::ops::dither::{
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
 use crate::ops::par;
+use crate::ops::realism::Realism;
 use crate::palette::{self, Search};
 use crate::params::{Choice, Color, Params, PictureName};
 use crate::{Error, Image, Inputs, Picture};
@@ -233,8 +234,8 @@ pub struct Params {
     /// may miss small areas of colour.
     #[param(default = 10000, unit = count, min = 1, max = 1000000, advanced)]
     pub sample: i32,
-    /// Random seed for the choice of sample dots and starting colours when `palette` is 'photo', and for the thresholds of
-    /// `white_noise`: the same seed always gives the same picture, another seed finds slightly different colours or other
+    /// Random seed for the choice of sample dots and starting colours when `palette` is 'photo', for the thresholds of
+    /// `white_noise`, and for `ink_noise` and `specks`: the same seed always gives the same picture, another seed finds slightly different colours or other
     /// noise.
     #[param(default = 0, unit = count, min = 0, max = 4294967295, advanced)]
     pub seed: u32,
@@ -257,6 +258,24 @@ pub struct Params {
     /// With an `offset`: the direction of the move, in degrees clockwise on screen from the x axis (90 is downward).
     #[param(default = 0.0, unit = degrees, min = 0, max = 360, cyclic)]
     pub offset_angle: f32,
+    /// With 'spot' separation: how much the press fattens dots, as presses quote it: the gain at 50 % tone, in tone (0.2 = a
+    /// 50 % tint prints as 70 %). An ink's coverage `a` becomes `a + 4 x dot_gain x a x (1 - a)`: the simplest curve through 0
+    /// and 1 that is symmetric and gains `dot_gain` at 50 % (ISO 12647-2 quotes dot gain at 50 %), so highlights and shadows
+    /// gain less. 0 = none.
+    #[param(default = 0.0, unit = fraction, min = 0, max = 0.25, advanced)]
+    pub dot_gain: f32,
+    /// With 'spot' separation: how uneven the ink is from dot to dot: each dot's coverage strays by a random share, up to this
+    /// one, of the nearer of its ink and its paper (the mean ink stays the same). 0 = even. It varies the coverage of each
+    /// dot, not each pixel: a press leaves one dot fat and the next thin, not grain.
+    #[param(default = 0.0, unit = fraction, min = 0, max = 1, advanced)]
+    pub ink_noise: f32,
+    /// With 'spot' separation: specks of bare paper in the ink: marks per 1000 design px², so any picture size looks alike; they
+    /// show only where there is ink. 0 = none.
+    #[param(default = 0.0, unit = density, min = 0, max = 5, advanced)]
+    pub specks: f32,
+    /// With 'spot' separation: the diameter in px of a paper speck.
+    #[param(default = 3.0, unit = px, min = 1, max = 10, advanced)]
+    pub speck_size: f32,
 }
 
 /// The colours of the fixed palettes as 0xrrggbb, as their authors publish them (sRGB):
@@ -467,10 +486,22 @@ fn printed(
     let colours: Vec<[f32; 3]> = params.inks.iter().map(|ink| ink.0).collect();
     let inks = Inks::new(params.paper.0, &colours);
     let count = colours.len().min(MOST_INKS);
+    let real = Realism {
+        dot_gain: params.dot_gain,
+        ink_noise: params.ink_noise,
+        specks: params.specks,
+        speck_size: params.speck_size,
+        seed: params.seed,
+    };
     let mut needed = vec![[0.0; MOST_INKS]; dots.len()];
     par::rows(&mut needed, 1, |first, band| {
-        for (out, dot) in band.iter_mut().zip(&dots[first..]) {
+        for (offset, (out, dot)) in band.iter_mut().zip(&dots[first..]).enumerate() {
+            let at = first + offset;
+            let cell = [u64::try_from(at / columns).unwrap_or_default(), u64::try_from(at % columns).unwrap_or_default()];
             *out = inks.coverages(*dot);
+            for (ink, amount) in out.iter_mut().enumerate() {
+                *amount = real.coverage(*amount, ink, cell);
+            }
         }
     });
     // an ink is the first channel of a dot; its two choices are no ink and full ink
@@ -510,7 +541,11 @@ fn printed(
                         mask |= usize::from(layer[row / cell * columns + column / cell]) << ink;
                     }
                 }
-                *pixel = table[mask];
+                *pixel = if mask == 0 {
+                    table[0]
+                } else {
+                    Realism::specked(table[mask], table[0], real.speck(x, y))
+                };
             }
         }
     });
