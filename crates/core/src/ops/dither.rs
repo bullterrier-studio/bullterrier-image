@@ -505,7 +505,8 @@ fn gilbert(height: usize, width: usize, visit: &mut impl FnMut(usize, usize)) {
             half_along.0.abs() + half_along.1.abs(),
             half_across.0.abs() + half_across.1.abs(),
         );
-        if 2 * long > 3 * short {
+        let wide = 2 * long > 3 * short; // constant: gilbert2d (Cerveny): split the long side when over 1.5 x the short
+        if wide {
             if long_half % 2 == 1 && long > 2 {
                 half_along = (half_along.0 + along_unit.0, half_along.1 + along_unit.1);
             }
