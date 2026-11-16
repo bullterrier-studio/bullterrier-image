@@ -37,23 +37,132 @@ pub(crate) const ATKINSON: Kernel = Kernel {
     divisor: 8.0, // constant: Atkinson's published error weights
 };
 
+/// Jarvis, Judice and Ninke (1976): 7/48 and 5/48 right; 3 5 7 5 3 below; 1 3 5 3 1 two below.
+pub(crate) const JARVIS_JUDICE_NINKE: Kernel = Kernel {
+    taps: &[
+        (1, 0, 7.0),
+        (2, 0, 5.0),
+        (-2, 1, 3.0),
+        (-1, 1, 5.0),
+        (0, 1, 7.0),
+        (1, 1, 5.0),
+        (2, 1, 3.0),
+        (-2, 2, 1.0),
+        (-1, 2, 3.0),
+        (0, 2, 5.0),
+        (1, 2, 3.0),
+        (2, 2, 1.0),
+    ], // constant: Jarvis, Judice and Ninke (1976)
+    divisor: 48.0, // constant: Jarvis, Judice and Ninke (1976)
+};
+
+/// Stucki (1981): JJN's shape with weights 8 4 / 2 4 8 4 2 / 1 2 4 2 1 over 42.
+pub(crate) const STUCKI: Kernel = Kernel {
+    taps: &[
+        (1, 0, 8.0),
+        (2, 0, 4.0),
+        (-2, 1, 2.0),
+        (-1, 1, 4.0),
+        (0, 1, 8.0),
+        (1, 1, 4.0),
+        (2, 1, 2.0),
+        (-2, 2, 1.0),
+        (-1, 2, 2.0),
+        (0, 2, 4.0),
+        (1, 2, 2.0),
+        (2, 2, 1.0),
+    ], // constant: Stucki (1981)
+    divisor: 42.0, // constant: Stucki (1981)
+};
+
+/// Burkes (1988): Stucki without its third row, 8 4 / 2 4 8 4 2 over 32.
+pub(crate) const BURKES: Kernel = Kernel {
+    taps: &[
+        (1, 0, 8.0),
+        (2, 0, 4.0),
+        (-2, 1, 2.0),
+        (-1, 1, 4.0),
+        (0, 1, 8.0),
+        (1, 1, 4.0),
+        (2, 1, 2.0),
+    ], // constant: Burkes (1988)
+    divisor: 32.0, // constant: Burkes (1988)
+};
+
+/// Sierra (1989), three rows: 5 3 / 2 4 5 4 2 / 2 3 2 over 32.
+pub(crate) const SIERRA: Kernel = Kernel {
+    taps: &[
+        (1, 0, 5.0),
+        (2, 0, 3.0),
+        (-2, 1, 2.0),
+        (-1, 1, 4.0),
+        (0, 1, 5.0),
+        (1, 1, 4.0),
+        (2, 1, 2.0),
+        (-1, 2, 2.0),
+        (0, 2, 3.0),
+        (1, 2, 2.0),
+    ], // constant: Sierra (1989)
+    divisor: 32.0, // constant: Sierra (1989)
+};
+
+/// Sierra (1989), two rows: 4 3 / 1 2 3 2 1 over 16.
+pub(crate) const SIERRA_TWO_ROW: Kernel = Kernel {
+    taps: &[
+        (1, 0, 4.0),
+        (2, 0, 3.0),
+        (-2, 1, 1.0),
+        (-1, 1, 2.0),
+        (0, 1, 3.0),
+        (1, 1, 2.0),
+        (2, 1, 1.0),
+    ], // constant: Sierra (1989), two-row
+    divisor: 16.0, // constant: Sierra (1989), two-row
+};
+
+/// Sierra (1989), Lite: 2 right, 1 below left, 1 below, over 4.
+pub(crate) const SIERRA_LITE: Kernel = Kernel {
+    taps: &[(1, 0, 2.0), (-1, 1, 1.0), (0, 1, 1.0)], // constant: Sierra (1989), Filter Lite
+    divisor: 4.0,                                    // constant: Sierra (1989), Filter Lite
+};
+
+/// Stevenson and Arce (1985), a hexagonal lattice's weights on the square grid: 32 two right; 12 26 30 16 below; 12 26 12; 5 12 12 5, over 200.
+pub(crate) const STEVENSON_ARCE: Kernel = Kernel {
+    taps: &[
+        (2, 0, 32.0),
+        (-3, 1, 12.0),
+        (-1, 1, 26.0),
+        (1, 1, 30.0),
+        (3, 1, 16.0),
+        (-2, 2, 12.0),
+        (0, 2, 26.0),
+        (2, 2, 12.0),
+        (-3, 3, 5.0),
+        (-1, 3, 12.0),
+        (1, 3, 12.0),
+        (3, 3, 5.0),
+    ], // constant: Stevenson and Arce (1985)
+    divisor: 200.0, // constant: Stevenson and Arce (1985)
+};
+
 /// The widest sideways reach of a kernel, in columns; the error rows are padded by it on both sides.
-const REACH: usize = 2; // constant: Atkinson's taps reach two columns right
+const REACH: usize = 3; // constant: Stevenson and Arce's taps reach three columns
 /// The rows an error is passed down to, and so how many error rows are alive at once, with the one being read.
-const ROWS_ALIVE: usize = 3; // constant: Atkinson's taps reach two rows down
+const ROWS_ALIVE: usize = 4; // constant: Stevenson and Arce's taps reach three rows down
 
 /// The palette colour chosen for each pixel of `values` (`height` x `width`, row after row) by error diffusion: indices
 /// into `palette`.
 ///
 /// Pixels are taken in reading order; each gets the palette colour closest to its value plus the error passed to it, and
 /// `amount` (0 to 1) of the difference between the two is passed on by `kernel`. An error that falls off the picture is
-/// lost.
+/// lost. With `serpentine`, odd rows are taken right to left and the kernel is mirrored for them.
 pub(crate) fn diffuse(
     values: &[Point],
     (height, width): (usize, usize),
     palette: &[Point],
     kernel: &Kernel,
     amount: f32,
+    serpentine: bool,
 ) -> Vec<u8> {
     let stride = width + 2 * REACH;
     // the errors waiting for the rows from the current one down; a row's slot is cleared once it is read
@@ -61,7 +170,9 @@ pub(crate) fn diffuse(
     let mut chosen = vec![0; height * width];
     let scale = amount / kernel.divisor;
     for row in 0..height {
-        for column in 0..width {
+        let backwards = serpentine && row % 2 == 1; // constant: odd rows are the ones turned back
+        for step in 0..width {
+            let column = if backwards { width - 1 - step } else { step };
             let at = (row % ROWS_ALIVE) * stride + REACH + column;
             let pixel = values[row * width + column];
             let value = [0, 1, 2].map(|channel| pixel[channel] + waiting[at][channel]);
@@ -70,6 +181,7 @@ pub(crate) fn diffuse(
             let colour = palette[usize::from(pick)];
             let error = [0, 1, 2].map(|channel| (value[channel] - colour[channel]) * scale);
             for &(right, down, weight) in kernel.taps {
+                let right = if backwards { -right } else { right };
                 let to = ((row + down) % ROWS_ALIVE) * stride + (REACH + column).wrapping_add_signed(right);
                 for (sum, part) in waiting[to].iter_mut().zip(error) {
                     *sum += part * weight;
@@ -314,4 +426,40 @@ pub(crate) fn ordered(
         }
     });
     chosen
+}
+
+#[cfg(test)]
+mod tests {
+    //! Inline: the kernel tables are private, and no public route reads their weights.
+    use super::*;
+
+    #[test]
+    fn a_kernels_weights_sum_to_its_divisor_and_every_tap_lies_ahead_inside_the_padding() {
+        let kernels = [
+            (&FLOYD_STEINBERG, "floyd_steinberg"),
+            (&JARVIS_JUDICE_NINKE, "jarvis_judice_ninke"),
+            (&STUCKI, "stucki"),
+            (&BURKES, "burkes"),
+            (&SIERRA, "sierra"),
+            (&SIERRA_TWO_ROW, "sierra_two_row"),
+            (&SIERRA_LITE, "sierra_lite"),
+            (&STEVENSON_ARCE, "stevenson_arce"),
+        ];
+        for (kernel, name) in kernels {
+            let total: f32 = kernel.taps.iter().map(|tap| tap.2).sum();
+            assert!(
+                (total - kernel.divisor).abs() < f32::EPSILON,
+                "{name}: {total} of {}",
+                kernel.divisor
+            );
+        }
+        // Atkinson's stated exception: six eighths
+        assert!((ATKINSON.taps.iter().map(|tap| tap.2).sum::<f32>() - 6.0).abs() < f32::EPSILON);
+        for kernel in kernels.map(|(kernel, _)| kernel).into_iter().chain([&ATKINSON]) {
+            for &(right, down, _) in kernel.taps {
+                assert!(down > 0 || (down == 0 && right > 0), "a tap behind the pixel");
+                assert!(right.unsigned_abs() <= REACH && down < ROWS_ALIVE);
+            }
+        }
+    }
 }

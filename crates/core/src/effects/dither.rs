@@ -9,7 +9,10 @@ use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cluster::{Point, Start};
 use crate::ops::colorspace::rgb_to_oklab;
-use crate::ops::dither::{ATKINSON, FLOYD_STEINBERG, Tile, diffuse, ordered};
+use crate::ops::dither::{
+    ATKINSON, BURKES, FLOYD_STEINBERG, JARVIS_JUDICE_NINKE, SIERRA, SIERRA_LITE, SIERRA_TWO_ROW, STEVENSON_ARCE,
+    STUCKI, Tile, diffuse, ordered,
+};
 use crate::ops::inks::{Inks, MOST_INKS, shift};
 use crate::ops::length::whole;
 use crate::ops::par;
@@ -42,6 +45,20 @@ pub enum Method {
     FloydSteinberg,
     /// Passes three quarters of the error on (Atkinson), so highlights and shadows go clean.
     Atkinson,
+    /// Spreads the error over twelve pixels in three rows (Jarvis, Judice and Ninke, 1976): smoother, less crawling grain.
+    JarvisJudiceNinke,
+    /// Jarvis-Judice-Ninke's twelve pixels with weights that favour the near ones (Stucki, 1981): sharper edges.
+    Stucki,
+    /// Stucki without its third row (Burkes, 1988): twice as fast, nearly as smooth.
+    Burkes,
+    /// Spreads the error over ten pixels in three rows (Sierra, 1989): close to Stucki, softer.
+    Sierra,
+    /// Sierra's first two rows, seven pixels (Sierra, 1989): faster, a little grainier.
+    SierraTwoRow,
+    /// Three pixels, the lightest kernel (Sierra Lite, 1989): near Floyd-Steinberg in grain.
+    SierraLite,
+    /// A wide hexagonal kernel on twelve pixels (Stevenson and Arce, 1985): a fine, even grain.
+    StevensonArce,
     /// A regular crosshatch of an 8 x 8 matrix.
     Bayer,
     /// An even, grainless scatter from a repeating 64 x 64 tile.
@@ -118,13 +135,20 @@ pub enum Init {
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {
-    /// How tones become a pattern of dots. `floyd_steinberg` and 'atkinson' pass each pixel's error on to its neighbours
-    /// (organic grain; Floyd-Steinberg keeps every tone, Atkinson drops a quarter of the error, so highlights and shadows go
-    /// clean and the contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix. `blue_noise` is an even,
+    /// How tones become a pattern of dots. `floyd_steinberg`, 'atkinson', `jarvis_judice_ninke`, 'stucki', 'burkes',
+    /// 'sierra', `sierra_two_row`, `sierra_lite` and `stevenson_arce` pass each pixel's error on to its neighbours
+    /// (organic grain; they differ in how many pixels and how far the error goes: wider kernels are smoother, narrower ones
+    /// sharper and faster; all keep every tone except Atkinson, which drops a quarter of the error, so highlights and
+    /// shadows go clean and the contrast is higher). 'bayer' is a regular crosshatch of an 8 x 8 matrix. `blue_noise` is an even,
     /// grainless scatter from a repeating 64 x 64 tile, the one with no visible pattern. Both of those mix colours of any
     /// palette, in steps of a sixteenth.
     #[param(default = FloydSteinberg)]
     pub method: Method,
+    /// Scan odd rows right to left, with the kernel mirrored, so the grain does not slant one way (`floyd_steinberg`,
+    /// 'atkinson', `jarvis_judice_ninke`, 'stucki', 'burkes', 'sierra', `sierra_two_row`, `sierra_lite` and
+    /// `stevenson_arce`; the other methods have no scan direction). Off, every row is scanned left to right.
+    #[param(default = false)]
+    pub serpentine: bool,
     /// Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' (the 4 greens
     /// widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8'
     /// (the 16 PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2 to 6 evenly spaced levels
@@ -146,8 +170,8 @@ pub struct Params {
     /// coarser, larger dots.
     #[param(default = 0.0, unit = px, min = 0, max = 48)]
     pub cell: f32,
-    /// How much of the dot pattern is used: 1 = the method as designed; lower passes less error on (`floyd_steinberg`,
-    /// atkinson) or mixes fewer colours per dot (bayer, `blue_noise`), so flatter areas; 0 gives each dot its nearest palette
+    /// How much of the dot pattern is used: 1 = the method as designed; lower passes less error on (the error-diffusion
+    /// methods) or mixes fewer colours per dot (bayer, `blue_noise`), so flatter areas; 0 gives each dot its nearest palette
     /// colour, plain flat colours with no pattern, whatever the method.
     #[param(default = 1.0, unit = fraction, min = 0, max = 1)]
     pub pattern: f32,
@@ -335,10 +359,19 @@ fn found(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
 }
 
 /// The `chosen` method on `values` (`size` dots), as a pattern of palette indices.
-fn pattern(method: Method, values: &[Point], size: (usize, usize), palette: &[Point], amount: f32) -> Vec<u8> {
+fn pattern(method: Method, values: &[Point], size: (usize, usize), palette: &[Point], params: &Params) -> Vec<u8> {
+    let (amount, serpentine) = (params.pattern, params.serpentine);
+    let by = |kernel| diffuse(values, size, palette, kernel, amount, serpentine);
     match method {
-        Method::FloydSteinberg => diffuse(values, size, palette, &FLOYD_STEINBERG, amount),
-        Method::Atkinson => diffuse(values, size, palette, &ATKINSON, amount),
+        Method::FloydSteinberg => by(&FLOYD_STEINBERG),
+        Method::Atkinson => by(&ATKINSON),
+        Method::JarvisJudiceNinke => by(&JARVIS_JUDICE_NINKE),
+        Method::Stucki => by(&STUCKI),
+        Method::Burkes => by(&BURKES),
+        Method::Sierra => by(&SIERRA),
+        Method::SierraTwoRow => by(&SIERRA_TWO_ROW),
+        Method::SierraLite => by(&SIERRA_LITE),
+        Method::StevensonArce => by(&STEVENSON_ARCE),
         Method::Bayer => ordered(values, size, palette, Tile::Bayer, amount),
         Method::BlueNoise => ordered(values, size, palette, Tile::BlueNoise, amount),
     }
@@ -370,7 +403,7 @@ fn printed(
             for (value, coverage) in plane.iter_mut().zip(&needed) {
                 value[0] = coverage[ink];
             }
-            pattern(params.method, &plane, (rows, columns), &[none, full], params.pattern)
+            pattern(params.method, &plane, (rows, columns), &[none, full], params)
         })
         .collect();
     // the print of every combination of inks, by the bits of the inks that land
@@ -419,7 +452,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let palette = colours(&dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
     let size = (rows, columns);
-    let chosen = pattern(params.method, &matched, size, &matched_palette, params.pattern);
+    let chosen = pattern(params.method, &matched, size, &matched_palette, params);
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {

@@ -712,3 +712,108 @@ fn ink_k_lands_k_offsets_away_along_the_angle_and_no_offset_leaves_the_angle_unu
     }
     Ok(())
 }
+
+// ---- the diffusion kernels and the serpentine scan ------------------------------------------------------------------------
+
+/// The picture as rows of '0' (black) and '1' (white), a space between rows.
+fn bits(picture: &[f32], width: usize) -> String {
+    let marks: Vec<String> = reds(picture)
+        .chunks(width)
+        .map(|row| row.iter().map(|&red| if red > 0.5 { '1' } else { '0' }).collect())
+        .collect();
+    marks.join(" ")
+}
+
+#[test]
+fn each_diffusion_kernel_spreads_the_error_by_its_published_weights() -> Result<(), Error> {
+    // A flat grey of 0.39 (6 x 4; no pixel lands within 4e-4 of the 0.5 threshold, so f32 rounding cannot decide one) in black and white. The pictures are worked pixel by pixel with each kernel's published
+    // weights (Floyd-Steinberg 7 3 5 1 / 16, Atkinson 1 1 1 1 1 1 / 8, Jarvis-Judice-Ninke / 48, Stucki / 42, Burkes / 32,
+    // Sierra / 32, two-row Sierra / 16, Sierra Lite 2 1 1 / 4, Stevenson-Arce / 200), by a separate exact-fraction
+    // script; every kernel gives a picture of its own, so a wrong weight shows.
+    let picture = greys(&[0.39; 24], 6);
+    let rows = [
+        (Method::FloydSteinberg, "010010 010101 010000 001011"),
+        (Method::Atkinson, "000100 010010 011001 000100"),
+        (Method::JarvisJudiceNinke, "000100 101001 010010 001100"),
+        (Method::Stucki, "001001 010010 101001 001001"),
+        (Method::Burkes, "001001 100100 010101 001000"),
+        (Method::Sierra, "000100 101001 010100 001010"),
+        (Method::SierraTwoRow, "001001 010100 010010 010010"),
+        (Method::SierraLite, "010010 010101 010001 001010"),
+        (Method::StevensonArce, "000000 011001 011001 000110"),
+    ];
+    for (method, expected) in rows {
+        let out = run(&ink(method, 1.0), &picture)?;
+        assert_eq!(bits(&out, 6), expected, "{method:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_serpentine_scan_turns_the_kernel_round_on_odd_rows() -> Result<(), Error> {
+    // Sierra Lite (2 right, 1 below left, 1 below, over 4). Row 0 is black and sends 0.1 down to the two pixels under and
+    // left of its 0.4. Row 1 is 0.45 each: left to right, 0.45 + 0 is black and passes 0.225 on, so the middle is white
+    // (0.775) and the right black (0.4375): "010". Right to left, the right is 0.55, white, passing -0.225 left, so the
+    // middle (0.325) is black and passes 0.1625 on, the left (0.6125) white: "101".
+    let picture = greys(&[0.0, 0.0, 0.4, 0.45, 0.45, 0.45], 3);
+    let plain = ink(Method::SierraLite, 1.0);
+    let turned = Params {
+        serpentine: true,
+        ..plain.clone()
+    };
+    assert_eq!(bits(&run(&plain, &picture)?, 3), "000 010");
+    assert_eq!(bits(&run(&turned, &picture)?, 3), "000 101");
+    Ok(())
+}
+
+#[test]
+fn a_serpentine_row_is_the_plain_scan_of_that_row_turned_round() -> Result<(), Error> {
+    // Row 0 is pure, so passes nothing down: row 1 starts clean, and scanned right to left it must equal the plain scan
+    // of its mirror image, mirrored back.
+    let row = [0.3, 0.55, 0.42, 0.8, 0.15, 0.5, 0.65, 0.35, 0.47, 0.9];
+    let width = row.len();
+    let mut pure_row = vec![0.0; width];
+    pure_row[3] = 1.0;
+    for method in [Method::FloydSteinberg, Method::JarvisJudiceNinke, Method::StevensonArce] {
+        let plain = ink(method, 1.0);
+        let turned = Params {
+            serpentine: true,
+            ..plain.clone()
+        };
+        let mirror: Vec<f32> = row.iter().rev().copied().collect();
+        let flat = |first: &[f32], second: &[f32]| greys(&[first, second].concat(), width);
+        let mut expected = reds(&run(&plain, &flat(&pure_row, &mirror))?)[width..].to_vec();
+        expected.reverse();
+        let got = reds(&run(&turned, &flat(&pure_row, &row))?)[width..].to_vec();
+        assert_eq!(got, expected, "{method:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn serpentine_changes_every_diffusion_method_and_no_ordered_one() -> Result<(), Error> {
+    // `parameters_are_read` cannot hold a row for this: the default method is a diffusion one, so `serpentine` changes the
+    // picture alone there.
+    let picture = (20, 20, varied(20, 20));
+    let diffusion = [
+        Method::FloydSteinberg,
+        Method::Atkinson,
+        Method::JarvisJudiceNinke,
+        Method::Stucki,
+        Method::Burkes,
+        Method::Sierra,
+        Method::SierraTwoRow,
+        Method::SierraLite,
+        Method::StevensonArce,
+    ];
+    for method in diffusion.into_iter().chain([Method::Bayer, Method::BlueNoise]) {
+        let plain = ink(method, 1.0);
+        let turned = Params {
+            serpentine: true,
+            ..plain.clone()
+        };
+        let same = run(&plain, &picture)? == run(&turned, &picture)?;
+        assert_eq!(same, !diffusion.contains(&method), "{method:?}");
+    }
+    Ok(())
+}
