@@ -133,6 +133,7 @@ mod pixel_grid;
 mod pixel_sort;
 mod placed;
 mod polar;
+mod preset_curves;
 mod preset_looks;
 mod presets;
 mod project;

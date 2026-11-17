@@ -18,3 +18,60 @@ blue_highlights = 0.62
 description = "Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet."
 highlights = 0.25
 white = 0.0
+
+# Contrast: an S-curve about the middle grey, which stays where it is.
+
+[low_contrast]
+description = "Gentle flattening: shadows and highlights pulled toward the middle, which stays put."
+shadows = 0.31
+highlights = 0.69
+
+[contrast]
+description = "A soft S-curve: darker shadows and brighter highlights, the middle grey unchanged."
+shadows = 0.18
+highlights = 0.82
+
+[strong_contrast]
+description = "A hard S-curve: deep shadows and bright highlights, the middle grey unchanged."
+shadows = 0.1
+highlights = 0.9
+
+# Lifted and crushed: where the ends of the scale go.
+
+[fade]
+description = "Faded print: lifted blacks and dimmed whites, a soft flat look."
+black = 0.08
+shadows = 0.3
+midtones = 0.52
+highlights = 0.76
+white = 0.94
+
+[matte]
+description = "Matte blacks: the darkest tone lifted to a dark grey, the rest left as it is."
+black = 0.12
+shadows = 0.29
+
+[crush]
+description = "Crushed blacks: the shadows sink to black early and the midtones darken a little."
+shadows = 0.1
+midtones = 0.45
+
+[lift_shadows]
+description = "Opened shadows: dark detail brightened, highlights left alone."
+shadows = 0.34
+midtones = 0.54
+
+# Film: a toe that darkens the lowest tones and a shoulder that rolls the highlights off before white.
+
+[film]
+description = "Film-like S-curve: a toe in the shadows and a shoulder that rolls the highlights off; blacks and whites slightly softened."
+black = 0.02
+shadows = 0.21
+midtones = 0.5
+highlights = 0.8
+white = 0.98
+
+[shoulder]
+description = "A highlight shoulder only: the brightest tones flatten smoothly toward white, shadows untouched."
+midtones = 0.52
+highlights = 0.82
