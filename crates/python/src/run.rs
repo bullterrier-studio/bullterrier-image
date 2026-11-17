@@ -378,7 +378,11 @@ pub(crate) fn map_problem(layer: PyArrayLike2<'_, f32, AllowTypeChange>) -> Opti
 }
 
 /// The options of a render: the longest side `size`, if asked for, `threads` (0: every core) and the `band` of rows.
-fn options_of(size: Option<Count<SIZE>>, threads: Count<THREADS>, band: Option<Count<BAND>>) -> PyResult<Options> {
+pub(super) fn options_of(
+    size: Option<Count<SIZE>>,
+    threads: Count<THREADS>,
+    band: Option<Count<BAND>>,
+) -> PyResult<Options> {
     let mut options = Options::default().with_threads(threads.within()?);
     if let Some(size) = size {
         options = options.with_size(size.within()?);
@@ -400,6 +404,13 @@ pub(crate) const BAND: u8 = 2;
 /// the pixel limit).
 #[derive(Clone, Copy)]
 pub(crate) struct Count<const OPTION: u8>(u64);
+
+impl Count<THREADS> {
+    /// One thread.
+    pub(super) const fn one() -> Self {
+        Self(1)
+    }
+}
 
 impl<const OPTION: u8> Count<OPTION> {
     const NAME: &'static str = match OPTION {
@@ -446,7 +457,7 @@ fn refusal(name: &str, value: impl std::fmt::Display) -> PyErr {
 }
 
 /// `photo` with the maps handed in, the finders given and the lookup tables given.
-fn photo_with<'a>(
+pub(super) fn photo_with<'a>(
     mut photo: Photo<'a>,
     maps: Option<&Bound<'_, PyDict>>,
     finders: Option<&Bound<'_, PyDict>>,
@@ -484,12 +495,12 @@ fn photo_with<'a>(
 }
 
 /// The recipe the dict `recipe` writes.
-fn recipe_of(recipe: &Bound<'_, PyDict>) -> PyResult<Recipe> {
+pub(super) fn recipe_of(recipe: &Bound<'_, PyDict>) -> PyResult<Recipe> {
     Recipe::from_json(&to_json(recipe.as_any())?.to_string()).map_err(core_error)
 }
 
 /// The presets of each effect in `presets`, which are TOML text.
-fn presets_of(presets: Option<&Bound<'_, PyDict>>) -> PyResult<Presets> {
+pub(super) fn presets_of(presets: Option<&Bound<'_, PyDict>>) -> PyResult<Presets> {
     let mut all = Presets::new();
     for (effect, text) in presets.into_iter().flatten() {
         all.add_toml(&effect.extract::<String>()?, &text.extract::<String>()?)

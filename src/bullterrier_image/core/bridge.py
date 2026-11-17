@@ -119,6 +119,27 @@ def region_map(
     return _each(run, rgb, [recipe], maps, finders, size, 1, None, region=name)[0]
 
 
+def data(
+    asked: str,
+    rgb: np.ndarray,
+    recipe: Recipe,
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Any] | None = None,
+    size: int | None = None,
+) -> Any:
+    """What the last step of `recipe` makes beside its picture on the photo `rgb`: `asked` is `ink_planes`,
+    `palette_map` or `characters`, the core's function of that name. The photo, `maps`, `finders` and `size` are as for
+    `render`; no thread or band is wanted."""
+    ask = getattr(native, asked)
+
+    def run(rgb: np.ndarray, document: dict[str, Any], *, threads: int, **keys: Any) -> Any:
+        """The core's function: it runs the steps whole, on the calling thread."""
+        return ask(rgb, document, **keys)
+
+    return _each(run, rgb, [recipe], maps, finders, size, 1, None)[0]
+
+
 def maps_needed(recipe: Recipe, region: str | None = None) -> frozenset[str]:
     """The names of the maps of the photo that rendering `recipe` must be given or find: `subject` when the frame crops
     around it or keeps only it, or a region a step uses (a mask, a field, a drive's `by`) is made from it; `depth`

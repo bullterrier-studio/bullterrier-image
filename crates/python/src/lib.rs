@@ -1,6 +1,7 @@
 //! `bullterrier_image._native._core`: runs the effects of the Rust core on numpy pictures. Generic: it names no effect, so
 //! porting one never changes it.
 
+mod data;
 mod files;
 mod finding;
 mod lut;
@@ -63,6 +64,9 @@ mod _core {
     use super::finding::{
         depth_finder_identity, find_depth, find_inverse_depth, find_subject, kept_onnx_runtime, subject_finder_identity,
     };
+
+    #[pymodule_export]
+    use super::data::{Characters, characters, ink_planes, palette_map};
 
     #[pymodule_export]
     use super::regions::{drive, frame, region};

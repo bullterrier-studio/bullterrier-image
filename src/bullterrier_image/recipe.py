@@ -24,7 +24,7 @@ from .core import looks as shipped_looks
 from .core.bridge import maps_needed, needs_finder
 from .core.finder import Finder
 from .core.framing import Framing
-from .core.native import RECIPE_FORMATS
+from .core.native import RECIPE_FORMATS, Characters
 from .core.pieces import Drive
 from .core.regions import (
     FOUND_MAPS,
@@ -57,6 +57,7 @@ __all__ = [
     "RECIPE_FORMATS",
     "Band",
     "Bands",
+    "Characters",
     "ColorRange",
     "Combine",
     "Components",
@@ -81,8 +82,11 @@ __all__ = [
     "Step",
     "Subject",
     "Svg",
+    "characters",
+    "ink_planes",
     "load_recipe",
     "looks",
+    "palette_map",
     "region_map",
     "render",
     "render_all",
@@ -224,6 +228,72 @@ def region_map(
     recipe = _one_recipe(recipe)
     return bridge.region_map(
         rgb, recipe, name, maps=maps, finders=_finders([recipe], maps, finders, region=name), size=size
+    )
+
+
+def ink_planes(
+    rgb: np.ndarray,
+    recipe: Recipe | Step,
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
+) -> list[np.ndarray]:
+    """The ink coverage planes of the picture `recipe` makes of the photo `rgb`: one float32 (h, w) array in 0..1 for
+    each ink, how much of that ink lies on each pixel, at the size a render works at. They are what the last step of the
+    recipe prints, so scene can write a printing plate from each: `halftone` gives its inks in order (no `separation`:
+    the one ink; `cmyk`: cyan, magenta, yellow, black; `rgb`: red, green, blue light; `spot`: its `inks`), `dither` with
+    `separation="spot"` its `inks`, each plane 0 or 1. Bare-paper specks are on no plate. The steps before the last
+    run as for `render`; the last must be one of those, plain (no `mask`, an `opacity` of 1, blend mode normal), else
+    RecipeError naming it. The picture is unchanged by asking: `render` of the same arguments is what the planes
+    make, and costs the run again.
+
+    rgb, recipe, maps, finders, size: as for `render`."""
+    recipe = _one_recipe(recipe)
+    return bridge.data("ink_planes", rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size)
+
+
+def palette_map(
+    rgb: np.ndarray,
+    recipe: Recipe | Step,
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
+) -> tuple[np.ndarray, list[str]]:
+    """The palette-index map of the picture `recipe` makes of the photo `rgb`, and its palette: `(labels, colors)`, an
+    int32 (h, w) array whose pixel is the number of its colour in `colors`, a list of `'#rrggbb'` text (as `palette`
+    gives).
+    Painting each pixel with its colour gives the picture exactly, and the labels are the regions of a colour for vector
+    to trace. The last step must be `dither` with a palette (not its `tiles` method, which draws between two colours),
+    plain (no `mask`, an `opacity` of 1, blend mode normal), else RecipeError naming it.
+
+    rgb, recipe, maps, finders, size: as for `render`."""
+    recipe = _one_recipe(recipe)
+    return cast(
+        tuple[np.ndarray, list[str]],
+        bridge.data("palette_map", rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size),
+    )
+
+
+def characters(
+    rgb: np.ndarray,
+    recipe: Recipe | Step,
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, Finder] | None = None,
+    size: int | None = None,
+) -> Characters:
+    """The characters of the picture `recipe` makes of the photo `rgb`: `ascii`'s grid as a `Characters`, with `text`
+    (`rows` lines of `columns` characters), `colors` (the ink of each, `'#rrggbb'`, a list per line), `paper`, and
+    `ansi()` and `html()` for text that keeps the colours. The last step must be `ascii`, plain (no `mask`, an
+    `opacity` of 1, blend mode normal), else RecipeError naming it.
+
+    rgb, recipe, maps, finders, size: as for `render`."""
+    recipe = _one_recipe(recipe)
+    return cast(
+        Characters,
+        bridge.data("characters", rgb, recipe, maps=maps, finders=_finders([recipe], maps, finders), size=size),
     )
 
 

@@ -10,9 +10,11 @@ import numpy as np
 
 __all__ = [
     "RECIPE_FORMATS",
+    "Characters",
     "CoreError",
     "Lut",
     "apply",
+    "characters",
     "check",
     "check_project",
     "check_recipe",
@@ -28,6 +30,7 @@ __all__ = [
     "find_subject",
     "frame",
     "init_project",
+    "ink_planes",
     "kept_onnx_runtime",
     "known_maps",
     "locate",
@@ -38,6 +41,7 @@ __all__ = [
     "number_pieces",
     "numbers",
     "palette",
+    "palette_map",
     "params",
     "parse_color",
     "project_maps",
@@ -237,6 +241,55 @@ def region_map(
     presets: Mapping[str, str] | None = None,
     size: int | None = None,
 ) -> np.ndarray: ...
+
+@final
+class Characters:
+    @property
+    def rows(self) -> int: ...
+    @property
+    def columns(self) -> int: ...
+    @property
+    def text(self) -> str: ...
+    @property
+    def colors(self) -> list[list[str]]: ...
+    @property
+    def paper(self) -> str: ...
+    def ansi(self) -> str: ...
+    def html(self) -> str: ...
+
+def ink_planes(
+    rgb: np.ndarray,
+    recipe: dict[str, Any],
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, _Finder] | None = None,
+    luts: Mapping[str, Lut] | None = None,
+    pictures: Mapping[str, np.ndarray] | None = None,
+    presets: Mapping[str, str] | None = None,
+    size: int | None = None,
+) -> list[np.ndarray]: ...
+def palette_map(
+    rgb: np.ndarray,
+    recipe: dict[str, Any],
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, _Finder] | None = None,
+    luts: Mapping[str, Lut] | None = None,
+    pictures: Mapping[str, np.ndarray] | None = None,
+    presets: Mapping[str, str] | None = None,
+    size: int | None = None,
+) -> tuple[np.ndarray, list[str]]: ...
+def characters(
+    rgb: np.ndarray,
+    recipe: dict[str, Any],
+    *,
+    maps: Mapping[str, np.ndarray] | None = None,
+    finders: Mapping[str, _Finder] | None = None,
+    luts: Mapping[str, Lut] | None = None,
+    pictures: Mapping[str, np.ndarray] | None = None,
+    presets: Mapping[str, str] | None = None,
+    size: int | None = None,
+) -> Characters: ...
 def number_pieces(rgb: np.ndarray, partition: np.ndarray) -> np.ndarray: ...
 def map_problem(layer: np.ndarray) -> str | None: ...
 def check_step(step: dict[str, Any], *, presets: dict[str, str] | None = None) -> None: ...
