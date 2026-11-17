@@ -32,7 +32,72 @@ fn main() -> io::Result<()> {
         writeln!(shipped, "];").map_err(io::Error::other)?;
     }
     fs::write(PathBuf::from(&out).join("shipped.rs"), shipped)?;
+    let palettes = Path::new(&manifest).join("data").join("palettes.toml");
+    println!("cargo::rerun-if-changed={}", palettes.display());
+    fs::write(PathBuf::from(&out).join("palettes.rs"), palette_enum(&palettes)?)?;
     fs::write(PathBuf::from(out).join("identity.rs"), identity(Path::new(&manifest))?)
+}
+
+/// The Rust source of `dither`'s `Palette`: the named palettes of `data/palettes.toml` (a variant each, documented by its
+/// description) between `photo` and the cubes, which are formulas, and `custom`; and `Palette::colours`, their 0xrrggbb codes.
+fn palette_enum(path: &Path) -> io::Result<String> {
+    let table: toml::Table = toml::from_str(&fs::read_to_string(path)?).map_err(io::Error::other)?;
+    let (mut variants, mut arms) = (String::new(), String::new());
+    for (name, palette) in &table {
+        let field = |key: &str| palette.get(key).ok_or_else(|| io::Error::other(format!("palette {name}: no {key}")));
+        let description = field("description")?.as_str().unwrap_or_default();
+        let variant: String = name
+            .split('_')
+            .map(|word| word[..1].to_uppercase() + &word[1..])
+            .collect();
+        let codes: Vec<String> = field("colors")?
+            .as_array()
+            .map_or(&[][..], Vec::as_slice)
+            .iter()
+            .map(|colour| {
+                let hex = colour.as_str().and_then(|text| text.strip_prefix('#')).unwrap_or_default();
+                match (hex.len(), u32::from_str_radix(hex, 16)) {
+                    (6, Ok(code)) => Ok(format!("{code:#08x}")),
+                    _ => Err(io::Error::other(format!("palette {name}: {colour:?} is not '#rrggbb'"))),
+                }
+            })
+            .collect::<io::Result<_>>()?;
+        if codes.len() < 2 || codes.len() > 256 {
+            return Err(io::Error::other(format!("palette {name}: 2 to 256 colours, got {}", codes.len())));
+        }
+        writeln!(variants, "    #[doc = {description:?}]\n    {variant},").map_err(io::Error::other)?;
+        writeln!(arms, "            Self::{variant} => &[{}],", codes.join(", ")).map_err(io::Error::other)?;
+    }
+    Ok(format!(
+        "/// Where the colours come from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
+pub enum Palette {{
+    /// Colours found in the picture itself (k-means).
+    Photo,
+{variants}    /// Every mix of 2 evenly spaced levels of red, green and blue: 8 colours.
+    Cube2,
+    /// Every mix of 3 levels: 27 colours.
+    Cube3,
+    /// Every mix of 4 levels: 64 colours.
+    Cube4,
+    /// Every mix of 5 levels: 125 colours.
+    Cube5,
+    /// Every mix of 6 levels: 216 colours.
+    Cube6,
+    /// The colours of `custom`.
+    Custom,
+}}
+
+impl Palette {{
+    /// The 0xrrggbb codes of a named palette, as `data/palettes.toml` lists them; none for the others.
+    const fn named(self) -> Option<&'static [u32]> {{
+        Some(match self {{
+{arms}            _ => return None,
+        }})
+    }}
+}}
+"
+    ))
 }
 
 /// The Rust source of the core's identity: a SHA-256 of every file that can change what the core makes (its sources, the

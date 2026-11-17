@@ -81,6 +81,76 @@ fn a_fixed_palette_paints_with_its_published_colours_only() -> Result<(), Error>
     Ok(())
 }
 
+/// The palettes that were typed in the code before they became data, as their colour strings: the oracle that the data
+/// reproduces them bit for bit.
+const FORMERLY_CODED: [(Palette, &[&str]); 7] = [
+    (Palette::Gameboy, &["#0f380f", "#306230", "#8bac0f", "#9bbc0f"]),
+    (Palette::Cga, &["#000000", "#55ffff", "#ff55ff", "#ffffff"]),
+    (
+        Palette::Ega,
+        &[
+            "#000000", "#0000aa", "#00aa00", "#00aaaa", "#aa0000", "#aa00aa", "#aa5500", "#aaaaaa", "#555555", "#5555ff",
+            "#55ff55", "#55ffff", "#ff5555", "#ff55ff", "#ffff55", "#ffffff",
+        ],
+    ),
+    (
+        Palette::Pico8,
+        &[
+            "#000000", "#1d2b53", "#7e2553", "#008751", "#ab5236", "#5f574f", "#c2c3c7", "#fff1e8", "#ff004d", "#ffa300",
+            "#ffec27", "#00e436", "#29adff", "#83769c", "#ff77a8", "#ffccaa",
+        ],
+    ),
+    (
+        Palette::ZxSpectrum,
+        &[
+            "#000000", "#0000d7", "#d70000", "#d700d7", "#00d700", "#00d7d7", "#d7d700", "#d7d7d7", "#000000", "#0000ff",
+            "#ff0000", "#ff00ff", "#00ff00", "#00ffff", "#ffff00", "#ffffff",
+        ],
+    ),
+    (
+        Palette::Msx,
+        &[
+            "#000000", "#3eb849", "#74d07d", "#5955e0", "#8076f1", "#b95e51", "#65dbef", "#db6559", "#ff897d", "#ccc35e",
+            "#ded087", "#3aa241", "#b766b5", "#cccccc", "#ffffff",
+        ],
+    ),
+    (
+        Palette::C64,
+        &[
+            "#000000", "#ffffff", "#68372b", "#70a4b2", "#6f3d86", "#588d43", "#352879", "#b8c76f", "#6f4f25", "#433900",
+            "#9a6759", "#444444", "#6c6c6c", "#9ad284", "#6c5eb5", "#959595",
+        ],
+    ),
+];
+
+#[test]
+fn a_named_palette_gives_the_same_picture_bit_for_bit_as_its_colours_given_as_custom() -> Result<(), Error> {
+    let picture = (24, 24, varied(24, 24));
+    for (palette, colours) in FORMERLY_CODED {
+        let custom = colours
+            .iter()
+            .map(|text| Color::parse(&json!(text)).ok_or_else(|| Error::Recipe(format!("{text}: not a colour"))))
+            .collect::<Result<Vec<_>, _>>()?;
+        for method in [Method::FloydSteinberg, Method::Bayer, Method::BlueNoise] {
+            let named = run(&Params { method, palette, ..Params::default() }, &picture)?;
+            let given = run(&Params { method, palette: Palette::Custom, custom: custom.clone(), ..Params::default() }, &picture)?;
+            let bits = |values: &[f32]| values.iter().map(|value| value.to_bits()).collect::<Vec<_>>();
+            assert!(bits(&named) == bits(&given), "{palette:?} {method:?}: differs from its colours as custom");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_palette_parameter_says_every_choice_it_has() -> Result<(), Error> {
+    let table = bullterrier_image::effect("dither")?.params();
+    let field = table.fields.iter().find(|field| field.name == "palette").ok_or_else(|| Error::Recipe("no palette".into()))?;
+    for choice in field.choices {
+        assert!(field.meaning.contains(choice), "the palette doc does not mention '{choice}'");
+    }
+    Ok(())
+}
+
 #[test]
 fn a_cube_palette_has_evenly_spaced_levels_in_every_channel_and_uses_them_all() -> Result<(), Error> {
     let picture = (16, 16, varied(16, 16));

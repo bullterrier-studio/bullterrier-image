@@ -95,32 +95,7 @@ pub enum Method {
     Tiles,
 }
 
-/// Where the colours come from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
-pub enum Palette {
-    /// Colours found in the picture itself (k-means).
-    Photo,
-    /// The 4 greens widely used to draw a Game Boy screen.
-    Gameboy,
-    /// IBM CGA graphics mode 4, palette 1, high intensity: black, cyan, magenta, white.
-    Cga,
-    /// The 16 default colours of the IBM EGA.
-    Ega,
-    /// The 16 colours of the PICO-8 fantasy console.
-    Pico8,
-    /// Every mix of 2 evenly spaced levels of red, green and blue: 8 colours.
-    Cube2,
-    /// Every mix of 3 levels: 27 colours.
-    Cube3,
-    /// Every mix of 4 levels: 64 colours.
-    Cube4,
-    /// Every mix of 5 levels: 125 colours.
-    Cube5,
-    /// Every mix of 6 levels: 216 colours.
-    Cube6,
-    /// The colours of `custom`.
-    Custom,
-}
+include!(concat!(env!("OUT_DIR"), "/palettes.rs"));
 
 /// How the colours are chosen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
@@ -223,10 +198,12 @@ pub struct Params {
     /// ones, black in both). 0 = any two colours. Ignored without a `block`.
     #[param(default = 0, unit = count, min = 0, max = 256)]
     pub block_group: i32,
-    /// Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'gameboy' (the 4 greens
-    /// widely used to draw a Game Boy screen), 'cga' (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8'
-    /// (the 16 PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2 to 6 evenly spaced levels
-    /// of red, green and blue: 8 to 216 colours) are fixed palettes; 'custom' takes your own list, `custom`.
+    /// Where the colours come from. 'photo' finds `colors` colours in the picture itself (k-means); 'custom' takes your own
+    /// list, `custom`; 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' are every mix of 2 to 6 evenly spaced levels of red,
+    /// green and blue (8 to 216 colours). The rest are named palettes, 2 to 16 colours each: hardware ('gameboy' the 4 greens
+    /// widely used to draw a Game Boy screen, 'cga', 'ega', 'pico8', 'zx_spectrum', 'msx', 'c64', 'windows16', 'teletext'),
+    /// greys ('grey4', 'grey16') and colour schemes ('solarized', 'nord', 'gruvbox', 'dracula', 'tango', 'monokai',
+    /// 'sweetie16', 'arne16', 'dawnbringer16').
     #[param(default = Photo)]
     pub palette: Palette,
     /// Your own colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1), at least two, used when `palette` is
@@ -318,27 +295,6 @@ pub struct Params {
     pub speck_size: f32,
 }
 
-/// The colours of the fixed palettes as 0xrrggbb, as their authors publish them (sRGB):
-/// - gameboy: the four greens widely used to draw a Game Boy screen, darkest to lightest (a community palette; the real DMG
-///   panel's colours differ and depend on the display).
-/// - cga: IBM CGA graphics mode 4, palette 1, high intensity: black, cyan, magenta, white.
-/// - ega: the 16 default colours of the IBM EGA (and VGA text mode).
-/// - pico8: the 16 colours of the PICO-8 fantasy console.
-// constant: the published colours of these palettes
-const GAMEBOY: [u32; 4] = [0x0f_380f, 0x30_6230, 0x8b_ac0f, 0x9b_bc0f];
-// constant: the published colours of these palettes
-const CGA: [u32; 4] = [0x00_0000, 0x55_ffff, 0xff_55ff, 0xff_ffff];
-// constant: the published colours of these palettes
-const EGA: [u32; 16] = [
-    0x00_0000, 0x00_00aa, 0x00_aa00, 0x00_aaaa, 0xaa_0000, 0xaa_00aa, 0xaa_5500, 0xaa_aaaa, 0x55_5555, 0x55_55ff,
-    0x55_ff55, 0x55_ffff, 0xff_5555, 0xff_55ff, 0xff_ff55, 0xff_ffff,
-];
-// constant: the published colours of these palettes
-const PICO8: [u32; 16] = [
-    0x00_0000, 0x1d_2b53, 0x7e_2553, 0x00_8751, 0xab_5236, 0x5f_574f, 0xc2_c3c7, 0xff_f1e8, 0xff_004d, 0xff_a300,
-    0xff_ec27, 0x00_e436, 0x29_adff, 0x83_769c, 0xff_77a8, 0xff_ccaa,
-];
-
 /// The colours of 0xrrggbb codes, as 0..1 sRGB.
 fn hex(codes: &[u32]) -> Vec<Point> {
     codes
@@ -421,16 +377,13 @@ fn averaged(pixels: &[Point], (height, width): (usize, usize), cell: usize) -> C
 fn colours(dots: &[Point], matched: &[Point], params: &Params) -> Vec<Point> {
     match params.palette {
         Palette::Custom => params.custom.iter().map(|colour| colour.0).collect(),
-        Palette::Gameboy => hex(&GAMEBOY),
-        Palette::Cga => hex(&CGA),
-        Palette::Ega => hex(&EGA),
-        Palette::Pico8 => hex(&PICO8),
         Palette::Cube2 => cube(2), // constant: the cubes offered run from 2 levels to 6
         Palette::Cube3 => cube(3), // constant: the cubes offered run from 2 levels to 6
         Palette::Cube4 => cube(4), // constant: the cubes offered run from 2 levels to 6
         Palette::Cube5 => cube(5), // constant: the cubes offered run from 2 levels to 6
         Palette::Cube6 => cube(6), // constant: the cubes offered run from 2 levels to 6
         Palette::Photo => found(dots, matched, params),
+        named => hex(named.named().unwrap_or_default()), // every variant left is a named palette: it has colours
     }
 }
 

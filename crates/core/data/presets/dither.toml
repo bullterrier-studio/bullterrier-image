@@ -21,15 +21,8 @@ pattern = 0.0
 
 [zx_spectrum]
 description = "ZX Spectrum: 256 x 192 dots, 8 x 8 attribute blocks of two colours that share their brightness (the colour clash); 15 colours."
-# Palette: the 8 colours at normal level 0xD7 and at bright level 0xFF, as in the Wikipedia article "ZX Spectrum graphic modes"
-# (colour table). Black is listed in both runs (it is the same colour), so `block_group` 8 keeps a block's two colours inside
-# one brightness: ink and paper of a cell share one BRIGHT bit (Wikipedia, "ZX Spectrum graphic modes", attributes).
 method = "bayer"
-palette = "custom"
-custom = [
-    "#000000", "#0000d7", "#d70000", "#d700d7", "#00d700", "#00d7d7", "#d7d700", "#d7d7d7",
-    "#000000", "#0000ff", "#ff0000", "#ff00ff", "#00ff00", "#00ffff", "#ffff00", "#ffffff",
-]
+palette = "zx_spectrum"
 cell = 1.875
 block = 8
 block_height = 8
@@ -37,31 +30,16 @@ block_group = 8
 
 [msx]
 description = "MSX (TMS9918A, screen 2): 256 x 192 dots, every 8 x 1 run of dots has two colours from the 15 of the chip."
-# Palette: the TMS9918A's 15 colours (colour 0 is transparent) as the widely circulated RGB set that emulators and palette
-# collections use (no source is official: the chip's output is analogue, so openMSX derives its own from the analog levels);
-# screen 2 gives each row of 8 dots its own foreground and background colour (Wikipedia, "MSX"; MSX2 Technical Handbook,
-# graphic mode 2).
 method = "bayer"
-palette = "custom"
-custom = [
-    "#000000", "#3eb849", "#74d07d", "#5955e0", "#8076f1", "#b95e51", "#65dbef", "#db6559",
-    "#ff897d", "#ccc35e", "#ded087", "#3aa241", "#b766b5", "#cccccc", "#ffffff",
-]
+palette = "msx"
 cell = 1.875
 block = 8
 block_height = 1
 
 [c64_hires]
 description = "Commodore 64 hires bitmap: 320 x 200 dots, every 8 x 8 cell has two colours from the 16."
-# Palette: "Pepto" (Philip Timmermann, 2001), the 16 VIC-II colours as measured from a PAL machine (pepto.de/projects/colorvic).
-# Hires bitmap mode: each 8 x 8 cell has a foreground and a background colour from the screen memory (C64 Programmer's
-# Reference Guide, chapter 3, "Bitmap mode").
 method = "bayer"
-palette = "custom"
-custom = [
-    "#000000", "#ffffff", "#68372b", "#70a4b2", "#6f3d86", "#588d43", "#352879", "#b8c76f",
-    "#6f4f25", "#433900", "#9a6759", "#444444", "#6c6c6c", "#9ad284", "#6c5eb5", "#959595",
-]
+palette = "c64"
 cell = 1.5
 block = 8
 block_height = 8
