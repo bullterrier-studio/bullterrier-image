@@ -85,7 +85,7 @@ repository's `image.md`.
 | Character grid as text | `ascii`'s characters as a string, with colours for ANSI or HTML: copy-paste text, and real text in SVG through vector. Like `palette()`, a function beside the recipe. |
 | DPI on write | `files::write` takes an optional resolution: the PNG `pHYs` chunk, the JPEG density. Never in a recipe. Scene's PNG goes through this writer and passes its DPI on. |
 
-Whether these come from a run option or from functions beside the recipe is the batch's decision.
+**Done (2026-11-17):** functions beside the recipe that ask its last step (`Photo::ink_planes`, `palette_map`, `characters`; Python `ink_planes`, `palette_map`, `characters`), and `write_with(path, image, &WriteOptions)` (`imageio.save(..., dpi=)`). Reasons and limits: design-decisions, "Data beside the picture".
 
 ## Finders
 
@@ -98,5 +98,5 @@ It gives data; drawing the boxes is vector's and scene's, following them over a 
 2. ~~`halftone` dot shapes, screen geometry, RGB separation, print realism.~~ **Done** (2026-11-16); open: see the later items under `halftone`.
 3. ~~`modulation`; attribute cells, pattern tiles, `phase`.~~ **Done** (2026-11-16, batch A); batch B (`stipple`, `crosshatch`, `engraving`) **Done** (2026-11-16).
 4. ~~Presets: gradient maps, palettes as data, tone curves.~~ **Done** (2026-11-17); open: see the table above.
-5. Data beside the picture, when scene's plates or vector's tracing is built.
+5. ~~Data beside the picture.~~ **Done** (2026-11-17): `Photo::ink_planes`, `palette_map`, `characters` and `write_with`/`WriteOptions` (Python: `ink_planes`, `palette_map`, `characters`, `imageio.save(dpi=)`); see design-decisions.
 6. `mosaic`, the detector.

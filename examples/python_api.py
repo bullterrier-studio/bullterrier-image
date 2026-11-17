@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from bullterrier_image import Band, Project, Recipe, fx, imageio, region_map, run, trace
+from bullterrier_image import Band, Project, Recipe, characters, fx, imageio, ink_planes, region_map, run, trace
 
 HERE = Path(__file__).parent
 PHOTO = HERE / "photos" / "bullterrier.jpeg"
@@ -50,6 +50,14 @@ def main(output: Path = HERE / "output" / "python-api") -> None:
     brights = region_map(photo, BRIGHTS, "brights", size=480)
     imageio.save(np.repeat(brights[..., None], 3, axis=2), output / "brights.jpg")
     print(f"  region 'brights': {brights.shape}, {brights.mean():.0%} of the picture chosen")
+
+    # Data beside the picture: one coverage plane per ink of a halftone (a printing plate each), the text of an `ascii`
+    # look, and a file that says how large it prints.
+    planes = ink_planes(photo, Recipe([fx.halftone(separation="cmyk", paper="#ffffff")]), size=480)
+    print(f"  halftone: {len(planes)} ink planes, black covers {planes[3].mean():.0%}")
+    text = characters(photo, Recipe([fx.ascii(cell=12)]), size=480)
+    print(f"  ascii: {text.rows} lines of {text.columns} characters")
+    imageio.save(photo, output / "photo-300dpi.png", dpi=300)
 
     # Or run the look through the whole pipeline, like a recipe file: cached, checked, exported, with a report.
     items = run(Project(photos=(PHOTO,), recipes=(TOXIC_NEON,), output=output / "pipeline", formats=("jpg",)))

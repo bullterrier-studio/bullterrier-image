@@ -112,7 +112,7 @@ another is set (as `grade.pivot` needs `contrast` other than 1): add a row to th
 `Params` breaks code that builds it without `..Default::default()`, accepted until the crate is published.
 A Python `ops` function and its Rust twin may coexist
 while unported effects use the Python one; delete it with its last Python user. `pub` also covers the runner's types
-(`Photo`, `Options`, `Finder`, `Stage`, `Layer`, `Labels`, `Inputs`, `Drive`, `ErrorKind`). A user's values are checked by Rust
+(`Photo`, `Options`, `Finder`, `Stage`, `Layer`, `Labels`, `Inputs`, `Drive`, `ErrorKind`), the data beside a picture (`Data`, `Characters`; an effect's `pub(crate) fn data`, found by the build script like `check`) and `WriteOptions`. A user's values are checked by Rust
 code (`Table::check`, `Recipe::checked`, `Presets`), which Python calls when a `Recipe` is made; running an effect trusts
 its parameters.
 

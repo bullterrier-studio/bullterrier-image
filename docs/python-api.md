@@ -72,6 +72,15 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   frame, then `size`, else the recipe's, else the photo's own). A step need not use the region. Only the maps the region is
   made from are needed (found by the default finders only then); no step runs. A partition or an unknown name is a
   `RecipeError` listing the selections and the nearest. Example: [`examples/python_api.py`](../examples/python_api.py).
+- **Data beside the picture.** `ink_planes(photo, recipe)`, `palette_map(photo, recipe)` and `characters(photo, recipe)` take
+  what `render` takes (`maps`, `finders`, `size`) and ask the recipe's **last step** for the data it makes beside its
+  picture: a list of float32 `(h, w)` ink coverage planes in 0..1, one per ink (`halftone`: its inks in order, cyan, magenta,
+  yellow, black for `cmyk`; `dither` with `separation="spot"`: its `inks`, each plane 0 or 1; bare-paper specks are on no
+  plate); `(labels, colors)`, an int32 `(h, w)` palette-index map and the palette as `'#rrggbb'` (`dither`; painting each pixel with its
+  colour gives the picture); a `Characters` (`ascii`) with `text`, `colors`, `paper`, `ansi()` and `html()`. The last step
+  must make that kind of data and be plain (no `mask`, opacity 1, blend mode normal, no drive), else a `RecipeError` naming it;
+  the data is of the very picture `render` makes. `imageio.save(image, path, dpi=300)` writes the resolution (PNG `pHYs`,
+  JPEG density; 1 to 65535; WebP holds none); it is never a recipe field. Example: [`examples/python_api.py`](../examples/python_api.py).
 - **Shapes.** `Path.rect(x, y, w, h)` and `Path.ellipse(cx, cy, rx, ry)` are `Path` regions (`samples=` as for `Path`) for the
   common shapes: `regions={"box": Path.rect(0.1, 0.2, 0.5, 0.3)}`. `Path` is not in `__all__` (so `import *` keeps `pathlib.Path`): write
   `from bullterrier_image import Path` or `bullterrier_image.Path`. All numbers are shares of the frame (0 to 1 across and down),

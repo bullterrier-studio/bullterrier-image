@@ -1684,3 +1684,23 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   coverage a' = a + 4 g a (1 - a) (exact at 50 %, monotone while g <= 0.25, its maximum); `ink_noise`, `specks`, `speck_size`
   and `seed` draw from the position-numbered noise (`ops/realism.rs`), so windows and bands agree; `dither`'s `spot` separation
   uses the same code. Defaults 0: today's picture.
+- **Data beside the picture: functions that ask a recipe's last step (print data batch, 2026-11-17).** `Photo::ink_planes`,
+  `palette_map` and `characters` (Python: functions of the same names taking what `render` takes) run the recipe to its last
+  step and ask that step's effect for `Effect::data` (`pub(crate) fn data` in an effect's file, found by the build script like
+  `check`; `halftone`, `dither`, `ascii` have one). *Reason:* the last step is what the recipe's picture is, so the data and the
+  picture cannot disagree, and scaling, presets, size, maps and assets keep one owner, the runner. The effects draw once for
+  both (`halftone` through a `Kept` pixel type, `dither` through `Inked`/`Chosen`, `ascii` through `grid`), so the picture is
+  bit-identical (hash of 23 renders across methods, separations and sizes equal before and after). *Rejected:* a run option
+  on `Options` (`render` would return a sum type, or need a side channel, and could not say which step); public per-effect
+  functions on typed `Params` (a second scaling path, no recipe context); one function with a kind argument (callers match
+  on an enum). *Limits:* the last step must be plain (opacity 1, normal blend, no mask or drive), else `Error::Recipe` naming
+  it; an `each` step, a window of a canvas and `dither`'s `tiles` method (two colours per dot, so no one index) refuse;
+  asking for the data and the picture runs the recipe twice; ink planes are coverages before bare-paper specks, so a plate is
+  clean; dither's spot planes are 0 or 1 (its overprint is binary per cell); ink order is the effect's (named in the docs);
+  `Characters.html()` colours spans, it draws no font, and an ANSI run is one 24-bit colour per run of equal 8-bit colour.
+- **A resolution is a write option (print data batch, 2026-11-17).** `write_with(path, image, &WriteOptions)` replaces
+  `write_with_quality`: `WriteOptions::new().with_quality(q).with_dpi(d)`. `dpi` is 1 to 65535 (the JPEG density is 16 bits; one
+  range for both formats), finite, else `Error::Inputs` naming `dpi` and the value, nothing written; PNG gets a `pHYs` chunk
+  (pixels per metre, `round(dpi / 0.0254)`: 300 dpi reads back as 299.9994) right after `IHDR`, JPEG a JFIF density in whole dots
+  per inch. A WebP holds no resolution and refuses `dpi` (`BackendUnavailable`) instead of dropping it. Files without `dpi`
+  are byte-identical to before. *Reason:* DPI says how a file prints, not how a picture looks, so it is never in a recipe.

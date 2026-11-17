@@ -119,6 +119,7 @@ def test_the_python_example_runs(tmp_path, capsys, echo_model, monkeypatch):
     spec.loader.exec_module(module)
     module.main(tmp_path)
     assert (tmp_path / "steps" / "00.jpg").is_file()
+    assert (tmp_path / "photo-300dpi.png").is_file()
     assert (tmp_path / "pipeline" / "bullterrier" / "toxic-neon.jpg").is_file()
     assert "toxic-neon: done" in capsys.readouterr().out
 
