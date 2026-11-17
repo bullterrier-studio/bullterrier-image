@@ -33,8 +33,8 @@ highlights = 0.82
 
 [strong_contrast]
 description = "A hard S-curve: deep shadows and bright highlights, the middle grey unchanged."
-shadows = 0.1
-highlights = 0.9
+shadows = 0.08
+highlights = 0.92
 
 # Lifted and crushed: where the ends of the scale go.
 
@@ -48,8 +48,8 @@ white = 0.94
 
 [matte]
 description = "Matte blacks: the darkest tone lifted to a dark grey, the rest left as it is."
-black = 0.12
-shadows = 0.29
+black = 0.16
+shadows = 0.31
 
 [crush]
 description = "Crushed blacks: the shadows sink to black early and the midtones darken a little."
@@ -66,12 +66,12 @@ midtones = 0.54
 [film]
 description = "Film-like S-curve: a toe in the shadows and a shoulder that rolls the highlights off; blacks and whites slightly softened."
 black = 0.02
-shadows = 0.21
+shadows = 0.19
 midtones = 0.5
-highlights = 0.8
+highlights = 0.82
 white = 0.98
 
 [shoulder]
 description = "A highlight shoulder only: the brightest tones flatten smoothly toward white, shadows untouched."
-midtones = 0.52
-highlights = 0.82
+midtones = 0.54
+highlights = 0.85

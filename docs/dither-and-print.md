@@ -69,7 +69,7 @@ Photocopy is a look, not an effect: `grade` contrast, `dither` threshold, `grain
 
 | Addition | Where |
 |---|---|
-| ~~Gradient maps~~ **Done** (2026-11-17) | `data/presets/gradient_map.toml`: 37 curated (tints, natural, scientific scales, duotones). `space` = `oklab` mixes stops in Oklab (default `rgb`): measured, lightness steps along thermal's ramp vary 2.8x in rgb and 1.75x in Oklab, and blue-to-yellow dips in lightness in rgb but steps evenly in Oklab. |
+| ~~Gradient maps~~ **Done** (2026-11-17) | `data/presets/gradient_map.toml`: 30 curated (tints, natural, scientific scales, duotones). `space` = `oklab` mixes stops in Oklab (default `rgb`): measured, lightness steps along thermal's ramp vary 2.8x in rgb and 1.75x in Oklab, and blue-to-yellow dips in lightness in rgb but steps evenly in Oklab. |
 | ~~Palettes~~ **Done** (2026-11-17) | See `dither`: modes. |
 | ~~Tone curves~~ **Done** (2026-11-17) | `curves` presets: `low_contrast`, `contrast`, `strong_contrast`, `fade`, `matte`, `crush`, `lift_shadows`, `film`, `shoulder`. Open: a toe/shoulder with more than five points; per-channel film stocks. |
 

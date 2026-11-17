@@ -30,21 +30,9 @@ stops = ["#0a0400", "#7a3b00", "#ffb000"]
 description = "Selenium-toned print: cool purple-brown shadows fading to a warm pale paper."
 stops = ["#14101a", "#6b5560", "#e8d9d4"]
 
-[platinum]
-description = "Platinum print: soft, low-contrast warm greys with a long, gentle shoulder."
-stops = ["#17130f", "#7a6f66", "#f0ebe3"]
-
-[newsprint]
-description = "Black ink on grey-cream newsprint."
-stops = ["#1a1a1a", "#e9e4d4"]
-
 [silver]
 description = "Cool silver-grey monochrome, near-black to white."
 stops = ["#0b0c0e", "#9aa0a8", "#ffffff"]
-
-[coffee]
-description = "Dark roast to milk foam: brown shadows, cream highlights."
-stops = ["#120a06", "#5b3a24", "#d6b48a", "#fbf1de"]
 
 [verdigris]
 description = "Weathered copper: deep green-black shadows, a blue-green patina, pale mint highlights."
@@ -59,10 +47,6 @@ stops = ["#120806", "#7a2a10", "#d9783a", "#f3d9b5"]
 [sunset]
 description = "Dusk sky: indigo shadows, plum, coral and a pale yellow sun."
 stops = ["#1b1035", "#7b2a6e", "#e8534a", "#fbb040", "#fff2c2"]
-
-[golden_hour]
-description = "Low sun: brown shadows warming to amber and a cream glow."
-stops = ["#1c0f0a", "#8f4a1e", "#f0a040", "#fff0c4"]
 
 [moonlight]
 description = "Night blues: near-black navy through slate blue to a pale silver-white."
@@ -112,21 +96,9 @@ stops = ["#0d0887", "#6a00a8", "#b12a90", "#e16462", "#fca636", "#f0f921"]
 description = "Duotone of deep indigo and hot pink."
 stops = ["#1b0b4d", "#ff5fa2"]
 
-[midnight_gold]
-description = "Duotone of midnight blue and warm gold."
-stops = ["#0b1030", "#f2c14e"]
-
-[teal_coral]
-description = "Duotone of dark teal and coral."
-stops = ["#05303a", "#ff8a65"]
-
 [lilac]
 description = "Duotone of deep violet and pale lilac."
 stops = ["#1d1033", "#d6b8ff"]
-
-[mint]
-description = "Duotone of dark green and pale mint."
-stops = ["#06291f", "#bff5d8"]
 
 [crimson]
 description = "Black to blood red to a pale flesh tone."

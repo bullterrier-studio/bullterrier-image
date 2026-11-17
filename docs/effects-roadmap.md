@@ -19,7 +19,7 @@ it becomes a new effect only when it is a new idea. The effect set is consolidat
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `grade` ✓ | Colour balance (temperature, tint), exposure, contrast, saturation, vibrance (muted colours rise more than vivid ones). | `fx.grade(exposure=0.3, vibrance=0.5, temperature=-0.2)` |
-| `gradient_map` ✓ | Recolour by brightness with any gradient; 37 presets; `space="oklab"` mixes the stops in Oklab. | `fx.gradient_map(stops=["#000","#f0f"])` |
+| `gradient_map` ✓ | Recolour by brightness with any gradient; 30 presets; `space="oklab"` mixes the stops in Oklab. | `fx.gradient_map(stops=["#000","#f0f"])` |
 | `levels` ✓ | Black point, white point, gamma, output range (`output_black` lifts the blacks for a matte film look). | `fx.levels(black=0.05, white=0.95, gamma=1.1)` |
 | `curves` ✓ | Tone curve through control points; preset `solarize` folds the highlights back dark. | `fx.curves(shadows=0.18, highlights=0.82)` |
 | `auto_levels` ✓ | Stretch to the full tonal range. | `fx.auto_levels(clip=0.005)` |
