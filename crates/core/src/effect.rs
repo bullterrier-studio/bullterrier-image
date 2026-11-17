@@ -223,10 +223,7 @@ pub trait Effect: Send + Sync {
     /// [`Error::Recipe`] for an effect that makes none, or none with these parameters (`dither`'s `tiles` method draws
     /// between two colours of the palette, so has no single colour for a pixel); those of [`apply`](Self::apply) otherwise.
     fn data(&self, _picture: &Picture<'_>, _params: &Value, _inputs: &Inputs<'_>) -> Result<Data, Error> {
-        Err(Error::Recipe(format!(
-            "effect '{}' makes no data beside its picture (`halftone`, `dither` and `ascii` do)",
-            self.name()
-        )))
+        Err(no_data(self.name()))
     }
 
     /// Run it on `picture` with `params` (an object with the effect's parameters): a new image of the picture's size.
@@ -287,6 +284,11 @@ pub(crate) struct Meta {
     pub(crate) opacity: f64,
     /// The inputs it declares.
     pub(crate) inputs: &'static [Input],
+}
+
+/// The refusal for an effect that declares no `data`: the one text, whoever refuses.
+fn no_data(name: &str) -> Error {
+    Error::Recipe(format!("effect '{name}' makes no data beside its picture"))
 }
 
 /// The refusal an effect's file declares: `Err` for a run its parameters and inputs cannot make.
@@ -399,10 +401,7 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
 
     fn data(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Data, Error> {
         let Some(data) = self.data else {
-            return Err(Error::Recipe(format!(
-                "effect '{}' makes no data beside its picture (`halftone`, `dither` and `ascii` do)",
-                self.name
-            )));
+            return Err(no_data(self.name));
         };
         let params = self.read(params)?;
         if let Some(check) = self.check {

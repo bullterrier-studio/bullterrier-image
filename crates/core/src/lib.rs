@@ -63,7 +63,8 @@ mod sheet;
 pub mod shipped;
 mod spread;
 
-pub use data::{Characters, Data};
+pub use data::Characters;
+pub(crate) use data::Data;
 pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error, ErrorKind, MapKind};
 pub use files::{WriteOptions, read, read_map, write, write_with};

@@ -68,7 +68,7 @@ impl Characters {
 
     /// The ink colour of each character, row after row, sRGB `[red, green, blue]` in 0..1.
     #[must_use]
-    pub fn colours(&self) -> &[[f32; 3]] {
+    pub fn colors(&self) -> &[[f32; 3]] {
         &self.ink
     }
 

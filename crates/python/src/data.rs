@@ -183,7 +183,7 @@ impl Characters {
     #[getter]
     fn colors(&self) -> Vec<Vec<String>> {
         self.0
-            .colours()
+            .colors()
             .chunks(self.0.columns())
             .map(|line| line.iter().copied().map(hex).collect())
             .collect()

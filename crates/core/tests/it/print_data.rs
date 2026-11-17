@@ -14,7 +14,7 @@ use bullterrier_image::effects::ascii::Params as Ascii;
 use bullterrier_image::effects::dither::{Method, Palette, Params as Dither, Separation as DitherInks};
 use bullterrier_image::effects::halftone::{Params as Halftone, Separation};
 use bullterrier_image::params::Color;
-use bullterrier_image::{Data, Error, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::{Error, Options, Photo, Picture, Presets, Recipe, Step};
 
 use crate::common::compare::first_difference_within;
 use crate::common::pictures::varied;
@@ -75,7 +75,7 @@ fn the_text_is_the_grid_of_the_picture_one_line_per_row_of_cells() -> Result<(),
     let lines: Vec<String> = text.text().lines().map(str::to_owned).collect();
     assert_eq!(lines.len(), 2);
     assert!(lines.iter().all(|line| line.chars().count() == 48), "{lines:?}");
-    assert_eq!(text.colours().len(), 96);
+    assert_eq!(text.colors().len(), 96);
     Ok(())
 }
 
@@ -108,7 +108,7 @@ fn the_colour_of_a_character_is_the_ink_or_the_photo_brightened_by_hand() -> Res
     let colours = |params: Ascii| -> Result<Vec<[f32; 3]>, Error> {
         Ok(on
             .characters(&recipe(Step::of(params)), &Presets::new(), Options::default())?
-            .colours()
+            .colors()
             .to_vec())
     };
     // no ink: the cell's colour scaled until its strongest channel is full, by at most 1 / ink_floor (0.35): 0.2 is below
@@ -437,11 +437,8 @@ fn data_is_the_same_whatever_the_thread_count() -> Result<(), Error> {
     let values = ramp();
     let on = photo(&values)?;
     let look = recipe(Step::of(screen(Separation::Cmyk)));
-    let one = on.data(&look, &Presets::new(), Options::default())?;
-    let many = on.data(&look, &Presets::new(), Options::default().with_threads(3))?;
-    let (Data::Planes(one), Data::Planes(many)) = (one, many) else {
-        return Err(Error::Recipe("halftone made no planes".to_owned()));
-    };
+    let one = on.ink_planes(&look, &Presets::new(), Options::default())?;
+    let many = on.ink_planes(&look, &Presets::new(), Options::default().with_threads(3))?;
     for (a, b) in one.iter().zip(&many) {
         assert_eq!(first_difference_within(a.values(), b.values(), 0.0), None);
     }

@@ -241,25 +241,30 @@ impl<'a> Photo<'a> {
         })?
     }
 
-    /// What the last step of `recipe` makes beside its picture (see [`Data`]): the steps before it run as for
+    /// What the last step of `recipe` makes beside its picture: the steps before it run as for
     /// [`render`](Self::render), then the last is asked for its data on the picture they made. That is the data of the very
     /// picture the recipe makes (but for a `frame.transparent` cut, which only adds alpha), so a plain last step is
     /// required: no `mask`, no opacity below 1, no blend mode, no drive. Rendering the recipe too costs the same run again.
     ///
     /// # Errors
     /// As [`render`](Self::render) for the recipe, the photo and its maps; [`Error::Recipe`] naming the last step's effect
-    /// if it makes no data, is not plain, or is an `each` step, or `options` asks for a window of a canvas.
-    pub fn data(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Data, Error> {
+    /// if it makes no data, is not plain, or is an `each` step, or `options` ask for room (`Options::with_room`).
+    pub(crate) fn data(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Data, Error> {
         par::install(options.threads(), || self.start(recipe, presets, options)?.data())?
     }
 
-    /// The ink coverage planes of the last step of `recipe`, one [`Layer`] per ink, 0 to 1 (see [`data`](Self::data)): how
+    /// The ink coverage planes of the last step of `recipe`, one [`Layer`] per ink, 0 to 1: how
     /// much of the ink lies on each pixel. `halftone` gives its inks in order (no `separation`: the one ink; `cmyk`: cyan,
     /// magenta, yellow, black; `rgb`: red, green, blue; `spot`: `inks`), `dither` with `separation` `spot` gives its
     /// `inks`, each 0 or 1. Bare-paper specks are not on a plate, so they are in no plane.
     ///
+    /// The steps before the last run as for [`render`](Self::render); the data is of the picture the last step makes, so it
+    /// must be plain: no `mask`, no opacity below 1, no blend mode, no drive. Asking for it and for the picture runs the
+    /// recipe twice.
+    ///
     /// # Errors
-    /// As [`data`](Self::data), and [`Error::Recipe`] if the last step makes another kind of data.
+    /// As [`render`](Self::render); [`Error::Recipe`] naming the last step's effect if it makes another kind of data (or
+    /// none), is not plain, or is an `each` step, or `options` ask for room (`Options::with_room`).
     pub fn ink_planes(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Vec<Layer>, Error> {
         match self.data(recipe, presets, options)? {
             Data::Planes(planes) => Ok(planes),
@@ -267,13 +272,14 @@ impl<'a> Photo<'a> {
         }
     }
 
-    /// The palette-index map of the last step of `recipe` and its palette (see [`data`](Self::data)): a [`Labels`] with the
+    /// The palette-index map of the last step of `recipe` and its palette: a [`Labels`] with the
     /// index of the palette colour each pixel has, and the colours as sRGB `[red, green, blue]` in 0..1. Painting each pixel
     /// with its colour gives the picture exactly. `dither` with a palette gives it (not its `tiles` method, which draws
     /// between two colours).
     ///
     /// # Errors
-    /// As [`data`](Self::data), and [`Error::Recipe`] if the last step makes another kind of data.
+    /// As [`render`](Self::render); [`Error::Recipe`] naming the last step's effect if it makes another kind of data (or
+    /// none), is not plain, or is an `each` step, or `options` ask for room (`Options::with_room`).
     pub fn palette_map(
         &self,
         recipe: &Recipe,
@@ -286,10 +292,11 @@ impl<'a> Photo<'a> {
         }
     }
 
-    /// The characters of the last step of `recipe` (see [`data`](Self::data)): `ascii`'s grid as text with the colour of each.
+    /// The characters of the last step of `recipe`: `ascii`'s grid as text with the colour of each.
     ///
     /// # Errors
-    /// As [`data`](Self::data), and [`Error::Recipe`] if the last step makes another kind of data.
+    /// As [`render`](Self::render); [`Error::Recipe`] naming the last step's effect if it makes another kind of data (or
+    /// none), is not plain, or is an `each` step, or `options` ask for room (`Options::with_room`).
     pub fn characters(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Characters, Error> {
         match self.data(recipe, presets, options)? {
             Data::Text(text) => Ok(text),

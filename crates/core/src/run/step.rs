@@ -76,7 +76,7 @@ impl Prepared {
     /// no room round it).
     ///
     /// # Errors
-    /// [`Error::Recipe`] for an `each` step, or a picture with room round its box (a window of a canvas), else as
+    /// [`Error::Recipe`] for an `each` step, or a picture with room round its box (`Options::with_room`), else as
     /// [`StepRun::data`].
     pub(super) fn data(
         &self,
@@ -94,7 +94,7 @@ impl Prepared {
         let part = origin.part(0, before.height(), false).filter(|_| !origin.has_room());
         let Some(part) = part else {
             return Err(Error::Recipe(
-                "data beside the picture is made for a whole picture, not a window of a canvas".to_owned(),
+                "data beside the picture is made for a picture with no room round it (`Options::with_room`)".to_owned(),
             ));
         };
         step.data(before, ratio, regions, working, &part)
