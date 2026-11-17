@@ -64,7 +64,7 @@ fn palette_enum(path: &Path) -> io::Result<String> {
                     .and_then(|text| text.strip_prefix('#'))
                     .unwrap_or_default();
                 match (hex.len(), u32::from_str_radix(hex, 16)) {
-                    (6, Ok(code)) => Ok(format!("{code:#08x}")),
+                    (6, Ok(code)) => Ok(format!("0x{:04x}_{:04x}", code >> 16, code & 0xffff)),
                     _ => Err(io::Error::other(format!("palette {name}: {colour:?} is not '#rrggbb'"))),
                 }
             })
