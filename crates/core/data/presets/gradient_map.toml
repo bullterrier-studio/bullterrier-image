@@ -19,3 +19,139 @@ stops = ["#000500", "#07400f", "#6dff7a"]
 [xray]
 description = "Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."
 stops = ["#e8f6ff", "#3d86c6", "#030c1c"]
+
+# Monochrome tints: one hue from dark to light, as toned prints and old screens show it.
+
+[amber_monitor]
+description = "Amber phosphor monochrome, as an old terminal glows."
+stops = ["#0a0400", "#7a3b00", "#ffb000"]
+
+[selenium]
+description = "Selenium-toned print: cool purple-brown shadows fading to a warm pale paper."
+stops = ["#14101a", "#6b5560", "#e8d9d4"]
+
+[platinum]
+description = "Platinum print: soft, low-contrast warm greys with a long, gentle shoulder."
+stops = ["#17130f", "#7a6f66", "#f0ebe3"]
+
+[newsprint]
+description = "Black ink on grey-cream newsprint."
+stops = ["#1a1a1a", "#e9e4d4"]
+
+[silver]
+description = "Cool silver-grey monochrome, near-black to white."
+stops = ["#0b0c0e", "#9aa0a8", "#ffffff"]
+
+[coffee]
+description = "Dark roast to milk foam: brown shadows, cream highlights."
+stops = ["#120a06", "#5b3a24", "#d6b48a", "#fbf1de"]
+
+[verdigris]
+description = "Weathered copper: deep green-black shadows, a blue-green patina, pale mint highlights."
+stops = ["#0a1a17", "#2d7a6a", "#a8d8c0"]
+
+[rust]
+description = "Oxidised iron: near-black red-brown, orange rust, pale sand."
+stops = ["#120806", "#7a2a10", "#d9783a", "#f3d9b5"]
+
+# Natural and warm: scenes in the colours of a time or a place.
+
+[sunset]
+description = "Dusk sky: indigo shadows, plum, coral and a pale yellow sun."
+stops = ["#1b1035", "#7b2a6e", "#e8534a", "#fbb040", "#fff2c2"]
+
+[golden_hour]
+description = "Low sun: brown shadows warming to amber and a cream glow."
+stops = ["#1c0f0a", "#8f4a1e", "#f0a040", "#fff0c4"]
+
+[moonlight]
+description = "Night blues: near-black navy through slate blue to a pale silver-white."
+stops = ["#05060f", "#1c2a54", "#6a86c8", "#e8eeff"]
+
+[fire]
+description = "Flame: black, ember red, orange, yellow and a white-hot core."
+stops = ["#000000", "#5a0a00", "#d83a00", "#ffb000", "#fff7c8"]
+
+[ice]
+description = "Glacier: deep navy, cobalt, sky blue and frost white."
+stops = ["#050a20", "#1d4e9e", "#6fc3ee", "#f2fbff"]
+
+[ocean]
+description = "Deep sea: abyss blue, teal and sea-foam."
+stops = ["#021326", "#04546e", "#1aa3a3", "#b8f0e0"]
+
+[forest]
+description = "Woodland: black-green shadows, leaf green and pale spring yellow-green."
+stops = ["#06130a", "#14452a", "#5e9a3c", "#e0efb0"]
+
+[toxic]
+description = "Radioactive green: dark moss to acid lime and a pale yellow glow."
+stops = ["#050a02", "#27500e", "#a6e22e", "#f4ffb0"]
+
+# Scientific colour scales (matplotlib's perceptually even scales, CC0): brightness reads as an even climb in lightness.
+
+[magma]
+description = "The magma scale: black through purple and pink to a pale yellow (perceptually even)."
+stops = ["#000004", "#2c115f", "#721f81", "#b73779", "#f1605d", "#feb078", "#fcfdbf"]
+
+[inferno]
+description = "The inferno scale: black through purple and red to pale yellow (perceptually even)."
+stops = ["#000004", "#420a68", "#932667", "#dd513a", "#fca50a", "#fcffa4"]
+
+[viridis]
+description = "The viridis scale: dark purple through blue and green to yellow (perceptually even)."
+stops = ["#440154", "#414487", "#2a788e", "#22a884", "#7ad151", "#fde725"]
+
+[plasma]
+description = "The plasma scale: deep blue-violet through magenta and orange to yellow (perceptually even)."
+stops = ["#0d0887", "#6a00a8", "#b12a90", "#e16462", "#fca636", "#f0f921"]
+
+# Duotones and tritones: two or three inks, in the combinations posters and album covers use.
+
+[indigo_pink]
+description = "Duotone of deep indigo and hot pink."
+stops = ["#1b0b4d", "#ff5fa2"]
+
+[midnight_gold]
+description = "Duotone of midnight blue and warm gold."
+stops = ["#0b1030", "#f2c14e"]
+
+[teal_coral]
+description = "Duotone of dark teal and coral."
+stops = ["#05303a", "#ff8a65"]
+
+[lilac]
+description = "Duotone of deep violet and pale lilac."
+stops = ["#1d1033", "#d6b8ff"]
+
+[mint]
+description = "Duotone of dark green and pale mint."
+stops = ["#06291f", "#bff5d8"]
+
+[crimson]
+description = "Black to blood red to a pale flesh tone."
+stops = ["#0d0000", "#b3000c", "#ffd6c4"]
+
+[rose]
+description = "Wine-dark shadows, rose midtones, blush highlights."
+stops = ["#1a0612", "#7a1f4e", "#e8769a", "#fde6ee"]
+
+[pastel_dusk]
+description = "Soft purple shadows, pink midtones, buttercream highlights."
+stops = ["#3b2a5e", "#f29cb7", "#fff3c4"]
+
+[candy]
+description = "Grape, bubblegum pink, lemon and mint: a sweet, high-key spread."
+stops = ["#2a0a4a", "#ff4fa3", "#ffd23f", "#aef5e8"]
+
+[neon]
+description = "Night-club neon: near-black violet, hot magenta and electric cyan."
+stops = ["#0b0020", "#ff2bd6", "#00f0ff"]
+
+[vaporwave]
+description = "Vaporwave: dark violet, purple, hot pink, cyan and a pale pink-white."
+stops = ["#1a0b3b", "#7b2ff7", "#f107a3", "#00e5ff", "#fff1fb"]
+
+[gameboy]
+description = "The four Game Boy greens as a smooth gradient (use the `gameboy` palette of `dither` for flat steps)."
+stops = ["#0f380f", "#306230", "#8bac0f", "#9bbc0f"]
