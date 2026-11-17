@@ -24,7 +24,7 @@ const AT_MOST: f64 = 1.6;
 struct Graded;
 
 impl Effect for Graded {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "vectorised_graded"
     }
 
