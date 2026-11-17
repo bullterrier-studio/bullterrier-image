@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use super::project::{Format, Settings};
-use crate::files::write_with_quality;
+use crate::files::{WriteOptions, write_with};
 use crate::ops::resample::Resize;
 use crate::{Error, Image};
 
@@ -92,7 +92,7 @@ fn sizes(settings: &Settings, native: usize) -> Vec<Option<u32>> {
 ///
 /// # Errors
 /// [`Error::Project`] for a file that would lie outside `output`; the errors of
-/// [`write_with_quality`](crate::write_with_quality) (a JPEG cannot hold transparency, a folder that cannot be written).
+/// [`write_with`](crate::write_with) (a JPEG cannot hold transparency, a folder that cannot be written).
 pub fn export_still(
     image: &Image,
     name: &str,
@@ -120,7 +120,7 @@ pub fn export_still(
             std::fs::create_dir_all(folder).map_err(|error| {
                 Error::ImageWrite(format!("cannot write to the folder {}: {error}", folder.display()))
             })?;
-            write_with_quality(&target, picture, settings.quality)?;
+            write_with(&target, picture, &WriteOptions::new().with_quality(settings.quality))?;
             written.push(target);
         }
     }

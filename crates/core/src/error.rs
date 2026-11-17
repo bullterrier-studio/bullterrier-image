@@ -103,7 +103,7 @@ pub enum Error {
     },
     /// An effect was given inputs that do not fit: one it declares is missing, or a partition or map is not of the
     /// picture's size, or a map or partition has values it must not. Also an option of a call outside its range (the
-    /// quality of `write_with_quality`).
+    /// quality of `write_with`).
     Inputs(String),
     /// Channel values that do not make a picture of the given size (three per pixel), or a size with no row or no column.
     Size {

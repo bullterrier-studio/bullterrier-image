@@ -19,7 +19,7 @@ mod icc;
 mod raw;
 mod write;
 
-pub use write::{write, write_with_quality};
+pub use write::{WriteOptions, write, write_with};
 
 /// The most pixels (width times height) a file may hold to be read: twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485,
 /// its decompression-bomb limit, so what the Python package read stays readable. Checked from the file's header,

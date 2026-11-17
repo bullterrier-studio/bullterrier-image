@@ -64,7 +64,7 @@ mod spread;
 
 pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error, ErrorKind, MapKind};
-pub use files::{read, read_map, write, write_with_quality};
+pub use files::{WriteOptions, read, read_map, write, write_with};
 pub use footprint::Footprint;
 pub use inputs::{Inputs, Labels, Layer, Place};
 pub use lut::Lut;

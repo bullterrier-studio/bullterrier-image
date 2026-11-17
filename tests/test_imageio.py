@@ -212,3 +212,23 @@ def test_named_palettes_lists_the_colours_of_every_dither_choice_that_has_a_list
     assert choices - set(listed) == {"photo", "custom", "cube2", "cube3", "cube4", "cube5", "cube6"}
     for name in listed:
         fx.dither(palette=name)  # a step is made
+
+
+@pytest.mark.parametrize("extension", ["png", "jpg"])
+def test_a_dpi_is_read_back_by_an_independent_decoder(photo, tmp_path, extension):
+    path = tmp_path / f"a.{extension}"
+    imageio.save(photo, path, dpi=300)
+    with Image.open(path) as written:
+        assert written.info["dpi"] == pytest.approx((300, 300), abs=0.01)
+
+
+@pytest.mark.parametrize("dpi", [0, -300, float("nan"), float("inf"), 70000])
+def test_a_dpi_that_is_no_resolution_is_refused_naming_it(photo, tmp_path, dpi):
+    with pytest.raises(ValueError, match="dpi"):
+        imageio.save(photo, tmp_path / "a.png", dpi=dpi)
+    assert not (tmp_path / "a.png").exists()
+
+
+def test_a_webp_refuses_a_dpi(photo, tmp_path):
+    with pytest.raises(BackendUnavailableError, match="dpi"):
+        imageio.save(photo, tmp_path / "a.webp", dpi=300)

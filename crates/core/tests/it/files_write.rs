@@ -1,4 +1,4 @@
-//! Writing image files (`write`, `write_with_quality`), through the public API alone: what is read back from the file,
+//! Writing image files (`write`, `write_with`), through the public API alone: what is read back from the file,
 //! and the bytes of the file itself where the standard says what they must be (the JPEG's quantisation tables, the
 //! chunks and segments a file holds).
 
@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 use crate::common::Outcome;
 use crate::common::files::{Png, Scratch, chunk, exif_geotagged};
-use bullterrier_image::{Error, ErrorKind, Image, read, write, write_with_quality};
+use bullterrier_image::{Error, ErrorKind, Image, WriteOptions, read, write, write_with};
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::webp::WebPEncoder;
 use image::{ExtendedColorType, ImageDecoder, ImageEncoder, ImageReader};
@@ -75,6 +75,11 @@ fn noise(height: usize, width: usize) -> Result<Image, Error> {
         })
         .collect();
     Image::new(height, width, &values)
+}
+
+/// The options of a write at JPEG `quality`.
+fn at_quality(quality: u8) -> WriteOptions {
+    WriteOptions::new().with_quality(quality)
 }
 
 /// The values of an image, for comparing two.
@@ -273,7 +278,7 @@ fn a_jpeg_keeps_full_resolution_colour() -> Outcome {
     }
     let image = Image::new(16, 16, &stripes)?;
     let (_folder, path) = target("stripes.jpg")?;
-    write_with_quality(&path, &image, 100)?;
+    write_with(&path, &image, &at_quality(100))?;
     let (largest, _) = error(&image, &read(&path)?);
     assert!(largest < 0.1, "{largest}");
     Ok(())
@@ -286,7 +291,7 @@ fn a_lower_quality_makes_a_smaller_file_and_a_worse_picture() -> Outcome {
     let mut previous: Option<(u64, f32, u8)> = None;
     for quality in [5, 20, 40, 60, 80, 95, 100] {
         let path = folder.path("q.jpg");
-        write_with_quality(&path, &image, quality)?;
+        write_with(&path, &image, &at_quality(quality))?;
         let (size, (_, mean)) = (std::fs::metadata(&path)?.len(), error(&image, &read(&path)?));
         if let Some((smaller, rougher, lower)) = previous {
             assert!(
@@ -368,7 +373,7 @@ fn the_quantisation_tables_are_the_standard_ones_scaled_by_the_ijg_formula_for_t
     let folder = Scratch::new()?;
     for quality in [1_u8, 10, 25, 49, 50, 51, 75, 90, 95, 99, 100] {
         let path = folder.path("q.jpg");
-        write_with_quality(&path, &image, quality)?;
+        write_with(&path, &image, &at_quality(quality))?;
         let file = std::fs::read(&path)?;
         let mut tables = Vec::new();
         for (_, payload) in jpeg_segments(&file).iter().filter(|(marker, _)| *marker == 0xDB) {
@@ -396,9 +401,9 @@ fn only_a_jpeg_has_a_quality() -> Outcome {
     let image = noise(16, 16)?;
     for extension in LOSSLESS {
         let (_folder, path) = target(&format!("a.{extension}"))?;
-        write_with_quality(&path, &image, 1)?;
+        write_with(&path, &image, &at_quality(1))?;
         let rough = std::fs::read(&path)?;
-        write_with_quality(&path, &image, 100)?;
+        write_with(&path, &image, &at_quality(100))?;
         assert!(
             rough == std::fs::read(&path)?,
             "{extension}: the quality changed the file"
@@ -475,7 +480,7 @@ fn a_quality_outside_1_to_100_is_refused_naming_it_for_every_format_and_nothing_
     for extension in ALL {
         for quality in [0_u8, 101, 255] {
             let (_folder, path) = target(&format!("a.{extension}"))?;
-            let result = write_with_quality(&path, &image, quality);
+            let result = write_with(&path, &image, &at_quality(quality));
             let message = result.as_ref().err().map(ToString::to_string).unwrap_or_default();
             assert!(
                 message.contains(&quality.to_string()),
@@ -485,7 +490,7 @@ fn a_quality_outside_1_to_100_is_refused_naming_it_for_every_format_and_nothing_
         }
         for quality in [1_u8, 100] {
             let (_folder, path) = target(&format!("a.{extension}"))?;
-            write_with_quality(&path, &image, quality)?;
+            write_with(&path, &image, &at_quality(quality))?;
             assert!(path.exists(), "{extension} {quality}");
         }
     }
@@ -715,5 +720,117 @@ fn a_file_written_is_a_file_other_readers_open() -> Outcome {
             .decode()?;
         assert_eq!((opened.height(), opened.width()), (6, 8), "{extension}");
     }
+    Ok(())
+}
+
+// ---- resolution --------------------------------------------------------------------------------------------------------
+
+/// The `pHYs` chunk a PNG at `dpi` must hold by the PNG standard: pixels per metre, x then y, unit 1 (the metre).
+fn physical(dpi: f64) -> Vec<u8> {
+    let per_metre = (dpi / 0.0254).round() as u32;
+    let data = [per_metre.to_be_bytes(), per_metre.to_be_bytes()].concat();
+    chunk("pHYs", &[data, vec![1]].concat())
+}
+
+#[test]
+fn a_png_at_a_dpi_holds_the_standards_physical_size_chunk_before_its_pixels_and_the_same_pixels() -> Outcome {
+    let image = noise(9, 7)?;
+    for dpi in [72.0, 300.0, 600.5] {
+        let (_folder, path) = target("a.png")?;
+        write_with(&path, &image, &WriteOptions::new().with_dpi(dpi))?;
+        let file = std::fs::read(&path)?;
+        let expected = physical(dpi);
+        let at = file
+            .windows(expected.len())
+            .position(|window| window == expected)
+            .ok_or_else(|| format!("{dpi}: no pHYs chunk {expected:02X?}"))?;
+        let types = png_chunks(&file);
+        assert_eq!(types.iter().filter(|kind| *kind == "pHYs").count(), 1, "{types:?}");
+        let idat = file.windows(4).position(|window| window == b"IDAT").unwrap_or(0);
+        assert!(at < idat, "{dpi}: pHYs after the pixels");
+        let (_other, plain) = target("b.png")?;
+        write(&plain, &image)?;
+        let (with, without) = (read(&path)?, read(&plain)?);
+        assert!(values(&with) == values(&without), "{dpi}: the pixels changed");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_jpeg_at_a_dpi_says_it_in_its_jfif_header() -> Outcome {
+    let image = noise(9, 7)?;
+    let (_folder, path) = target("a.jpg")?;
+    write_with(&path, &image, &WriteOptions::new().with_dpi(300.0))?;
+    let jfif = &jpeg_segments(&std::fs::read(&path)?)[0].1;
+    // "JFIF\0", version (2 bytes), units (1 = dots per inch), x density, y density (16 bits each)
+    assert_eq!(jfif[..5], *b"JFIF\0");
+    assert_eq!(jfif[7], 1, "units");
+    assert_eq!(u16::from_be_bytes([jfif[8], jfif[9]]), 300);
+    assert_eq!(u16::from_be_bytes([jfif[10], jfif[11]]), 300);
+    Ok(())
+}
+
+#[test]
+fn a_dpi_and_a_quality_go_together() -> Outcome {
+    let image = noise(16, 16)?;
+    let (_folder, path) = target("a.jpg")?;
+    write_with(&path, &image, &at_quality(40).with_dpi(150.0))?;
+    let (_other, rough) = target("b.jpg")?;
+    write_with(&rough, &image, &at_quality(40))?;
+    assert_eq!(std::fs::metadata(&path)?.len(), std::fs::metadata(&rough)?.len());
+    assert_eq!(jpeg_segments(&std::fs::read(&path)?)[0].1[8..10], 150_u16.to_be_bytes());
+    Ok(())
+}
+
+#[test]
+fn no_dpi_leaves_the_files_as_they_were() -> Outcome {
+    let image = noise(9, 7)?;
+    for extension in ALL {
+        let (_folder, path) = target(&format!("a.{extension}"))?;
+        write_with(&path, &image, &WriteOptions::new())?;
+        assert!(
+            std::fs::read(&path)? == written_bytes(&image, &format!("a.{extension}"))?,
+            "{extension}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_dpi_that_is_no_resolution_is_refused_naming_dpi_and_its_value_and_nothing_is_written() -> Outcome {
+    let image = levels(2, 2)?;
+    for extension in ["png", "jpg"] {
+        for dpi in [0.0, -300.0, 0.4, f64::NAN, f64::INFINITY, 65_536.0, 1e12] {
+            let (_folder, path) = target(&format!("a.{extension}"))?;
+            let result = write_with(&path, &image, &WriteOptions::new().with_dpi(dpi));
+            let message = result.as_ref().err().map(ToString::to_string).unwrap_or_default();
+            assert!(
+                message.contains("dpi") && message.contains(&dpi.to_string()),
+                "{extension} {dpi}: {message}"
+            );
+            assert!(
+                matches!(result, Err(Error::Inputs(_))) && !path.exists(),
+                "{extension} {dpi}"
+            );
+        }
+        for dpi in [1.0, 65_535.0] {
+            let (_folder, path) = target(&format!("a.{extension}"))?;
+            write_with(&path, &image, &WriteOptions::new().with_dpi(dpi))?;
+            assert!(path.exists(), "{extension} {dpi}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_webp_cannot_hold_a_resolution_and_says_so_instead_of_dropping_it() -> Outcome {
+    let (_folder, path) = target("a.webp")?;
+    let result = write_with(&path, &levels(2, 2)?, &WriteOptions::new().with_dpi(300.0));
+    let message = result.as_ref().err().map(ToString::to_string).unwrap_or_default();
+    assert!(
+        matches!(result, Err(Error::BackendUnavailable(_))) && message.contains("dpi"),
+        "{message}"
+    );
+    assert!(!path.exists());
     Ok(())
 }

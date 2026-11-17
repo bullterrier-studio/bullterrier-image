@@ -83,7 +83,7 @@ def load_lut(path: str | Path) -> Lut:
     return read_lut(path)
 
 
-def save(image: np.ndarray, path: str | Path, quality: int = 95) -> None:
+def save(image: np.ndarray, path: str | Path, quality: int = 95, *, dpi: float | None = None) -> None:
     """Write `image` to `path`; the extension picks the format: `.png`, `.jpg` or `.jpeg`, `.webp`.
 
     `image` is (height, width, 3) RGB, or (height, width, 4) RGB with straight alpha as the last channel, which
@@ -93,13 +93,16 @@ def save(image: np.ndarray, path: str | Path, quality: int = 95) -> None:
     NonFiniteImageError naming the first such pixel.
     Levels are rounded to 8 bits. PNG and WebP are lossless (WebP is always written lossless); `quality` (1..100,
     default 95, ValueError outside it) sets JPEG compression only, and JPEGs keep full-resolution colour (4:4:4, no
-    chroma subsampling). The file embeds a small sRGB profile (under a kilobyte), so every viewer shows the colours the
-    effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and no GPS position;
+    chroma subsampling). `dpi` (1 to 65535, ValueError outside it, default none) says how large the picture prints:
+    the PNG `pHYs` chunk or the JPEG density, no pixel changes; WebP holds none (BackendUnavailableError). It belongs
+    to the file, never to a recipe. The file embeds a small sRGB profile (under a kilobyte), so every viewer shows
+    the colours the effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and
+    no GPS position;
     the same picture gives the same bytes every time. BackendUnavailableError, naming the extension, for any other
     extension (TIFF, GIF, BMP are read, not written). ImageWriteError, naming the path, when the file cannot be created
     (no such folder, no permission) or the picture is too large for the format; no file is left behind.
     """
-    native.write(path, as_image(image, alpha=True), quality)
+    native.write(path, as_image(image, alpha=True), quality, dpi)
 
 
 def resize(image: np.ndarray, longest_side: int) -> np.ndarray:

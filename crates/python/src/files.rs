@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use bullterrier_image::{Error, Image};
+use bullterrier_image::{Error, Image, WriteOptions};
 use numpy::{PyArray1, PyArray2, PyArray3, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 
@@ -36,19 +36,28 @@ pub(crate) fn read_map(py: Python<'_>, path: PathBuf) -> PyResult<Bound<'_, PyAr
 
 /// Write `image` (float32, C-contiguous, `(height, width, 3)`, or `(height, width, 4)` with straight alpha last) to
 /// `path` (a `str` or a path); the extension picks the format: `.png`, `.jpg` or `.jpeg`, `.webp` (lossless). Levels are
-/// rounded to 8 bits; one outside 0..1 is cut to the nearest end. `quality` (1..100) applies to JPEG only. The file
+/// rounded to 8 bits; one outside 0..1 is cut to the nearest end. `quality` (1..100) applies to JPEG only; `dpi` (1..65535, none: no resolution) is the PNG `pHYs` chunk or the JPEG density, refused for WebP. The file
 /// carries a small sRGB profile and no other metadata. The core does the work without the GIL.
 ///
 /// A failure is a `CoreError` of kind `backend_unavailable` (another extension, or a JPEG with alpha), `image_write`
-/// (the file cannot be created), `invalid_image` (an array that is no such picture) or `other` (`quality` out of range).
+/// (the file cannot be created), `invalid_image` (an array that is no such picture) or `other` (`quality` or `dpi` out of range).
 #[pyfunction]
-#[pyo3(signature = (path, image, quality=95))]
+#[pyo3(signature = (path, image, quality=95, dpi=None))]
 #[expect(clippy::needless_pass_by_value, reason = "pyo3 extracts a path as an owned PathBuf")]
-pub(crate) fn write(py: Python<'_>, path: PathBuf, image: &Bound<'_, PyAny>, quality: i64) -> PyResult<()> {
+pub(crate) fn write(
+    py: Python<'_>,
+    path: PathBuf,
+    image: &Bound<'_, PyAny>,
+    quality: i64,
+    dpi: Option<f64>,
+) -> PyResult<()> {
     let quality = u8::try_from(quality)
         .map_err(|_| core_error(Error::Inputs(format!("quality is from 1 to 100, got {quality}"))))?;
+    let options = dpi
+        .map_or(WriteOptions::new(), |dpi| WriteOptions::new().with_dpi(dpi))
+        .with_quality(quality);
     let image = image_of(image)?;
-    py.detach(|| bullterrier_image::write_with_quality(&path, &image, quality))
+    py.detach(|| bullterrier_image::write_with(&path, &image, &options))
         .map_err(core_error)
 }
 
