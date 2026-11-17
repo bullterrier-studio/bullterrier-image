@@ -477,7 +477,7 @@ paper : colour, default '#ffffff'
     ...
 
 @_effect
-def curves(*, black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize'] | None = None) -> Step:
+def curves(*, black: float = 0.0, shadows: float = 0.25, midtones: float = 0.5, highlights: float = 0.75, white: float = 1.0, red_shadows: float = 0.25, red_midtones: float = 0.5, red_highlights: float = 0.75, green_shadows: float = 0.25, green_midtones: float = 0.5, green_highlights: float = 0.75, blue_shadows: float = 0.25, blue_midtones: float = 0.5, blue_highlights: float = 0.75, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['cross_process', 'solarize', 'low_contrast', 'contrast', 'strong_contrast', 'fade', 'matte', 'crush', 'lift_shadows', 'film', 'shoulder'] | None = None) -> Step:
     """Bend tones along smooth curves through control points: a master curve, then one per colour channel (cross process, solarize).  The master curve has five points at input 0, 0.25, 0.5, 0.75 and 1 (`black`, `shadows`, `midtones`, `highlights`, `white`) and is applied to all channels; each channel curve then has its own three middle points between a fixed black and white. A curve passes exactly through its points and is a monotone cubic (PCHIP): it never overshoots its neighbouring points, so rising points never darken a brighter tone. The defaults are the straight line.
 
 Parameters
@@ -540,7 +540,16 @@ blue_highlights : number, fraction, 0 to 1, default 0.75
 Presets
 -------
 cross_process : Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows.
-solarize : Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet."""
+solarize : Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet.
+low_contrast : Gentle flattening: shadows and highlights pulled toward the middle, which stays put.
+contrast : A soft S-curve: darker shadows and brighter highlights, the middle grey unchanged.
+strong_contrast : A hard S-curve: deep shadows and bright highlights, the middle grey unchanged.
+fade : Faded print: lifted blacks and dimmed whites, a soft flat look.
+matte : Matte blacks: the darkest tone lifted to a dark grey, the rest left as it is.
+crush : Crushed blacks: the shadows sink to black early and the midtones darken a little.
+lift_shadows : Opened shadows: dark detail brightened, highlights left alone.
+film : Film-like S-curve: a toe in the shadows and a shoulder that rolls the highlights off; blacks and whites slightly softened.
+shoulder : A highlight shoulder only: the brightest tones flatten smoothly toward white, shadows untouched."""
     ...
 
 @_effect
@@ -848,7 +857,7 @@ scatter : Frosted glass: every pixel jumps on its own a few pixels, so edges bre
     ...
 
 @_effect
-def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', 'tiles'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, tiles: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, phase: float | Drive = 0.0, block: int = 0, block_height: int = 8, block_group: int = 0, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'spot'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, dot_gain: float = 0.0, ink_noise: float = 0.0, specks: float = 0.0, speck_size: float = 3.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize', 'zx_spectrum', 'msx', 'c64_hires'] | None = None) -> Step:
+def dither(*, method: Literal['floyd_steinberg', 'atkinson', 'jarvis_judice_ninke', 'stucki', 'burkes', 'sierra', 'sierra_two_row', 'sierra_lite', 'stevenson_arce', 'ostromoukhov', 'dot_diffusion', 'riemersma', 'bayer2', 'bayer4', 'bayer', 'clustered', 'clustered45', 'blue_noise', 'white_noise', 'gameboy_camera', 'matrix', 'tiles'] = 'floyd_steinberg', serpentine: bool = False, matrix: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, tiles: Picture | os.PathLike[str] | numpy.ndarray | str | list[float] | tuple[float, float, float] | None = None, phase: float | Drive = 0.0, block: int = 0, block_height: int = 8, block_group: int = 0, palette: Literal['photo', 'gameboy', 'cga', 'ega', 'pico8', 'zx_spectrum', 'msx', 'c64', 'windows16', 'teletext', 'grey4', 'grey16', 'solarized', 'nord', 'gruvbox', 'dracula', 'tango', 'monokai', 'sweetie16', 'arne16', 'dawnbringer16', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom'] = 'photo', custom: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), colors: int = 8, cell: float = 0.0, pattern: float = 1.0, space: Literal['oklab', 'rgb'] = 'oklab', init: Literal['spread', 'random'] = 'spread', iterations: int = 20, tolerance: float = 0.001, sample: int = 10000, seed: int = 0, separation: Literal['none', 'spot'] = 'none', inks: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#ff4d6d', '#2b59ff'), paper: str | list[float] | tuple[float, float, float] = '#ffffff', offset: float = 0.0, offset_angle: float = 0.0, dot_gain: float = 0.0, ink_noise: float = 0.0, specks: float = 0.0, speck_size: float = 3.0, mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['posterize', 'threshold', 'palette_quantize', 'zx_spectrum', 'msx', 'c64_hires'] | None = None) -> Step:
     """Redraw the picture in a few colours, its tones kept as dots of `cell` size: ordered or error-diffusion dither, 1-bit black and white, retro palettes, and the presets `posterize`, `threshold` and `palette_quantize`.  The picture is averaged onto a grid of `cell`-sized squares, each of which becomes one palette colour, so seen from afar the dots add up to the original tones; the result is shown with hard square dots. `palette` picks the colours (found in the photo, a named set or your own), `method` the pattern and `pattern` how much of it is used: 0 gives plain flat colours. Colours are matched, and errors measured, in `space`. `separation` 'spot' prints the `inks` instead (one to four colours): the photo's colours are split into amounts of the inks (as in `halftone`), mixed back as printed subtractively over `paper` (inks overlap like transparent layers and only darken it, so use a light `paper`), and dithered once with `method` and `cell` against the paper, each ink and every overlap. `palette`, `custom`, `colors`, `space`, `init`, `iterations`, `tolerance` and `sample` are used only with no `separation`; `seed` also seeds `white_noise`. `offset` px moves the second ink's layer that far from the first along `offset_angle`, as ink misregistered on a press.
 
 Parameters
@@ -927,13 +936,15 @@ block_group : whole number, count, 0 to 256, default 0
     and a block's two colours come from one run, as the Spectrum's two colours of a
     block share their brightness (a run of 8 normal colours, then of 8 bright ones,
     black in both). 0 = any two colours. Ignored without a `block`.
-palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom', default 'photo'
+palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'zx_spectrum', 'msx', 'c64', 'windows16', 'teletext', 'grey4', 'grey16', 'solarized', 'nord', 'gruvbox', 'dracula', 'tango', 'monokai', 'sweetie16', 'arne16', 'dawnbringer16', 'cube2', 'cube3', 'cube4', 'cube5', 'cube6', 'custom', default 'photo'
     Where the colours come from. 'photo' finds `colors` colours in the picture itself
-    (k-means); 'gameboy' (the 4 greens widely used to draw a Game Boy screen), 'cga'
-    (black, cyan, magenta, white), 'ega' (the 16 IBM EGA colours), 'pico8' (the 16
-    PICO-8 colours) and 'cube2', 'cube3', 'cube4', 'cube5' and 'cube6' (every mix of 2
-    to 6 evenly spaced levels of red, green and blue: 8 to 216 colours) are fixed
-    palettes; 'custom' takes your own list, `custom`.
+    (k-means); 'custom' takes your own list, `custom`; 'cube2', 'cube3', 'cube4',
+    'cube5' and 'cube6' are every mix of 2 to 6 evenly spaced levels of red, green and
+    blue (8 to 216 colours). The rest are named palettes, 2 to 16 colours each: hardware
+    ('gameboy' the 4 greens widely used to draw a Game Boy screen, 'cga', 'ega',
+    'pico8', 'zx_spectrum', 'msx', 'c64', 'windows16', 'teletext'), greys ('grey4',
+    'grey16') and colour schemes ('solarized', 'nord', 'gruvbox', 'dracula', 'tango',
+    'monokai', 'sweetie16', 'arne16', 'dawnbringer16').
 custom : list of colours, default ('#000000', '#ffffff')
     Your own colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1), at least
     two, used when `palette` is 'custom' (ignored for any other palette).
@@ -1680,7 +1691,7 @@ fill : Flat colour fill (black; set colors for another). To replace the backgrou
     ...
 
 @_effect
-def gradient_map(*, stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray'] | None = None) -> Step:
+def gradient_map(*, stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', space: Literal['rgb', 'oklab'] = 'rgb', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray', 'amber_monitor', 'selenium', 'platinum', 'newsprint', 'silver', 'coffee', 'verdigris', 'rust', 'sunset', 'golden_hour', 'moonlight', 'fire', 'ice', 'ocean', 'forest', 'toxic', 'magma', 'inferno', 'viridis', 'plasma', 'indigo_pink', 'midnight_gold', 'teal_coral', 'lilac', 'mint', 'crimson', 'rose', 'pastel_dusk', 'candy', 'neon', 'vaporwave', 'gameboy'] | None = None) -> Step:
     """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.  A gradient that brightness is mapped onto, after an automatic contrast stretch. Two stops make a duotone, three a tritone; for example the stops "#0b0020", "#ff2bd6" and "#00f0ff" make a neon scheme. The picture is first stretched to use its full tonal range (cutting `shadow_clip` and `highlight_clip` off its ends), so the whole gradient is always visible.
 
 Parameters
@@ -1694,6 +1705,12 @@ shadow_clip : number, fraction, 0 to 0.5, default 0.01
 highlight_clip : number, fraction, 0 to 0.5, default 0.01
     Share of the brightest pixels (0..0.5) that the contrast stretch pushes onto the
     last stop. Larger gives brighter highlights.
+space : one of 'rgb', 'oklab', default 'rgb'
+    The colour space in which the colour between two stops is mixed. 'rgb' mixes the
+    picture's own red, green and blue values; 'oklab' mixes where equal distances look
+    equally different, so the brightness steps look even along the gradient and stops of
+    opposite colours (blue and yellow) do not pass through a dull grey. Only the colours
+    between the stops differ.
 
 Advanced parameters
 -------------------
@@ -1712,7 +1729,39 @@ sepia : Warm brown monochrome, from dark chocolate to cream, like an aged print.
 cyanotype : Prussian-blue monochrome fading to pale cyan, like a blueprint print.
 thermal : Heat-camera false colour: indigo for the coldest, through red and orange, to white-hot.
 night_vision : Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette).
-xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest)."""
+xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest).
+amber_monitor : Amber phosphor monochrome, as an old terminal glows.
+selenium : Selenium-toned print: cool purple-brown shadows fading to a warm pale paper.
+platinum : Platinum print: soft, low-contrast warm greys with a long, gentle shoulder.
+newsprint : Black ink on grey-cream newsprint.
+silver : Cool silver-grey monochrome, near-black to white.
+coffee : Dark roast to milk foam: brown shadows, cream highlights.
+verdigris : Weathered copper: deep green-black shadows, a blue-green patina, pale mint highlights.
+rust : Oxidised iron: near-black red-brown, orange rust, pale sand.
+sunset : Dusk sky: indigo shadows, plum, coral and a pale yellow sun.
+golden_hour : Low sun: brown shadows warming to amber and a cream glow.
+moonlight : Night blues: near-black navy through slate blue to a pale silver-white.
+fire : Flame: black, ember red, orange, yellow and a white-hot core.
+ice : Glacier: deep navy, cobalt, sky blue and frost white.
+ocean : Deep sea: abyss blue, teal and sea-foam.
+forest : Woodland: black-green shadows, leaf green and pale spring yellow-green.
+toxic : Radioactive green: dark moss to acid lime and a pale yellow glow.
+magma : The magma scale: black through purple and pink to a pale yellow (perceptually even).
+inferno : The inferno scale: black through purple and red to pale yellow (perceptually even).
+viridis : The viridis scale: dark purple through blue and green to yellow (perceptually even).
+plasma : The plasma scale: deep blue-violet through magenta and orange to yellow (perceptually even).
+indigo_pink : Duotone of deep indigo and hot pink.
+midnight_gold : Duotone of midnight blue and warm gold.
+teal_coral : Duotone of dark teal and coral.
+lilac : Duotone of deep violet and pale lilac.
+mint : Duotone of dark green and pale mint.
+crimson : Black to blood red to a pale flesh tone.
+rose : Wine-dark shadows, rose midtones, blush highlights.
+pastel_dusk : Soft purple shadows, pink midtones, buttercream highlights.
+candy : Grape, bubblegum pink, lemon and mint: a sweet, high-key spread.
+neon : Night-club neon: near-black violet, hot magenta and electric cyan.
+vaporwave : Vaporwave: dark violet, purple, hot pink, cyan and a pale pink-white.
+gameboy : The four Game Boy greens as a smooth gradient (use the `gameboy` palette of `dither` for flat steps)."""
     ...
 
 @_effect

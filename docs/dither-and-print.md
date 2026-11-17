@@ -29,7 +29,7 @@ the pattern shows is `pattern`. Done 2026-11-16, bar the later items below.
 | ~~Attribute cells~~ **Done** (2026-11-16) | The palette search limited per block: each n x n block (8 by default) gets two colours of the palette, ink and paper, and dithers between them (ZX Spectrum colour clash; MSX rows of 8 x 1, C64 hires as presets). |
 | ~~Pattern tiles~~ **Done** (2026-11-16, `method="tiles"` with a caller's strip; the bundled sets wait for presets that can name a picture) | Tone picks one tile from an ordered set (classic 2 x 2, weave, brick, grid, fishnet, spiral), the set a preset or a caller's picture strip. |
 | ~~`phase`~~ **Done** (2026-11-16, ordered and noise methods; diffusion ignores it) | A state that shifts the threshold or noise tile by a step. A caller rendering a series sets it per picture: the pattern holds still or moves. With `seed`, the same for diffusion's noise. Keeping a dither steady over a moving sequence needs the previous picture and is not image's. |
-| Named palettes as data | The named palettes are `Palette` variants today. A library of dozens belongs in `data/presets`, like the gradient maps, not in an enum. |
+| ~~Named palettes as data~~ **Done** (2026-11-17) | `crates/core/data/palettes.toml`: a table per palette, the build writes `dither`'s `Palette` choices from it (20 named: hardware, greys, colour schemes). The cubes stay in code (a formula). Open: the `palette` doc lists the names by hand (a test fails when one is missing). |
 
 Tone maps (a curve before the dither) need no parameter: a `curves` or `levels` step before `dither` is one. The gap is
 presets (below).
@@ -69,9 +69,9 @@ Photocopy is a look, not an effect: `grade` contrast, `dither` threshold, `grain
 
 | Addition | Where |
 |---|---|
-| Gradient maps | `data/presets/gradient_map.toml`: 5 today; dither tools ship well over a hundred. Check whether stops should interpolate in Oklab as well as sRGB. |
-| Palettes | Named palettes as data (see `dither`: modes). |
-| Tone curves | `curves` presets: contrast, fade, crush, film-like shoulders. |
+| ~~Gradient maps~~ **Done** (2026-11-17) | `data/presets/gradient_map.toml`: 37 curated (tints, natural, scientific scales, duotones). `space` = `oklab` mixes stops in Oklab (default `rgb`): measured, lightness steps along thermal's ramp vary 2.8x in rgb and 1.75x in Oklab, and blue-to-yellow dips in lightness in rgb but steps evenly in Oklab. |
+| ~~Palettes~~ **Done** (2026-11-17) | See `dither`: modes. |
+| ~~Tone curves~~ **Done** (2026-11-17) | `curves` presets: `low_contrast`, `contrast`, `strong_contrast`, `fade`, `matte`, `crush`, `lift_shadows`, `film`, `shoulder`. Open: a toe/shoulder with more than five points; per-channel film stocks. |
 
 ## Data beside the picture (design change)
 
@@ -97,6 +97,6 @@ It gives data; drawing the boxes is vector's and scene's, following them over a 
 1. ~~`dither` methods and matrices; `serpentine`.~~ **Done** (2026-11-16); open: Guo-Liu and Mese matrices, Peano curve, the four-shade camera set.
 2. ~~`halftone` dot shapes, screen geometry, RGB separation, print realism.~~ **Done** (2026-11-16); open: see the later items under `halftone`.
 3. ~~`modulation`; attribute cells, pattern tiles, `phase`.~~ **Done** (2026-11-16, batch A); batch B (`stipple`, `crosshatch`, `engraving`) **Done** (2026-11-16).
-4. Presets: gradient maps, palettes as data, tone curves.
+4. ~~Presets: gradient maps, palettes as data, tone curves.~~ **Done** (2026-11-17); open: see the table above.
 5. Data beside the picture, when scene's plates or vector's tracing is built.
 6. `mosaic`, the detector.

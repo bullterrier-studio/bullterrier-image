@@ -13,7 +13,7 @@ Grades, gradient maps, tints and hue changes: they recolour the picture and leav
 | <img src="../gallery/curves.jpg" width="160" alt="curves"> | `curves` | Bend tones along smooth curves through control points: a master curve, then one per colour channel (cross process, solarize). | `black=0.0` `shadows=0.25` `midtones=0.5` `highlights=0.75` `white=1.0` +9 advanced | [curves.toml](../../examples/effects/curves.toml) |
 | <img src="../gallery/equalize.jpg" width="160" alt="equalize"> | `equalize` | Equalise the brightness histogram tile by tile (CLAHE, Zuiderveld 1994), keeping each pixel's colour. | `tiles=8` `limit=3.0` `bins=256` | [equalize.toml](../../examples/effects/equalize.toml) |
 | <img src="../gallery/grade.jpg" width="160" alt="grade"> | `grade` | White balance, exposure, contrast, saturation and vibrance: `temperature`/`tint` fix a warm or cool cast first. | `temperature=0.0` `tint=0.0` `exposure=0.0` `contrast=1.0` `pivot=0.5` `saturation=1.0` `vibrance=0.0` | [grade.toml](../../examples/effects/grade.toml) |
-| <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
+| <img src="../gallery/gradient_map.jpg" width="160" alt="gradient_map"> | `gradient_map` | Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between. | `stops=('#000000', '#ffffff')` `shadow_clip=0.01` `highlight_clip=0.01` `space='rgb'` +1 advanced | [gradient_map.toml](../../examples/effects/gradient_map.toml) |
 | <img src="../gallery/levels.jpg" width="160" alt="levels"> | `levels` | Remap tones with an input black point, white point and midtone `gamma`, then an output range: contrast stretch, faded blacks, or the negative (invert). | `black=0.0` `white=1.0` `gamma=1.0` `output_black=0.0` `output_white=1.0` | [levels.toml](../../examples/effects/levels.toml) |
 | <img src="../gallery/lut.jpg" width="160" alt="lut"> | `lut` | Colour grade from a LUT file (a film look): apply a `.cube` 3D lookup table, mixed in by `amount`. | `file=Lut.identity(2)` `amount=1.0` | [lut.toml](../../examples/effects/lut.toml) |
 | <img src="../gallery/selective_color.jpg" width="160" alt="selective_color"> | `selective_color` | Shift the hue, saturation and lightness of the colours in one hue range, leaving every other pixel untouched; a range as wide as the wheel is a hue shift. | `hue=0.0` `width=60.0` `feather=30.0` `hue_shift=0.0` `saturation=1.0` `lightness=0.0` | [selective_color.toml](../../examples/effects/selective_color.toml) |
@@ -113,6 +113,15 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | --- | --- |
 | `cross_process` | Cross-processed film: punchy contrast, warm yellow-green highlights and cool blue-green shadows. |
 | `solarize` | Darkroom solarization: the tones rise to the middle grey, then fold back, so highlights turn dark with a bright edge where they meet. |
+| `low_contrast` | Gentle flattening: shadows and highlights pulled toward the middle, which stays put. |
+| `contrast` | A soft S-curve: darker shadows and brighter highlights, the middle grey unchanged. |
+| `strong_contrast` | A hard S-curve: deep shadows and bright highlights, the middle grey unchanged. |
+| `fade` | Faded print: lifted blacks and dimmed whites, a soft flat look. |
+| `matte` | Matte blacks: the darkest tone lifted to a dark grey, the rest left as it is. |
+| `crush` | Crushed blacks: the shadows sink to black early and the midtones darken a little. |
+| `lift_shadows` | Opened shadows: dark detail brightened, highlights left alone. |
+| `film` | Film-like S-curve: a toe in the shadows and a shoulder that rolls the highlights off; blacks and whites slightly softened. |
+| `shoulder` | A highlight shoulder only: the brightest tones flatten smoothly toward white, shadows untouched. |
 
 ### `equalize`
 
@@ -147,6 +156,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `stops` | list of colours |  |  | `('#000000', '#ffffff')` | The gradient's colours from darkest to brightest, evenly spaced; at least two. Two make a duotone, three a tritone. |
 | `shadow_clip` | number | fraction | 0 to 0.5 | `0.01` | Share of the darkest pixels (0..0.5) that the contrast stretch pushes onto the first stop; 0 maps only the darkest pixel there. Larger gives deeper shadows. |
 | `highlight_clip` | number | fraction | 0 to 0.5 | `0.01` | Share of the brightest pixels (0..0.5) that the contrast stretch pushes onto the last stop. Larger gives brighter highlights. |
+| `space` | one of 'rgb', 'oklab' |  |  | `'rgb'` | The colour space in which the colour between two stops is mixed. 'rgb' mixes the picture's own red, green and blue values; 'oklab' mixes where equal distances look equally different, so the brightness steps look even along the gradient and stops of opposite colours (blue and yellow) do not pass through a dull grey. Only the colours between the stops differ. |
 
 <details><summary>Advanced parameters (1)</summary>
 
@@ -165,6 +175,38 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `thermal` | Heat-camera false colour: indigo for the coldest, through red and orange, to white-hot. |
 | `night_vision` | Green phosphor monochrome, as a night-vision scope shows it (no noise or vignette). |
 | `xray` | Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest). |
+| `amber_monitor` | Amber phosphor monochrome, as an old terminal glows. |
+| `selenium` | Selenium-toned print: cool purple-brown shadows fading to a warm pale paper. |
+| `platinum` | Platinum print: soft, low-contrast warm greys with a long, gentle shoulder. |
+| `newsprint` | Black ink on grey-cream newsprint. |
+| `silver` | Cool silver-grey monochrome, near-black to white. |
+| `coffee` | Dark roast to milk foam: brown shadows, cream highlights. |
+| `verdigris` | Weathered copper: deep green-black shadows, a blue-green patina, pale mint highlights. |
+| `rust` | Oxidised iron: near-black red-brown, orange rust, pale sand. |
+| `sunset` | Dusk sky: indigo shadows, plum, coral and a pale yellow sun. |
+| `golden_hour` | Low sun: brown shadows warming to amber and a cream glow. |
+| `moonlight` | Night blues: near-black navy through slate blue to a pale silver-white. |
+| `fire` | Flame: black, ember red, orange, yellow and a white-hot core. |
+| `ice` | Glacier: deep navy, cobalt, sky blue and frost white. |
+| `ocean` | Deep sea: abyss blue, teal and sea-foam. |
+| `forest` | Woodland: black-green shadows, leaf green and pale spring yellow-green. |
+| `toxic` | Radioactive green: dark moss to acid lime and a pale yellow glow. |
+| `magma` | The magma scale: black through purple and pink to a pale yellow (perceptually even). |
+| `inferno` | The inferno scale: black through purple and red to pale yellow (perceptually even). |
+| `viridis` | The viridis scale: dark purple through blue and green to yellow (perceptually even). |
+| `plasma` | The plasma scale: deep blue-violet through magenta and orange to yellow (perceptually even). |
+| `indigo_pink` | Duotone of deep indigo and hot pink. |
+| `midnight_gold` | Duotone of midnight blue and warm gold. |
+| `teal_coral` | Duotone of dark teal and coral. |
+| `lilac` | Duotone of deep violet and pale lilac. |
+| `mint` | Duotone of dark green and pale mint. |
+| `crimson` | Black to blood red to a pale flesh tone. |
+| `rose` | Wine-dark shadows, rose midtones, blush highlights. |
+| `pastel_dusk` | Soft purple shadows, pink midtones, buttercream highlights. |
+| `candy` | Grape, bubblegum pink, lemon and mint: a sweet, high-key spread. |
+| `neon` | Night-club neon: near-black violet, hot magenta and electric cyan. |
+| `vaporwave` | Vaporwave: dark violet, purple, hot pink, cyan and a pale pink-white. |
+| `gameboy` | The four Game Boy greens as a smooth gradient (use the `gameboy` palette of `dither` for flat steps). |
 
 ### `levels`
 
