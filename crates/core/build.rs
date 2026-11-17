@@ -44,7 +44,11 @@ fn palette_enum(path: &Path) -> io::Result<String> {
     let table: toml::Table = toml::from_str(&fs::read_to_string(path)?).map_err(io::Error::other)?;
     let (mut variants, mut arms) = (String::new(), String::new());
     for (name, palette) in &table {
-        let field = |key: &str| palette.get(key).ok_or_else(|| io::Error::other(format!("palette {name}: no {key}")));
+        let field = |key: &str| {
+            palette
+                .get(key)
+                .ok_or_else(|| io::Error::other(format!("palette {name}: no {key}")))
+        };
         let description = field("description")?.as_str().unwrap_or_default();
         let variant: String = name
             .split('_')
@@ -55,7 +59,10 @@ fn palette_enum(path: &Path) -> io::Result<String> {
             .map_or(&[][..], Vec::as_slice)
             .iter()
             .map(|colour| {
-                let hex = colour.as_str().and_then(|text| text.strip_prefix('#')).unwrap_or_default();
+                let hex = colour
+                    .as_str()
+                    .and_then(|text| text.strip_prefix('#'))
+                    .unwrap_or_default();
                 match (hex.len(), u32::from_str_radix(hex, 16)) {
                     (6, Ok(code)) => Ok(format!("{code:#08x}")),
                     _ => Err(io::Error::other(format!("palette {name}: {colour:?} is not '#rrggbb'"))),
@@ -63,7 +70,10 @@ fn palette_enum(path: &Path) -> io::Result<String> {
             })
             .collect::<io::Result<_>>()?;
         if codes.len() < 2 || codes.len() > 256 {
-            return Err(io::Error::other(format!("palette {name}: 2 to 256 colours, got {}", codes.len())));
+            return Err(io::Error::other(format!(
+                "palette {name}: 2 to 256 colours, got {}",
+                codes.len()
+            )));
         }
         writeln!(variants, "    #[doc = {description:?}]\n    {variant},").map_err(io::Error::other)?;
         writeln!(arms, "            Self::{variant} => &[{}],", codes.join(", ")).map_err(io::Error::other)?;

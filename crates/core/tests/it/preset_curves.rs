@@ -26,7 +26,10 @@ fn every_curves_preset_but_solarize_keeps_the_tones_in_order_and_in_range() -> O
             continue; // folds the tones back on purpose
         }
         let out = curved(name)?;
-        assert!(out.windows(2).all(|pair| pair[0] <= pair[1]), "{name}: {out:?} is not in order");
+        assert!(
+            out.windows(2).all(|pair| pair[0] <= pair[1]),
+            "{name}: {out:?} is not in order"
+        );
         assert!(out.iter().all(|value| (0.0..=1.0).contains(value)), "{name}: {out:?}");
     }
     Ok(())
@@ -38,9 +41,15 @@ fn the_contrast_presets_push_shadows_down_and_highlights_up_by_their_degree() ->
     for out in [low, mild, strong] {
         assert!((out[2] - 0.5).abs() < 1e-5, "the middle grey stays: {out:?}");
     }
-    assert!(low[1] > 0.25 && low[3] < 0.75, "low contrast pulls the quarters in: {low:?}");
+    assert!(
+        low[1] > 0.25 && low[3] < 0.75,
+        "low contrast pulls the quarters in: {low:?}"
+    );
     assert!(mild[1] < 0.25 && mild[3] > 0.75, "contrast pushes them out: {mild:?}");
-    assert!(strong[1] < mild[1] && strong[3] > mild[3], "strong goes further: {strong:?} {mild:?}");
+    assert!(
+        strong[1] < mild[1] && strong[3] > mild[3],
+        "strong goes further: {strong:?} {mild:?}"
+    );
     Ok(())
 }
 
@@ -48,14 +57,21 @@ fn the_contrast_presets_push_shadows_down_and_highlights_up_by_their_degree() ->
 fn fade_and_matte_lift_black_and_fade_dims_white() -> Outcome {
     let (fade, matte) = (curved("fade")?, curved("matte")?);
     assert!(fade[0] >= 0.05 && fade[4] <= 0.97, "fade: {fade:?}");
-    assert!(matte[0] >= 0.08 && (matte[4] - 1.0).abs() < 1e-5, "matte lifts black only: {matte:?}");
+    assert!(
+        matte[0] >= 0.08 && (matte[4] - 1.0).abs() < 1e-5,
+        "matte lifts black only: {matte:?}"
+    );
     Ok(())
 }
 
 #[test]
 fn crush_darkens_the_shadows_and_lift_shadows_opens_them() -> Outcome {
     assert!(curved("crush")?[1] <= 0.15, "crush: {:?}", curved("crush")?);
-    assert!(curved("lift_shadows")?[1] >= 0.32, "lift_shadows: {:?}", curved("lift_shadows")?);
+    assert!(
+        curved("lift_shadows")?[1] >= 0.32,
+        "lift_shadows: {:?}",
+        curved("lift_shadows")?
+    );
     Ok(())
 }
 
@@ -64,7 +80,10 @@ fn the_film_presets_roll_the_highlights_off_the_shoulder() -> Outcome {
     // the slope between the top two points is gentler than between the middle two: the curve flattens toward white
     for name in ["film", "shoulder"] {
         let out = curved(name)?;
-        assert!(out[4] - out[3] < out[3] - out[2], "{name}: {out:?} does not flatten at the top");
+        assert!(
+            out[4] - out[3] < out[3] - out[2],
+            "{name}: {out:?} does not flatten at the top"
+        );
     }
     // the film curve also has a toe: it darkens the quarter tone
     assert!(curved("film")?[1] < 0.25);

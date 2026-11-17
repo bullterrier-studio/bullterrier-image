@@ -70,7 +70,12 @@ fn oklab_mixes_the_colour_between_two_stops_in_oklab_and_rgb_stays_the_default()
     assert_eq!(gradient_map::Params::default().space, Space::Rgb);
     // the Oklab midpoint of blue (L .45201, a -.03246, b -.31153) and yellow (L .96798, a -.07137, b .19857), converted back
     // to sRGB offline with numpy; the rgb mix of the two is the plain grey 0.5
-    let expected = [BLUE, [0.114_572_64, 0.464_816_57, 0.906_055_22], [0.422_551_4, 0.672_366_2, 0.780_543_06], [1.0, 1.0, 0.0]];
+    let expected = [
+        BLUE,
+        [0.114_572_64, 0.464_816_57, 0.906_055_22],
+        [0.422_551_4, 0.672_366_2, 0.780_543_06],
+        [1.0, 1.0, 0.0],
+    ];
     assert_close(
         run(&blue_to_yellow(Space::Oklab), &picture)?.as_flattened(),
         expected.as_flattened(),
