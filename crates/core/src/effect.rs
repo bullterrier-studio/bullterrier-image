@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
 use crate::params::{Declared, Kind, Table};
-use crate::{Error, Footprint, Image, Inputs, Picture, Spread};
+use crate::{Data, Error, Footprint, Image, Inputs, Picture, Spread};
 
 /// The sections of the effect catalogue. Every effect is in exactly one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -215,6 +215,20 @@ pub trait Effect: Send + Sync {
         Ok(Spread::NONE)
     }
 
+    /// What it makes beside its picture, run on `picture` with `params` and `inputs` as [`apply`](Self::apply) is: ink
+    /// planes, a palette-index map or a grid of characters, for an effect that has one (`halftone`, `dither`, `ascii`). The
+    /// default is an error naming the effect: most make no data.
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] for an effect that makes none, or none with these parameters (`dither`'s `tiles` method draws
+    /// between two colours of the palette, so has no single colour for a pixel); those of [`apply`](Self::apply) otherwise.
+    fn data(&self, _picture: &Picture<'_>, _params: &Value, _inputs: &Inputs<'_>) -> Result<Data, Error> {
+        Err(Error::Recipe(format!(
+            "effect '{}' makes no data beside its picture (`halftone`, `dither` and `ascii` do)",
+            self.name()
+        )))
+    }
+
     /// Run it on `picture` with `params` (an object with the effect's parameters): a new image of the picture's size.
     /// `inputs` holds the inputs the effect declares and nothing else, each of the picture's size: the core makes it
     /// so (see [`Inputs`]).
@@ -252,6 +266,19 @@ pub(crate) fn run(
     Ok(image)
 }
 
+/// What `effect` makes beside its picture on `picture` with `params`, handed the part of `offered` that it declares.
+///
+/// # Errors
+/// As [`run`] for the inputs, else what [`Effect::data`] returns.
+pub(crate) fn data(
+    effect: &dyn Effect,
+    picture: &Picture<'_>,
+    params: &Value,
+    offered: &Inputs<'_>,
+) -> Result<Data, Error> {
+    effect.data(picture, params, &offered.declared_by(effect, picture)?)
+}
+
 /// What a file in `src/effects/` declares about its effect besides its parameters: `pub(crate) const META: Meta`.
 pub(crate) struct Meta {
     /// Its section of the catalogue.
@@ -264,6 +291,9 @@ pub(crate) struct Meta {
 
 /// The refusal an effect's file declares: `Err` for a run its parameters and inputs cannot make.
 type Check<P> = fn(&P, &Inputs<'_>) -> Result<(), Error>;
+
+/// What an effect's file declares as `data`: what it makes beside its picture.
+type DataOf<P> = fn(&Picture<'_>, &P, &Inputs<'_>) -> Result<Data, Error>;
 
 /// An effect written in Rust, in a file of `src/effects/`: its `META`, its `Params` (read from the parameters), its
 /// `footprint`, its `spread` if it paints outward, its `check` if it refuses runs the table cannot, and its `render`. The build script makes one for each file.
@@ -278,6 +308,8 @@ pub(crate) struct Native<P> {
     /// What the effect refuses of a step's parameters taken with its inputs, which the table cannot say (a picture that
     /// must be given when another parameter has a value).
     check: Option<Check<P>>,
+    /// What the effect makes beside its picture, if it makes any (see [`Effect::data`]).
+    data: Option<DataOf<P>>,
 }
 
 impl<P: Declared> Native<P> {
@@ -304,7 +336,14 @@ impl<P: Declared> Native<P> {
             spread,
             render,
             check: None,
+            data: None,
         }
+    }
+
+    /// The effect, making `data` beside its picture (see `data` in `src/effects/`).
+    pub(crate) fn with_data(mut self, data: DataOf<P>) -> Self {
+        self.data = Some(data);
+        self
     }
 
     /// The effect, refusing a run for which `check` fails (see `check` in `src/effects/`).
@@ -356,6 +395,20 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
     fn spread(&self, params: &Value) -> Result<Spread, Error> {
         let params = self.read(params)?;
         Ok(self.spread.map_or(Spread::NONE, |spread| spread(&params)))
+    }
+
+    fn data(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Data, Error> {
+        let Some(data) = self.data else {
+            return Err(Error::Recipe(format!(
+                "effect '{}' makes no data beside its picture (`halftone`, `dither` and `ascii` do)",
+                self.name
+            )));
+        };
+        let params = self.read(params)?;
+        if let Some(check) = self.check {
+            check(&params, inputs)?;
+        }
+        data(picture, &params, inputs)
     }
 
     fn apply(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Image, Error> {

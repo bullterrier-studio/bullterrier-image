@@ -17,7 +17,7 @@ use crate::ops::length::{float, whole};
 use crate::ops::par;
 use crate::ops::realism::Realism;
 use crate::params::{Choice, Color, Params, PictureName};
-use crate::{Error, Image, Inputs, Picture, Place};
+use crate::{Data, Error, Image, Inputs, Layer, Picture, Place};
 
 /// Where `halftone` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -427,8 +427,43 @@ fn speck_over(real: &Realism, coverages: &[f32; MOST_INKS], x: usize, y: usize) 
     }
 }
 
+/// What the screen keeps of each pixel it draws: its colour (the picture) or its ink coverages (the plates). One drawing
+/// serves both, so the plates are of the very picture.
+trait Kept: Copy + Default + Send {
+    fn keep(colour: [f32; 3], coverages: &[f32; MOST_INKS]) -> Self;
+}
+
+impl Kept for [f32; 3] {
+    fn keep(colour: [f32; 3], _coverages: &[f32; MOST_INKS]) -> Self {
+        colour
+    }
+}
+
+impl Kept for [f32; MOST_INKS] {
+    fn keep(_colour: [f32; 3], coverages: &[f32; MOST_INKS]) -> Self {
+        *coverages
+    }
+}
+
 /// The dot screen.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    Image::from_pixels(picture.height(), picture.width(), draw::<[f32; 3]>(picture, params, inputs).0)
+}
+
+/// The ink coverage planes of the dot screen: one for each ink, 0 to 1, bare-paper specks not in them.
+#[expect(clippy::unnecessary_wraps, reason = "the signature every effect's `data` has")]
+pub(crate) fn data(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Result<Data, Error> {
+    let (height, width) = (picture.height(), picture.width());
+    let (kept, count) = draw::<[f32; MOST_INKS]>(picture, params, inputs);
+    Ok(Data::Planes(
+        (0..count)
+            .map(|ink| Layer::from_checked(height, width, kept.iter().map(|coverages| coverages[ink]).collect()))
+            .collect(),
+    ))
+}
+
+/// The dot screen drawn on `picture`, each pixel as `O` keeps it, and the number of inks.
+fn draw<O: Kept>(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> (Vec<O>, usize) {
     let (height, width) = (picture.height(), picture.width());
     // the screen is laid on the canvas, of which the picture holds the rows from `first_row`
     let place = inputs.place(picture);
@@ -465,7 +500,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let real = realism(params);
     let bare = bare_paper(params, &inks, paper);
     let (inv_cell, inv_feather) = (1.0 / cell, 1.0 / params.feather);
-    let mut pixels = vec![[0.0; 3]; height * width];
+    let mut pixels = vec![O::default(); height * width];
     par::rows(&mut pixels, width, |first, band| {
         let mut cells: Vec<Cell> = screens
             .iter()
@@ -528,9 +563,9 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                     paper
                 };
                 let speck = speck_over(&real, &coverages, column, place.first_row + first + offset);
-                *out = Realism::specked(printed, bare, speck);
+                *out = O::keep(Realism::specked(printed, bare, speck), &coverages);
             }
         }
     });
-    Image::from_pixels(height, width, pixels)
+    (pixels, count)
 }

@@ -118,6 +118,8 @@ pub(crate) struct Atlas {
     height: usize,
     /// Coverage 0..1 of each glyph, `height` rows of `width`.
     glyphs: Vec<Vec<f32>>,
+    /// The character of each glyph.
+    characters: Vec<char>,
 }
 
 impl Atlas {
@@ -148,7 +150,7 @@ impl Atlas {
         let outlines = face.font.outline_glyphs();
         let charmap = face.font.charmap();
         let mut seen = Vec::new();
-        let mut glyphs: Vec<(f64, Vec<f32>)> = Vec::new();
+        let mut glyphs: Vec<(f64, char, Vec<f32>)> = Vec::new();
         for character in chars.chars() {
             if seen.contains(&character) {
                 continue;
@@ -178,13 +180,14 @@ impl Atlas {
                 coverage(height, width, &shape, SAMPLES, Limits::STANDARD.crossings)?
             };
             let ink = covered.iter().map(|&share| f64::from(share)).sum::<f64>();
-            glyphs.push((ink, covered));
+            glyphs.push((ink, character, covered));
         }
         glyphs.sort_by(|one, other| one.0.total_cmp(&other.0));
         Ok(Self {
             width,
             height,
-            glyphs: glyphs.into_iter().map(|(_, covered)| covered).collect(),
+            characters: glyphs.iter().map(|&(_, character, _)| character).collect(),
+            glyphs: glyphs.into_iter().map(|(_, _, covered)| covered).collect(),
         })
     }
 
@@ -201,6 +204,11 @@ impl Atlas {
     /// The height of a cell, px.
     pub(crate) const fn height(&self) -> usize {
         self.height
+    }
+
+    /// The character of glyph `index` (0 is the lightest).
+    pub(crate) fn character(&self, index: usize) -> char {
+        self.characters[index]
     }
 
     /// The coverage of glyph `index` (0 is the lightest), `height` rows of `width`.

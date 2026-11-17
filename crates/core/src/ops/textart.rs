@@ -8,7 +8,7 @@ use super::color::{luminance, vivid};
 use super::glyphs::Atlas;
 use super::length::{float, whole};
 use super::{cast, par};
-use crate::{Image, Picture};
+use crate::{Characters, Image, Picture};
 
 /// How a picture is redrawn.
 pub(crate) struct Style<'a> {
@@ -30,20 +30,21 @@ pub(crate) struct Style<'a> {
     pub(crate) photo: f32,
 }
 
-/// `picture` redrawn in characters, a new image of the same size. The grid starts at the top left corner; a cell cut off by
-/// the right or bottom edge is measured as if the border pixels went on. Each cell is the average colour of its pixels; its
-/// ink amount is that colour's luminance on a dark paper and its complement on a light one, to the power `gamma`, and the
-/// character is the one at that share of the way along the palette sorted by ink.
-pub(crate) fn text_art(picture: &Picture<'_>, style: &Style<'_>) -> Image {
-    let atlas = Atlas::new(style.chars, style.cell);
+/// The size of a grid (rows, columns) and its cells: each one's average colour and glyph.
+type Grid = ((usize, usize), Vec<([f32; 3], usize)>);
+
+/// The grid of `picture` in cells of `atlas`: how many rows and columns, and for each cell its average colour and the glyph
+/// it stands for. The grid starts at the top left corner; a cell cut off by the right or bottom edge is measured as if
+/// the border pixels went on. A cell's ink amount is its colour's luminance on a dark paper and its complement on a light
+/// one, to the power `gamma`, and the glyph is the one at that share of the way along the palette sorted by ink.
+fn grid(picture: &Picture<'_>, style: &Style<'_>, atlas: &Atlas) -> Grid {
     let (cell_width, cell_height) = (atlas.width(), atlas.height());
     let (height, width) = (picture.height(), picture.width());
     let (rows, columns) = (height.div_ceil(cell_height), width.div_ceil(cell_width));
     let pixels = picture.pixels();
     let dark_paper = luminance(style.paper) < style.paper_threshold;
     let last = float(atlas.len() - 1);
-    // the average colour of each cell and the glyph it stands for
-    let cells: Vec<([f32; 3], usize)> = (0..rows * columns)
+    let cells = (0..rows * columns)
         .map(|cell| {
             let (top, left) = (cell / columns * cell_height, cell % columns * cell_width);
             let mut sum = [0.0_f64; 3];
@@ -65,6 +66,34 @@ pub(crate) fn text_art(picture: &Picture<'_>, style: &Style<'_>) -> Image {
             (mean, whole(f64::from(amount) * last))
         })
         .collect();
+    ((rows, columns), cells)
+}
+
+/// The colour a character of a cell of average colour `mean` is drawn in.
+fn ink_of(style: &Style<'_>, mean: [f32; 3]) -> [f32; 3] {
+    style.ink.unwrap_or_else(|| vivid(mean, style.ink_floor))
+}
+
+/// `picture` redrawn in characters, as a grid of text (see [`grid`] for how each is chosen) with the colour of each.
+pub(crate) fn characters(picture: &Picture<'_>, style: &Style<'_>) -> Characters {
+    let atlas = Atlas::new(style.chars, style.cell);
+    let ((rows, columns), cells) = grid(picture, style, &atlas);
+    Characters::new(
+        rows,
+        columns,
+        cells.iter().map(|&(_, glyph)| atlas.character(glyph)).collect(),
+        cells.iter().map(|&(mean, _)| ink_of(style, mean)).collect(),
+        style.paper,
+    )
+}
+
+/// `picture` redrawn in characters, a new image of the same size (see [`grid`] for how each character is chosen).
+pub(crate) fn text_art(picture: &Picture<'_>, style: &Style<'_>) -> Image {
+    let atlas = Atlas::new(style.chars, style.cell);
+    let (cell_width, cell_height) = (atlas.width(), atlas.height());
+    let (height, width) = (picture.height(), picture.width());
+    let pixels = picture.pixels();
+    let ((_, columns), cells) = grid(picture, style, &atlas);
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
@@ -72,7 +101,7 @@ pub(crate) fn text_art(picture: &Picture<'_>, style: &Style<'_>) -> Image {
             for (column, pixel) in line.iter_mut().enumerate() {
                 let (mean, glyph) = cells[row / cell_height * columns + column / cell_width];
                 let share = atlas.glyph(glyph)[row % cell_height * cell_width + column % cell_width];
-                let text = style.ink.unwrap_or_else(|| vivid(mean, style.ink_floor));
+                let text = ink_of(style, mean);
                 let photo = pixels[row * width + column];
                 *pixel = [0, 1, 2].map(|channel| {
                     let base = style.paper[channel] * (1.0 - style.photo) + photo[channel] * style.photo;

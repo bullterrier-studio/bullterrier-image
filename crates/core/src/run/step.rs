@@ -13,7 +13,7 @@ use crate::effect::{self, Effect};
 use crate::ops::{blend, levels};
 use crate::params::Kind;
 use crate::recipe::drive;
-use crate::{BlendMode, Entry, Error, Image, Input, Inputs, Labels, Layer, Lut, Picture, Presets, Spread, Step};
+use crate::{BlendMode, Data, Entry, Error, Image, Input, Inputs, Labels, Layer, Lut, Picture, Presets, Spread, Step};
 
 /// The entry `entry` (at `place`, as `step 2`) resolved: for a step its parameters complete and scaled, the regions it
 /// names, for an `each` step its looks the same.
@@ -70,6 +70,34 @@ impl Prepared {
             out[row * width + columns.start..row * width + columns.end].copy_from_slice(line);
         }
         Ok(Image::from_pixels(height, width, out))
+    }
+
+    /// What this entry makes beside its picture, run on `before` (all of `working`, which `origin` places on a canvas with
+    /// no room round it).
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] for an `each` step, or a picture with room round its box (a window of a canvas), else as
+    /// [`StepRun::data`].
+    pub(super) fn data(
+        &self,
+        before: &Picture<'_>,
+        ratio: f64,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+        origin: Origin,
+    ) -> Result<Data, Error> {
+        let Self::Step(step) = self else {
+            return Err(Error::Recipe(
+                "the last step is an `each` step, which makes no data beside its picture".to_owned(),
+            ));
+        };
+        let part = origin.part(0, before.height(), false).filter(|_| !origin.has_room());
+        let Some(part) = part else {
+            return Err(Error::Recipe(
+                "data beside the picture is made for a whole picture, not a window of a canvas".to_owned(),
+            ));
+        };
+        step.data(before, ratio, regions, working, &part)
     }
 
     fn apply_part(
@@ -131,6 +159,11 @@ pub(super) struct Overlay {
 }
 
 impl Overlay {
+    /// Whether the result is laid over its input as it is: blend mode normal, opacity 1, no mask.
+    pub(super) fn is_plain(&self) -> bool {
+        self.opacity >= 1.0 && self.mask.is_none() && self.blend_mode == BlendMode::Normal
+    }
+
     pub(super) fn new(opacity: f64, blend_mode: BlendMode, mask: Option<&String>) -> Self {
         Self {
             opacity,
@@ -154,19 +187,17 @@ impl Overlay {
             .as_ref()
             .map(|mask| regions.selection(mask, working).map(|mask| cut(mask, part)))
             .transpose()?;
-        Ok(
-            if self.opacity >= 1.0 && mask.is_none() && self.blend_mode == BlendMode::Normal {
-                after
-            } else {
-                blend::lay(
-                    before,
-                    &after.as_picture(),
-                    self.blend_mode,
-                    self.opacity,
-                    mask.as_deref(),
-                )
-            },
-        )
+        Ok(if self.is_plain() {
+            after
+        } else {
+            blend::lay(
+                before,
+                &after.as_picture(),
+                self.blend_mode,
+                self.opacity,
+                mask.as_deref(),
+            )
+        })
     }
 }
 
@@ -334,17 +365,16 @@ impl StepRun {
         }
     }
 
-    /// This step's effect run on `before`, which is the rows of `working` from `at` on (all of it when `at` is 0 and
-    /// `before` is as tall), with the selections it names made by `regions` for `working` and cut to those rows, and the
-    /// result laid over `before`.
-    pub(super) fn apply(
+    /// `then` given the inputs this step offers its effect: the selections it names made by `regions` for `working` and cut
+    /// to `part`, its tables and pictures, the pieces of its partition and the size ratio.
+    fn offering<T>(
         &self,
-        before: &Picture<'_>,
         ratio: f64,
         regions: &mut Evaluator,
         working: &Picture<'_>,
         part: &Part,
-    ) -> Result<Image, Error> {
+        then: impl FnOnce(&Inputs<'_>, &mut Evaluator) -> Result<T, Error>,
+    ) -> Result<T, Error> {
         let mut fields = Vec::with_capacity(self.fields.len());
         for (parameter, region) in &self.fields {
             fields.push((parameter, cut(regions.selection(region, working)?, part)));
@@ -367,14 +397,73 @@ impl StepRun {
         if let Some(pieces) = &partition {
             offered = offered.with_partition(pieces);
         }
-        let after = match &self.runs {
-            Runs::One { scaled } => effect::run(&*self.effect, before, scaled, &offered)?,
+        then(&offered, regions)
+    }
+
+    /// What this step's effect makes beside its picture, run on `before` as [`apply`](Self::apply) runs it on the whole of
+    /// `working` (`before` is all of it).
+    ///
+    /// # Errors
+    /// [`Error::Recipe`] for a step that is driven, or laid over its input by an opacity, a blend mode or a mask (its data
+    /// would not be of the picture the recipe makes), else what the effect refuses.
+    pub(super) fn data(
+        &self,
+        before: &Picture<'_>,
+        ratio: f64,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+        part: &Part,
+    ) -> Result<Data, Error> {
+        let Runs::One { scaled } = &self.runs else {
+            return Err(Error::Recipe(format!(
+                "effect '{}' is driven, so its data would not be of the picture the step makes",
+                self.effect.name()
+            )));
+        };
+        if !self.overlay.is_plain() {
+            return Err(Error::Recipe(format!(
+                "the last step ('{}') is laid over its input by an opacity, blend mode or mask, so its data would not be of the picture the recipe makes",
+                self.effect.name()
+            )));
+        }
+        self.offering(ratio, regions, working, part, |offered, _| {
+            effect::data(&*self.effect, before, scaled, offered)
+        })
+    }
+
+    /// This step's effect run on `before`, which is the rows of `working` from `at` on (all of it when `at` is 0 and
+    /// `before` is as tall), with the selections it names made by `regions` for `working` and cut to those rows, and the
+    /// result laid over `before`.
+    pub(super) fn apply(
+        &self,
+        before: &Picture<'_>,
+        ratio: f64,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+        part: &Part,
+    ) -> Result<Image, Error> {
+        let after = self.offering(ratio, regions, working, part, |offered, regions| {
+            self.effect_on(before, regions, working, part, offered)
+        })?;
+        self.overlay.over(before, after, regions, working, part)
+    }
+
+    /// The effect run on `before` with `offered`, each level of a drive mixed by its map.
+    fn effect_on(
+        &self,
+        before: &Picture<'_>,
+        regions: &mut Evaluator,
+        working: &Picture<'_>,
+        part: &Part,
+        offered: &Inputs<'_>,
+    ) -> Result<Image, Error> {
+        match &self.runs {
+            Runs::One { scaled } => effect::run(&*self.effect, before, scaled, offered),
             Runs::Driven { by, top, levels } => {
                 let by = cut(regions.selection(by, working)?, part);
-                self.driven(before, &offered, &by, *top, levels)?
+                self.driven(before, offered, &by, *top, levels)
             }
-        };
-        self.overlay.over(before, after, regions, working, part)
+        }
     }
 
     /// The effect run on `before` for each level of the drive that some pixel is on or next to, and each pixel mixes the

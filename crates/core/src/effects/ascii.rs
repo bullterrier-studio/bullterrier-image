@@ -4,9 +4,9 @@ use serde::Deserialize;
 
 use crate::Footprint;
 use crate::effect::{Category, Meta};
-use crate::ops::textart::{Style, text_art};
+use crate::ops::textart::{Style, characters, text_art};
 use crate::params::{Color, Params};
-use crate::{Image, Inputs, Picture};
+use crate::{Data, Error, Image, Inputs, Picture};
 
 /// Where `ascii` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -72,9 +72,9 @@ pub struct Params {
     pub photo: f32,
 }
 
-/// The picture redrawn in characters.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let style = Style {
+/// How `params` draw.
+fn style(params: &Params) -> Style<'_> {
+    Style {
         cell: params.cell,
         chars: &params.chars,
         ink: params.ink.map(|ink| ink.0),
@@ -83,6 +83,16 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         paper_threshold: params.paper_threshold,
         gamma: params.gamma,
         photo: params.photo,
-    };
-    text_art(picture, &style)
+    }
+}
+
+/// The picture redrawn in characters.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+    text_art(picture, &style(params))
+}
+
+/// The characters of the picture: what `render` draws, as text with the colour of each.
+#[expect(clippy::unnecessary_wraps, reason = "the signature every effect's `data` has")]
+pub(crate) fn data(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Result<Data, Error> {
+    Ok(Data::Text(characters(picture, &style(params))))
 }

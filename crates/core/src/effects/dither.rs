@@ -22,7 +22,7 @@ use crate::ops::realism::Realism;
 use crate::ops::tiles::{self, Strip};
 use crate::palette::{self, Search};
 use crate::params::{Choice, Color, Params, PictureName};
-use crate::{Error, Image, Inputs, Picture};
+use crate::{Data, Error, Image, Inputs, Labels, Layer, Picture};
 
 /// Where `dither` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -505,18 +505,46 @@ fn matrix_of(inputs: &Inputs<'_>) -> Thresholds<'static> {
     from_greys(&greys, size)
 }
 
-/// The inks printed: the dots' colours are split into amounts of the inks (after the press's dot gain and uneven ink), mixed
-/// in the print model into one target colour per dot, and that is dithered once with `method` against the overprint palette,
-/// the print of every combination of inks. The inks of the colour chosen for a pixel (the bits of its index) are moved by their
-/// share of the offset, and every pixel gets the print of the inks that land on it.
-fn printed(
+/// The inks printed, decided: which inks land on which cell, and what each combination of them prints.
+struct Inked {
+    /// For each cell, the bits of the inks that land on it.
+    layers: Vec<u8>,
+    /// The whole pixels each ink's layer is moved by, (x, y).
+    moves: Vec<[isize; 2]>,
+    /// The print of every combination of inks, by the bits of the inks that land: the overprint palette.
+    table: Vec<[f32; 3]>,
+    real: Realism,
+    columns: usize,
+    cell: usize,
+    size: (usize, usize),
+}
+
+impl Inked {
+    /// Whether `ink` lands on the pixel (`x`, `y`): its layer moved by its share of the offset, none from off the picture.
+    fn lands(&self, ink: usize, x: usize, y: usize) -> bool {
+        let (height, width) = self.size;
+        let by = self.moves[ink];
+        // where the layer comes from; none where that is off the picture
+        let from = |at: usize, away: isize, size: usize| at.checked_add_signed(-away).filter(|&at| at < size);
+        match (from(y, by[1], height), from(x, by[0], width)) {
+            (Some(row), Some(column)) => usize::from(self.layers[row / self.cell * self.columns + column / self.cell]) >> ink & 1 == 1,
+            _ => false,
+        }
+    }
+}
+
+/// The inks decided: the dots' colours are split into amounts of the inks (after the press's dot gain and uneven ink),
+/// mixed in the print model into one target colour per dot, and that is dithered once with `method` against the overprint
+/// palette, the print of every combination of inks. The inks of the colour chosen for a pixel (the bits of its index) are
+/// moved by their share of the offset.
+fn inked(
     dots: &[Point],
     (rows, columns): (usize, usize),
     cell: usize,
     (height, width): (usize, usize),
     params: &Params,
     inputs: &Inputs<'_>,
-) -> Image {
+) -> Inked {
     let colours: Vec<[f32; 3]> = params.inks.iter().map(|ink| ink.0).collect();
     let inks = Inks::new(params.paper.0, &colours);
     let count = colours.len().min(MOST_INKS);
@@ -566,24 +594,30 @@ fn printed(
     let moves: Vec<[isize; 2]> = (0..count)
         .map(|ink| shift(params.offset, params.offset_angle, ink).map(whole_move))
         .collect();
+    Inked {
+        layers,
+        moves,
+        table,
+        real,
+        columns,
+        cell,
+        size: (height, width),
+    }
+}
+
+/// The inks printed: every pixel gets the print of the inks that land on it.
+fn printed(print: &Inked) -> Image {
+    let (height, width) = print.size;
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
             let y = first_row + offset;
             for (x, pixel) in line.iter_mut().enumerate() {
-                let mut mask = 0; // constant: no ink has landed yet
-                for (ink, by) in moves.iter().enumerate() {
-                    // where the layer comes from; none where that is off the picture
-                    let from =
-                        |at: usize, away: isize, size: usize| at.checked_add_signed(-away).filter(|&at| at < size);
-                    if let (Some(row), Some(column)) = (from(y, by[1], height), from(x, by[0], width)) {
-                        mask |= (usize::from(layers[row / cell * columns + column / cell]) >> ink & 1) << ink;
-                    }
-                }
+                let mask = (0..print.moves.len()).fold(0, |mask, ink| mask | usize::from(print.lands(ink, x, y)) << ink);
                 *pixel = if mask == 0 {
-                    table[0]
+                    print.table[0]
                 } else {
-                    Realism::specked(table[mask], table[0], real.speck(x, y))
+                    Realism::specked(print.table[mask], print.table[0], print.real.speck(x, y))
                 };
             }
         }
@@ -591,28 +625,51 @@ fn printed(
     Image::from_pixels(height, width, out)
 }
 
-/// The picture redrawn.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    let (height, width) = (picture.height(), picture.width());
-    let strip = Strip::of(inputs);
-    let cell = if params.method == Method::Tiles {
-        strip.side()
-    } else {
-        whole(f64::from(params.cell)).max(1)
-    };
-    let (rows, columns) = (height.div_ceil(cell), width.div_ceil(cell));
-    let dots = averaged(picture.pixels(), (height, width), cell);
-    if params.separation == Separation::Spot {
-        return printed(&dots, (rows, columns), cell, (height, width), params, inputs);
+/// One plane for each ink: 1 where it lands on the pixel, else 0.
+fn planes(print: &Inked) -> Vec<Layer> {
+    let (height, width) = print.size;
+    (0..print.moves.len())
+        .map(|ink| {
+            let mut plane = vec![0.0_f32; height * width];
+            par::rows(&mut plane, width, |first_row, band| {
+                for (offset, line) in band.chunks_exact_mut(width).enumerate() {
+                    for (x, level) in line.iter_mut().enumerate() {
+                        *level = f32::from(u8::from(print.lands(ink, x, first_row + offset)));
+                    }
+                }
+            });
+            Layer::from_checked(height, width, plane)
+        })
+        .collect()
+}
+
+/// What `dither` chooses for a picture drawn from a palette: the palette and the index of its colour for each dot.
+struct Chosen {
+    palette: Vec<Point>,
+    /// The palette index of each dot, row after row of `columns`.
+    indices: Vec<u8>,
+    columns: usize,
+    cell: usize,
+}
+
+impl Chosen {
+    /// The index of the colour of the pixel (`row`, `column`).
+    fn at(&self, row: usize, column: usize) -> u8 {
+        self.indices[row / self.cell * self.columns + column / self.cell]
     }
-    let matched = in_space(&dots, params.space);
-    let palette = colours(&dots, &matched, params);
+}
+
+/// The dots' colours chosen from a palette by `params.method` (not `tiles`, which draws between two colours of its own).
+fn chosen(
+    dots: &[Point],
+    size: (usize, usize),
+    cell: usize,
+    params: &Params,
+    inputs: &Inputs<'_>,
+) -> Chosen {
+    let matched = in_space(dots, params.space);
+    let palette = colours(dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
-    if params.method == Method::Tiles {
-        let out = tiles::draw((&matched, &matched_palette), &palette, &strip, (height, width));
-        return Image::from_pixels(height, width, out);
-    }
-    let size = (rows, columns);
     let blocks = (params.block > 0).then(|| {
         let shape = Shape {
             width: count(params.block),
@@ -621,7 +678,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         };
         Blocks::choose(&matched, size, &matched_palette, shape)
     });
-    let chosen = pattern(
+    let indices = pattern(
         params.method,
         &matched,
         size,
@@ -630,14 +687,85 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         inputs,
         params.space,
     );
+    Chosen {
+        palette,
+        indices,
+        columns: size.1,
+        cell,
+    }
+}
+
+/// The picture painted with the colours `chosen` gave its dots.
+fn painted(chosen: &Chosen, (height, width): (usize, usize)) -> Image {
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
-            let row = (first_row + offset) / cell;
-            for (column, run) in line.chunks_mut(cell).enumerate() {
-                run.fill(palette[usize::from(chosen[row * columns + column])]);
+            let row = first_row + offset;
+            for (column, pixel) in line.iter_mut().enumerate() {
+                *pixel = chosen.palette[usize::from(chosen.at(row, column))];
             }
         }
     });
     Image::from_pixels(height, width, out)
+}
+
+/// The dots of `picture` and the grid they make: the cell side, the rows and columns of dots.
+fn dots_of<'a>(
+    picture: &Picture<'a>,
+    params: &Params,
+    inputs: &Inputs<'_>,
+) -> (usize, (usize, usize), Cow<'a, [Point]>) {
+    let (height, width) = (picture.height(), picture.width());
+    let cell = if params.method == Method::Tiles {
+        Strip::of(inputs).side()
+    } else {
+        whole(f64::from(params.cell)).max(1)
+    };
+    let dots = averaged(picture.pixels(), (height, width), cell);
+    (cell, (height.div_ceil(cell), width.div_ceil(cell)), dots)
+}
+
+/// The picture redrawn.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    let size = (picture.height(), picture.width());
+    let (cell, grid, dots) = dots_of(picture, params, inputs);
+    if params.separation == Separation::Spot {
+        return printed(&inked(&dots, grid, cell, size, params, inputs));
+    }
+    if params.method == Method::Tiles {
+        let matched = in_space(&dots, params.space);
+        let palette = colours(&dots, &matched, params);
+        let matched_palette = in_space(&palette, params.space);
+        let out = tiles::draw((&matched, &matched_palette), &palette, &Strip::of(inputs), size);
+        return Image::from_pixels(size.0, size.1, out);
+    }
+    painted(&chosen(&dots, grid, cell, params, inputs), size)
+}
+
+/// What `dither` makes beside its picture: with 'spot' `separation` an ink plane for each ink, else the index of each
+/// pixel's palette colour and the palette.
+///
+/// # Errors
+/// [`Error::Recipe`] naming `method` for 'tiles', which draws between two palette colours, so has no one colour for a pixel.
+pub(crate) fn data(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Result<Data, Error> {
+    let (height, width) = (picture.height(), picture.width());
+    let (cell, grid, dots) = dots_of(picture, params, inputs);
+    if params.separation == Separation::Spot {
+        return Ok(Data::Planes(planes(&inked(&dots, grid, cell, (height, width), params, inputs))));
+    }
+    if params.method == Method::Tiles {
+        return Err(Error::Recipe(
+            "dither: `method` 'tiles' draws each dot between two palette colours, so it has no palette index map".to_owned(),
+        ));
+    }
+    let made = chosen(&dots, grid, cell, params, inputs);
+    let labels = (0..height)
+        .flat_map(|row| (0..width).map(move |column| (row, column)))
+        .map(|(row, column)| i32::from(made.at(row, column)))
+        .collect();
+    let map = Labels::new(height, width, labels, made.palette.len())?;
+    Ok(Data::Palette {
+        map,
+        colours: made.palette,
+    })
 }

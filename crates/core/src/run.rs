@@ -36,7 +36,7 @@ use step::{Prepared, prepare};
 pub use trace::Stage;
 
 use crate::ops::par;
-use crate::{Error, Frame, Image, Layer, Lut, Picture, Presets, Recipe, Spread};
+use crate::{Characters, Data, Entry, Error, Frame, Image, Labels, Layer, Lut, Picture, Presets, Recipe, Spread};
 
 impl Recipe {
     /// How far `self` paints beyond the edge of the picture it is rendered on: the room, in output pixels, that a
@@ -241,6 +241,62 @@ impl<'a> Photo<'a> {
         })?
     }
 
+    /// What the last step of `recipe` makes beside its picture (see [`Data`]): the steps before it run as for
+    /// [`render`](Self::render), then the last is asked for its data on the picture they made. That is the data of the very
+    /// picture the recipe makes (but for a `frame.transparent` cut, which only adds alpha), so a plain last step is
+    /// required: no `mask`, no opacity below 1, no blend mode, no drive. Rendering the recipe too costs the same run again.
+    ///
+    /// # Errors
+    /// As [`render`](Self::render) for the recipe, the photo and its maps; [`Error::Recipe`] naming the last step's effect
+    /// if it makes no data, is not plain, or is an `each` step, or `options` asks for a window of a canvas.
+    pub fn data(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Data, Error> {
+        par::install(options.threads(), || self.start(recipe, presets, options)?.data())?
+    }
+
+    /// The ink coverage planes of the last step of `recipe`, one [`Layer`] per ink, 0 to 1 (see [`data`](Self::data)): how
+    /// much of the ink lies on each pixel. `halftone` gives its inks in order (no `separation`: the one ink; `cmyk`: cyan,
+    /// magenta, yellow, black; `rgb`: red, green, blue; `spot`: `inks`), `dither` with `separation` `spot` gives its
+    /// `inks`, each 0 or 1. Bare-paper specks are not on a plate, so they are in no plane.
+    ///
+    /// # Errors
+    /// As [`data`](Self::data), and [`Error::Recipe`] if the last step makes another kind of data.
+    pub fn ink_planes(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Vec<Layer>, Error> {
+        match self.data(recipe, presets, options)? {
+            Data::Planes(planes) => Ok(planes),
+            other => Err(wrong_kind(recipe, "ink planes", &other)),
+        }
+    }
+
+    /// The palette-index map of the last step of `recipe` and its palette (see [`data`](Self::data)): a [`Labels`] with the
+    /// index of the palette colour each pixel has, and the colours as sRGB `[red, green, blue]` in 0..1. Painting each pixel
+    /// with its colour gives the picture exactly. `dither` with a palette gives it (not its `tiles` method, which draws
+    /// between two colours).
+    ///
+    /// # Errors
+    /// As [`data`](Self::data), and [`Error::Recipe`] if the last step makes another kind of data.
+    pub fn palette_map(
+        &self,
+        recipe: &Recipe,
+        presets: &Presets,
+        options: Options,
+    ) -> Result<(Labels, Vec<[f32; 3]>), Error> {
+        match self.data(recipe, presets, options)? {
+            Data::Palette { map, colours } => Ok((map, colours)),
+            other => Err(wrong_kind(recipe, "a palette map", &other)),
+        }
+    }
+
+    /// The characters of the last step of `recipe` (see [`data`](Self::data)): `ascii`'s grid as text with the colour of each.
+    ///
+    /// # Errors
+    /// As [`data`](Self::data), and [`Error::Recipe`] if the last step makes another kind of data.
+    pub fn characters(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Characters, Error> {
+        match self.data(recipe, presets, options)? {
+            Data::Text(text) => Ok(text),
+            other => Err(wrong_kind(recipe, "characters", &other)),
+        }
+    }
+
     /// The map of the region `name` of `recipe`: how much each pixel of the working picture is chosen by it, a number from 0
     /// to 1, as a step that names the region (`mask`, a field) is given it. `name` is `subject`, `background`, `depth`,
     /// `light` or a region the recipe declares that is a selection, whether or not a step uses it.
@@ -348,6 +404,25 @@ impl<'a> Photo<'a> {
     }
 }
 
+/// The refusal for asking a recipe's last step for `wanted` when it makes `found`.
+fn wrong_kind(recipe: &Recipe, wanted: &str, found: &Data) -> Error {
+    let made = match found {
+        Data::Planes(_) => "ink planes",
+        Data::Palette { .. } => "a palette map",
+        Data::Text(_) => "characters",
+    };
+    let last = recipe.steps.last().map_or_else(
+        || "none".to_owned(),
+        |entry| match entry {
+            Entry::Step(step) => step.effect.clone(),
+            Entry::Each(_) => "each".to_owned(),
+        },
+    );
+    Error::Recipe(format!(
+        "the last step ('{last}') makes {made} with these parameters, not {wanted}"
+    ))
+}
+
 /// A recipe being run, the one engine of `render` and `trace`: the steps still to run and the newest image. Each step
 /// takes the image before it and drops it once its own is made, so no earlier image is kept; whoever wants them (a
 /// trace) copies what [`advance`](Self::advance) shows.
@@ -388,6 +463,28 @@ impl Run<'_> {
         self.ran += 1;
         self.current = Some(after);
         Ok(self.current.as_ref())
+    }
+
+    /// Runs every step but the last, then asks the last what it makes beside its picture (see [`Data`]).
+    fn data(&mut self) -> Result<Data, Error> {
+        while self.steps.len() > 1 {
+            self.advance()?;
+        }
+        let step = self
+            .steps
+            .next()
+            .ok_or_else(|| Error::Recipe("a recipe needs at least one step".to_owned()))?;
+        let before = self
+            .current
+            .as_ref()
+            .map_or_else(|| self.working.picture(), Image::as_picture);
+        step.data(
+            &before,
+            self.ratio,
+            &mut self.regions,
+            &self.working.picture(),
+            self.origin,
+        )
     }
 
     /// The image after the last step, cut out if the recipe's frame says so.

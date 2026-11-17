@@ -275,7 +275,7 @@ fn effect_files(folder: &Path) -> io::Result<Vec<(String, PathBuf)>> {
 /// and `builtin()`, which makes each effect from its `META`, its `Params` (read from the parameters), its `footprint`
 /// (`fn(&Params) -> Footprint`), its `spread` (`fn(&Params) -> Spread`, if the file declares one: an effect that paints
 /// nothing outward has none), its `check` (`fn(&Params, &Inputs) -> Result<(), Error>`, if it declares one: a run it
-/// refuses) and its `render` (`fn(&Picture, &Params, &Inputs) -> Image`).
+/// refuses), its `data` (`fn(&Picture, &Params, &Inputs) -> Result<Data, Error>`, if it makes some beside its picture) and its `render` (`fn(&Picture, &Params, &Inputs) -> Image`).
 fn table(files: &[(String, PathBuf)]) -> Result<String, Box<dyn std::error::Error>> {
     let mut code = String::new();
     for (name, path) in files {
@@ -302,9 +302,14 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, Box<dyn std::error::Erro
         } else {
             String::new()
         };
+        let data = if fs::read_to_string(path)?.contains("\npub(crate) fn data(") {
+            format!(".with_data({name}::data)")
+        } else {
+            String::new()
+        };
         writeln!(
             code,
-            "        ::std::sync::Arc::new(crate::effect::Native::new({name:?}, &{name}::META, {name}::footprint, {spread}, {name}::render){check}),"
+            "        ::std::sync::Arc::new(crate::effect::Native::new({name:?}, &{name}::META, {name}::footprint, {spread}, {name}::render){check}{data}),"
         )?;
     }
     writeln!(code, "    ]\n}}")?;
