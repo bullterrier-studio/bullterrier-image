@@ -204,6 +204,7 @@ pub struct Params {
     /// widely used to draw a Game Boy screen, 'cga', 'ega', 'pico8', 'zx_spectrum', 'msx', 'c64', 'windows16', 'teletext'),
     /// greys ('grey4', 'grey16') and colour schemes ('solarized', 'nord', 'gruvbox', 'dracula', 'tango', 'monokai',
     /// 'sweetie16', 'arne16', 'dawnbringer16').
+    #[expect(clippy::doc_markdown, reason = "names of palettes are quoted plain text")]
     #[param(default = Photo)]
     pub palette: Palette,
     /// Your own colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1), at least two, used when `palette` is

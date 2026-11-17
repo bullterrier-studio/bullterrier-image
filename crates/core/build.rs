@@ -80,6 +80,7 @@ fn palette_enum(path: &Path) -> io::Result<String> {
     }
     Ok(format!(
         "/// Where the colours come from.
+#[expect(clippy::doc_markdown, reason = \"the descriptions are prose written in data\")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
 pub enum Palette {{
     /// Colours found in the picture itself (k-means).

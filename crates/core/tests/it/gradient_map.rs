@@ -72,8 +72,8 @@ fn oklab_mixes_the_colour_between_two_stops_in_oklab_and_rgb_stays_the_default()
     // to sRGB offline with numpy; the rgb mix of the two is the plain grey 0.5
     let expected = [
         BLUE,
-        [0.114_572_64, 0.464_816_57, 0.906_055_22],
-        [0.422_551_4, 0.672_366_2, 0.780_543_06],
+        [0.114_572_64, 0.464_816_6, 0.906_055_2],
+        [0.422_551_4, 0.672_366_2, 0.780_543_1],
         [1.0, 1.0, 0.0],
     ];
     assert_close(
