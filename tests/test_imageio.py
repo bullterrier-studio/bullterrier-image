@@ -13,6 +13,7 @@ from bullterrier_image import (
     fx,
     imageio,
 )
+from bullterrier_image.core import registry
 
 
 def test_save_load_roundtrip_within_8_bit_precision(photo, tmp_path):
@@ -198,3 +199,16 @@ def test_palette_refuses_a_seed_outside_0_to_4294967295_naming_the_value(seed, s
 @pytest.mark.parametrize("seed", [0, 2**32 - 1])
 def test_palette_takes_the_smallest_and_largest_seed(seed):
     assert imageio.palette(np.zeros((2, 2, 3), np.float32), colors=1, seed=seed) == ["#000000"]
+
+
+def test_named_palettes_lists_the_colours_of_every_dither_choice_that_has_a_list():
+    listed = imageio.named_palettes()
+    assert bullterrier_image.named_palettes is imageio.named_palettes
+    assert listed["gameboy"] == ["#0f380f", "#306230", "#8bac0f", "#9bbc0f"]
+    assert not {"photo", "custom", "cube2", "cube6"} & set(listed)
+    field = next(f for f in registry.parameters("dither")["fields"] if f["name"] == "palette")
+    choices = set(field["choices"])  # every listed name is a choice
+    assert set(listed) <= choices
+    assert choices - set(listed) == {"photo", "custom", "cube2", "cube3", "cube4", "cube5", "cube6"}
+    for name in listed:
+        fx.dither(palette=name)  # a step is made

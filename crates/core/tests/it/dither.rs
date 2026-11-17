@@ -5,7 +5,7 @@
 
 use bullterrier_image::Error;
 use bullterrier_image::effects::dither::{Init, Method, Palette, Params, Space};
-use bullterrier_image::params::Color;
+use bullterrier_image::params::{Choice, Color};
 use serde_json::json;
 
 use crate::common::dither::{BLACK, WHITE, grey_matrix, near, pixels, rgb, run, with_matrix};
@@ -81,8 +81,8 @@ fn a_fixed_palette_paints_with_its_published_colours_only() -> Result<(), Error>
     Ok(())
 }
 
-/// The palettes that were typed in the code before they became data, as their colour strings: the oracle that the data
-/// reproduces them bit for bit.
+/// Seven named palettes typed again from their published colours: the oracle that the data holds them bit for bit. (Gameboy,
+/// CGA, EGA and PICO-8 were in the code before the data; ZX Spectrum, MSX and C64 came with it.)
 const FORMERLY_CODED: [(Palette, &[&str]); 7] = [
     (Palette::Gameboy, &["#0f380f", "#306230", "#8bac0f", "#9bbc0f"]),
     (Palette::Cga, &["#000000", "#55ffff", "#ff55ff", "#ffffff"]),
@@ -110,8 +110,8 @@ const FORMERLY_CODED: [(Palette, &[&str]); 7] = [
     (
         Palette::Msx,
         &[
-            "#000000", "#3eb849", "#74d07d", "#5955e0", "#8076f1", "#b95e51", "#65dbef", "#db6559", "#ff897d",
-            "#ccc35e", "#ded087", "#3aa241", "#b766b5", "#cccccc", "#ffffff",
+            "#000000", "#0aad1e", "#34c84c", "#2b2de3", "#514bfb", "#bd2925", "#1ee2ef", "#fb2c2b", "#ff5f4c",
+            "#bda22b", "#d7b454", "#0a8c18", "#af329a", "#b2b2b2", "#ffffff",
         ],
     ),
     (
@@ -160,20 +160,33 @@ fn a_named_palette_gives_the_same_picture_bit_for_bit_as_its_colours_given_as_cu
 }
 
 #[test]
-fn the_palette_parameter_says_every_choice_it_has() -> Result<(), Error> {
-    let table = bullterrier_image::effect("dither")?.params();
-    let field = table
-        .fields
-        .iter()
-        .find(|field| field.name == "palette")
-        .ok_or_else(|| Error::Recipe("no palette".into()))?;
-    for choice in field.choices {
+fn the_named_palettes_list_their_description_and_colours_and_the_formulas_have_none() {
+    assert!(Palette::NAMED.len() >= FORMERLY_CODED.len());
+    for palette in Palette::NAMED {
+        let colours = palette.colours().unwrap_or_default();
         assert!(
-            field.meaning.contains(choice),
-            "the palette doc does not mention '{choice}'"
+            (2..=256).contains(&colours.len()),
+            "{}: {} colours",
+            palette.name(),
+            colours.len()
+        );
+        assert!(
+            !palette.description().unwrap_or_default().is_empty(),
+            "{}: no description",
+            palette.name()
+        );
+        assert!(Palette::CHOICES.contains(&palette.name()));
+    }
+    for (palette, colours) in FORMERLY_CODED {
+        assert_eq!(
+            palette.colours().as_deref(),
+            Some(&colours.iter().map(|c| (*c).to_owned()).collect::<Vec<_>>()[..])
         );
     }
-    Ok(())
+    for formula in [Palette::Photo, Palette::Custom, Palette::Cube2, Palette::Cube6] {
+        assert_eq!((formula.colours(), formula.description()), (None, None));
+        assert!(!Palette::NAMED.contains(&formula));
+    }
 }
 
 #[test]

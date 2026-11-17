@@ -128,3 +128,14 @@ def palette(rgb: np.ndarray, *, colors: int = 5, seed: int = 0) -> list[str]:
     checked as `render` checks a photo: InvalidImageError for another array.
     """
     return native.palette(as_image(rgb), colors, seed)
+
+
+def named_palettes() -> dict[str, list[str]]:
+    """The named palettes of `fx.dither(palette=...)`, by name, each its colours as `'#rrggbb'` in the order the data
+    lists them, in the data file's order:
+
+        named_palettes()["gameboy"]   # ['#0f380f', '#306230', '#8bac0f', '#9bbc0f']
+
+    `photo` (found in the picture), `custom` (yours) and `cube2` to `cube6` (formulas) are not listed. A name goes
+    straight into `fx.dither(palette=name)`; the colours go into `fx.gradient_map(stops=...)` too."""
+    return dict(native.named_palettes())

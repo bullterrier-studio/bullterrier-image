@@ -33,7 +33,8 @@ that recipe redone. Same seed, same pixels. Look wrong? See the picture after ev
 - **Subject- and depth-aware.** Aim an effect at subject, background, near or far.
 - **Looks and presets built in.** Nine multi-step looks (glitch, crt, hologram, stained glass...): `looks()` lists them,
   `load_recipe("crt")` loads one, `bt-image render photo.jpg crt` renders it. A preset is one effect's named values:
-  `fx.slice_shift(preset="glitch")`, listed by `fx.slice_shift.presets` and `bt-image effects`.
+  `fx.slice_shift(preset="glitch")`, listed by `fx.slice_shift.presets` and `bt-image effects`. `dither`'s named
+  palettes (`palette="gameboy"`) are listed with their colours by `named_palettes()`.
 - **Fails early.** Typo fails at load, not halfway through batch.
 
 ## Install

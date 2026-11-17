@@ -49,7 +49,7 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
     )
     from .finding.depth import depth_finder, depth_map, inverse_depth
     from .finding.subject import subject_finder, subject_matte
-    from .imageio import palette
+    from .imageio import named_palettes, palette
     from .pipeline import Project, load_project, run
     from .recipe import (
         RECIPE_FORMATS,
@@ -102,7 +102,7 @@ _HOMES = {
     ".core.values": ("Lut", "Picture"),
     ".finding.depth": ("depth_finder", "depth_map", "inverse_depth"),
     ".finding.subject": ("subject_finder", "subject_matte"),
-    ".imageio": ("palette",),
+    ".imageio": ("named_palettes", "palette"),
     ".pipeline": ("Project", "load_project", "run"),
     ".recipe": (
         "RECIPE_FORMATS", "Band", "Bands", "ColorRange", "Combine", "Components", "Cuts", "Curve", "Drive", "Each",
@@ -195,6 +195,7 @@ __all__ = [
     "load_project",
     "load_recipe",
     "looks",
+    "named_palettes",
     "palette",
     "recipe",
     "region_map",

@@ -1,5 +1,7 @@
 //! `_core.palette`: a picture's dominant colours as hex text.
 
+use bullterrier_image::effects::dither::Palette;
+use bullterrier_image::params::Choice;
 use pyo3::prelude::*;
 
 use super::{core_error, photo_array, picture_of};
@@ -28,4 +30,13 @@ pub(crate) fn palette(py: Python<'_>, rgb: &Bound<'_, PyAny>, colors: i64, seed:
         .into_iter()
         .map(|[red, green, blue]| format!("#{:02x}{:02x}{:02x}", byte(red), byte(green), byte(blue)))
         .collect())
+}
+
+/// The named palettes of `dither` as `(name, ['#rrggbb', ...])`, in the order of the data file.
+#[pyfunction]
+pub(crate) fn named_palettes() -> Vec<(&'static str, Vec<String>)> {
+    Palette::NAMED
+        .iter()
+        .map(|palette| (palette.name(), palette.colours().unwrap_or_default()))
+        .collect()
 }

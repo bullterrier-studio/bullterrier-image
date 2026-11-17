@@ -54,7 +54,7 @@ mod _core {
     use super::lut::PyLut;
 
     #[pymodule_export]
-    use super::palette::palette;
+    use super::palette::{named_palettes, palette};
 
     #[pymodule_export]
     use super::pipeline::{check_project, init_project, project_maps, read_project, run_project};

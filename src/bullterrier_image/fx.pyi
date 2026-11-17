@@ -940,11 +940,9 @@ palette : one of 'photo', 'gameboy', 'cga', 'ega', 'pico8', 'zx_spectrum', 'msx'
     Where the colours come from. 'photo' finds `colors` colours in the picture itself
     (k-means); 'custom' takes your own list, `custom`; 'cube2', 'cube3', 'cube4',
     'cube5' and 'cube6' are every mix of 2 to 6 evenly spaced levels of red, green and
-    blue (8 to 216 colours). The rest are named palettes, 2 to 16 colours each: hardware
-    ('gameboy' the 4 greens widely used to draw a Game Boy screen, 'cga', 'ega',
-    'pico8', 'zx_spectrum', 'msx', 'c64', 'windows16', 'teletext'), greys ('grey4',
-    'grey16') and colour schemes ('solarized', 'nord', 'gruvbox', 'dracula', 'tango',
-    'monokai', 'sweetie16', 'arne16', 'dawnbringer16').
+    blue (8 to 216 colours). Every other choice is a named palette of 2 to 16 colours
+    (hardware, greys, colour schemes), listed with its description and colours by
+    `Palette::NAMED` in Rust and `named_palettes()` in Python.
 custom : list of colours, default ('#000000', '#ffffff')
     Your own colours, in any order ('#rrggbb', '#rgb' or three numbers 0 to 1), at least
     two, used when `palette` is 'custom' (ignored for any other palette).
