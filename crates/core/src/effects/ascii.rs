@@ -93,7 +93,8 @@ fn style(params: &Params) -> Style<'_> {
 pub(crate) fn check(params: &Params, _inputs: &Inputs<'_>) -> Result<(), Error> {
     if params.chars.contains(['\n', '\r']) {
         return Err(Error::Recipe(
-            "ascii: `chars` must not hold a line break (a character of the grid is one cell, not the end of a line)".to_owned(),
+            "ascii: `chars` must not hold a line break (a character of the grid is one cell, not the end of a line)"
+                .to_owned(),
         ));
     }
     Ok(())
