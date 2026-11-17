@@ -25,8 +25,8 @@ colors = [
     "#ff004d", "#ffa300", "#ffec27", "#00e436", "#29adff", "#83769c", "#ff77a8", "#ffccaa",
 ]
 
-# The ZX Spectrum's 8 colours at normal level 0xD7 and at bright level 0xFF, as in the Wikipedia article "ZX Spectrum
-# graphic modes" (colour table). Black is listed in both runs (it is the same colour), so `block_group` 8 keeps a block's two
+# The ZX Spectrum's 8 colours at normal level 0xD7 and at bright level 0xFF: the D7 variant (Wikipedia, "ZX Spectrum
+# graphic modes", colour table). Black is listed in both runs (it is the same colour), so `block_group` 8 keeps a block's two
 # colours inside one brightness: ink and paper of a cell share one BRIGHT bit.
 [zx_spectrum]
 description = "The ZX Spectrum's 15 colours: 8 at normal brightness, then 8 bright (black twice, so runs of 8 are the BRIGHT sets)."
@@ -35,13 +35,13 @@ colors = [
     "#000000", "#0000ff", "#ff0000", "#ff00ff", "#00ff00", "#00ffff", "#ffff00", "#ffffff",
 ]
 
-# The TMS9918A's 15 colours (colour 0 is transparent) as the widely circulated RGB set that emulators and palette
-# collections use; no source is official, the chip's output being analogue.
+# The TMS9918A's 15 colours (colour 0 is transparent), as the Wikipedia article "Texas Instruments TMS9918" lists them in
+# its CRT display table (the chip's YPbPr output converted to RGB with gamma 1.6).
 [msx]
-description = "The MSX (TMS9918A) 15 colours."
+description = "The TMS9918A's 15 colours; the MSX's colours."
 colors = [
-    "#000000", "#3eb849", "#74d07d", "#5955e0", "#8076f1", "#b95e51", "#65dbef", "#db6559",
-    "#ff897d", "#ccc35e", "#ded087", "#3aa241", "#b766b5", "#cccccc", "#ffffff",
+    "#000000", "#0aad1e", "#34c84c", "#2b2de3", "#514bfb", "#bd2925", "#1ee2ef", "#fb2c2b",
+    "#ff5f4c", "#bda22b", "#d7b454", "#0a8c18", "#af329a", "#b2b2b2", "#ffffff",
 ]
 
 # "Pepto" (Philip Timmermann, 2001): the 16 VIC-II colours as measured from a PAL machine (pepto.de/projects/colorvic).
@@ -115,7 +115,7 @@ colors = [
 ]
 
 [monokai]
-description = "Monokai: near-black with hot pink, lime, orange, sky blue and violet."
+description = "Monokai: near-black with hot pink, lime, sand yellow, sky blue and violet."
 colors = ["#272822", "#f92672", "#a6e22e", "#f4bf75", "#66d9ef", "#ae81ff", "#a1efe4", "#f8f8f2"]
 
 # Sweetie 16 by GrafxKid (CC0).
