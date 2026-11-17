@@ -447,3 +447,18 @@ fn data_is_the_same_whatever_the_thread_count() -> Result<(), Error> {
     }
     Ok(())
 }
+
+#[test]
+fn a_line_break_among_the_chars_is_refused_naming_chars() -> Result<(), Error> {
+    let values = ramp();
+    let on = photo(&values)?;
+    for chars in [" .\n#", " .\r#"] {
+        let look = recipe(Step::of(Ascii {
+            chars: chars.to_owned(),
+            ..white_on_black(10)
+        }));
+        let said = message(on.characters(&look, &Presets::new(), Options::default()));
+        assert!(said.contains("chars"), "{said}");
+    }
+    Ok(())
+}

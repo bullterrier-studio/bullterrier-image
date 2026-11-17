@@ -232,3 +232,10 @@ def test_a_dpi_that_is_no_resolution_is_refused_naming_it(photo, tmp_path, dpi):
 def test_a_webp_refuses_a_dpi(photo, tmp_path):
     with pytest.raises(BackendUnavailableError, match="dpi"):
         imageio.save(photo, tmp_path / "a.webp", dpi=300)
+
+
+@pytest.mark.parametrize("dpi", [True, False, "300", [300]])
+def test_a_dpi_that_is_no_number_is_refused_naming_it(photo, tmp_path, dpi):
+    with pytest.raises(TypeError, match="dpi"):
+        imageio.save(photo, tmp_path / "a.png", dpi=dpi)
+    assert not (tmp_path / "a.png").exists()

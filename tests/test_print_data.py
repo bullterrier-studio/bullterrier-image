@@ -52,3 +52,8 @@ def test_the_wrong_kind_of_data_is_a_recipe_error_naming_the_effect(photo):
         characters(photo, fx.grade())
     with pytest.raises(RecipeError, match="opacity"):
         characters(photo, Recipe([fx.ascii(opacity=0.5)]))
+
+
+def test_a_line_break_among_the_chars_is_refused_naming_chars(photo):
+    with pytest.raises(RecipeError, match="chars"):
+        characters(photo, fx.ascii(chars=" .\n#"))

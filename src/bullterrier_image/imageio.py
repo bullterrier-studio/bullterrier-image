@@ -6,6 +6,7 @@ Rust core reads and writes them (formats, EXIF rotation, ICC profiles, 8-bit con
 effects. It also resizes pictures and reads `.cube` colour tables.
 """
 
+import numbers
 from pathlib import Path
 
 import numpy as np
@@ -93,15 +94,18 @@ def save(image: np.ndarray, path: str | Path, quality: int = 95, *, dpi: float |
     NonFiniteImageError naming the first such pixel.
     Levels are rounded to 8 bits. PNG and WebP are lossless (WebP is always written lossless); `quality` (1..100,
     default 95, ValueError outside it) sets JPEG compression only, and JPEGs keep full-resolution colour (4:4:4, no
-    chroma subsampling). `dpi` (1 to 65535, ValueError outside it, default none) says how large the picture prints:
-    the PNG `pHYs` chunk or the JPEG density, no pixel changes; WebP holds none (BackendUnavailableError). It belongs
-    to the file, never to a recipe. The file embeds a small sRGB profile (under a kilobyte), so every viewer shows
+    chroma subsampling). `dpi` (a number, 1 to 65535: TypeError for another type, ValueError outside it; default none)
+    says how large the picture prints: the PNG `pHYs` chunk or the JPEG density, no pixel changes; WebP holds none
+    (BackendUnavailableError). It belongs to the file, never to a recipe. The file embeds a small sRGB profile (under a
+    kilobyte), so every viewer shows
     the colours the effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and
     no GPS position;
     the same picture gives the same bytes every time. BackendUnavailableError, naming the extension, for any other
     extension (TIFF, GIF, BMP are read, not written). ImageWriteError, naming the path, when the file cannot be created
     (no such folder, no permission) or the picture is too large for the format; no file is left behind.
     """
+    if dpi is not None and (isinstance(dpi, bool) or not isinstance(dpi, numbers.Real)):
+        raise TypeError(f"dpi is a number of dots per inch, got {dpi!r}")
     native.write(path, as_image(image, alpha=True), quality, dpi)
 
 

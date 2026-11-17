@@ -37,7 +37,7 @@ pub struct Params {
     /// Width of one character, 1 to 200 px; the height follows from the font. Smaller = finer detail, more characters.
     #[param(default = 10, unit = px, min = 1, max = 200)]
     pub cell: usize,
-    /// The character palette, in any order: at least two different characters, at most 128 characters long. It is sorted
+    /// The character palette, in any order: at least two different characters, at most 128 characters long, none a line break. It is sorted
     /// by how much ink each glyph puts down, so the densest is used for the brightest areas on dark paper and the darkest
     /// on light paper (see `paper`). Try ' .:-=+*#%@', ' .oO0@', '01', or blocks like ' ░▒▓█': the bundled font has the
     /// Latin letters and the block elements, not braille.
@@ -84,6 +84,19 @@ fn style(params: &Params) -> Style<'_> {
         gamma: params.gamma,
         photo: params.photo,
     }
+}
+
+/// The refusal `ascii` declares: a line break among `chars` would break the grid's lines.
+///
+/// # Errors
+/// [`Error::Recipe`] naming `chars` if it holds `\n` or `\r`.
+pub(crate) fn check(params: &Params, _inputs: &Inputs<'_>) -> Result<(), Error> {
+    if params.chars.contains(['\n', '\r']) {
+        return Err(Error::Recipe(
+            "ascii: `chars` must not hold a line break (a character of the grid is one cell, not the end of a line)".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 /// The picture redrawn in characters.
