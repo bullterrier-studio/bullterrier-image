@@ -2,7 +2,7 @@
 //! quantile method, and the order of the result. Expected clip points come from `numpy.quantile`, worked out offline.
 
 use bullterrier_image::Error;
-use bullterrier_image::effects::gradient_map::{self, QuantileMethod};
+use bullterrier_image::effects::gradient_map::{self, QuantileMethod, Space};
 use bullterrier_image::params::Color;
 use proptest::prelude::*;
 
@@ -53,6 +53,35 @@ fn stops_sit_evenly_spaced_and_the_colour_between_two_is_their_linear_mix() -> R
         [RED, [0.25, 0.75, 0.0], [0.0, 0.5, 0.5], [0.25, 0.25, 1.0], white].as_flattened(),
         TOLERANCE,
         "four stops",
+    );
+    Ok(())
+}
+
+#[test]
+fn oklab_mixes_the_colour_between_two_stops_in_oklab_and_rgb_stays_the_default() -> Result<(), Error> {
+    let picture = greys(&[0.0, 0.25, 0.5, 1.0]);
+    let blue_to_yellow = |space| gradient_map::Params {
+        stops: vec![Color(BLUE), Color([1.0, 1.0, 0.0])],
+        shadow_clip: 0.0,
+        highlight_clip: 0.0,
+        space,
+        ..gradient_map::Params::default()
+    };
+    assert_eq!(gradient_map::Params::default().space, Space::Rgb);
+    // the Oklab midpoint of blue (L .45201, a -.03246, b -.31153) and yellow (L .96798, a -.07137, b .19857), converted back
+    // to sRGB offline with numpy; the rgb mix of the two is the plain grey 0.5
+    let expected = [BLUE, [0.114_572_64, 0.464_816_57, 0.906_055_22], [0.422_551_4, 0.672_366_2, 0.780_543_06], [1.0, 1.0, 0.0]];
+    assert_close(
+        run(&blue_to_yellow(Space::Oklab), &picture)?.as_flattened(),
+        expected.as_flattened(),
+        1e-4,
+        "oklab",
+    );
+    assert_close(
+        run(&blue_to_yellow(Space::Rgb), &picture)?[2].as_slice(),
+        [0.5, 0.5, 0.5].as_slice(),
+        TOLERANCE,
+        "rgb",
     );
     Ok(())
 }

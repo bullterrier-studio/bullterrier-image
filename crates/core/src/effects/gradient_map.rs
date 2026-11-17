@@ -7,6 +7,7 @@ use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::cast::single;
 use crate::ops::color::luminance;
+use crate::ops::colorspace::{oklab_to_rgb, rgb_to_oklab};
 use crate::ops::ramp;
 use crate::params::{Choice, Color, Params};
 use crate::{Image, Inputs, Picture};
@@ -59,6 +60,15 @@ pub enum QuantileMethod {
     NormalUnbiased,
 }
 
+/// The colour space in which the colour between two stops is mixed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
+pub enum Space {
+    /// The picture's own red, green and blue values: complementary stops pass through a dull grey and the lightness can dip.
+    Rgb,
+    /// Where equal distances look equally different: the lightness changes evenly along each stretch between two stops.
+    Oklab,
+}
+
 /// Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.
 ///
 /// A gradient that brightness is mapped onto, after an automatic contrast stretch. Two stops make a duotone, three a
@@ -87,6 +97,12 @@ pub struct Params {
     /// sample-quantile definitions (Hyndman and Fan). Only visible on small or flat pictures.
     #[param(default = Linear, advanced)]
     pub quantile_method: QuantileMethod,
+    /// The colour space in which the colour between two stops is mixed. 'rgb' mixes the picture's own red, green and blue
+    /// values; 'oklab' mixes where equal distances look equally different, so the brightness steps look even along the
+    /// gradient and stops of opposite colours (blue and yellow) do not pass through a dull grey. Only the colours between
+    /// the stops differ.
+    #[param(default = Rgb)]
+    pub space: Space,
 }
 
 /// Where a quantile falls among the sorted values.
@@ -212,7 +228,8 @@ fn quantile(values: &mut [f32], q: f64, method: QuantileMethod) -> f64 {
 
 /// The picture with its brightness stretched and mapped onto the stops.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let stops: Vec<[f32; 3]> = params.stops.iter().map(|stop| stop.0).collect();
+    let mixed = |stop: [f32; 3]| if params.space == Space::Oklab { rgb_to_oklab(stop) } else { stop };
+    let stops: Vec<[f32; 3]> = params.stops.iter().map(|stop| mixed(stop.0)).collect();
     let mut brightness: Vec<f32> = picture.pixels().iter().map(|&pixel| luminance(pixel)).collect();
     let method = params.quantile_method;
     let dark = quantile(&mut brightness, f64::from(params.shadow_clip), method);
@@ -220,6 +237,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     let span = (bright - dark).max(FLAT);
     picture.map(|pixel| {
         let position = ((f64::from(luminance(pixel)) - dark) / span).clamp(0.0, 1.0);
-        ramp::at(&stops, single(position))
+        let colour = ramp::at(&stops, single(position));
+        // mixed colours of in-gamut stops stay inside it up to rounding, which the contract's range needs gone
+        if params.space == Space::Oklab { oklab_to_rgb(colour).map(|channel| channel.clamp(0.0, 1.0)) } else { colour }
     })
 }
