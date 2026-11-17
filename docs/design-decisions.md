@@ -835,8 +835,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   vectorised (fixed, see the next point). The image looks of a shirt-print demo as one recipe (grade, blue-noise dither,
   outline, gradient, halftone, grain) take 105 ms native and 154 ms in WASM. The core's `.wasm` is 5.4 MB after
   `wasm-opt`, 1.25 MB brotli. *Conclusion:* no GPU is needed for a live preview; the order is a smaller preview (about
-  0.5 MP) with a render on slider release for the slow class, then the missed vectorisation, the sampler and the Fourier
-  blur at preview size.
+  0.5 MP) with a render on slider release for the slow class, then the missed vectorisation and the sampler (both done,
+  next point) and the Fourier blur at preview size.
 
 - **Pixel loops vectorise only when the compiler can see the buffers do not overlap (2026-11-17).** `Picture::map` and
   `map_at` run each band through a `#[inline(never)]` helper that takes the output and input as slices: inlined into the
@@ -844,7 +844,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   loop stayed scalar. A branch on a parameter inside a per-pixel closure does the same, so `grade` decides its colour
   balance once per picture. `Sampler::at` reads its taps directly when all lie inside the picture (the same sum in the same
   order, so the pixels are identical to the bit; the edge rules apply only to the rest), and WASM builds use `rustfft`'s
-  `wasm_simd` (and `+simd128`, which the browser builds must set: without it the fix gains nothing there). Measured on an
+  `wasm_simd` (and `+simd128`, which a browser build sets itself with `RUSTFLAGS="-C target-feature=+simd128"`: no such build lives
+  in this repo yet, and without it the fix gains nothing there). Measured on an
   M4, 1 MP, one thread, median of 15, each effect in its own process, load 5 to 10 (so about 20 %): `grade` 6.7 to 1.9 ms,
   `channel_mixer` 1.7 to 0.65, `color_balance` 4.1 to 1.8, `radial_blur` 107 to 69, `light_rays` 96 to 59, `flow_warp` 81 to
   56; the median of the 91 effects is unchanged (1.03x). *Consequence:* the output of all 91 effects is bit-identical to

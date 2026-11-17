@@ -5,7 +5,7 @@
 //! 3.4 times as long (`Picture::map`, `map_at`).
 //!
 //! Only an optimised build vectorises: the test profile (opt-level 1) cannot tell the two apart, so the test exists only
-//! without debug assertions. No gate runs it; run it by hand: `cargo test --release -p bullterrier-image --test vectorised`.
+//! without debug assertions. `poe full` runs it (`rust-test-release`); by hand: `cargo test --release -p bullterrier-image --test vectorised`.
 
 #![cfg(not(debug_assertions))]
 
@@ -60,19 +60,25 @@ fn grey(pixel: [f32; 3]) -> f32 {
     0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2]
 }
 
-/// The median of `RUNS` renders of `name` at one thread, in seconds.
-fn median(values: &[f32], name: &str) -> Result<f64, Error> {
-    let recipe = Recipe::new([Step::new(name).opacity(1.0)]);
-    let mut times = Vec::new();
+/// The medians of `RUNS` renders of `first` and of `second` at one thread, in seconds, the two taken in turn so that a
+/// change of load falls on both.
+fn medians(values: &[f32], first: &str, second: &str) -> Result<(f64, f64), Error> {
+    let recipes = [first, second].map(|name| Recipe::new([Step::new(name).opacity(1.0)]));
+    let mut times = [Vec::new(), Vec::new()];
     for _ in 0..RUNS {
-        let photo = Photo::new(Picture::new(SIDE, SIDE, values)?);
-        let start = Instant::now();
-        let image = photo.render(&recipe, &Presets::new(), Options::default().with_threads(1))?;
-        times.push(start.elapsed().as_secs_f64());
-        black_box(image);
+        for (recipe, times) in recipes.iter().zip(&mut times) {
+            let photo = Photo::new(Picture::new(SIDE, SIDE, values)?);
+            let start = Instant::now();
+            let image = photo.render(recipe, &Presets::new(), Options::default().with_threads(1))?;
+            times.push(start.elapsed().as_secs_f64());
+            black_box(image);
+        }
     }
-    times.sort_by(f64::total_cmp);
-    Ok(times[RUNS / 2])
+    let [first, second] = times.map(|mut times| {
+        times.sort_by(f64::total_cmp);
+        times[RUNS / 2]
+    });
+    Ok((first, second))
 }
 
 #[test]
@@ -80,7 +86,7 @@ fn grade_is_about_as_fast_as_the_same_arithmetic_registered_from_outside() -> Re
     register(std::sync::Arc::new(Graded))?;
     #[expect(clippy::cast_precision_loss, reason = "an index below 2^24")]
     let values: Vec<f32> = (0..SIDE * SIDE * 3).map(|at| (at % 251) as f32 / 250.0).collect();
-    let (grade, outside) = (median(&values, "grade")?, median(&values, "vectorised_graded")?);
+    let (grade, outside) = medians(&values, "grade", "vectorised_graded")?;
     let ratio = grade / outside;
     assert!(
         ratio < AT_MOST,
