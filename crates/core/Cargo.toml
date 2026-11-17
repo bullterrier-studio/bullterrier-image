@@ -42,6 +42,10 @@ zip = { workspace = true, optional = true }
 zune-core.workspace = true
 zune-jpeg.workspace = true
 
+# the WebAssembly build runs the transform on SIMD instructions
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+rustfft = { workspace = true, features = ["wasm_simd"] }
+
 [dev-dependencies]
 peak_alloc.workspace = true
 proptest.workspace = true
