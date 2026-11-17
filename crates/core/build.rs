@@ -38,11 +38,45 @@ fn main() -> io::Result<()> {
     fs::write(PathBuf::from(out).join("identity.rs"), identity(Path::new(&manifest))?)
 }
 
+/// A palette error, naming the palette and the file.
+fn palette_error(name: &str, problem: &str) -> io::Error {
+    io::Error::other(format!("data/palettes.toml: palette [{name}]: {problem}"))
+}
+
+/// The variant of the palette `name`, or why the name will not do: lowercase words (letters, then letters and digits)
+/// joined by single `_` (a word that starts with a digit would not read back as the same name from the variant), and
+/// none of the built-in choices.
+fn variant_of(name: &str) -> io::Result<String> {
+    const BUILT_IN: [&str; 7] = ["photo", "cube2", "cube3", "cube4", "cube5", "cube6", "custom"];
+    let word = |word: &str| {
+        word.starts_with(|c: char| c.is_ascii_lowercase())
+            && word.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit())
+    };
+    if !name.split('_').all(word) {
+        return Err(palette_error(
+            name,
+            "a name is lowercase words joined by single `_`, each word a letter then letters or digits (like `zx_spectrum`)",
+        ));
+    }
+    if BUILT_IN.contains(&name) {
+        return Err(palette_error(
+            name,
+            "that name is a built-in choice of `palette` (photo, cube2 to cube6, custom)",
+        ));
+    }
+    Ok(name
+        .split('_')
+        .map(|word| word[..1].to_uppercase() + &word[1..])
+        .collect())
+}
+
 /// The Rust source of `dither`'s `Palette`: the named palettes of `data/palettes.toml` (a variant each, documented by its
 /// description) between `photo` and the cubes, which are formulas, and `custom`; and `Palette::colours`, their 0xrrggbb codes.
 fn palette_enum(path: &Path) -> io::Result<String> {
     let table: toml::Table = toml::from_str(&fs::read_to_string(path)?).map_err(io::Error::other)?;
-    let (mut variants, mut arms) = (String::new(), String::new());
+    let (mut variants, mut arms, mut named, mut described) =
+        (String::new(), String::new(), String::new(), String::new());
+    let mut variants_seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for (name, palette) in &table {
         let field = |key: &str| {
             palette
@@ -50,10 +84,10 @@ fn palette_enum(path: &Path) -> io::Result<String> {
                 .ok_or_else(|| io::Error::other(format!("palette {name}: no {key}")))
         };
         let description = field("description")?.as_str().unwrap_or_default();
-        let variant: String = name
-            .split('_')
-            .map(|word| word[..1].to_uppercase() + &word[1..])
-            .collect();
+        let variant = variant_of(name)?;
+        if !variants_seen.insert(variant.clone()) {
+            return Err(palette_error(name, "its variant name is taken by another palette"));
+        }
         let codes: Vec<String> = field("colors")?
             .as_array()
             .map_or(&[][..], Vec::as_slice)
@@ -77,6 +111,8 @@ fn palette_enum(path: &Path) -> io::Result<String> {
         }
         writeln!(variants, "    #[doc = {description:?}]\n    {variant},").map_err(io::Error::other)?;
         writeln!(arms, "            Self::{variant} => &[{}],", codes.join(", ")).map_err(io::Error::other)?;
+        writeln!(named, "        Self::{variant},").map_err(io::Error::other)?;
+        writeln!(described, "            Self::{variant} => {description:?},").map_err(io::Error::other)?;
     }
     Ok(format!(
         "/// Where the colours come from.
@@ -100,7 +136,27 @@ pub enum Palette {{
 }}
 
 impl Palette {{
-    /// The 0xrrggbb codes of a named palette, as `data/palettes.toml` lists them; none for the others.
+    /// The palettes of `data/palettes.toml`, in the file's order (`photo`, `custom` and the cubes are not among them). A
+    /// palette's name is `Choice::name`.
+    pub const NAMED: &'static [Self] = &[
+{named}    ];
+
+    /// What the palette is, in a sentence; none for `photo`, `custom` and the cubes.
+    #[must_use]
+    pub const fn description(self) -> Option<&'static str> {{
+        Some(match self {{
+{described}            _ => return None,
+        }})
+    }}
+
+    /// The colours of a palette of `Palette::NAMED`, as `'#rrggbb'` in the order the data lists them; none for the others.
+    #[must_use]
+    pub fn colours(self) -> Option<Vec<String>> {{
+        self.named()
+            .map(|codes| codes.iter().map(|code| format!(\"#{{code:06x}}\")).collect())
+    }}
+
+    /// The 0xrrggbb codes of a named palette; none for the others.
     const fn named(self) -> Option<&'static [u32]> {{
         Some(match self {{
 {arms}            _ => return None,
