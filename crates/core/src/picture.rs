@@ -112,7 +112,11 @@ impl<'a> Picture<'a> {
     /// given ([`Options::with_threads`](crate::Options::with_threads)): the pixel it gives must depend only on its arguments.
     #[must_use]
     pub fn map(&self, change: impl Fn([f32; 3]) -> [f32; 3] + Sync) -> Image {
-        self.map_at(|_, _, pixel| change(pixel))
+        let mut pixels = vec![[0.0; 3]; self.pixels.len()];
+        par::rows(&mut pixels, self.width, |first_row, band| {
+            map_band(band, &self.pixels[first_row * self.width..], &change);
+        });
+        Image::from_pixels(self.height, self.width, pixels)
     }
 
     /// Like [`Picture::map`], for an effect that also depends on where a pixel is: `change` is given the pixel's row
@@ -123,12 +127,33 @@ impl<'a> Picture<'a> {
         let mut pixels = vec![[0.0; 3]; self.pixels.len()];
         par::rows(&mut pixels, self.width, |first_row, band| {
             let first = first_row * self.width;
-            for (index, (out, &pixel)) in band.iter_mut().zip(&self.pixels[first..]).enumerate() {
-                let index = first + index;
-                *out = change(index / self.width, index % self.width, pixel);
-            }
+            map_band_at(band, &self.pixels[first..], first, self.width, &change);
         });
         Image::from_pixels(self.height, self.width, pixels)
+    }
+}
+
+// Not inlined: inside `par::rows`' single-thread branch the slices become pointers read from a closure, LLVM cannot
+// prove they do not overlap, and the loop stays scalar (grade was 3x slower).
+#[inline(never)]
+fn map_band(out: &mut [[f32; 3]], from: &[[f32; 3]], change: &impl Fn([f32; 3]) -> [f32; 3]) {
+    for (out, &pixel) in out.iter_mut().zip(from) {
+        *out = change(pixel);
+    }
+}
+
+// Not inlined, for the same reason as `map_band`.
+#[inline(never)]
+fn map_band_at(
+    out: &mut [[f32; 3]],
+    from: &[[f32; 3]],
+    first: usize,
+    width: usize,
+    change: &impl Fn(usize, usize, [f32; 3]) -> [f32; 3],
+) {
+    for (index, (out, &pixel)) in out.iter_mut().zip(from).enumerate() {
+        let index = first + index;
+        *out = change(index / width, index % width, pixel);
     }
 }
 
