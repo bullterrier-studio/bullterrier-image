@@ -831,12 +831,26 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   9 between 50 and 200 ms, and only `stipple` more (614 ms); on all cores only `stipple`, `focus_blur` and `starburst` stay above 50 ms.
   WASM (Node's V8, one thread) is a median 1.9x slower than native: 1.0 to 1.6x for arithmetic per pixel, 2.1 to 2.9x for
   the effects built on the sampler or the Fourier blur, so `radial_blur`, `light_rays`, `flow_warp`, `bloom` and
-  `focus_blur` exceed 200 ms there. WASM SIMD (`simd128`) changes nothing, which supports the open finding above that the
-  per-pixel loops are not vectorised. The image looks of a shirt-print demo as one recipe (grade, blue-noise dither,
+  `focus_blur` exceed 200 ms there. WASM SIMD (`simd128`) changed nothing then, because the per-pixel loops were not
+  vectorised (fixed, see the next point). The image looks of a shirt-print demo as one recipe (grade, blue-noise dither,
   outline, gradient, halftone, grain) take 105 ms native and 154 ms in WASM. The core's `.wasm` is 5.4 MB after
   `wasm-opt`, 1.25 MB brotli. *Conclusion:* no GPU is needed for a live preview; the order is a smaller preview (about
   0.5 MP) with a render on slider release for the slow class, then the missed vectorisation, the sampler and the Fourier
   blur at preview size.
+
+- **Pixel loops vectorise only when the compiler can see the buffers do not overlap (2026-11-17).** `Picture::map` and
+  `map_at` run each band through a `#[inline(never)]` helper that takes the output and input as slices: inlined into the
+  single-thread branch of `par::rows` they were pointers read from a closure, LLVM could not rule out an overlap and the
+  loop stayed scalar. A branch on a parameter inside a per-pixel closure does the same, so `grade` decides its colour
+  balance once per picture. `Sampler::at` reads its taps directly when all lie inside the picture (the same sum in the same
+  order, so the pixels are identical to the bit; the edge rules apply only to the rest), and WASM builds use `rustfft`'s
+  `wasm_simd` (and `+simd128`, which the browser builds must set: without it the fix gains nothing there). Measured on an
+  M4, 1 MP, one thread, median of 15, each effect in its own process, load 5 to 10 (so about 20 %): `grade` 6.7 to 1.9 ms,
+  `channel_mixer` 1.7 to 0.65, `color_balance` 4.1 to 1.8, `radial_blur` 107 to 69, `light_rays` 96 to 59, `flow_warp` 81 to
+  56; the median of the 91 effects is unchanged (1.03x). *Consequence:* the output of all 91 effects is bit-identical to
+  before, and `crates/core/tests/vectorised.rs` fails when `grade` takes 1.6 times as long as the same arithmetic written
+  outside the library (3.4 before, 1.0 to 1.15 after). It needs an optimised build (`cargo test --release -p
+  bullterrier-image --test vectorised`); the test profile (opt-level 1) vectorises nothing, so no gate runs it.
 
 ## The Rust core
 
