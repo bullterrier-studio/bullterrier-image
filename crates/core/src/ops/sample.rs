@@ -81,6 +81,23 @@ impl<'a> Sampler<'a> {
         let (first_row, row_weights) = self.interpolation.taps(row);
         let (first_column, column_weights) = self.interpolation.taps(column);
         let (row_weights, column_weights) = (row_weights.as_slice(), column_weights.as_slice());
+        let inside = |first: isize, count: usize, size: usize| {
+            first >= 0 && first.unsigned_abs() + count <= size // `first` is not negative here
+        };
+        if inside(first_row, row_weights.len(), self.height) && inside(first_column, column_weights.len(), self.width) {
+            // every tap is in the picture, so no rule applies: the same sum as below, read directly
+            let mut sum = [0.0; 3];
+            for (&row_weight, row_index) in row_weights.iter().zip(first_row.unsigned_abs()..) {
+                let line = &self.pixels[row_index * self.width + first_column.unsigned_abs()..];
+                for (&column_weight, pixel) in column_weights.iter().zip(line) {
+                    let weight = row_weight * column_weight;
+                    for (total, &level) in sum.iter_mut().zip(pixel) {
+                        *total += weight * f64::from(level);
+                    }
+                }
+            }
+            return sum;
+        }
         // the sources of the columns are the same for every row
         let mut across = [Source::Value(0.0); TAPS];
         for (source, index) in across.iter_mut().zip(first_column..).take(column_weights.len()) {
@@ -316,6 +333,26 @@ mod tests {
             (bilinear.at(0.0, 2.5)[0] - 0.25).abs() < 1e-6,
             "half way between 0.4 and 0.1"
         );
+    }
+
+    #[test]
+    fn reads_inside_and_at_the_border_give_the_hand_worked_values_for_every_reading() {
+        // a row of four pixels 0, 1, 2, 4 (every channel): reads whose taps are all inside, then one that leaves
+        let pixels = vec![[0.0; 3], [1.0; 3], [2.0; 3], [4.0; 3]];
+        let read = |interpolation, edge, column| Sampler::new(&pixels, 1, 4, interpolation, edge).at(0.0, column)[0];
+        // nearest: column 1.5 takes pixel 2; bilinear: between 1 and 2 a quarter on is 1.25
+        assert!((read(Interpolation::Nearest, Extension::Nearest, 1.5) - 2.0).abs() < 1e-12);
+        assert!((read(Interpolation::Bilinear, Extension::Nearest, 1.25) - 1.25).abs() < 1e-12);
+        // bicubic a quarter on from pixel 1: weights -9/128, 111/128, 29/128, -3/128 (all four taps inside)
+        let inside = (111.0 + 2.0 * 29.0 - 3.0 * 4.0) / 128.0;
+        assert!((read(Interpolation::Bicubic, Extension::Nearest, 1.25) - inside).abs() < 1e-12);
+        // at the border: the last pixel itself, and 3.5 with the rule's pixels beyond it
+        assert!((read(Interpolation::Nearest, Extension::Nearest, 3.0) - 4.0).abs() < 1e-12);
+        assert!((read(Interpolation::Bilinear, Extension::Nearest, 3.5) - 4.0).abs() < 1e-12);
+        assert!((read(Interpolation::Bilinear, Extension::Constant(0.5), 3.5) - 2.25).abs() < 1e-12);
+        // bicubic at 0.25: taps -1..2 read pixels 0, 0, 1, 2 (the first stands in for the one before it)
+        let border = (29.0 * 1.0 + -3.0 * 2.0 + 111.0 * 0.0 + -9.0 * 0.0) / 128.0;
+        assert!((read(Interpolation::Bicubic, Extension::Nearest, 0.25) - border).abs() < 1e-12);
     }
 
     #[test]
