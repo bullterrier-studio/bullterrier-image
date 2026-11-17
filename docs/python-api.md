@@ -77,7 +77,7 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   picture: a list of float32 `(h, w)` ink coverage planes in 0..1, one per ink (`halftone`: its inks in order, cyan, magenta,
   yellow, black for `cmyk`; `dither` with `separation="spot"`: its `inks`, each plane 0 or 1; bare-paper specks are on no
   plate); `(labels, colors)`, an int32 `(h, w)` palette-index map and the palette as `'#rrggbb'` (`dither`; painting each pixel with its
-  colour gives the picture); a `Characters` (`ascii`) with `text`, `colors`, `paper`, `ansi()` and `html()`. The last step
+  colour gives the picture to within one 8-bit level, the colors being `#rrggbb` text); a `Characters` (`ascii`) with `text`, `colors`, `paper`, `ansi()` and `html()`. The last step
   must make that kind of data and be plain (no `mask`, opacity 1, blend mode normal, no drive), else a `RecipeError` naming it;
   the data is of the very picture `render` makes. `imageio.save(image, path, dpi=300)` writes the resolution (PNG `pHYs`,
   JPEG density; 1 to 65535; WebP holds none); it is never a recipe field. Example: [`examples/python_api.py`](../examples/python_api.py).

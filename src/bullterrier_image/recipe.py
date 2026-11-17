@@ -264,9 +264,10 @@ def palette_map(
     """The palette-index map of the picture `recipe` makes of the photo `rgb`, and its palette: `(labels, colors)`, an
     int32 (h, w) array whose pixel is the number of its colour in `colors`, a list of `'#rrggbb'` text (as `palette`
     gives).
-    Painting each pixel with its colour gives the picture exactly, and the labels are the regions of a colour for vector
-    to trace. The last step must be `dither` with a palette (not its `tiles` method, which draws between two colours),
-    plain (no `mask`, an `opacity` of 1, blend mode normal), else RecipeError naming it.
+    Painting each pixel with its colour gives the picture to within one 8-bit level (the colors are `#rrggbb` text), and
+    the labels are the regions of a colour for vector to trace. The last step must be `dither` with a palette (not its
+    `tiles` method, which draws between two colours), plain (no `mask`, an `opacity` of 1, blend mode normal), else
+    RecipeError naming it.
 
     rgb, recipe, maps, finders, size: as for `render`."""
     recipe = _one_recipe(recipe)

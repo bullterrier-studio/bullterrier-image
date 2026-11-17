@@ -104,6 +104,8 @@ longest_side) -> Result<Spread, Error>` is the room of a whole recipe, in px of 
 to whole pixels (top, right, bottom, left). **A caller that grows the picture by that room** renders it with `Options::with_room(top, right, bottom, left)` (below), so that the effects that
 place themselves by the picture (the vignette, a `x`/`y` centre, `Place`-numbered noise, `frame`, a statistic of the whole picture) take the original box, not the grown picture, as theirs.
 
+**Data:** An effect that makes data beside its picture (ink planes, a palette-index map or a grid of characters: `halftone`, `dither`, `ascii`) declares it as `pub(crate) fn data(&Picture, &Params, &Inputs) -> Result<Data, Error>` in its file (the build script finds it, as it finds `spread`); one that does not is refused with one message, `effect 'name' makes no data beside its picture`. `Data` is crate-private: callers use `Photo::ink_planes`, `palette_map` and `characters` (Python the same), each the last step's data of the very picture `render` makes, so the effect draws once for both.
+
 **Check:** An optional `pub(crate) fn check(&Params, &Inputs) -> Result<(), Error>` in the effect's file (the build script finds it, as it finds `spread`) refuses a run with an error naming the parameter, for what the parameter table cannot hold: a picture parameter's size or presence (`dither`'s `matrix`).
 
 **Room:** `Options::with_room(top, right, bottom, left)` says the picture handed to `render` is the box grown by that room, and the render is of the box. The design scale

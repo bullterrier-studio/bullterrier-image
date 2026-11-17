@@ -83,7 +83,7 @@ repository's `image.md`.
 | Ink coverage planes | `halftone` and `dither` with `separation` already compute a coverage per ink. Handed out as one `Layer` per ink, scene writes printing plates. |
 | Palette-index map | `dither`'s colour index per pixel, as `Labels` (the type regions use): vector traces it into SVG regions, one group per colour. |
 | Character grid as text | `ascii`'s characters as a string, with colours for ANSI or HTML: copy-paste text, and real text in SVG through vector. Like `palette()`, a function beside the recipe. |
-| DPI on write | `files::write` takes an optional resolution: the PNG `pHYs` chunk, the JPEG density. Never in a recipe. Scene's PNG goes through this writer and passes its DPI on. |
+| DPI on write | `write_with(path, image, &WriteOptions)` takes an optional resolution (`WriteOptions::with_dpi`): the PNG `pHYs` chunk, the JPEG density. Never in a recipe. Scene's PNG goes through this writer and passes its DPI on. |
 
 **Done (2026-11-17):** functions beside the recipe that ask its last step (`Photo::ink_planes`, `palette_map`, `characters`; Python `ink_planes`, `palette_map`, `characters`), and `write_with(path, image, &WriteOptions)` (`imageio.save(..., dpi=)`). Reasons and limits: design-decisions, "Data beside the picture".
 

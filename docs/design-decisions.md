@@ -1694,7 +1694,7 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   on `Options` (`render` would return a sum type, or need a side channel, and could not say which step); public per-effect
   functions on typed `Params` (a second scaling path, no recipe context); one function with a kind argument (callers match
   on an enum). *Limits:* the last step must be plain (opacity 1, normal blend, no mask or drive), else `Error::Recipe` naming
-  it; an `each` step, a window of a canvas and `dither`'s `tiles` method (two colours per dot, so no one index) refuse;
+  it; an `each` step, a picture with room round its box (`Options::with_room`; a window of a canvas is exact) and `dither`'s `tiles` method (two colours per dot, so no one index) refuse;
   asking for the data and the picture runs the recipe twice; ink planes are coverages before bare-paper specks, so a plate is
   clean; dither's spot planes are 0 or 1 (its overprint is binary per cell); ink order is the effect's (named in the docs);
   `Characters.html()` colours spans, it draws no font, and an ANSI run is one 24-bit colour per run of equal 8-bit colour.
