@@ -447,7 +447,11 @@ impl Kept for [f32; MOST_INKS] {
 
 /// The dot screen.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    Image::from_pixels(picture.height(), picture.width(), draw::<[f32; 3]>(picture, params, inputs).0)
+    Image::from_pixels(
+        picture.height(),
+        picture.width(),
+        draw::<[f32; 3]>(picture, params, inputs).0,
+    )
 }
 
 /// The ink coverage planes of the dot screen: one for each ink, 0 to 1, bare-paper specks not in them.

@@ -527,7 +527,9 @@ impl Inked {
         // where the layer comes from; none where that is off the picture
         let from = |at: usize, away: isize, size: usize| at.checked_add_signed(-away).filter(|&at| at < size);
         match (from(y, by[1], height), from(x, by[0], width)) {
-            (Some(row), Some(column)) => usize::from(self.layers[row / self.cell * self.columns + column / self.cell]) >> ink & 1 == 1,
+            (Some(row), Some(column)) => {
+                usize::from(self.layers[row / self.cell * self.columns + column / self.cell]) >> ink & 1 == 1
+            }
             _ => false,
         }
     }
@@ -613,7 +615,8 @@ fn printed(print: &Inked) -> Image {
         for (offset, line) in band.chunks_exact_mut(width).enumerate() {
             let y = first_row + offset;
             for (x, pixel) in line.iter_mut().enumerate() {
-                let mask = (0..print.moves.len()).fold(0, |mask, ink| mask | usize::from(print.lands(ink, x, y)) << ink);
+                let mask =
+                    (0..print.moves.len()).fold(0, |mask, ink| mask | usize::from(print.lands(ink, x, y)) << ink);
                 *pixel = if mask == 0 {
                     print.table[0]
                 } else {
@@ -660,13 +663,7 @@ impl Chosen {
 }
 
 /// The dots' colours chosen from a palette by `params.method` (not `tiles`, which draws between two colours of its own).
-fn chosen(
-    dots: &[Point],
-    size: (usize, usize),
-    cell: usize,
-    params: &Params,
-    inputs: &Inputs<'_>,
-) -> Chosen {
+fn chosen(dots: &[Point], size: (usize, usize), cell: usize, params: &Params, inputs: &Inputs<'_>) -> Chosen {
     let matched = in_space(dots, params.space);
     let palette = colours(dots, &matched, params);
     let matched_palette = in_space(&palette, params.space);
@@ -751,11 +748,19 @@ pub(crate) fn data(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) 
     let (height, width) = (picture.height(), picture.width());
     let (cell, grid, dots) = dots_of(picture, params, inputs);
     if params.separation == Separation::Spot {
-        return Ok(Data::Planes(planes(&inked(&dots, grid, cell, (height, width), params, inputs))));
+        return Ok(Data::Planes(planes(&inked(
+            &dots,
+            grid,
+            cell,
+            (height, width),
+            params,
+            inputs,
+        ))));
     }
     if params.method == Method::Tiles {
         return Err(Error::Recipe(
-            "dither: `method` 'tiles' draws each dot between two palette colours, so it has no palette index map".to_owned(),
+            "dither: `method` 'tiles' draws each dot between two palette colours, so it has no palette index map"
+                .to_owned(),
         ));
     }
     let made = chosen(&dots, grid, cell, params, inputs);
