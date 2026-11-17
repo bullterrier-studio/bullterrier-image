@@ -1691,7 +1691,7 @@ fill : Flat colour fill (black; set colors for another). To replace the backgrou
     ...
 
 @_effect
-def gradient_map(*, stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', space: Literal['rgb', 'oklab'] = 'rgb', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray', 'amber_monitor', 'selenium', 'platinum', 'newsprint', 'silver', 'coffee', 'verdigris', 'rust', 'sunset', 'golden_hour', 'moonlight', 'fire', 'ice', 'ocean', 'forest', 'toxic', 'magma', 'inferno', 'viridis', 'plasma', 'indigo_pink', 'midnight_gold', 'teal_coral', 'lilac', 'mint', 'crimson', 'rose', 'pastel_dusk', 'candy', 'neon', 'vaporwave', 'gameboy'] | None = None) -> Step:
+def gradient_map(*, stops: collections.abc.Sequence[str | list[float] | tuple[float, float, float]] = ('#000000', '#ffffff'), shadow_clip: float = 0.01, highlight_clip: float = 0.01, quantile_method: Literal['linear', 'lower', 'higher', 'nearest', 'midpoint', 'inverted_cdf', 'averaged_inverted_cdf', 'closest_observation', 'interpolated_inverted_cdf', 'hazen', 'weibull', 'median_unbiased', 'normal_unbiased'] = 'linear', space: Literal['rgb', 'oklab'] = 'rgb', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['sepia', 'cyanotype', 'thermal', 'night_vision', 'xray', 'amber_monitor', 'selenium', 'silver', 'verdigris', 'rust', 'sunset', 'moonlight', 'fire', 'ice', 'ocean', 'forest', 'toxic', 'magma', 'inferno', 'viridis', 'plasma', 'indigo_pink', 'lilac', 'crimson', 'rose', 'pastel_dusk', 'candy', 'neon', 'vaporwave', 'gameboy'] | None = None) -> Step:
     """Recolour by brightness: darkest pixels get the first stop, brightest the last, evenly spaced between.  A gradient that brightness is mapped onto, after an automatic contrast stretch. Two stops make a duotone, three a tritone; for example the stops "#0b0020", "#ff2bd6" and "#00f0ff" make a neon scheme. The picture is first stretched to use its full tonal range (cutting `shadow_clip` and `highlight_clip` off its ends), so the whole gradient is always visible.
 
 Parameters
@@ -1732,14 +1732,10 @@ night_vision : Green phosphor monochrome, as a night-vision scope shows it (no n
 xray : Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest).
 amber_monitor : Amber phosphor monochrome, as an old terminal glows.
 selenium : Selenium-toned print: cool purple-brown shadows fading to a warm pale paper.
-platinum : Platinum print: soft, low-contrast warm greys with a long, gentle shoulder.
-newsprint : Black ink on grey-cream newsprint.
 silver : Cool silver-grey monochrome, near-black to white.
-coffee : Dark roast to milk foam: brown shadows, cream highlights.
 verdigris : Weathered copper: deep green-black shadows, a blue-green patina, pale mint highlights.
 rust : Oxidised iron: near-black red-brown, orange rust, pale sand.
 sunset : Dusk sky: indigo shadows, plum, coral and a pale yellow sun.
-golden_hour : Low sun: brown shadows warming to amber and a cream glow.
 moonlight : Night blues: near-black navy through slate blue to a pale silver-white.
 fire : Flame: black, ember red, orange, yellow and a white-hot core.
 ice : Glacier: deep navy, cobalt, sky blue and frost white.
@@ -1751,10 +1747,7 @@ inferno : The inferno scale: black through purple and red to pale yellow (percep
 viridis : The viridis scale: dark purple through blue and green to yellow (perceptually even).
 plasma : The plasma scale: deep blue-violet through magenta and orange to yellow (perceptually even).
 indigo_pink : Duotone of deep indigo and hot pink.
-midnight_gold : Duotone of midnight blue and warm gold.
-teal_coral : Duotone of dark teal and coral.
 lilac : Duotone of deep violet and pale lilac.
-mint : Duotone of dark green and pale mint.
 crimson : Black to blood red to a pale flesh tone.
 rose : Wine-dark shadows, rose midtones, blush highlights.
 pastel_dusk : Soft purple shadows, pink midtones, buttercream highlights.

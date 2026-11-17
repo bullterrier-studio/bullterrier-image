@@ -177,14 +177,10 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `xray` | Inverted pale blue on deep navy, like a radiograph (the brightest parts become the darkest). |
 | `amber_monitor` | Amber phosphor monochrome, as an old terminal glows. |
 | `selenium` | Selenium-toned print: cool purple-brown shadows fading to a warm pale paper. |
-| `platinum` | Platinum print: soft, low-contrast warm greys with a long, gentle shoulder. |
-| `newsprint` | Black ink on grey-cream newsprint. |
 | `silver` | Cool silver-grey monochrome, near-black to white. |
-| `coffee` | Dark roast to milk foam: brown shadows, cream highlights. |
 | `verdigris` | Weathered copper: deep green-black shadows, a blue-green patina, pale mint highlights. |
 | `rust` | Oxidised iron: near-black red-brown, orange rust, pale sand. |
 | `sunset` | Dusk sky: indigo shadows, plum, coral and a pale yellow sun. |
-| `golden_hour` | Low sun: brown shadows warming to amber and a cream glow. |
 | `moonlight` | Night blues: near-black navy through slate blue to a pale silver-white. |
 | `fire` | Flame: black, ember red, orange, yellow and a white-hot core. |
 | `ice` | Glacier: deep navy, cobalt, sky blue and frost white. |
@@ -196,10 +192,7 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `viridis` | The viridis scale: dark purple through blue and green to yellow (perceptually even). |
 | `plasma` | The plasma scale: deep blue-violet through magenta and orange to yellow (perceptually even). |
 | `indigo_pink` | Duotone of deep indigo and hot pink. |
-| `midnight_gold` | Duotone of midnight blue and warm gold. |
-| `teal_coral` | Duotone of dark teal and coral. |
 | `lilac` | Duotone of deep violet and pale lilac. |
-| `mint` | Duotone of dark green and pale mint. |
 | `crimson` | Black to blood red to a pale flesh tone. |
 | `rose` | Wine-dark shadows, rose midtones, blush highlights. |
 | `pastel_dusk` | Soft purple shadows, pink midtones, buttercream highlights. |
