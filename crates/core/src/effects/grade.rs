@@ -73,15 +73,19 @@ pub struct Params {
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
     let balance = colour_balance(params.temperature, params.tint);
     let gain = params.exposure.exp2(); // a stop is a factor of 2 (photographic definition)
-    picture.map(|pixel| {
-        let balanced = balance.map_or(pixel, |gains| {
-            [0, 1, 2].map(|channel| linear_to_srgb(srgb_to_linear(pixel[channel]) * gains[channel]))
-        });
+    let rest = |balanced: [f32; 3]| {
         let contrasted = balanced.map(|value| params.pivot + (value * gain - params.pivot) * params.contrast);
         let grey = luminance(contrasted.map(|value| value.clamp(0.0, 1.0)));
         let saturated = contrasted.map(|value| (grey + (value - grey) * params.saturation).clamp(0.0, 1.0));
         vibrance(saturated, params.vibrance)
-    })
+    };
+    // decided once per picture: a branch inside the pixel loop keeps it from vectorising
+    match balance {
+        None => picture.map(rest),
+        Some(gains) => picture.map(|pixel| {
+            rest([0, 1, 2].map(|channel| linear_to_srgb(srgb_to_linear(pixel[channel]) * gains[channel])))
+        }),
+    }
 }
 
 /// The von Kries gains of red, green and blue in linear light, divided by the largest so nothing brightens; none
