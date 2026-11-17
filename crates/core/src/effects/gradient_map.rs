@@ -228,7 +228,13 @@ fn quantile(values: &mut [f32], q: f64, method: QuantileMethod) -> f64 {
 
 /// The picture with its brightness stretched and mapped onto the stops.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let mixed = |stop: [f32; 3]| if params.space == Space::Oklab { rgb_to_oklab(stop) } else { stop };
+    let mixed = |stop: [f32; 3]| {
+        if params.space == Space::Oklab {
+            rgb_to_oklab(stop)
+        } else {
+            stop
+        }
+    };
     let stops: Vec<[f32; 3]> = params.stops.iter().map(|stop| mixed(stop.0)).collect();
     let mut brightness: Vec<f32> = picture.pixels().iter().map(|&pixel| luminance(pixel)).collect();
     let method = params.quantile_method;
@@ -239,6 +245,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         let position = ((f64::from(luminance(pixel)) - dark) / span).clamp(0.0, 1.0);
         let colour = ramp::at(&stops, single(position));
         // mixed colours of in-gamut stops stay inside it up to rounding, which the contract's range needs gone
-        if params.space == Space::Oklab { oklab_to_rgb(colour).map(|channel| channel.clamp(0.0, 1.0)) } else { colour }
+        if params.space == Space::Oklab {
+            oklab_to_rgb(colour).map(|channel| channel.clamp(0.0, 1.0))
+        } else {
+            colour
+        }
     })
 }
