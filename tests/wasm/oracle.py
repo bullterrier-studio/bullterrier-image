@@ -92,13 +92,19 @@ def main(out: Path) -> None:
     answers = {"photo": {"width": width, "height": height}, "cases": {}}
     for case in all_cases():
         stem = case["name"].removeprefix("example-")
+        answer: dict[str, str | int]
         if stem in NEEDS_FILES and case["name"].startswith("example-"):
             answer = {"error": NEEDS_FILES[stem]}
         else:
             out_width, out_height, pixels = native_pixels(rgb, case, maps, out / "native.png")
-            answer = {"width": out_width, "height": out_height, "sha256": hashlib.sha256(pixels).hexdigest()}
-            answer["bound"] = level_bound(case)
-            if answer["bound"]:  # the Node test compares these pixel by pixel
+            bound = level_bound(case)
+            answer = {
+                "width": out_width,
+                "height": out_height,
+                "sha256": hashlib.sha256(pixels).hexdigest(),
+                "bound": bound,
+            }
+            if bound:  # the Node test compares these pixel by pixel
                 (out / f"{case['name']}.rgba").write_bytes(pixels)
         answers["cases"][case["name"]] = {**case, **answer}
     (out / "native.png").unlink()
