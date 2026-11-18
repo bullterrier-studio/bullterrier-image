@@ -194,6 +194,7 @@ More from same photo. All 17 recipes: [`examples/recipes/`](examples/recipes).
 - **[Effect catalogue](docs/effects/README.md)**: every effect with picture, parameters, defaults.
 - [Recipes](docs/recipes.md): step keys, regions, fields, driven numbers, framing, presets.
 - [Python API](docs/python-api.md): `fx`, sizes, addresses, plugins.
+- [JavaScript API](docs/javascript-api.md): the WebAssembly package, for a live preview in a browser page.
 - [Pipeline and command line](docs/pipeline.md): batch behaviour, project file, checks, `bt-image` commands.
 - [Subject and depth](docs/subject-and-depth.md): models, offline use, own finders and maps.
 - [Development](docs/development.md): layout, adding an effect. Why built this way: [design decisions](docs/design-decisions.md).

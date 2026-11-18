@@ -855,6 +855,32 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   outside the library (3.4 before, 1.0 to 1.15 after). It needs an optimised build (`cargo test --release -p
   bullterrier-image --test vectorised`); the test profile (opt-level 1) vectorises nothing, so no gate runs it.
 
+- **A WebAssembly package (2026-11-18): the browser renders the preview, a native backend the export.** `crates/wasm`
+  (crate `bullterrier-image-wasm`, `wasm-bindgen`) builds the core unchanged for `wasm32-unknown-unknown`, one thread, with no
+  `onnx` feature; its JavaScript API is in [javascript-api.md](javascript-api.md). The bindings only convert: a `Photo`
+  (8-bit RGBA in, the alpha is not read) and a `Recipe` (TOML or JSON, the forms a recipe already has) go to the core's
+  `Photo::render` with the shipped presets, and the pixels come back as 8-bit RGBA rounded as the files the core writes are.
+  A render of the same photo, recipe and `size` is **byte-identical to the native one**: `poe wasm-test` (in `check`) renders
+  six recipes in Node (a one-ink halftone, a blue-noise dither and a Fourier-blur bloom, a two-ink halftone through a handed-in
+  `subject` map, the shipped look `crt`, a recipe's own `size`) and compares SHA-256 of the bytes with what the Python package
+  writes for them. Errors are `Error`s named as Python's exceptions (`RecipeError`, `UnknownEffectError`,
+  `SubjectNotFoundError`), with the core's message. *Rejected:* a second recipe format for JavaScript (a recipe is the
+  recipe document); the subject finder in the browser (`ort` loads its library with `dlopen`: the cut-out is made elsewhere
+  and handed in with `Photo.setMap`); returning float pixels (4x the bytes, and the native export rounds to 8 bits anyway);
+  threads (workers and `SharedArrayBuffer` need cross-origin isolation, and the budget below is met on one); a GPU path (a
+  second implementation of every effect: see the spike above). *Limits:* a render blocks the thread that calls it (a page
+  uses a worker when it must not); the photo is converted to floats once, by `new Photo`, and every render resamples it to
+  `size`, so a page keeps the photo near the preview size; the package is 8 MB uncompressed; a recipe naming a file on disk
+  (an svg region, a `.cube` table, a picture by path) fails in the browser, as no file system is there (a picture and a table
+  can only be handed in by a native caller yet). The build needs `RUSTFLAGS="-C target-feature=+simd128"` (set by `poe
+  wasm-test`, never in a config file or for a native build): without it the vectorised loops stay scalar.
+  *Measured* (Apple M4, headless Chrome 157, the page's recipe: grade, halftone of the photo's colours, grain; a 1 MP photo
+  resampled to the preview size at every move; median of 12 slider moves; the Python package on one thread beside): 0.25 MP 32
+  ms (native 26), 0.5 MP 56 (native 43), 1 MP 93 (native 70), so WebAssembly costs 1.25 to 1.35 times native here, and 0.25 MP
+  is live by the 50 ms bar while 0.5 and 1 MP want a pause after the last move. The same recipe in Node's V8 takes the same
+  time. A halftone with two or more `inks` (or `separation = "cmyk"`) costs 0.6 to 4 s at the same sizes, in WebAssembly and
+  natively alike: it is the effect, not the build, and a live preview should use one ink or the single-colour halftone.
+
 ## The Rust core
 
 - **The numeric work moves to Rust; Python stays the interface.** Two crates in a Cargo workspace beside `src/`:

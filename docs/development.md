@@ -81,6 +81,7 @@ src/bullterrier_image/                  layers, top to bottom; each imports only
                            errors: imports nothing
 crates/core/     the Rust core, crate `bullterrier-image`: ops/ (primitives by concept), effects/<name>.rs (one per effect)
 crates/python/   the PyO3 bindings that build `bullterrier_image._native._core`; generic, names no effect
+crates/wasm/     the WebAssembly bindings (`poe wasm-test` builds them and runs tests/wasm in Node against the Python package; needs `node`)
 examples/        demo project (bt-image.toml, photos/, recipes/, output/), one snippet per effect (effects/),
                  older experiments (experiments/), a Python example; see examples/README.md
 docs/            effect catalogue (effects/, generated: index + page per category), its pictures (gallery/), roadmap, design decisions

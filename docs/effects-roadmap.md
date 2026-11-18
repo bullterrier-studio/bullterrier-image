@@ -384,11 +384,11 @@ Asked by `bullterrier-scene` while building real pieces, and by the three direct
   `lighten` (`bullterrier-demos/feedback/scene-conan.md`, 6): it works and is awkward.
 - **Done: `Path` in the star export.** `Path` (the region) is out of `__all__`, so `from bullterrier_image import *` no longer
   shadows `pathlib.Path`; `from bullterrier_image import Path` and `bullterrier_image.Path` still work.
-- **A WebAssembly build proof.** `cargo check -p bullterrier-image --target wasm32-unknown-unknown` with default features
-  compiles in about 10 s (measured 2026-11-14); no browser has run it. Open: rayon threads (`wasm-bindgen-rayon` or a
-  single-thread fallback), `std::fs`, `glob` and the clock, and the AI finders (subject, depth, SAM 2), which are native
-  only (feature `onnx` loads the ONNX Runtime library at run time): onnxruntime-web later, or cut out on a server and hand
-  back the matte. *Why:* effects live in a web page (direction 2). Done when a browser demo renders a recipe.
+- **Done 2026-11-18: a WebAssembly build proof.** `crates/wasm` builds the core for `wasm32-unknown-unknown` (one thread, no
+  `onnx`); Node renders recipes to the native render's bytes (`poe wasm-test`), and a static page in headless Chrome
+  re-renders a halftone recipe on every slider move: 32 ms at 0.25 MP, 93 ms at 1 MP (`design-decisions.md`, "A WebAssembly
+  package"; API: `javascript-api.md`). *Open, on demand:* a worker for the render, a `Photo` that resizes once for the preview, the AI finders
+  (onnxruntime-web, or a cut-out made on a server and handed in as the `subject` map), `.wasm` size (8 MB; `wasm-opt` not run).
 - **Done, pushed (recorded so nobody redoes it):** a look's `px` follow the canvas through `with_canvas`; a canvas smaller than
   the picture is allowed, and only fixes the scale (scene scales a layer past the canvas edge). A look's `px` are image's
   design pixels, 1/480 of the canvas long side.
