@@ -62,7 +62,7 @@ _native    home of the Rust extension `_native._core`, beside errors          (i
 - Rust effects never refer to each other.
 - The ratio of design px (480 on the longest side) is derived from that working picture, never passed in.
 - Every user number that drives allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of `Region::check` with neither a row nor a reason.
-- Python is a facade over the core and runs no recipe itself. The WebAssembly package (`crates/wasm`) is another, as thin: it names no effect, and its renders equal the native ones byte for byte at the same size (`poe wasm-test`, in `check`; needs `node`).
+- Python is a facade over the core and runs no recipe itself. The WebAssembly package (`crates/wasm`) is another, as thin: it names no effect, and its renders equal the native ones byte for byte at the same size, except the effects through the Fourier transform, which may differ by one level of a channel (rustfft's SIMD routines round differently on each architecture; `poe wasm-test`, in `check`, runs every example recipe; needs `node`).
 - The render stays on the calling thread, only row bands run on the pool, and rayon's global pool is never used.
 - Outside a pool a kernel runs inline, and `Effect::apply` takes no thread parameter.
 - Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count).

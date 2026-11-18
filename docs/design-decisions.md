@@ -860,10 +860,17 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   `onnx` feature; its JavaScript API is in [javascript-api.md](javascript-api.md). The bindings only convert: a `Photo`
   (8-bit RGBA in, the alpha is not read) and a `Recipe` (TOML or JSON, the forms a recipe already has) go to the core's
   `Photo::render` with the shipped presets, and the pixels come back as 8-bit RGBA rounded as the files the core writes are.
-  A render of the same photo, recipe and `size` is **byte-identical to the native one**: `poe wasm-test` (in `check`) renders
-  six recipes in Node (a one-ink halftone, a blue-noise dither and a Fourier-blur bloom, a two-ink halftone through a handed-in
-  `subject` map, the shipped look `crt`, a recipe's own `size`) and compares SHA-256 of the bytes with what the Python package
-  writes for them. Errors are `Error`s named as Python's exceptions (`RecipeError`, `UnknownEffectError`,
+  A render of the same photo, recipe and `size` is **byte-identical to the native one, except for the effects that filter
+  through the Fourier transform** (`bloom`, `engraving`, `focus_blur`, `lens_blur`, `starburst`), where a channel may differ by
+  one level of 255 (measured: 1 to 4 bytes of 360000 in each of the five examples at size 300, never more than one level).
+  *Cause:* rustfft picks a SIMD routine per architecture (NEON, AVX with fused multiply-add, WebAssembly SIMD), and each rounds
+  its f32 sums its own way; with the scalar planner on both targets the five were identical too. *Rejected:* the scalar planner
+  for every target: the same bytes, but 1.4 to 1.6 times the native time of those five (release build, 1200 px, Apple M4:
+  bloom 162 to 265 ms, engraving 20 to 27, focus_blur 170 to 265, lens_blur 61 to 85, starburst 155 to 233), against a 5% limit.
+  `poe wasm-test` (in `check`) renders the shipped look `crt`, five recipes of its own and every `examples/effects` recipe in
+  Node (with a `subject` and a `depth` map handed in) and compares SHA-256 of the bytes with what the Python package writes for
+  them (the five Fourier effects, and the recipes that use them, within one level); the three examples that read a file
+  (`blend`, `color_transfer`, `lut`) must fail as named. Errors are `Error`s named as Python's exceptions (`RecipeError`, `UnknownEffectError`,
   `SubjectNotFoundError`), with the core's message. *Rejected:* a second recipe format for JavaScript (a recipe is the
   recipe document); the subject finder in the browser (`ort` loads its library with `dlopen`: the cut-out is made elsewhere
   and handed in with `Photo.setMap`); returning float pixels (4x the bytes, and the native export rounds to 8 bits anyway);
