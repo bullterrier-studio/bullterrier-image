@@ -43,9 +43,9 @@ def main(out: Path) -> None:
     """Write the oracle files into `out`."""
     out.mkdir(parents=True, exist_ok=True)
     with Image.open(PHOTO) as opened:
-        opened = opened.convert("RGB")
-        scale = SIDE / max(opened.size)
-        small = opened.resize((round(opened.width * scale), round(opened.height * scale)), Image.Resampling.LANCZOS)
+        full = opened.convert("RGB")
+    scale = SIDE / max(full.size)
+    small = full.resize((round(full.width * scale), round(full.height * scale)), Image.Resampling.LANCZOS)
     rgb = np.asarray(small, dtype=np.uint8)
     height, width = rgb.shape[:2]
     rgba = np.dstack([rgb, np.full((height, width), 255, np.uint8)])
