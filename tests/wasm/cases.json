@@ -1,0 +1,8 @@
+[
+  { "name": "preview", "recipe": "recipes/preview.toml", "size": 400 },
+  { "name": "preview-quarter", "recipe": "recipes/preview.toml", "size": 200 },
+  { "name": "dither-bloom", "recipe": "recipes/dither_bloom.toml", "size": 300 },
+  { "name": "halftone-subject", "recipe": "../../examples/effects/halftone.toml", "size": 360, "maps": ["subject"] },
+  { "name": "look-crt", "look": "crt", "size": 320 },
+  { "name": "own-size", "recipe": "../../examples/effects/grain.toml" }
+]

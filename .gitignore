@@ -30,3 +30,4 @@ target/
 proptest-regressions
 src/bullterrier_image/_native/_core*.so
 src/bullterrier_image/_native/_core*.pyd
+pkg/

@@ -1,0 +1,13 @@
+# Blue-noise dither, then a Fourier-blur bloom: the two kinds of kernel a browser build has to run the same way.
+[[step]]
+effect = "dither"
+method = "blue_noise"
+cell = 3
+palette = "custom"
+custom = ["#0b1026", "#ff5a36", "#f7e7c6"]
+
+[[step]]
+effect = "bloom"
+radius = 12
+threshold = 0.5
+amount = 0.6
