@@ -62,7 +62,7 @@ are in [docs/releasing.md](docs/releasing.md).
 ## Design decisions
 
 A new decision, or a change to an old one, goes in [docs/design-decisions.md](docs/design-decisions.md) with its reason,
-in the same change as the code. Planned effects are in [docs/effects-roadmap.md](docs/effects-roadmap.md).
+in the same change as the code. The effects that exist are listed in [docs/effects-roadmap.md](docs/effects-roadmap.md).
 
 ## Security problems
 

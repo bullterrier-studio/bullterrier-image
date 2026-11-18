@@ -1,10 +1,12 @@
 # Effects roadmap
 
-What bullterrier-image can do today and what could be added. **✓ marks what exists now** (`bt-image effects` lists it with every
-parameter); everything else is a proposal. Examples use the Python form `fx.<effect>(...)`; in a recipe file the same call
+This file records what shipped. Planned work is tracked outside this repository.
+
+What bullterrier-image can do today. **✓ marks what exists now** (`bt-image effects` lists it with every
+parameter). Examples use the Python form `fx.<effect>(...)`; in a recipe file the same call
 is `effect = "<effect>"` plus the same parameters.
 
-Only looks that read as made, not as a one-click photo filter, are proposed. Cut: oil paint, sketch, toon, comic,
+Only looks that read as made, not as a one-click photo filter, are built. Cut: oil paint, sketch, toon, comic,
 watercolor, woodcut, pop art, film emulation, pixel and brick novelties, novelty text looks and reveal wipes.
 
 Looks that are one effect with a set of values ship as presets of that effect (`fx.gradient_map(preset="sepia")`, data in
@@ -12,7 +14,7 @@ Looks that are one effect with a set of values ship as presets of that effect (`
 recipes. A new look first extends an existing effect when every one of its parameters still matters for every look;
 it becomes a new effect only when it is a new idea. The effect set is consolidated: a name that is no longer an effect is a preset, a look or a parameter of the effect that took it over (`bt-image effects NAME` finds it).
 
-**Nothing is scheduled.** The Rust port is complete (R0-R6, E1-E7, 2026-11-11). What could still be built is listed under "On demand", at the end.
+The Rust port is complete (R0-R6, E1-E7, 2026-11-11).
 
 ## Colour and tone
 
@@ -46,8 +48,6 @@ it becomes a new effect only when it is a new idea. The effect set is consolidat
 | --- | --- | --- |
 | `sharpen` ✓ | Unsharp mask; preset `clarity` is local contrast. | `fx.sharpen(radius=2, amount=0.8)` |
 | `highpass` ✓ | Keep only fine detail (for blending). | `fx.highpass(radius=8)` |
-| `denoise` (deferred) | Median, bilateral or non-local-means (the default method fits the render budget; a slower one may be chosen). | `fx.denoise(method="bilateral", amount=0.4)` |
-| `lens_blur` aperture (planned) | `blades` on `lens_blur`: hexagonal or cat's-eye bokeh; 0 = a disc. | `fx.lens_blur(radius=12, highlights=4, blades=6)` |
 | `dehaze` ✓ | Remove atmospheric haze. | `fx.dehaze(amount=0.5)` |
 | `tone_map` ✓ | Local tone mapping: the "HDR look", shadows and highlights recovery (preset `shadows_highlights`). | `fx.tone_map(amount=0.7)` |
 | `vignette` ✓ | Darken (or colour) the corners. | `fx.vignette(amount=0.5, roundness=0.8)` |
@@ -83,7 +83,7 @@ belong to a layout package, not here.
 
 ## Stylised looks
 
-Planned additions to `dither` and `halftone`, new screen and line looks, presets and print data: [dither-and-print.md](dither-and-print.md).
+The `dither` and `halftone` looks, screens, presets and print data: [dither-and-print.md](dither-and-print.md).
 
 | Effect | What it does | Example |
 | --- | --- | --- |
@@ -109,8 +109,6 @@ takes an explicit step count so it stays within the render budget.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `liquid_metal` ✓ | Chrome: the picture's brightness as a relief, lit and reflecting a fake environment, in a metal gradient. | `fx.liquid_metal(relief=35, tint="#c9d6ff")` |
-| `distance_field` | Signed-distance-field shapes from the picture's silhouette or brightness: soft outlines, glow, contour bands, metaballs. | `fx.distance_field(source="luminance", level=0.5, bands=8)` |
-| `glass` (after `distance_field`) | The picture refracted through a region's shape with a lit bevel: fluted or ribbed glass, glass blocks, "liquid glass" over a logo, text or the subject. May absorb `lenticular` (fluted glass). | `fx.glass(kind="fluted", refraction=1.4)` with `partition = "logo"` |
 | `reaction_diffusion` ✓ | Gray-Scott growth seeded by the picture: spots, stripes, coral. | `fx.reaction_diffusion(feed=0.037, kill=0.06, steps=300)` |
 | `lenticular` ✓ | Lenticular-print look: thin interlaced strips that shift with the viewing angle. | `fx.lenticular(strip=6, shift=5)` |
 
@@ -120,9 +118,6 @@ Dropped: `cellular_automata` (noisy specks, little value).
 
 | Effect | What it does | Example |
 | --- | --- | --- |
-| glyph matching (planned, on `ascii`) | Pick each character by how its shape matches the cell rather than by its ink: edge characters (`/ \ \| _`), braille (2x4 dots) or half blocks (`▀▄`). Replaces `ascii_edges`, `braille` and `half_blocks`. | `fx.ascii(match="shape", chars="braille")` |
-| text order (planned, on `ascii`) | The photo built from a supplied text, its characters in order, tone carried by colour. Replaces `text_mosaic`. | `fx.ascii(text=open("poem.txt").read())` |
-| `typographic_portrait` (deferred) | Lines of text, weight carries tone (needs variable font weights). | `fx.typographic_portrait(text="...")` |
 
 ## Distortion and geometry
 
@@ -208,7 +203,6 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | `depth_haze` ✓ (a recipe, [depth-haze.toml](../examples/recipes/depth-haze.toml)) | Aerial perspective: a one-colour `gradient` toward a pale haze and a flatter `grade`, masked to a `band` of the far part of the depth; `sharpen` (preset `clarity`) on the near. | one-colour `gradient` with `mask` = a `band` of `depth` region |
 | `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `grade`, `color_balance` and `gaussian_blur` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light a field (`depth` by default, the picture's `light`, any region), read as a relief, from a direction (Lambert on normals of the smoothed field); flat areas are unchanged. | `fx.relight(field="depth", angle=180, elevation=35, height=250)` |
-| coloured point light (planned, on `relight`) | `color` and a light at `x`, `y` as well as a direction: a neon light moving over the subject as video sets `x`, `y`. | `fx.relight(color="#ff2bd6", x=0.8, y=0.3)` |
 | depth contours ✓ (`topographic` with `field`) | Contour lines of any field, such as the depth: a LiDAR or scanner look. | `fx.topographic(field="depth", levels=24)` |
 | `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |
 
@@ -233,8 +227,6 @@ Use the subject cut-out, so they target the subject or the background.
 | `color_pop` ✓ | Subject in colour, background in grey. A recipe: `channel_mixer(preset="black_and_white")` with `mask = "background"` (examples/recipes/portrait-pop.toml). | `channel_mixer preset = "black_and_white", mask = "background"` |
 | `spotlight` ✓ | Light the subject, darken the rest. A recipe: `vignette` with `mask = "background"` (crates/core/data/looks/spotlight.toml). | `vignette mask = "background"` |
 | `aura` ✓ | Soft coloured halo around the subject. `outline` with a large `glow`. | `fx.outline(width=0, color="#7a2cff", glow=40)` |
-| `subject` selection | Pick `largest`, `all` or the n-th subject when there are several. | `subject="largest"` on any masked step |
-| decisions layer (future) | Optional, bring-your-own-key: a vision model you configure decides which subjects to select (the person, not the dog), off by default and never needed. | `subject="the person on the left"` with your own API key |
 
 ## Compositing
 
@@ -246,7 +238,7 @@ Combine the photo with an asset (a picture that is part of the look, given as a 
 | `gradient_overlay` ✓ (a recipe step) | Linear, radial or conic colour wash: `gradient` with a step `blend_mode`, not an effect. | `fx.gradient(colors=["#f0f","#0ff"], kind="linear", blend_mode="screen")` |
 
 Combining several photos as equals (a collage, a transition or morph between two shots) needs several inputs or a
-canvas of its own, so it belongs to video or a layout package; before/after side by side is the `compare` command.
+canvas of its own, so it belongs to video or a layout package; before/after side by side is a layout job.
 
 Text is bullterrier-vector's (typesetting); a caption here is an `svg` region + `fill`/`outline`.
 
@@ -273,8 +265,6 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | `upscale` ✓ (a setting) | Resampling to a `size` above the photo's own (an optional AI model is not built). | `size = 4096` |
 | `palette_from_photo` ✓ | Extract dominant colours to feed other steps: a reference picture's colours in, the stops of a `gradient_map` or the colours of a `gradient` out. A function over a numpy array, largest share first. | `bullterrier_image.palette(rgb, colors=5, *, seed=0)` |
 | `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml rgb_split.amount 0..20` |
-| `compare` (CLI) | Before/after slider page. | `bt-image compare a.jpg b.jpg` |
-| `avatar pack` (export) | Every size a set of platforms asks for. | `[export] preset = "avatars"` |
 
 ## One moment of a process
 
@@ -285,8 +275,6 @@ no time of its own.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `disperse` ✓ | Pieces detach, drift on the wind and fade. Presets `evaporate`, `halo`, `windblown`, `disintegrate` are stills part-way through. | `fx.disperse(progress=0.45, wind=0.3)` |
-| `dissolve` | Pixels or blocks of `cell` px vanish in noise order, with a burning edge (covers the old `pixel_dissolve`). | `fx.dissolve(progress=0.5, cell=16, edge="#ff7a2b")` |
-| burst (planned, on `disperse`) | Pieces burst outward from a point (`x`, `y`) as well as drifting on the wind. Replaces `explode`. | `fx.disperse(progress=0.5, burst=1, x=0.5, y=0.4)` |
 | `parallax` ✓ | 2.5D depth shift, from the injected depth: near layers slide over far ones, one shifted view. | `fx.parallax(amount=14.4, focus=0.5)` |
 
 Dropped: `assemble`. Pieces flying in and settling is `disperse` with `progress` running from 1 to 0, set by video.
@@ -309,86 +297,30 @@ What combining effects can give, once the pieces exist:
 - **Double exposure** ✓ ([recipe](../examples/recipes/double-exposure.toml)): black and white, a night sky multiplied into the silhouette, vignette
 - **Sticker** ✓ ([recipe](../examples/recipes/sticker.toml)): cut-out with a white border and drop shadow
 - **Portrait pop** ✓ ([recipe](../examples/recipes/portrait-pop.toml)): grey, blurred background, subject in colour
-- **Turn to dust**: ASCII, disperse, `particles` (preset `embers`) (one moment of it; a video tool animates it)
 - **Northern lights** ✓ ([recipe](../examples/recipes/northern-lights.toml)): aurora and stars behind a cold-tinted subject with a rim light
 
-A look is added to `examples/recipes/` by the batch that builds its last missing effect (Double exposure needed the first `Picture` effect, `blend`, which exists; Turn to dust needs a recipe file only: `ascii`, `disperse` and `particles` exist).
+A look is added to `examples/recipes/` by the batch that builds its last missing effect (Double exposure needed the first `Picture` effect, `blend`, which exists).
 
-## On demand (not scheduled)
+## Built for scene and the future directions (2026-11-14)
 
-Each item is built only when video or scene needs it.
-
-- **Subject matte (R6 extras).** Matte refinement as a post-process of the subject matte (the guided filter is the primitive),
-  and an AI upscaler as a model kind in the model catalogue. Also asked by real pieces: filling holes in a matte, and
-  taking a region or a colour out of it (a leash, grass at the feet were painted out by hand); and a note in
-  `subject-and-depth.md` that SAM 2's matte can be softer, with holes, than Apple Vision's on the same photo.
-- **Effects, in this order of value.** `distance_field`; glass, then emboss and bevel (new rows); `dissolve`;
-  `denoise`. `stipple`, `engraving` and
-  `crosshatch` are built.
-- **Input depth (a watch item).** A 16-bit input is read as sRGB. Colour management beyond sRGB (CMYK, ICC output) is not
-  image's job.
-- **Speed and memory.** `.superpowers/todos/performance.md` (what was measured, what is left), `banded-render-optimisation.md`
-  (the banded render's open items) and `e7-ledger.md` (the E7 batches, their decisions and the breaks they made).
-
-## From scene and the future directions (2026-11-14)
-
-Asked by `bullterrier-scene` while building real pieces, and by the three directions in the design repository's `future.md`
-(animated posters, websites, a drag-and-drop editor). Each is built when scene or video needs it.
+Asked by `bullterrier-scene` while building real pieces and by the planned directions (animated posters, websites, a
+drag-and-drop editor).
 
 - **Done: a sideways reach and a recipe-level query.** Not a sideways `Footprint` but a separate `Effect::spread` (how far an effect paints
   beyond its content's box, per side in working px, or `Unbounded`) and `Recipe::spread(presets, longest_side)`, the steps' sum for scene's room
-  (`architecture.md`, "Spread"; `design-decisions.md`). Remains: 28 of the 55 effects that paint outward say `Unbounded` (warps about the
-  picture's centre, tilings, reflections, tone statistics, `vhs`, `ntsc`, `anamorphic_streaks`, `light_rays`, `quadtree`, ...): a bound for each is a
-  parameter formula and a row in the oracle `tests/it/spread.rs` away, worked out when a look needs it; `Recipe::spread` in Python
-  (`Recipe.parameters()` is its neighbour).
+  (`architecture.md`, "Spread"; `design-decisions.md`).
 - **Done: position-aware effects, with a public canvas size and first row** (banded render for scene B1). `Options::with_window(first_row,
   canvas_width, canvas_height)` and `Recipe::band_margin` (`architecture.md`, "Window"; `design-decisions.md`). Every effect that bands reads
-  `Place`, so a band of rows equals the same rows of the whole render (oracle: `tests/it/window.rs`). Remains: Python (`window=`). `band_margin` is exact-only
+  `Place`, so a band of rows equals the same rows of the whole render (oracle: `tests/it/window.rs`). `band_margin` is exact-only
   (`Footprint::Fourier`, `design-decisions.md`).
 - **Done: `Options::with_room(top, right, bottom, left)`** (`architecture.md`, "Room"; `design-decisions.md`): a step that places itself by the picture
-  or reads all of it runs on the original box; the room is left as it received it. Remains: a boxed step reaching a halo painted into the room (a signed
-  `Place` for the effects a look needs), `Recipe::spread` and `with_room` in Python.
-- **Remaining of the banded-looks batch (written when the session closed; sub-batches 2 and 3 were not started because the audit found them built).**
-  - *Category A (position only)* and the seeded ones that were B and C in the 2026-11 audit (`design-decisions.md`, "Footprints of the 57"): built
-    in B1b to B3b, not by this batch. `grain`, `paper_texture`, `noise_field` kind `value`, `fog`, `vhs` noise hash the canvas place; `dead_pixels`,
-    `slice_shift`, `vhs`, `dust_scratches`, `particles`, `light_leak`, `lens_drops`, `flow_lines` draw a bounded list over the canvas from the seed and
-    take what falls in the rows. `tests/it/window.rs` and `banded.rs` hold them to the whole render. **No jump-ahead of the sequential `Rng` is
-    needed** (xoshiro256++, `ops/random.rs`): it would have to skip `rows x width x draws` values, which the effects that still draw sequentially
-    cannot state (rejection sampling, `Rng::below`, `shuffled`, a data-dependent count), and a hash of the canvas place already does what it was
-    for without changing a render. Keep that: never mix the two sources in one effect.
-  - *Still `Whole` (so `band_margin` answers none), by reason:* B/C `shatter` (a Voronoi over the canvas from the seed: the cells could be drawn
-    over the canvas and clipped, as `dead_pixels` does; the nearest-cell search is then `Radius`) and `jpeg_crush` (averages the canvas down to
-    design px; a block row's DC differences run along it); `noise_field` kinds `perlin`, `worley`, `sine` (their own picture-wide standardisation:
-    divide by a known deviation as `field_rows` does, or leave whole); D `auto_levels`, `dehaze`, `equalize`, `color_transfer`, `gradient_map`,
-    `radial_blur`, `starburst`, `tone_map` (a statistic of the whole picture: a band cannot have it unless the caller hands it the canvas's
-    statistic, a new input); E `droste`, `kaleidoscope`, `lens_distortion`, `perspective`, `polar`, `light_rays`, `pinch_bulge`, `swirl`, `tile`,
-    `quadtree`, `dither`, `disperse`, `reaction_diffusion`, `reflection`, `rim_light`, `relight` (Fourier blur), `edges` (canny), `ascii`,
-    `pixel_sort` and `stretch` (vertical).
-  - *Steps a window cannot make* whatever their effect: `each`, driven steps, and any step with a `mask`, `partition` or field parameter, because a
-    band's maps and pieces are the band's. Lifting it: scene hands the caller's maps cut to the band (`Photo::with_map` of the band) and
-    `band_margin` takes a flag saying the maps are the canvas's own, for the regions that are pixel-local (`given`, `color_range`, gradients, `band`
-    of a given map); a region with a feather or a blur needs its own margin.
-  - *Exact only:* done 2026-11-15 (`band_margin` answers none for a step that sums a blur by the Fourier transform; `design-decisions.md`).
-  - *Room:* a boxed step does not reach a halo an earlier step painted into the room (`architecture.md`, "Room"). **Decided 2026-11-15: not
-    built, a design change:** `Place` is public and its `first_row` is a `usize` (a signed one changes the API), the 30 readers and the noise lattice
-    and numbering of draws would change what they draw past the box edge, and each needs its own exactness argument; the remedy stays the order of the
-    steps (halos last). The signed-`Place` design that would lift it: `Place` gets a signed `first_row` and a `first_col`, the box's size as the canvas; every one of the 30 `Place` readers takes
-    its columns from it; the noise lattice (`cubic`) and the numbering of draws (`row * width + column` wrapped as `i64` so a column past the
-    box does not alias the next row) take negative places; clumped noise reads the room through the edge rule of the box. Do it per effect,
-    grain and vignette first, each with the box-equality oracle of `tests/it/room.rs`.
-- **Python `canvas=` for `Options::with_canvas`.** Rust only today (`design-decisions.md`: "Built: `Options::with_canvas`" says
-  Python would follow `band` through `bridge` and the stubs). *Why:* a Python caller placing a layer on a larger canvas gets
-  the layer's own design scale. *Evidence:* none from a Python caller yet; scene calls the Rust API.
-- **A keyline helper:** grow a cut-out into an outline as alpha only (a stroke without its host picture). *Why:* a poster
-  keyline needs the stroke alone. *Evidence:* the Conan poster used `fx.outline(field="subject")` on a second picture with
-  `lighten` (`bullterrier-demos/feedback/scene-conan.md`, 6): it works and is awkward.
+  or reads all of it runs on the original box; the room is left as it received it.
 - **Done: `Path` in the star export.** `Path` (the region) is out of `__all__`, so `from bullterrier_image import *` no longer
   shadows `pathlib.Path`; `from bullterrier_image import Path` and `bullterrier_image.Path` still work.
 - **Done 2026-11-18: a WebAssembly build proof.** `crates/wasm` builds the core for `wasm32-unknown-unknown` (one thread, no
   `onnx`); Node renders recipes to the native render's bytes (`poe wasm-test`), and a static page in headless Chrome
   re-renders a halftone recipe on every slider move: 32 ms at 0.25 MP, 93 ms at 1 MP (`design-decisions.md`, "A WebAssembly
-  package"; API: `javascript-api.md`). *Open, on demand:* a worker for the render, a `Photo` that resizes once for the preview, the AI finders
-  (onnxruntime-web, or a cut-out made on a server and handed in as the `subject` map), `.wasm` size (8 MB; `wasm-opt` not run).
+  package"; API: `javascript-api.md`).
 - **Done, pushed (recorded so nobody redoes it):** a look's `px` follow the canvas through `with_canvas`; a canvas smaller than
   the picture is allowed, and only fixes the scale (scene scales a layer past the canvas edge). A look's `px` are image's
   design pixels, 1/480 of the canvas long side.
