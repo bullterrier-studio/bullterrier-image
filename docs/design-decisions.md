@@ -873,7 +873,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); what could be added on demand is 
   (`blend`, `color_transfer`, `lut`) must fail as named. Errors are `Error`s named as Python's exceptions (`RecipeError`, `UnknownEffectError`,
   `SubjectNotFoundError`), with the core's message. *Rejected:* a second recipe format for JavaScript (a recipe is the
   recipe document); the subject finder in the browser (`ort` loads its library with `dlopen`: the cut-out is made elsewhere
-  and handed in with `Photo.setMap`); returning float pixels (4x the bytes, and the native export rounds to 8 bits anyway);
+  and handed in with `options.maps` of `render`); returning float pixels (4x the bytes, and the native export rounds to 8 bits anyway);
   threads (workers and `SharedArrayBuffer` need cross-origin isolation, and the budget below is met on one); a GPU path (a
   second implementation of every effect: see the spike above). *Limits:* a render blocks the thread that calls it (a page
   uses a worker when it must not); the photo is converted to floats once, by `new Photo`, and every render resamples it to
