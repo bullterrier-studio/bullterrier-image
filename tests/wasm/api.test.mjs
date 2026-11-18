@@ -57,9 +57,83 @@ test("a recipe that needs the subject says so when none was handed in", () => {
 });
 
 test("a photo or map of the wrong size is refused", () => {
+  const masked = Recipe.fromToml(`[[step]]\neffect = "halftone"\nmask = "subject"\n`);
   assert.equal(failure(() => new Photo(new Uint8Array(10), 4, 4)).name, "InvalidImageError");
-  assert.equal(failure(() => grey(4, 4).setMap("mask", new Float32Array(3))).name, "MapNotFoundError");
-  assert.equal(failure(() => grey(4, 4).setMap("mask", new Float32Array(16).fill(2))).name, "MapNotFoundError");
+  const wrong = (subject) => failure(() => masked.render(grey(4, 4), { maps: { subject } })).name;
+  assert.equal(wrong(new Float32Array(3)), "SubjectNotFoundError");
+  assert.equal(wrong(new Float32Array(16).fill(2)), "SubjectNotFoundError");
+});
+
+test("a map is handed in with each render and kept for none", () => {
+  const masked = Recipe.fromToml(`[[step]]\neffect = "halftone"\nmask = "subject"\n`);
+  const photo = grey(16, 16);
+  const subject = new Float32Array(256).fill(1);
+  assert.equal(masked.render(photo, { maps: { subject } }).width, 16);
+  assert.equal(failure(() => masked.render(photo)).name, "SubjectNotFoundError");
+  assert.equal(failure(() => masked.render(photo, { maps: { subject: [1, 1] } })).name, "TypeError");
+  assert.match(failure(() => masked.render(photo, { maps: { subject: [1, 1] } })).message, /maps\.subject/);
+  assert.match(failure(() => masked.render(photo, { maps: 3 })).message, /maps/);
+});
+
+test("a render is a plain object whose data is a JavaScript array to keep", () => {
+  const out = Recipe.fromToml(halftone).render(grey(8, 8));
+  assert.equal(Object.getPrototypeOf(out), Object.prototype);
+  assert.deepEqual(Object.keys(out).sort(), ["data", "height", "width"]);
+  assert.ok(out.data instanceof Uint8ClampedArray);
+  assert.equal(out.data, out.data);
+  assert.equal(out.free, undefined);
+});
+
+test("the numbers of a recipe are listed by address and set by address, as in Python", () => {
+  const recipe = Recipe.fromToml(halftone);
+  const cell = recipe.parameters()["halftone.cell"];
+  assert.equal(cell.value, 5);
+  assert.ok(cell.min > 0 && cell.max > cell.min && cell.meaning.length > 0 && typeof cell.unit === "string");
+  const wider = recipe.withValues({ "halftone.cell": 9 });
+  assert.equal(wider.parameters()["halftone.cell"].value, 9);
+  assert.equal(recipe.parameters()["halftone.cell"].value, 5); // the recipe itself is left as it is
+  assert.deepEqual(JSON.parse(wider.toJson()), JSON.parse(Recipe.fromToml(halftone.replace("cell = 5", "cell = 9")).toJson()));
+  assert.equal(failure(() => recipe.withValues({ "halftone.cell": -1 })).name, "RecipeError");
+  assert.match(failure(() => recipe.withValues({ "halftone.cell": -1 })).message, /halftone\.cell/);
+  assert.equal(failure(() => recipe.withValues({ nope: 1 })).name, "RecipeError");
+  assert.match(failure(() => recipe.withValues({ "halftone.cell": "9" })).message, /halftone\.cell/);
+  assert.equal(failure(() => recipe.withValues({ "halftone.cell": "9" })).name, "TypeError");
+  assert.equal(failure(() => recipe.withValues(4)).name, "TypeError");
+});
+
+test("a recipe is checked when it is loaded", () => {
+  const unknown = failure(() => Recipe.fromToml(`${halftone}zzz = 1\n`));
+  assert.equal(unknown.name, "RecipeError");
+  assert.match(unknown.message, /zzz/);
+  assert.equal(failure(() => Recipe.fromJson("{}")).name, "RecipeError");
+  assert.equal(failure(() => Recipe.fromToml(`[[step]]\neffect = "halftne"\n`)).name, "UnknownEffectError");
+});
+
+test("a photo takes whole positive sizes and 8-bit bytes only", () => {
+  for (const [width, height] of [[2.5, 4], [4, 2.5], [2 ** 32 + 2, 4], [0, 4], [4, -1], ["4", 4], [NaN, 4]]) {
+    const error = failure(() => new Photo(new Uint8Array(64), width, height));
+    assert.equal(error.name, "TypeError", `${width} x ${height}`);
+    assert.match(error.message, /width|height/);
+  }
+  for (const rgba of [new Float32Array(64), new Array(64).fill(0), new ArrayBuffer(64), null, "x"]) {
+    const error = failure(() => new Photo(rgba, 4, 4));
+    assert.equal(error.name, "TypeError");
+    assert.match(error.message, /rgba/);
+  }
+  assert.equal(Recipe.fromToml(halftone).render(new Photo(new Uint8ClampedArray(64).fill(9), 4, 4)).width, 4);
+});
+
+test("options that are not an object are refused, naming options", () => {
+  for (const options of [5, "big", true]) {
+    const error = failure(() => Recipe.fromToml(halftone).render(grey(8, 8), options));
+    assert.equal(error.name, "TypeError");
+    assert.match(error.message, /options/);
+  }
+});
+
+test("recipes that need a depth or a file fail as named in the browser", () => {
+  const depth = `[[step]]\neffect = "halftone"\nmask = "depth"\n`;
+  assert.equal(failure(() => Recipe.fromToml(depth).render(grey(8, 8))).name, "DepthNotFoundError");
 });
 
 test("a size that is not a whole number of pixels is refused", () => {

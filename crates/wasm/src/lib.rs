@@ -3,17 +3,41 @@
 //! same size, byte for byte, except for the effects that filter through the Fourier transform (`bloom`, `engraving`,
 //! `focus_blur`, `lens_blur`, `starburst`): rustfft rounds differently in each architecture's SIMD routine, so a channel
 //! may differ by one level of 255 (measured on 5 of the 84 example recipes, 1 to 4 bytes of 360000); this file only converts between JavaScript's values and the core's, and gives each core
-//! error its JavaScript `Error`. A subject cut-out is not found here: the page hands it in with `Photo.setMap`.
+//! error its JavaScript `Error`. A subject cut-out is not found here: the page hands it in with each render (`maps`).
 
 use bullterrier_image as image;
-use js_sys::{Error, JSON, Uint8Array, Uint8ClampedArray};
+use js_sys::{Error, Float32Array, JSON, Object, Reflect, TypeError, Uint8Array, Uint8ClampedArray};
+use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &str = r#"
-/** What a render is asked for: `size` is the longest side in pixels, else the recipe's `size`, else the photo's own. */
+/**
+ * What a render is asked for: `size` is the longest side in pixels, else the recipe's `size`, else the photo's own;
+ * `maps` are the maps the recipe reads, by name (`subject`: 1 where the subject is, `depth`: 1 nearest, or a region
+ * the recipe declares `given`): a value from 0 to 1 for each pixel of the photo, row after row.
+ */
 export interface RenderOptions {
     size?: number;
+    maps?: Record<string, Float32Array>;
+}
+
+/** A render: `data` is the 8-bit RGBA bytes of `new ImageData(data, width, height)`, straight alpha. */
+export interface Rendered {
+    width: number;
+    height: number;
+    data: Uint8ClampedArray;
+}
+
+/** A number of a recipe that can be set, by address (`recipe.parameters()`, `recipe.withValues`). */
+export interface RecipeParameter {
+    value: number | null;
+    unit: string;
+    min: number;
+    max: number;
+    meaning: string;
+    whole: boolean;
+    cyclic: boolean;
 }
 
 /** A parameter of an effect, as the core declares it (`kind` is "float", "int", "bool", "choice", "color", ...). */
@@ -22,7 +46,7 @@ export interface Parameter {
     kind: string;
     meaning: string;
     default: number | string | boolean | string[] | null;
-    unit: string | null;
+    unit: string;
     min: number | null;
     max: number | null;
     choices: string[];
@@ -36,6 +60,14 @@ extern "C" {
     /// The 8-bit RGBA pixels of a photo: a `Uint8Array`, or the `data` of an `ImageData` (a `Uint8ClampedArray`).
     #[wasm_bindgen(typescript_type = "Uint8Array | Uint8ClampedArray")]
     pub type Rgba;
+
+    /// A number of pixels.
+    #[wasm_bindgen(typescript_type = "number")]
+    pub type Pixels;
+
+    /// The numbers to set, by address.
+    #[wasm_bindgen(typescript_type = "Record<string, number>")]
+    pub type Values;
 
     /// What a render is asked for.
     #[wasm_bindgen(typescript_type = "RenderOptions")]
@@ -89,39 +121,54 @@ fn eight_bit(level: f32) -> u8 {
     (level * 255.0 + 0.5) as u8
 }
 
-/// The number of pixels `value` writes: a whole number from 1 up that a `u32` holds.
+/// The `TypeError` for a value that is not what a call reads.
+fn refuse(what: &str, expected: &str, value: &JsValue) -> JsValue {
+    let found = value.js_typeof().as_string().unwrap_or_default();
+    TypeError::new(&format!("{what}: expected {expected}, got a {found}")).into()
+}
+
+/// The number of pixels `value` writes (`what` is its name): a whole number from 1 up that a `u32` holds.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
     reason = "checked to be a whole number within 1..=u32::MAX"
 )]
-fn whole_pixels(value: &JsValue) -> Result<u32, JsValue> {
+fn whole_pixels(value: &JsValue, what: &str) -> Result<u32, JsValue> {
     value
         .as_f64()
         .filter(|size| size.fract() == 0.0 && (1.0..=f64::from(u32::MAX)).contains(size))
         .map(|size| size as u32)
-        .ok_or_else(|| js_sys::TypeError::new("size: expected a whole number of pixels").into())
+        .ok_or_else(|| TypeError::new(&format!("{what}: expected a whole number of pixels, got {value:?}")).into())
 }
 
-/// A photo to render recipes on: 8-bit pixels (the alpha is not read) and the maps handed in beside them.
+/// A photo to render recipes on: 8-bit pixels (the alpha is not read), as the core's levels.
 #[wasm_bindgen(js_name = Photo)]
 pub struct Photo {
     height: usize,
     width: usize,
     levels: Vec<f32>,
-    maps: Vec<(String, image::Layer)>,
 }
 
 #[wasm_bindgen(js_class = Photo)]
 impl Photo {
     /// The photo of `width` x `height` pixels that `rgba` holds, four bytes a pixel, row after row (an `ImageData`'s
-    /// `data` is such an array). Throws `InvalidImageError` for any other length.
+    /// `data` is such an array).
     ///
     /// # Errors
-    /// `InvalidImageError` unless `width` and `height` are at least 1 and `rgba` has `width * height * 4` bytes.
+    /// A `TypeError` naming `width`, `height` or `rgba` unless they are whole numbers of at least 1 and a `Uint8Array` or
+    /// `Uint8ClampedArray`; `InvalidImageError` unless `rgba` has `width * height * 4` bytes.
     #[wasm_bindgen(constructor)]
-    pub fn new(rgba: &Rgba, width: usize, height: usize) -> Result<Photo, JsValue> {
-        let bytes = Uint8Array::new(rgba.as_ref()).to_vec();
+    pub fn new(rgba: &Rgba, width: &Pixels, height: &Pixels) -> Result<Photo, JsValue> {
+        let (width, height) = (whole_pixels(width, "width")?, whole_pixels(height, "height")?);
+        let given: &JsValue = rgba.as_ref();
+        let bytes = if let Some(array) = given.dyn_ref::<Uint8Array>() {
+            array.to_vec()
+        } else if let Some(array) = given.dyn_ref::<Uint8ClampedArray>() {
+            array.to_vec()
+        } else {
+            return Err(refuse("rgba", "a Uint8Array or Uint8ClampedArray", given));
+        };
+        let (width, height) = (width as usize, height as usize);
         if width.checked_mul(height).and_then(|pixels| pixels.checked_mul(4)) != Some(bytes.len()) {
             let message = format!(
                 "{} bytes do not make {width} x {height} pixels of 4 channels",
@@ -137,36 +184,7 @@ impl Photo {
             .flat_map(|pixel| &pixel[..3])
             .map(|&byte| f32::from(byte) / 255.0)
             .collect();
-        let photo = Photo {
-            height,
-            width,
-            levels,
-            maps: Vec::new(),
-        };
-        raised(image::Picture::new(height, width, &photo.levels))?; // a size of zero
-        Ok(photo)
-    }
-
-    /// Hand in the map `name` (`"subject"`: 1 where the subject is, `"depth"`: 1 nearest, or a region the recipe declares
-    /// as given): one `Float32Array` value from 0 to 1 for each pixel of the photo, row after row. A map of the same name
-    /// replaces the one before.
-    ///
-    /// # Errors
-    /// `MapNotFoundError` unless there is a value for each pixel and each is within 0..1.
-    #[wasm_bindgen(js_name = setMap)]
-    pub fn set_map(&mut self, name: &str, values: &[f32]) -> Result<(), JsValue> {
-        let layer = image::Layer::new(self.height, self.width, values.to_vec()).map_err(|why| {
-            thrown_for(&image::Error::map_not_found(
-                name,
-                format!(
-                    "the map '{name}' is no map of the {} x {} photo: {why}",
-                    self.width, self.height
-                ),
-            ))
-        })?;
-        self.maps.retain(|(known, _)| known != name);
-        self.maps.push((name.to_owned(), layer));
-        Ok(())
+        Ok(Photo { height, width, levels })
     }
 }
 
@@ -174,24 +192,31 @@ impl Photo {
 #[wasm_bindgen(js_name = Recipe)]
 pub struct Recipe(image::Recipe);
 
+/// A recipe the core has read and checked, as `load_recipe` does in Python.
+fn loaded(recipe: Result<image::Recipe, image::Error>) -> Result<Recipe, JsValue> {
+    let presets = raised(image::Presets::shipped())?;
+    raised(recipe.and_then(|recipe| recipe.checked(&presets))).map(Recipe)
+}
+
 #[wasm_bindgen(js_class = Recipe)]
 impl Recipe {
     /// The recipe a recipe file writes (TOML text).
     ///
     /// # Errors
-    /// `RecipeError` for text that is not a recipe, with the line and the rule.
+    /// `RecipeError` for text that is not a recipe or breaks a rule of one (an unknown parameter, a value out of its
+    /// range), with the step and the rule; `UnknownEffectError` for an effect that does not exist.
     #[wasm_bindgen(js_name = fromToml)]
     pub fn from_toml(text: &str) -> Result<Recipe, JsValue> {
-        raised(image::Recipe::from_toml(text)).map(Recipe)
+        loaded(image::Recipe::from_toml(text))
     }
 
     /// The recipe the JSON document `text` writes, as `toJson` writes it.
     ///
     /// # Errors
-    /// `RecipeError` for text that is not a recipe.
+    /// As `fromToml`.
     #[wasm_bindgen(js_name = fromJson)]
     pub fn from_json(text: &str) -> Result<Recipe, JsValue> {
-        raised(image::Recipe::from_json(text)).map(Recipe)
+        loaded(image::Recipe::from_json(text))
     }
 
     /// The look that ships with the package, by name (`looks()` lists them).
@@ -202,33 +227,123 @@ impl Recipe {
         raised(image::Recipe::look(name)).map(Recipe)
     }
 
-    /// The recipe as a JSON document: edit a value and read it back with `fromJson`.
+    /// The recipe as a JSON document: `fromJson` reads it back.
     ///
     /// # Errors
-    /// `BullterrierImageError` if the recipe cannot be written (it can always be).
+    /// `RecipeError` if the recipe cannot be written (it can always be).
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&self.0).map_err(|error| thrown_for(&image::Error::Recipe(error.to_string())))
     }
 
-    /// Run the recipe on `photo`: the photo framed and scaled to `options.size` (else the recipe's `size`, else its own),
-    /// the steps in order, as the native render of the same size does.
+    /// Every number of the recipe that can be set, by address, in the order of the recipe (`halftone.cell`; as Python's
+    /// `Recipe.parameters`): an object of the address to `{ value, unit, min, max, meaning, whole, cyclic }`, what a page
+    /// needs for a slider each. `value` is `null` for an optional number the recipe leaves unset.
     ///
     /// # Errors
-    /// What the core refuses the recipe for (`RecipeError`, `UnknownEffectError`), `SubjectNotFoundError` or another
-    /// `MapNotFoundError` for a map the recipe needs and the photo was not given.
-    pub fn render(&self, photo: &Photo, options: Option<RenderOptions>) -> Result<Rendered, JsValue> {
+    /// `UnknownEffectError` for a step of an effect that does not exist (a loaded recipe has none).
+    #[wasm_bindgen(unchecked_return_type = "Record<string, RecipeParameter>")]
+    pub fn parameters(&self) -> Result<JsValue, JsValue> {
+        let all = Object::new();
+        for number in raised(self.0.numbers())? {
+            let found = Object::new();
+            let value = number.value.map_or(JsValue::NULL, JsValue::from_f64);
+            for (key, member) in [
+                ("value", value),
+                ("unit", number.unit.into()),
+                ("min", number.min.into()),
+                ("max", number.max.into()),
+                ("meaning", number.doc.into()),
+                ("whole", number.whole.into()),
+                ("cyclic", number.cyclic.into()),
+            ] {
+                Reflect::set(&found, &key.into(), &member)?;
+            }
+            Reflect::set(&all, &number.address.into(), &found)?;
+        }
+        Ok(all.into())
+    }
+
+    /// A copy of the recipe with each number at an address of `values` set (as Python's `Recipe.with_values`): the
+    /// recipe itself is left as it is.
+    ///
+    /// # Errors
+    /// A `TypeError` naming `values` or an address unless they are an object of numbers; `RecipeError` naming the
+    /// address for an address that points at nothing or a value the recipe refuses (never clamped).
+    #[wasm_bindgen(js_name = withValues)]
+    pub fn with_values(&self, values: &Values) -> Result<Recipe, JsValue> {
+        let given: &JsValue = values.as_ref();
+        let object = given
+            .dyn_ref::<Object>()
+            .ok_or_else(|| refuse("values", "an object of addresses to numbers", given))?;
+        let mut set = Vec::new();
+        for address in Object::keys(object) {
+            let address = address.as_string().unwrap_or_default();
+            let value = Reflect::get(object, &JsValue::from_str(&address))?;
+            let number = value.as_f64().ok_or_else(|| refuse(&address, "a number", &value))?;
+            set.push((address, number));
+        }
+        let asked: Vec<(&str, f64)> = set
+            .iter()
+            .map(|(address, number)| (address.as_str(), *number))
+            .collect();
+        let presets = raised(image::Presets::shipped())?;
+        raised(self.0.with_values(&asked, &presets)).map(Recipe)
+    }
+
+    /// Run the recipe on `photo`: the photo framed and scaled to `options.size` (else the recipe's `size`, else its own),
+    /// the steps in order, with the maps of `options.maps` (`subject`, `depth`, or a region the recipe declares `given`: a
+    /// `Float32Array` of 0..1, a value per pixel of the photo), as the native render of the same size does.
+    ///
+    /// # Errors
+    /// A `TypeError` naming `options`, `size` or a map for a value of the wrong type; what the core refuses the recipe for
+    /// (`RecipeError`, `UnknownEffectError`); `MapNotFoundError` for a map of the wrong length or with a value outside
+    /// 0..1; `SubjectNotFoundError` or another `MapNotFoundError` for a map the recipe needs and `maps` lacks.
+    #[wasm_bindgen(unchecked_return_type = "Rendered")]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a side is at most 2^26 pixels, far inside f64's 53 bits"
+    )]
+    pub fn render(&self, photo: &Photo, options: Option<RenderOptions>) -> Result<JsValue, JsValue> {
         let mut chosen = image::Options::default();
+        let mut maps = Vec::new();
         if let Some(options) = options {
-            let size = js_sys::Reflect::get(options.as_ref(), &JsValue::from_str("size"))?;
+            let given: &JsValue = options.as_ref();
+            if !given.is_object() {
+                return Err(refuse("options", "an object", given));
+            }
+            let size = Reflect::get(given, &JsValue::from_str("size"))?;
             if !size.is_undefined() {
-                chosen = chosen.with_size(whole_pixels(&size)?);
+                chosen = chosen.with_size(whole_pixels(&size, "size")?);
+            }
+            let given_maps = Reflect::get(given, &JsValue::from_str("maps"))?;
+            if !given_maps.is_undefined() {
+                let object = given_maps
+                    .dyn_ref::<Object>()
+                    .ok_or_else(|| refuse("options.maps", "an object of names to Float32Arrays", &given_maps))?;
+                for name in Object::keys(object) {
+                    let name = name.as_string().unwrap_or_default();
+                    let values = Reflect::get(object, &JsValue::from_str(&name))?;
+                    let values = values
+                        .dyn_ref::<Float32Array>()
+                        .ok_or_else(|| refuse(&format!("maps.{name}"), "a Float32Array", &values))?;
+                    maps.push((name, values.to_vec()));
+                }
             }
         }
         let picture = raised(image::Picture::new(photo.height, photo.width, &photo.levels))?;
         let mut core = image::Photo::new(picture);
-        for (name, layer) in &photo.maps {
-            core = raised(core.with_map(name.clone(), layer.clone()))?;
+        for (name, values) in maps {
+            let layer = image::Layer::new(photo.height, photo.width, values).map_err(|why| {
+                thrown_for(&image::Error::map_not_found(
+                    &name,
+                    format!(
+                        "the map '{name}' is no map of the {} x {} photo: {why}",
+                        photo.width, photo.height
+                    ),
+                ))
+            })?;
+            core = raised(core.with_map(name, layer))?;
         }
         let presets = raised(image::Presets::shipped())?;
         let done = raised(core.render(&self.0, &presets, chosen))?;
@@ -241,40 +356,12 @@ impl Recipe {
                 bytes.push(255);
             }
         }
-        Ok(Rendered { width, height, bytes })
-    }
-}
-
-/// A render's pixels: `width`, `height` and `data`, the 8-bit RGBA bytes of `new ImageData(data, width, height)`.
-#[wasm_bindgen(js_name = Rendered)]
-pub struct Rendered {
-    width: usize,
-    height: usize,
-    bytes: Vec<u8>,
-}
-
-#[wasm_bindgen(js_class = Rendered)]
-impl Rendered {
-    /// The number of columns.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn width(&self) -> usize {
-        self.width
-    }
-
-    /// The number of rows.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn height(&self) -> usize {
-        self.height
-    }
-
-    /// The pixels, four bytes each, straight alpha (255 unless the recipe cuts the picture out): a new array on every
-    /// read, so read it once.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn data(&self) -> Uint8ClampedArray {
-        Uint8ClampedArray::from(self.bytes.as_slice())
+        // a plain object holding a copy in JavaScript's memory: nothing to free, and the array is the same on every read
+        let rendered = Object::new();
+        Reflect::set(&rendered, &"width".into(), &JsValue::from_f64(width as f64))?;
+        Reflect::set(&rendered, &"height".into(), &JsValue::from_f64(height as f64))?;
+        Reflect::set(&rendered, &"data".into(), &Uint8ClampedArray::from(bytes.as_slice()))?;
+        Ok(rendered.into())
     }
 }
 
@@ -295,7 +382,14 @@ pub fn parameters(effect: &str) -> Result<JsValue, JsValue> {
     let table = raised(image::effect(effect))?.params();
     let text =
         serde_json::to_string(&table.fields).map_err(|error| thrown_for(&image::Error::Recipe(error.to_string())))?;
-    JSON::parse(&text)
+    let fields = JSON::parse(&text)?;
+    // no unit is "", as the other bindings write it, not `null`
+    for field in js_sys::Array::from(&fields) {
+        if Reflect::get(&field, &"unit".into())?.is_null() {
+            Reflect::set(&field, &"unit".into(), &"".into())?;
+        }
+    }
+    Ok(fields)
 }
 
 /// The names of the looks that ship with the package, for `Recipe.look`.

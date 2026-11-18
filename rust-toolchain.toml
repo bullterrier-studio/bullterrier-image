@@ -2,6 +2,6 @@
 [toolchain]
 channel = "1.99.1"
 components = ["rustfmt", "clippy"]
-# the core builds for the browser, too (`poe wasm-build`): rustup installs the target with the toolchain
+# the core builds for the browser, too (`poe wasm-test`): rustup installs the target with the toolchain
 targets = ["wasm32-unknown-unknown"]
 profile = "minimal"

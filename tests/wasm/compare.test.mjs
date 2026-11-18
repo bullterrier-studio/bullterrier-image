@@ -14,9 +14,10 @@ const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 const { width, height } = oracle.photo;
 const photo = new Photo(readFileSync(new URL("../../pkg/photo.rgba", here)), width, height);
+const maps = {};
 for (const name of ["subject", "depth"]) {
   const bytes = readFileSync(new URL(`../../pkg/${name}.f32`, here));
-  photo.setMap(name, new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4));
+  maps[name] = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4);
 }
 
 for (const [name, expected] of Object.entries(oracle.cases)) {
@@ -24,10 +25,10 @@ for (const [name, expected] of Object.entries(oracle.cases)) {
   test(`${name}: the same pixels as the native render`, () => {
     const loaded = look ? Recipe.look(look) : Recipe.fromToml(readFileSync(new URL(recipe, here), "utf8"));
     if (expected.error) {
-      assert.throws(() => loaded.render(photo, size === undefined ? undefined : { size }), { name: expected.error });
+      assert.throws(() => loaded.render(photo, { size, maps }), { name: expected.error });
       return;
     }
-    const out = loaded.render(photo, size === undefined ? undefined : { size });
+    const out = loaded.render(photo, { size, maps });
     assert.deepEqual([out.width, out.height], [expected.width, expected.height]);
     assert.equal(out.data.length, out.width * out.height * 4);
     if (expected.bound > 0 && sha256(out.data) !== expected.sha256) {
