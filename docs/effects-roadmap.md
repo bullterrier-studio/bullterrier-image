@@ -215,7 +215,7 @@ Use the subject cut-out, so they target the subject or the background.
 | --- | --- | --- |
 | `fill` ✓ (a preset of `gradient`) | Flat colour; masked = background removal. | `fx.gradient(preset="fill", mask="background")` |
 | `outline` ✓ | Coloured stroke around the subject, optional glow. | `fx.outline(width=6, color="#fff", glow=12)` |
-| `drop_shadow` ✓ | Soft shadow behind the subject; `copies` stack offset copies, from `color` to `end_color`, as cut paper. | `fx.drop_shadow(offset=22, angle=56, blur=24)` |
+| `drop_shadow` ✓ | Soft shadow behind the subject; `copies` stack offset copies, from `color` to `end_color`, as cut paper; `source="point"` steps them away from a lamp at `x`, `y` instead of along `angle`. | `fx.drop_shadow(offset=22, angle=56, blur=24)` |
 | `long_shadow` ✓ | Flat-design shadow at an angle. A preset of `drop_shadow`. | `fx.drop_shadow(preset="long_shadow", angle=45)` |
 | `rim_light` ✓ | Light along the subject's edge from a side. | `fx.rim_light(angle=320, color="#ff9a4d")` |
 | `defringe` ✓ | Removes the backdrop's colour halo a cut-out's edge carries: the edge takes the subject's interior colour. | `fx.defringe(width=3)` |
