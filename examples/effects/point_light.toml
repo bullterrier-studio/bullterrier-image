@@ -1,0 +1,10 @@
+# A lamp at the upper left of the photo, the rest of the picture dimmed to half.
+name = "point_light"
+size = 480
+
+[[step]]
+effect = "point_light"
+x = 0.2
+y = 0.3
+gain = 1.2
+ambient = 0.5

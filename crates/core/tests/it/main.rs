@@ -132,6 +132,7 @@ mod pipeline_run;
 mod pixel_grid;
 mod pixel_sort;
 mod placed;
+mod point_light;
 mod polar;
 mod preset_curves;
 mod preset_looks;
