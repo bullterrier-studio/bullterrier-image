@@ -1,0 +1,28 @@
+# Looks that are one point_light step.
+
+[warm_key]
+description = "A warm lamp at the upper left; the rest of the picture dimmed to under half."
+color = "#ffd9a0"
+x = 0.2
+y = 0.25
+gain = 1.4
+ambient = 0.45
+
+[neon_magenta]
+description = "A magenta lamp low on the left in a dim room: the lit side turns pink, the rest falls to a quarter."
+color = "#ff3fa8"
+x = 0.05
+y = 0.65
+gain = 1.6
+ambient = 0.25
+radius = 576.0
+
+[shadow_spot]
+description = "A soft pool of shadow: a lamp that darkens, with no relief, so the light is its fall-off alone."
+x = 0.5
+y = 0.5
+gain = -0.8
+ambient = 1.0
+height = 0.0
+detail = 0.0
+radius = 288.0

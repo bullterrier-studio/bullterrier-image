@@ -17,3 +17,12 @@ angle = 45.0
 blur = 0.0
 color = "#ff8a5b"
 end_color = "#3b1f6b"
+
+[lamp_shadow]
+description = "The shadow of a lamp at the upper left, long and soft: the copies step away from it, the farther from the lamp the more."
+source = "point"
+x = 0.15
+y = 0.15
+copies = 1
+offset = 140.0
+blur = 14.0
