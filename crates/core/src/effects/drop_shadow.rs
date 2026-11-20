@@ -7,8 +7,8 @@ use crate::Footprint;
 use crate::effect::{Category, Meta};
 use crate::ops::blur::gaussian_filter_owned;
 use crate::ops::edge::Edge;
-use crate::ops::shift::shifted;
-use crate::params::{Color, FieldName, Params};
+use crate::ops::shift::{scaled_about, shifted};
+use crate::params::{Choice, Color, FieldName, Params};
 use crate::{Image, Inputs, Picture};
 
 /// Where `drop_shadow` sits in the catalogue.
@@ -20,6 +20,10 @@ pub(crate) const META: Meta = Meta {
 
 /// What `drop_shadow` reads around a pixel: the shape as far as the farthest copy lies, softened by the blur's reach.
 pub(crate) fn footprint(params: &Params) -> Footprint {
+    if params.source == Source::Point {
+        // a copy is read from between the lamp and the pixel: from anywhere
+        return Footprint::Whole;
+    }
     // constant: the Gaussian reaches int(truncate x blur + 0.5) px, and a copy moved by a fraction reads one row more
     Footprint::reach(
         f64::from(params.copies) * f64::from(params.offset) + f64::from(params.blur * params.truncate) + 1.5,
@@ -30,6 +34,9 @@ pub(crate) fn footprint(params: &Params) -> Footprint {
 /// How far `drop_shadow` paints beyond the picture's edge: the farthest copy's move, the way it moves, and the blur's reach
 /// on every side.
 pub(crate) fn spread(params: &Params) -> crate::Spread {
+    if params.source == Source::Point {
+        return crate::Spread::Unbounded;
+    }
     if params.edge == Edge::Wrap {
         return crate::Spread::Unbounded;
     }
@@ -38,6 +45,16 @@ pub(crate) fn spread(params: &Params) -> crate::Spread {
     // constant: the Gaussian reaches int(truncate x blur + 0.5) px
     let blur = f64::from(params.blur * params.truncate) + 0.5;
     crate::Spread::moved(far * heading.sin(), far * heading.cos()).then(crate::Spread::all(blur))
+}
+
+/// Which way the copies step away.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Choice)]
+pub enum Source {
+    /// Every copy moves the same way, along `angle`: the shadow of a far light, parallel and of one length.
+    Angle,
+    /// Every copy moves away from the lamp at (`x`, `y`), the farther from it the more: the shadow of a lamp, which swings
+    /// and stretches as the lamp moves.
+    Point,
 }
 
 /// Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by `blur`:
@@ -59,13 +76,26 @@ pub struct Params {
     pub copies: i32,
     /// How far each copy lies beyond the one before it, in px, tuned for a picture about 480 px high: the first is
     /// `offset` from the shape, the last `copies` x `offset`. 0 = every copy hidden behind the shape, leaving only what
-    /// `blur` spreads past its edge.
+    /// `blur` spreads past its edge. With `source` 'point' it is the move of a point one picture width from the lamp;
+    /// nearer points move less, in proportion to their distance from it.
     #[param(default = 22.0, unit = px, min = 0, max = 1000)]
     pub offset: f32,
-    /// The direction the copies step away in, in degrees clockwise from pointing right on the screen, 0 to 360: 0 = to
-    /// the right, 45 = to the lower right, 90 = down, 180 = to the left, 270 = up.
+    /// Which way the copies step away: 'angle' (all the same way, along `angle`) or 'point' (away from the lamp at
+    /// `x`, `y`, the farther from it the more, so a shadow swings and stretches as the lamp moves).
+    #[param(default = Angle)]
+    pub source: Source,
+    /// The direction the copies step away in when `source` is 'angle', in degrees clockwise from pointing right on the
+    /// screen, 0 to 360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to the left, 270 = up.
     #[param(default = 56.0, unit = degrees, min = 0, max = 360, cyclic)]
     pub angle: f32,
+    /// The lamp's horizontal place when `source` is 'point', as a fraction of the way across the picture: 0 = the first
+    /// pixel column, 0.5 = the middle, 1 = the last. Beyond 0 to 1 the lamp stands outside the picture.
+    #[param(default = 0.3, unit = fraction, min = -0.5, max = 1.5)]
+    pub x: f32,
+    /// The lamp's vertical place when `source` is 'point', as a fraction of the way down the picture: 0 = the first pixel
+    /// row, 0.5 = the middle, 1 = the last.
+    #[param(default = 0.3, unit = fraction, min = -0.5, max = 1.5)]
+    pub y: f32,
     /// Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger and fainter at their edge; 0 =
     /// hard-edged silhouettes.
     #[param(default = 24.0, unit = px, min = 0, max = 200)]
@@ -116,6 +146,14 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         f64::from(params.offset) * heading.cos(),
     );
     let copies = params.copies.unsigned_abs();
+    // the lamp lies on the canvas, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
+    #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
+    let (canvas_width, canvas_height) = (place.canvas_width as f64, place.canvas_height as f64);
+    let lamp = (
+        f64::from(params.y) * (canvas_height - 1.0),
+        f64::from(params.x) * (canvas_width - 1.0),
+    );
     // Laying the copies over the picture, the farthest first, is the same as walking them from the nearest: each takes
     // its opacity of what the nearer ones left clear, and its colour, which is `color` plus `along` of the way to
     // `end_color`, is summed as `color` and the `along`-weighted share, so each copy costs one-channel planes, not three.
@@ -126,15 +164,20 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         let along = (number - 1) as f32 / copies.saturating_sub(1).max(1) as f32; // 0 at the first copy, 1 at the last
         let opacity = params.copy_opacity * (1.0 - params.fade * along);
         let steps = f64::from(number);
-        let moved = shifted(
-            &silhouette,
-            height,
-            width,
-            inputs.place(picture).first_row,
-            down * steps,
-            right * steps,
-            edge,
-        );
+        let moved = match params.source {
+            Source::Angle => shifted(&silhouette, height, width, place.first_row, down * steps, right * steps, edge),
+            // the copy is the shape scaled about the lamp: a point `offset` x `steps` px (at a picture's width from the
+            // lamp) farther from it, nearer ones in proportion
+            Source::Point => scaled_about(
+                &silhouette,
+                height,
+                width,
+                place.first_row,
+                lamp,
+                1.0 + steps * f64::from(params.offset) / canvas_width,
+                edge,
+            ),
+        };
         let cover: Vec<f32> = moved.iter().map(|pixel| pixel[0]).collect();
         let cover = gaussian_filter_owned(
             cover,

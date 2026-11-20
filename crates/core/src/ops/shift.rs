@@ -57,6 +57,43 @@ pub(crate) fn shifted(
     out
 }
 
+/// The `height` x `width` `pixels` (row after row, both at least 1) scaled by `factor` (above 0) about `centre`, a (row,
+/// column) point of the canvas that may lie outside the picture, as a new picture of the same size.
+///
+/// Pixel (i, j) of the result is the picture at `centre + (position - centre) / factor`, read between pixels as
+/// [`shifted`] reads: a factor of 2 doubles every distance from `centre`, so a point lands twice as far from it and a lone
+/// pixel spreads over twice the width. `edge` says what lies beyond the picture's edge. `canvas_row` is the canvas row of the
+/// picture's first row, as for [`shifted`]: a window of a canvas reads the same positions as the whole render.
+pub(crate) fn scaled_about(
+    pixels: &[[f32; 3]],
+    height: usize,
+    width: usize,
+    canvas_row: usize,
+    centre: (f64, f64),
+    factor: f64,
+    edge: Extension,
+) -> Vec<[f32; 3]> {
+    let sampler = Sampler::new(pixels, height, width, Interpolation::Bilinear, edge);
+    let mut out = vec![[0.0; 3]; height * width];
+    par::rows(&mut out, width, |first_row, band| {
+        for (at, pixel) in band.iter_mut().enumerate() {
+            #[expect(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                reason = "a picture side is far below 2**52; the reading is made in f64 and stored in the f32 picture"
+            )]
+            {
+                let (row, column) = (first_row + at / width, at % width);
+                let canvas_position = (canvas_row + row) as f64;
+                let source_row = centre.0 + (canvas_position - centre.0) / factor - canvas_row as f64;
+                let source_column = centre.1 + (column as f64 - centre.1) / factor;
+                *pixel = sampler.at(source_row, source_column).map(|level| level as f32);
+            }
+        }
+    });
+    out
+}
+
 /// `row` moved `distance` px right (left if negative) into `out` (as long as `row`, not empty): the row of [`shifted`] for
 /// a move of 0 down and `distance` across, made without a sampler, for many rows each moved by a distance of its own.
 ///

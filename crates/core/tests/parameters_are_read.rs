@@ -835,6 +835,17 @@ fn conditional() -> Vec<Conditional> {
             field: "copies",
             with: vec![("offset", json!(2.0))],
         },
+        // the lamp's place matters only while the copies step away from it
+        Conditional {
+            effect: "drop_shadow",
+            field: "x",
+            with: vec![("offset", json!(2.0)), ("source", json!("point"))],
+        },
+        Conditional {
+            effect: "drop_shadow",
+            field: "y",
+            with: vec![("offset", json!(2.0)), ("source", json!("point"))],
+        },
         Conditional {
             effect: "drop_shadow",
             field: "blur",

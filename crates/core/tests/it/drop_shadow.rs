@@ -156,3 +156,97 @@ fn a_shape_cut_off_by_the_border_casts_its_copy_from_what_the_edge_rule_puts_bey
     }
     Ok(())
 }
+
+/// A lamp at the canvas point (0, 0) (`x` and `y` 0 of a 32 px picture), the copies stepping away from it.
+fn lamp_at_the_corner(offset: f32) -> drop_shadow::Params {
+    drop_shadow::Params {
+        source: drop_shadow::Source::Point,
+        x: 0.0,
+        y: 0.0,
+        ..hard(offset, 0.0)
+    }
+}
+
+/// How much of a lone pixel at `place`, scaled by `factor` about the canvas point (0, 0), covers pixel `at`: a tent as wide
+/// as the factor along each axis (the pixel enlarged and read between its neighbours), worked from the geometry.
+fn tent(place: (usize, usize), factor: f32, at: (usize, usize)) -> f32 {
+    let along = |from: usize, to: usize| (1.0 - (to as f32 - factor * from as f32).abs() / factor).max(0.0);
+    along(place.0, at.0) * along(place.1, at.1)
+}
+
+#[test]
+fn a_lamp_moves_a_copy_away_from_it_in_proportion_to_the_distance() -> Result<(), Error> {
+    // two lone pixels at (10, 12) and (4, 6), the lamp at (0, 0). An offset of the picture's width (32 px) is a factor of 2
+    // (a pixel at p lands at 2p, so the nearer one moves less); half of it is a factor of 1.5
+    let shapes = [(10, 12), (4, 6)];
+    let lone = pixels_of(32, 32, |row, column| shapes.contains(&(row, column)));
+    for (offset, factor) in [(32.0, 2.0), (16.0, 1.5)] {
+        let out = run(&lamp_at_the_corner(offset), &lone, 32, 32)?;
+        for (at, pixel) in out.iter().enumerate() {
+            let place = (at / 32, at % 32);
+            let shadow: f32 = shapes.iter().map(|&shape| tent(shape, factor, place)).sum();
+            // the shapes themselves are never changed
+            let wanted = if shapes.contains(&place) {
+                GREY
+            } else {
+                GREY * (1.0 - shadow)
+            };
+            assert!(
+                near(*pixel, [wanted; 3]),
+                "factor {factor}: pixel {place:?} is {pixel:?}, wanted {wanted}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_lamp_ignores_the_angle_and_no_offset_leaves_no_shadow() -> Result<(), Error> {
+    let square = pixels_of(32, 32, |row, column| row.abs_diff(16) < 4 && column.abs_diff(16) < 4);
+    let turned = drop_shadow::Params {
+        angle: 123.0,
+        ..lamp_at_the_corner(20.0)
+    };
+    assert_eq!(
+        run(&lamp_at_the_corner(20.0), &square, 32, 32)?,
+        run(&turned, &square, 32, 32)?
+    );
+    let hidden = run(&lamp_at_the_corner(0.0), &square, 32, 32)?;
+    assert!(hidden.iter().all(|pixel| *pixel == [GREY; 3]));
+    Ok(())
+}
+
+#[test]
+fn a_lamp_at_the_middle_of_a_square_casts_a_shadow_around_it_that_is_the_same_on_every_side() -> Result<(), Error> {
+    // the lamp at the canvas point (15.5, 15.5), the middle of a 32 px picture, and a square centred on it: the shadow is a
+    // bigger square about the same middle, so turning the picture half a turn gives the same picture
+    let square = pixels_of(32, 32, |row, column| {
+        (12..20).contains(&row) && (12..20).contains(&column)
+    });
+    let settings = drop_shadow::Params {
+        x: 0.5,
+        y: 0.5,
+        ..lamp_at_the_corner(8.0)
+    };
+    let out = run(&settings, &square, 32, 32)?;
+    for (at, pixel) in out.iter().enumerate() {
+        let turned = 32 * 32 - 1 - at;
+        assert!(
+            near(*pixel, out[turned]),
+            "pixel {at} is {pixel:?}, its opposite {:?}",
+            out[turned]
+        );
+    }
+    // just outside the square and inside its copy (a factor of 1.25: 8 px grow to 10) the picture is dark; far outside it is not
+    assert!(
+        out[11 * 32 + 16][0] < 0.2 * GREY,
+        "just outside the square: {:?}",
+        out[11 * 32 + 16]
+    );
+    assert!(
+        near(out[5 * 32 + 5], [GREY; 3]),
+        "far outside the copy: {:?}",
+        out[5 * 32 + 5]
+    );
+    Ok(())
+}
