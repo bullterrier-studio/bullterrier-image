@@ -140,7 +140,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     }
     if params.detail > 0.0 {
         let brightness: Vec<f32> = pixels.iter().map(|&pixel| luminance(pixel)).collect();
-        let fine = gaussian_filter_plane(&brightness, (height, width), blur / f64::from(DETAIL_SMOOTHING), truncate, edge);
+        let fine = gaussian_filter_plane(
+            &brightness,
+            (height, width),
+            blur / f64::from(DETAIL_SMOOTHING),
+            truncate,
+            edge,
+        );
         for (at, brightness) in relief.iter_mut().zip(fine) {
             *at += params.detail * brightness;
         }
@@ -158,43 +164,50 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     ];
     let reach = params.radius;
     let mut out = vec![[0.0; 3]; height * width];
-    shade_slopes(&relief, (height, width), 1.0, edge, &mut out, |index, rise_y, rise_x| {
-        let (column, row) = ((index % width) as f32, (place.first_row + index / width) as f32);
-        let to_lamp = [lamp[0] - column, lamp[1] - row, lamp[2] - relief[index]];
-        let distance = to_lamp.iter().map(|part| part * part).sum::<f32>().sqrt();
-        let unit = to_lamp.map(|part| part / distance);
-        let normal_length = (1.0 + rise_x * rise_x + rise_y * rise_y).sqrt();
-        // the surface's unit normal (-rise_x, -rise_y, 1) / its length against the unit vector to the lamp
-        let facing = (-rise_x * unit[0] - rise_y * unit[1] + unit[2]) / normal_length;
-        // the light fades with the distance from the lamp over the relief's top, not from the surface itself: how tall the
-        // relief is drawn (`height`) shapes the shadows, never how far the lamp reaches
-        let fall = (to_lamp[0] * to_lamp[0] + to_lamp[1] * to_lamp[1] + lamp_height * lamp_height).sqrt();
-        let window = (1.0 - (fall / reach) * (fall / reach)).max(0.0);
-        let lit = facing.max(0.0) * window * window;
-        // the half way vector between the lamp and the eye (straight above the picture)
-        let half = [unit[0], unit[1], unit[2] + 1.0];
-        let half_length = half.iter().map(|part| part * part).sum::<f32>().sqrt();
-        let glint = ((-rise_x * half[0] - rise_y * half[1] + half[2]) / half_length / normal_length)
-            .max(0.0)
-            .powi(SHININESS)
-            * window
-            * window;
-        let pixel = pixels[index];
-        let gloss = params.specular * params.gain.max(0.0) * glint * luminance(pixel);
-        let mut lit_pixel = [0.0; 3];
-        for channel in 0..3 {
-            let linear = srgb_to_linear(pixel[channel]);
-            let base = linear * params.ambient;
-            let light = params.gain * lit * params.color.0[channel];
-            let lamp_result = if light >= 0.0 {
-                // screen: the light is added, and a bright part cannot burn out
-                1.0 - (1.0 - base) * (1.0 - (linear * light).clamp(0.0, 1.0))
-            } else {
-                (base * (1.0 + light)).max(0.0)
-            };
-            lit_pixel[channel] = linear_to_srgb((lamp_result + gloss * params.color.0[channel]).clamp(0.0, 1.0));
-        }
-        lit_pixel
-    });
+    shade_slopes(
+        &relief,
+        (height, width),
+        1.0,
+        edge,
+        &mut out,
+        |index, rise_y, rise_x| {
+            let (column, row) = ((index % width) as f32, (place.first_row + index / width) as f32);
+            let to_lamp = [lamp[0] - column, lamp[1] - row, lamp[2] - relief[index]];
+            let distance = to_lamp.iter().map(|part| part * part).sum::<f32>().sqrt();
+            let unit = to_lamp.map(|part| part / distance);
+            let normal_length = (1.0 + rise_x * rise_x + rise_y * rise_y).sqrt();
+            // the surface's unit normal (-rise_x, -rise_y, 1) / its length against the unit vector to the lamp
+            let facing = (-rise_x * unit[0] - rise_y * unit[1] + unit[2]) / normal_length;
+            // the light fades with the distance from the lamp over the relief's top, not from the surface itself: how tall the
+            // relief is drawn (`height`) shapes the shadows, never how far the lamp reaches
+            let fall = (to_lamp[0] * to_lamp[0] + to_lamp[1] * to_lamp[1] + lamp_height * lamp_height).sqrt();
+            let window = (1.0 - (fall / reach) * (fall / reach)).max(0.0);
+            let lit = facing.max(0.0) * window * window;
+            // the half way vector between the lamp and the eye (straight above the picture)
+            let half = [unit[0], unit[1], unit[2] + 1.0];
+            let half_length = half.iter().map(|part| part * part).sum::<f32>().sqrt();
+            let glint = ((-rise_x * half[0] - rise_y * half[1] + half[2]) / half_length / normal_length)
+                .max(0.0)
+                .powi(SHININESS)
+                * window
+                * window;
+            let pixel = pixels[index];
+            let gloss = params.specular * params.gain.max(0.0) * glint * luminance(pixel);
+            let mut lit_pixel = [0.0; 3];
+            for channel in 0..3 {
+                let linear = srgb_to_linear(pixel[channel]);
+                let base = linear * params.ambient;
+                let light = params.gain * lit * params.color.0[channel];
+                let lamp_result = if light >= 0.0 {
+                    // screen: the light is added, and a bright part cannot burn out
+                    1.0 - (1.0 - base) * (1.0 - (linear * light).clamp(0.0, 1.0))
+                } else {
+                    (base * (1.0 + light)).max(0.0)
+                };
+                lit_pixel[channel] = linear_to_srgb((lamp_result + gloss * params.color.0[channel]).clamp(0.0, 1.0));
+            }
+            lit_pixel
+        },
+    );
     Image::from_pixels(height, width, out)
 }

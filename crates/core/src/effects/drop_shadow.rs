@@ -165,7 +165,15 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         let opacity = params.copy_opacity * (1.0 - params.fade * along);
         let steps = f64::from(number);
         let moved = match params.source {
-            Source::Angle => shifted(&silhouette, height, width, place.first_row, down * steps, right * steps, edge),
+            Source::Angle => shifted(
+                &silhouette,
+                height,
+                width,
+                place.first_row,
+                down * steps,
+                right * steps,
+                edge,
+            ),
             // the copy is the shape scaled about the lamp: a point `offset` x `steps` px (at a picture's width from the
             // lamp) farther from it, nearer ones in proportion
             Source::Point => scaled_about(
