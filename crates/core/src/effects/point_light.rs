@@ -80,13 +80,13 @@ pub struct Params {
     /// stand out; it also dims the lit parts' surroundings.
     #[param(default = 0.5, unit = fraction, min = 0, max = 1)]
     pub ambient: f32,
-    /// How high the lamp stands over the picture, as a fraction of the picture's width, above the tallest the relief
-    /// can be. A low lamp rakes across the surface and shows its shape; a high one lights it flat.
-    #[param(default = 0.3, unit = fraction, min = 0.01, max = 2, advanced)]
+    /// How high the lamp stands above the tallest the relief can be, in px at the recipe's size. A low lamp rakes across
+    /// the surface and shows its shape; a high one lights it flat.
+    #[param(default = 144.0, unit = px, min = 5, max = 1000, advanced)]
     pub z: f32,
-    /// How far the lamp reaches, as a fraction of the picture's width: the light falls smoothly from the lamp to nothing
-    /// at this distance, and past it the picture keeps only its `ambient`. Raising it lights more of the picture.
-    #[param(default = 0.9, unit = fraction, min = 0.1, max = 4, advanced)]
+    /// How far the lamp reaches, in px at the recipe's size: the light falls smoothly from the lamp to nothing at this
+    /// distance, and past it the picture keeps only its `ambient`. Raising it lights more of the picture.
+    #[param(default = 432.0, unit = px, min = 50, max = 2000, advanced)]
     pub radius: f32,
     /// How much of a bright, glossy glint the lamp leaves on the picture's bright parts, 0 = none: dark parts get none,
     /// and a surface turned toward the lamp more. Raising it makes a stronger glint.
@@ -145,17 +145,17 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         }
     }
 
-    // the lamp lies on the canvas, of which the picture holds the rows from `first_row`; it stands `z` widths above the
+    // the lamp lies on the canvas, of which the picture holds the rows from `first_row`; it stands `z` px above the
     // tallest the relief can be
     let place = inputs.place(picture);
     let (canvas_width, canvas_height) = (place.canvas_width as f32, place.canvas_height as f32);
-    let lamp_height = params.z * canvas_width;
+    let lamp_height = params.z;
     let lamp = [
         params.x * (canvas_width - 1.0),
         params.y * (canvas_height - 1.0),
         lamp_height + params.height + params.detail,
     ];
-    let reach = params.radius * canvas_width;
+    let reach = params.radius;
     let mut out = vec![[0.0; 3]; height * width];
     shade_slopes(&relief, (height, width), 1.0, edge, &mut out, |index, rise_y, rise_x| {
         let (column, row) = ((index % width) as f32, (place.first_row + index / width) as f32);

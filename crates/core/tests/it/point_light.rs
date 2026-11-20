@@ -75,7 +75,7 @@ fn to_srgb(value: f32) -> f32 {
 }
 
 /// What the lamp makes of one pixel of grey-or-coloured `picture`, from the geometry: the surface at the pixel stands
-/// `height_px` high and rises `rise` (x, y) px per px; the lamp stands over the canvas point (x, y) at `z` widths plus the
+/// `height_px` high and rises `rise` (x, y) px per px; the lamp stands over the canvas point (x, y) at `z` px plus the
 /// tallest relief there can be. The light is the unit normal against the unit vector to the lamp, times the fall-off
 /// window (1 - (distance over the relief's top / reach)^2)^2, then added (screen) or taken away in linear light.
 fn expected(
@@ -88,15 +88,15 @@ fn expected(
     let lamp = (
         params.x * (width - 1.0),
         params.y * (width - 1.0),
-        params.z * width + params.height + params.detail,
+        params.z + params.height + params.detail,
     );
     let to_lamp = [lamp.0 - column as f32, lamp.1 - row as f32, lamp.2 - height_px];
     let distance = to_lamp.iter().map(|v| v * v).sum::<f32>().sqrt();
-    // the light fades with the distance from the lamp over the relief's top (`z` widths up), not from the surface itself
-    let fall = (to_lamp[0] * to_lamp[0] + to_lamp[1] * to_lamp[1] + (params.z * width).powi(2)).sqrt();
+    // the light fades with the distance from the lamp over the relief's top (`z` px up), not from the surface itself
+    let fall = (to_lamp[0] * to_lamp[0] + to_lamp[1] * to_lamp[1] + params.z.powi(2)).sqrt();
     let normal_length = (1.0 + rise.0 * rise.0 + rise.1 * rise.1).sqrt();
     let facing = (-rise.0 * to_lamp[0] - rise.1 * to_lamp[1] + to_lamp[2]) / normal_length / distance;
-    let window = (1.0 - (fall / (params.radius * width)).powi(2)).max(0.0);
+    let window = (1.0 - (fall / params.radius).powi(2)).max(0.0);
     let lit = facing.max(0.0) * window * window;
     let mut out = [0.0; 3];
     for channel in 0..3 {
@@ -136,7 +136,7 @@ fn no_light_and_full_ambient_leave_the_picture_as_it_was() -> Result<(), Error> 
 #[test]
 fn over_a_flat_relief_the_light_is_the_fall_off_window_of_the_distance() -> Result<(), Error> {
     let settings = params(|p| {
-        (p.x, p.y, p.z, p.radius) = (0.0, 0.0, 0.2, 0.9);
+        (p.x, p.y, p.z, p.radius) = (0.0, 0.0, 6.4, 28.8);
         (p.gain, p.ambient, p.height) = (1.5, 0.4, 0.0);
     });
     let out = run(&settings, &flat(), &grey(0.4))?;
@@ -158,7 +158,7 @@ fn over_a_flat_relief_the_light_is_the_fall_off_window_of_the_distance() -> Resu
 #[test]
 fn a_surface_is_lit_by_the_angle_between_its_normal_and_the_lamp() -> Result<(), Error> {
     let settings = params(|p| {
-        (p.x, p.y, p.z, p.radius) = (1.0, 0.5, 0.15, 1.6);
+        (p.x, p.y, p.z, p.radius) = (1.0, 0.5, 4.8, 51.2);
         (p.gain, p.ambient) = (1.0, 0.5);
     });
     for direction in [0.0_f32, 90.0, 180.0, 300.0] {
@@ -214,7 +214,7 @@ fn a_coloured_lamp_adds_only_its_own_colour() -> Result<(), Error> {
 fn a_negative_gain_takes_the_light_away_and_never_adds() -> Result<(), Error> {
     let picture = varied(SIZE, SIZE);
     let settings = params(|p| {
-        (p.x, p.y, p.z, p.radius) = (0.5, 0.5, 0.2, 1.0);
+        (p.x, p.y, p.z, p.radius) = (0.5, 0.5, 6.4, 32.0);
         (p.gain, p.ambient, p.height) = (-1.0, 1.0, 0.0);
     });
     let out = run(&settings, &flat(), &picture)?;
@@ -238,7 +238,7 @@ fn a_negative_gain_takes_the_light_away_and_never_adds() -> Result<(), Error> {
 fn the_lamp_is_brightest_at_the_pixel_nearest_its_place_on_the_canvas() -> Result<(), Error> {
     // the lamp's canvas point is (0.25 x 31, 0.75 x 31) = (7.75, 23.25): the pixel (8, 23)
     let settings = params(|p| {
-        (p.x, p.y, p.z, p.radius) = (0.25, 0.75, 0.1, 1.2);
+        (p.x, p.y, p.z, p.radius) = (0.25, 0.75, 3.2, 38.4);
         (p.gain, p.ambient, p.height) = (1.0, 0.5, 0.0);
     });
     let out = run(&settings, &flat(), &grey(0.5))?;
@@ -254,7 +254,7 @@ fn the_pictures_own_brightness_is_a_fine_relief_that_detail_makes_tall() -> Resu
     // a grey ramp from 0 to 1 over 31 px, lit with no field relief: it rises `detail / 31` px per px to the right
     let picture = ramp(SIZE, SIZE);
     let settings = params(|p| {
-        (p.x, p.y, p.z, p.radius) = (1.0, 0.5, 0.15, 1.6);
+        (p.x, p.y, p.z, p.radius) = (1.0, 0.5, 4.8, 51.2);
         (p.gain, p.ambient, p.height, p.detail) = (1.0, 0.5, 0.0, 12.0);
     });
     let out = run(&settings, &flat(), &picture)?;
@@ -273,7 +273,7 @@ fn the_pictures_own_brightness_is_a_fine_relief_that_detail_makes_tall() -> Resu
     }
     // with no detail the same picture is lit as a flat surface: the ramp is not read as a shape
     let plain =
-        params(|p| (p.x, p.y, p.z, p.radius, p.gain, p.ambient, p.height) = (1.0, 0.5, 0.15, 1.6, 1.0, 0.5, 0.0));
+        params(|p| (p.x, p.y, p.z, p.radius, p.gain, p.ambient, p.height) = (1.0, 0.5, 4.8, 51.2, 1.0, 0.5, 0.0));
     let out = run(&plain, &flat(), &picture)?;
     for column in INSIDE {
         let level = column as f32 / (SIZE as f32 - 1.0);
@@ -286,7 +286,7 @@ fn the_pictures_own_brightness_is_a_fine_relief_that_detail_makes_tall() -> Resu
 #[test]
 fn a_glint_rides_on_bright_parts_only_and_is_off_by_default() -> Result<(), Error> {
     let lit = |settings: &point_light::Params, level| run(settings, &flat(), &grey(level));
-    let plain = params(|p| (p.x, p.y, p.z, p.gain, p.ambient, p.height) = (0.5, 0.5, 0.3, 1.0, 0.5, 0.0));
+    let plain = params(|p| (p.x, p.y, p.z, p.gain, p.ambient, p.height) = (0.5, 0.5, 9.6, 1.0, 0.5, 0.0));
     let glossy = point_light::Params {
         specular: 0.8,
         ..plain.clone()
