@@ -344,3 +344,55 @@ fn the_pictures_brightness_is_smoothed_a_third_as_much_as_the_field() -> Result<
     assert!(change(16, 18) > 1e-3, "two pixels away: {}", change(16, 18));
     Ok(())
 }
+
+/// A smooth picture of `side` x `side`: a ramp with a soft bump, the same scene at any side.
+fn scene_at(side: usize) -> Vec<f32> {
+    (0..side * side)
+        .flat_map(|index| {
+            let (x, y) = ((index % side) as f32 / side as f32, (index / side) as f32 / side as f32);
+            let bump = (-((x - 0.6).powi(2) + (y - 0.4).powi(2)) / 0.02).exp();
+            [0.2 + 0.4 * x + 0.3 * bump, 0.3 + 0.3 * y, 0.5 * bump + 0.2]
+        })
+        .collect()
+}
+
+/// The look at `side` px, then shrunk by `side / small` (a whole number) to `small` px by averaging blocks.
+fn lit_at(side: usize, small: usize, radius: f32) -> Result<Vec<f32>, Error> {
+    use bullterrier_image::{Options, Photo, Picture, Presets, Recipe, Step};
+    let values = scene_at(side);
+    let step = Step::new("point_light")
+        .param("field", "light")
+        .param("radius", radius)
+        .param("x", 0.7)
+        .param("y", 0.3);
+    let lit = Photo::new(Picture::new(side, side, &values)?)
+        .render(&Recipe::new([step]), &Presets::new(), Options::default())?
+        .into_values();
+    let block = side / small;
+    Ok((0..small * small * 3)
+        .map(|at| {
+            let (channel, cell) = (at % 3, at / 3);
+            let (row, column) = ((cell / small) * block, (cell % small) * block);
+            let sum: f32 = (0..block * block)
+                .map(|k| lit[((row + k / block) * side + column + k % block) * 3 + channel])
+                .sum();
+            sum / (block * block) as f32
+        })
+        .collect())
+}
+
+#[test]
+fn a_px_value_is_design_px_so_the_look_matches_at_two_frame_sizes() -> Result<(), Error> {
+    // radius is 432 design px of a 480 frame: 86.4 px at 96, 172.8 at 192. The same look at 192, shrunk to 96, matches the
+    // 96 one; if `radius` stayed a raw px count at 192 (half the reach) it would not.
+    let (small, large) = (lit_at(96, 96, 432.0)?, lit_at(192, 96, 432.0)?);
+    let drift = |a: &[f32], b: &[f32]| a.iter().zip(b).fold(0.0_f32, |most, (a, b)| most.max((a - b).abs()));
+    let scaled = drift(&small, &large);
+    let unscaled = drift(&small, &lit_at(192, 96, 216.0)?);
+    assert!(scaled < 0.02, "scaled drift {scaled}");
+    assert!(
+        unscaled > 5.0 * scaled,
+        "raw px would drift {unscaled} against {scaled}"
+    );
+    Ok(())
+}
