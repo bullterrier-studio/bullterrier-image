@@ -1045,7 +1045,7 @@ c64_hires : Commodore 64 hires bitmap: 320 x 200 dots, every 8 x 8 cell has two 
     ...
 
 @_effect
-def drop_shadow(*, field: str = 'subject', copies: int = 1, offset: float = 22.0, angle: float = 56.0, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow', 'layered_cutouts'] | None = None) -> Step:
+def drop_shadow(*, field: str = 'subject', copies: int = 1, offset: float = 22.0, source: Literal['angle', 'point'] = 'angle', angle: float = 56.0, x: float = 0.3, y: float = 0.3, blur: float = 24.0, color: str | list[float] | tuple[float, float, float] = '#000000', end_color: str | list[float] | tuple[float, float, float] = '#000000', copy_opacity: float = 1.0, fade: float = 0.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'nearest', mask: str | None = None, opacity: float = 0.6, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['long_shadow', 'layered_cutouts', 'lamp_shadow'] | None = None) -> Step:
     """Copies of a shape (the subject by default) behind it, each `offset` px farther along `angle` and softened by `blur`: a drop shadow, layered paper cutouts or a long shadow.  One copy is a drop shadow. More, with `blur` 0 and a `color` to `end_color` ramp, are layers of cut paper; many at a small `offset` in one colour with `fade` are a long shadow (preset `long_shadow`). The copies run in colour from `color` (nearest the shape) to `end_color` (farthest); a nearer copy lies over the ones beyond it, each at `copy_opacity` falling by `fade`, and the shape on top of all of them, so the shape itself is never changed.
 
 Parameters
@@ -1061,10 +1061,23 @@ offset : number, px, 0 to 1000, default 22.0
     How far each copy lies beyond the one before it, in px, tuned for a picture about
     480 px high: the first is `offset` from the shape, the last `copies` x `offset`. 0 =
     every copy hidden behind the shape, leaving only what `blur` spreads past its edge.
+    With `source` 'point' it is the move of a point one picture width from the lamp;
+    nearer points move less, in proportion to their distance from it.
+source : one of 'angle', 'point', default 'angle'
+    Which way the copies step away: 'angle' (all the same way, along `angle`) or 'point'
+    (away from the lamp at `x`, `y`, the farther from it the more, so a shadow swings
+    and stretches as the lamp moves).
 angle : number (cyclic), degrees, 0 to 360, default 56.0
-    The direction the copies step away in, in degrees clockwise from pointing right on
-    the screen, 0 to 360: 0 = to the right, 45 = to the lower right, 90 = down, 180 = to
-    the left, 270 = up.
+    The direction the copies step away in when `source` is 'angle', in degrees clockwise
+    from pointing right on the screen, 0 to 360: 0 = to the right, 45 = to the lower
+    right, 90 = down, 180 = to the left, 270 = up.
+x : number, fraction, -0.5 to 1.5, default 0.3
+    The lamp's horizontal place when `source` is 'point', as a fraction of the way
+    across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last.
+    Beyond 0 to 1 the lamp stands outside the picture.
+y : number, fraction, -0.5 to 1.5, default 0.3
+    The lamp's vertical place when `source` is 'point', as a fraction of the way down
+    the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last.
 blur : number, px, 0 to 200, default 24.0
     Gaussian sigma of each copy's soft edge in px: raising it makes the copies larger
     and fainter at their edge; 0 = hard-edged silhouettes.
@@ -1101,7 +1114,8 @@ Step opacity
 Presets
 -------
 long_shadow : The flat-design long shadow: 150 copies 2 px apart, one colour, fading out over 300 px. Shows on light backgrounds; set color for dark ones.
-layered_cutouts : Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple."""
+layered_cutouts : Cut-paper layers (set `opacity` 1): four opaque copies of the silhouette stacked behind the subject, from orange to purple.
+lamp_shadow : The shadow of a lamp at the upper left, long and soft: the copies step away from it, the farther from the lamp the more."""
     ...
 
 @_effect
@@ -3028,6 +3042,81 @@ axis : one of 'horizontal', 'vertical', default 'horizontal'
 order : one of 'ascending', 'descending', default 'ascending'
     Which way a run is ordered: 'ascending' puts the lowest key first (the left or top
     end of the run), 'descending' the highest key first."""
+    ...
+
+@_effect
+def point_light(*, field: str = 'depth', x: float = 0.3, y: float = 0.3, color: str | list[float] | tuple[float, float, float] = '#ffffff', gain: float = 1.0, ambient: float = 0.5, z: float = 144.0, radius: float = 432.0, specular: float = 0.0, height: float = 400.0, detail: float = 6.0, blur: float = 6.0, truncate: float = 4.0, edge: Literal['reflect', 'nearest', 'mirror', 'wrap'] = 'reflect', mask: str | None = None, opacity: float = 1.0, blend_mode: Literal['normal', 'multiply', 'screen', 'overlay', 'soft_light', 'difference', 'color'] = 'normal', name: str | None = None, preset: Literal['warm_key', 'neon_magenta', 'shadow_spot'] | None = None) -> Step:
+    """A lamp lights the picture: only the picture's own pixels are brightened (or darkened), so what is in it stays as it was.  The lamp stands over the picture at (`x`, `y`) and `z` high, and shines on a relief made of the picture's own shape: the `field` (the depth, by default) `height` px tall plus the picture's brightness `detail` px tall. A surface that faces the lamp gets more light than one that turns away; the light fades with its distance from the lamp to nothing at `radius`. The light is added to the picture in linear light, in the lamp's `color`, so a bright part cannot burn out; where the lamp does not reach, the picture keeps `ambient` of its brightness. `gain` below 0 takes that much light away instead, a lamp that darkens. A `specular` glint rides on the picture's bright parts, as bright as the lamp's positive `gain`. With `gain` 0 and `ambient` 1 the picture is returned unchanged.
+
+Parameters
+----------
+field : field name, default 'depth'
+    The relief the lamp shines on, the higher the value the higher the ground: `depth`
+    (the nearest stands highest), `light` (the picture's own brightness), `subject`, or
+    a region the recipe declares.
+x : number, fraction, -0.5 to 1.5, default 0.3
+    The lamp's horizontal place as a fraction of the way across the picture: 0 = the
+    first pixel column, 0.5 = the middle, 1 = the last. Beyond 0 to 1 the lamp stands
+    outside the picture.
+y : number, fraction, -0.5 to 1.5, default 0.3
+    The lamp's vertical place as a fraction of the way down the picture: 0 = the first
+    pixel row, 0.5 = the middle, 1 = the last.
+color : colour, default '#ffffff'
+    The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. A coloured lamp adds
+    only that colour (a red lamp leaves green and blue as they were); for a negative
+    `gain` it is the colour taken away.
+gain : number, ratio, -4 to 4, default 1.0
+    How much light the lamp gives, where it is brightest: 0 = none, 1 = a full lamp,
+    more burns the picture toward the lamp's colour. Below 0 it takes light away: -1
+    darkens the picture to black under the lamp.
+ambient : number, fraction, 0 to 1, default 0.5
+    How much of the picture's brightness is left where the lamp does not reach: 1 = all
+    of it (the lamp only adds light), 0 = none (the picture is lit by the lamp alone, in
+    a dark room). Lowering it makes the lamp's light stand out; it also dims the lit
+    parts' surroundings.
+
+Advanced parameters
+-------------------
+z : number, px, 5 to 1000, default 144.0
+    How high the lamp stands above the tallest the relief can be, in px at the recipe's
+    size. A low lamp rakes across the surface and shows its shape; a high one lights it
+    flat.
+radius : number, px, 50 to 2000, default 432.0
+    How far the lamp reaches, in px at the recipe's size: the light falls smoothly from
+    the lamp to nothing at this distance, and past it the picture keeps only its
+    `ambient`. Raising it lights more of the picture.
+specular : number, fraction, 0 to 1, default 0.0
+    How much of a bright, glossy glint the lamp leaves on the picture's bright parts, 0
+    = none: dark parts get none, and a surface turned toward the lamp more. Raising it
+    makes a stronger glint.
+height : number, px, 0 to 1000, default 400.0
+    How tall the whole range of the `field` stands as a relief, in px at the recipe's
+    size: a field value of 1 stands this many px above 0. 0 = flat (only `detail` and
+    the distance shape the light); larger = steeper shapes that catch the light from the
+    side.
+detail : number, px, 0 to 100, default 6.0
+    How tall the picture's own brightness stands as a fine relief on top of the field's,
+    in px at the recipe's size: bright parts stand proud, so pores, creases and fabric
+    catch the light. 0 = the picture is not read as a shape.
+blur : number, px, 0 to 50, default 6.0
+    Gaussian sigma in px with which the field is smoothed before its slopes are taken
+    (the picture's brightness is smoothed a third as much, to keep its finer detail): 0
+    = every ripple of the field is lit, larger = softer lighting that follows only the
+    broad shapes. A sharp step in the field (a subject's outline in depth) lights as a
+    cliff and leaves a bright fringe beside it; the default softens it.
+truncate : number, ratio, 1 to 10, default 4.0
+    Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0).
+    Larger is more exact and slower.
+edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
+    What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored,
+    edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge
+    pixel repeated), 'wrap' (the opposite edge).
+
+Presets
+-------
+warm_key : A warm lamp at the upper left; the rest of the picture dimmed to under half.
+neon_magenta : A magenta lamp low on the left in a dim room: the lit side turns pink, the rest falls to a quarter.
+shadow_spot : A soft pool of shadow: a lamp that darkens, with no relief, so the light is its fall-off alone."""
     ...
 
 @_effect

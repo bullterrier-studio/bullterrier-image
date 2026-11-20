@@ -19,6 +19,7 @@ Bloom and local contrast: they add or shape the light in the picture.
 | <img src="../gallery/light_leak.jpg" width="160" alt="light_leak"> | `light_leak` | Add `blobs` seeded patches of warm light coming in from the side `angle` points to, tinted `color` and screened over the picture by `amount`. | `color='#ff8a3d'` `amount=0.8` `size=150.0` `angle=0.0` `blobs=3` `seed=0` | [light_leak.toml](../../examples/effects/light_leak.toml) |
 | <img src="../gallery/light_rays.jpg" width="160" alt="light_rays"> | `light_rays` | God rays: what is brighter than `threshold` is streaked away from (`x`, `y`) and screened over the picture by `amount`. | `x=0.5` `y=0.3` `length=0.5` `threshold=0.7` `amount=2.5` `decay=0.9` +3 advanced | [light_rays.toml](../../examples/effects/light_rays.toml) |
 | <img src="../gallery/motion_blur.jpg" width="160" alt="motion_blur"> | `motion_blur` | Smear the picture along a straight line of `length` px at `angle` degrees, as a moving camera would. | `angle=0.0` `length=24.0` +1 advanced | [motion_blur.toml](../../examples/effects/motion_blur.toml) |
+| <img src="../gallery/point_light.jpg" width="160" alt="point_light"> | `point_light` | A lamp lights the picture: only the picture's own pixels are brightened (or darkened), so what is in it stays as it was. | `field='depth'` `x=0.3` `y=0.3` `color='#ffffff'` `gain=1.0` `ambient=0.5` +8 advanced | [point_light.toml](../../examples/effects/point_light.toml) |
 | <img src="../gallery/radial_blur.jpg" width="160" alt="radial_blur"> | `radial_blur` | Smear the picture around a centre (`mode` 'spin') or away from it ('zoom'), by `amount`. | `mode='zoom'` `amount=0.1` `x=0.5` `y=0.5` +3 advanced | [radial_blur.toml](../../examples/effects/radial_blur.toml) |
 | <img src="../gallery/relight.jpg" width="160" alt="relight"> | `relight` | Light the picture from the shape of a field, read as a relief `height` px tall, from `angle` at `elevation`: bump lighting, emboss, relighting by depth. | `field='depth'` `angle=225.0` `elevation=45.0` `height=200.0` `blur=2.0` `saturation=1.0` +2 advanced | [relight.toml](../../examples/effects/relight.toml) |
 | <img src="../gallery/sharpen.jpg" width="160" alt="sharpen"> | `sharpen` | An unsharp mask: the difference between the picture and a blurred copy is added back, scaled by `amount`. | `radius=2.0` `amount=0.8` `threshold=0.0` +3 advanced | [sharpen.toml](../../examples/effects/sharpen.toml) |
@@ -260,6 +261,40 @@ Presets (`preset="name"` in a recipe step or `fx`):
 | `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the blur sees beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
 
 </details>
+
+### `point_light`
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `field` | field name |  |  | `'depth'` | The relief the lamp shines on, the higher the value the higher the ground: `depth` (the nearest stands highest), `light` (the picture's own brightness), `subject`, or a region the recipe declares. |
+| `x` | number | fraction | -0.5 to 1.5 | `0.3` | The lamp's horizontal place as a fraction of the way across the picture: 0 = the first pixel column, 0.5 = the middle, 1 = the last. Beyond 0 to 1 the lamp stands outside the picture. |
+| `y` | number | fraction | -0.5 to 1.5 | `0.3` | The lamp's vertical place as a fraction of the way down the picture: 0 = the first pixel row, 0.5 = the middle, 1 = the last. |
+| `color` | colour |  |  | `'#ffffff'` | The colour of the light: '#rrggbb', '#rgb' or [r, g, b] 0..1. A coloured lamp adds only that colour (a red lamp leaves green and blue as they were); for a negative `gain` it is the colour taken away. |
+| `gain` | number | ratio | -4 to 4 | `1.0` | How much light the lamp gives, where it is brightest: 0 = none, 1 = a full lamp, more burns the picture toward the lamp's colour. Below 0 it takes light away: -1 darkens the picture to black under the lamp. |
+| `ambient` | number | fraction | 0 to 1 | `0.5` | How much of the picture's brightness is left where the lamp does not reach: 1 = all of it (the lamp only adds light), 0 = none (the picture is lit by the lamp alone, in a dark room). Lowering it makes the lamp's light stand out; it also dims the lit parts' surroundings. |
+
+<details><summary>Advanced parameters (8)</summary>
+
+| Parameter | Type | Unit | Range | Default | Description |
+| --- | --- | --- | --- | --- | --- |
+| `z` | number | px | 5 to 1000 | `144.0` | How high the lamp stands above the tallest the relief can be, in px at the recipe's size. A low lamp rakes across the surface and shows its shape; a high one lights it flat. |
+| `radius` | number | px | 50 to 2000 | `432.0` | How far the lamp reaches, in px at the recipe's size: the light falls smoothly from the lamp to nothing at this distance, and past it the picture keeps only its `ambient`. Raising it lights more of the picture. |
+| `specular` | number | fraction | 0 to 1 | `0.0` | How much of a bright, glossy glint the lamp leaves on the picture's bright parts, 0 = none: dark parts get none, and a surface turned toward the lamp more. Raising it makes a stronger glint. |
+| `height` | number | px | 0 to 1000 | `400.0` | How tall the whole range of the `field` stands as a relief, in px at the recipe's size: a field value of 1 stands this many px above 0. 0 = flat (only `detail` and the distance shape the light); larger = steeper shapes that catch the light from the side. |
+| `detail` | number | px | 0 to 100 | `6.0` | How tall the picture's own brightness stands as a fine relief on top of the field's, in px at the recipe's size: bright parts stand proud, so pores, creases and fabric catch the light. 0 = the picture is not read as a shape. |
+| `blur` | number | px | 0 to 50 | `6.0` | Gaussian sigma in px with which the field is smoothed before its slopes are taken (the picture's brightness is smoothed a third as much, to keep its finer detail): 0 = every ripple of the field is lit, larger = softer lighting that follows only the broad shapes. A sharp step in the field (a subject's outline in depth) lights as a cliff and leaves a bright fringe beside it; the default softens it. |
+| `truncate` | number | ratio | 1 to 10 | `4.0` | Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0). Larger is more exact and slower. |
+| `edge` | one of 'reflect', 'nearest', 'mirror', 'wrap' |  |  | `'reflect'` | What the smoothing and the slope see beyond the picture's edge: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge). |
+
+</details>
+
+Presets (`preset="name"` in a recipe step or `fx`):
+
+| Preset | Description |
+| --- | --- |
+| `warm_key` | A warm lamp at the upper left; the rest of the picture dimmed to under half. |
+| `neon_magenta` | A magenta lamp low on the left in a dim room: the lit side turns pink, the rest falls to a quarter. |
+| `shadow_spot` | A soft pool of shadow: a lamp that darkens, with no relief, so the light is its fall-off alone. |
 
 ### `radial_blur`
 

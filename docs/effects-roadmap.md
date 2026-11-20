@@ -204,6 +204,7 @@ treats the ground under the subject's feet like the subject, and falloff follows
 | `depth_grade` ✓ (a recipe, [depth-grade.toml](../examples/recipes/depth-grade.toml)) | A grade per distance: `grade`, `color_balance` and `gaussian_blur` looks over `bands` of `depth` pieces (`each` + `looks`). | `each` over a `bands` region of `depth` |
 | `relight` ✓ | Light a field (`depth` by default, the picture's `light`, any region), read as a relief, from a direction (Lambert on normals of the smoothed field); flat areas are unchanged. | `fx.relight(field="depth", angle=180, elevation=35, height=250)` |
 | depth contours ✓ (`topographic` with `field`) | Contour lines of any field, such as the depth: a LiDAR or scanner look. | `fx.topographic(field="depth", levels=24)` |
+| `point_light` ✓ | A lamp at a place over the picture lights the relief of the depth plus the picture's own brightness, in linear light and in its colour; a negative `gain` takes light away; `ambient` dims the rest. Only the picture's own pixels change. | `fx.point_light(x=0.2, y=0.3, color="#ffe2b8", gain=1.5, ambient=0.35)` |
 | `ambient_occlusion` ✓ | Soft darkening in creases and beside nearer things, from the depth (screen-space); steps mix it in at opacity 0.6 by default. | `fx.ambient_occlusion()` |
 
 ## Subject-aware effects
