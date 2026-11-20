@@ -260,6 +260,25 @@ fn cases() -> Vec<Case> {
                     .param("height", 20)
                     .param("blur", 14)
                     .param("edge", "nearest"),
+                Step::new("point_light")
+                    .param("field", "light")
+                    .param("x", 0.4)
+                    .param("y", 0.6)
+                    .param("blur", 3)
+                    .param("detail", 12)
+                    .param("specular", 0.5)
+                    .param("edge", "wrap"),
+                Step::new("point_light")
+                    .param("field", "light")
+                    .param("gain", -1.5)
+                    .param("blur", 14)
+                    .param("edge", "nearest"),
+                Step::new("drop_shadow")
+                    .param("field", "light")
+                    .param("source", "point")
+                    .param("copies", 3)
+                    .param("offset", 6)
+                    .param("blur", 3),
                 Step::new("outline")
                     .param("field", "light")
                     .param("width", 5)

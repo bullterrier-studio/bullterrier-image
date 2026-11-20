@@ -362,6 +362,20 @@ fn combinations() -> Vec<(&'static str, Value)> {
         ("edges", json!({"method": "dog", "radius": 12, "truncate": 1})),
         ("focus_blur", json!({"radius": 2, "truncate": 10})),
         ("focus_blur", json!({"radius": 12, "truncate": 1})),
+        ("point_light", json!({"blur": 2, "truncate": 10, "detail": 12})),
+        ("point_light", json!({"blur": 12, "truncate": 1, "x": 0.9, "y": 0.1})),
+        (
+            "point_light",
+            json!({"blur": 6, "detail": 40, "specular": 1, "gain": -2}),
+        ),
+        (
+            "drop_shadow",
+            json!({"source": "point", "copies": 3, "offset": 6, "blur": 4, "x": 0.8}),
+        ),
+        (
+            "drop_shadow",
+            json!({"source": "point", "copies": 1, "offset": 40, "blur": 0, "x": -0.4, "y": 1.3}),
+        ),
         ("relight", json!({"blur": 2, "truncate": 10})),
         ("relight", json!({"blur": 12, "truncate": 1})),
         ("halftone", json!({"cell": 3, "sigma": 5, "truncate": 1})), // a small screen, a long blur
