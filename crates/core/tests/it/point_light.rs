@@ -77,7 +77,7 @@ fn to_srgb(value: f32) -> f32 {
 /// What the lamp makes of one pixel of grey-or-coloured `picture`, from the geometry: the surface at the pixel stands
 /// `height_px` high and rises `rise` (x, y) px per px; the lamp stands over the canvas point (x, y) at `z` widths plus the
 /// tallest relief there can be. The light is the unit normal against the unit vector to the lamp, times the fall-off
-/// window (1 - (distance / reach)^2)^2, then added (screen) or taken away in linear light.
+/// window (1 - (distance over the relief's top / reach)^2)^2, then added (screen) or taken away in linear light.
 fn expected(
     params: &point_light::Params,
     (column, row): (usize, usize),
@@ -92,9 +92,11 @@ fn expected(
     );
     let to_lamp = [lamp.0 - column as f32, lamp.1 - row as f32, lamp.2 - height_px];
     let distance = to_lamp.iter().map(|v| v * v).sum::<f32>().sqrt();
+    // the light fades with the distance from the lamp over the relief's top (`z` widths up), not from the surface itself
+    let fall = (to_lamp[0] * to_lamp[0] + to_lamp[1] * to_lamp[1] + (params.z * width).powi(2)).sqrt();
     let normal_length = (1.0 + rise.0 * rise.0 + rise.1 * rise.1).sqrt();
     let facing = (-rise.0 * to_lamp[0] - rise.1 * to_lamp[1] + to_lamp[2]) / normal_length / distance;
-    let window = (1.0 - (distance / (params.radius * width)).powi(2)).max(0.0);
+    let window = (1.0 - (fall / (params.radius * width)).powi(2)).max(0.0);
     let lit = facing.max(0.0) * window * window;
     let mut out = [0.0; 3];
     for channel in 0..3 {
@@ -156,8 +158,7 @@ fn over_a_flat_relief_the_light_is_the_fall_off_window_of_the_distance() -> Resu
 #[test]
 fn a_surface_is_lit_by_the_angle_between_its_normal_and_the_lamp() -> Result<(), Error> {
     let settings = params(|p| {
-        // the lamp stands about 105 px up, over the 100 px relief: a reach of 4 widths (128 px) lights every pixel
-        (p.x, p.y, p.z, p.radius) = (1.0, 0.5, 0.15, 4.0);
+        (p.x, p.y, p.z, p.radius) = (1.0, 0.5, 0.15, 1.6);
         (p.gain, p.ambient) = (1.0, 0.5);
     });
     for direction in [0.0_f32, 90.0, 180.0, 300.0] {

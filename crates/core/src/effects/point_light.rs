@@ -47,7 +47,7 @@ pub(crate) fn spread(params: &Params) -> Spread {
 ///
 /// The lamp stands over the picture at (`x`, `y`) and `z` high, and shines on a relief made of the picture's own shape:
 /// the `field` (the depth, by default) `height` px tall plus the picture's brightness `detail` px tall. A surface that faces
-/// the lamp gets more light than one that turns away; the light fades with distance to nothing at `radius`. The light is
+/// the lamp gets more light than one that turns away; the light fades with its distance from the lamp to nothing at `radius`. The light is
 /// added to the picture in linear light, in the lamp's `color`, so a bright part cannot burn out; where the lamp does not
 /// reach, the picture keeps `ambient` of its brightness. `gain` below 0 takes that much light away instead, a lamp that
 /// darkens. A `specular` glint rides on the picture's bright parts, as bright as the lamp's positive `gain`. With `gain` 0 and `ambient` 1 the picture is returned
@@ -149,10 +149,11 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     // tallest the relief can be
     let place = inputs.place(picture);
     let (canvas_width, canvas_height) = (place.canvas_width as f32, place.canvas_height as f32);
+    let lamp_height = params.z * canvas_width;
     let lamp = [
         params.x * (canvas_width - 1.0),
         params.y * (canvas_height - 1.0),
-        params.z * canvas_width + params.height + params.detail,
+        lamp_height + params.height + params.detail,
     ];
     let reach = params.radius * canvas_width;
     let mut out = vec![[0.0; 3]; height * width];
@@ -164,7 +165,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         let normal_length = (1.0 + rise_x * rise_x + rise_y * rise_y).sqrt();
         // the surface's unit normal (-rise_x, -rise_y, 1) / its length against the unit vector to the lamp
         let facing = (-rise_x * unit[0] - rise_y * unit[1] + unit[2]) / normal_length;
-        let window = (1.0 - (distance / reach) * (distance / reach)).max(0.0);
+        // the light fades with the distance from the lamp over the relief's top, not from the surface itself: how tall the
+        // relief is drawn (`height`) shapes the shadows, never how far the lamp reaches
+        let fall = (to_lamp[0] * to_lamp[0] + to_lamp[1] * to_lamp[1] + lamp_height * lamp_height).sqrt();
+        let window = (1.0 - (fall / reach) * (fall / reach)).max(0.0);
         let lit = facing.max(0.0) * window * window;
         // the half way vector between the lamp and the eye (straight above the picture)
         let half = [unit[0], unit[1], unit[2] + 1.0];
