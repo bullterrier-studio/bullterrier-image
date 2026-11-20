@@ -103,8 +103,9 @@ pub struct Params {
     pub detail: f32,
     /// Gaussian sigma in px with which the field is smoothed before its slopes are taken (the picture's brightness is
     /// smoothed a third as much, to keep its finer detail): 0 = every ripple of the field is lit, larger = softer
-    /// lighting that follows only the broad shapes.
-    #[param(default = 2.0, unit = px, min = 0, max = 50, advanced)]
+    /// lighting that follows only the broad shapes. A sharp step in the field (a subject's outline in depth) lights as a
+    /// cliff and leaves a bright fringe beside it; the default softens it.
+    #[param(default = 6.0, unit = px, min = 0, max = 50, advanced)]
     pub blur: f32,
     /// Where the smoothing Gaussian is cut off, in sigmas (only matters when `blur` > 0). Larger is more exact and
     /// slower.

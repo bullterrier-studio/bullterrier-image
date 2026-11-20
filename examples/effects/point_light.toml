@@ -1,10 +1,11 @@
-# A lamp at the upper left of the photo, the rest of the picture dimmed to half.
+# A warm lamp at the left of the photo; the rest of the picture dimmed to a third.
 name = "point_light"
 size = 480
 
 [[step]]
 effect = "point_light"
-x = 0.2
+x = 0.1
 y = 0.3
-gain = 1.2
-ambient = 0.5
+color = "#ffe2b8"
+gain = 1.5
+ambient = 0.35
