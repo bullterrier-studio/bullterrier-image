@@ -830,11 +830,7 @@ fn conditional() -> Vec<Conditional> {
         },
         // the default offset (22 px) moves every copy off the test's 12 px picture, where the edge rule repeats a corner
         // the shape does not cover; the farthest copy's colour and how much it fades matter only with more than one copy
-        Conditional {
-            effect: "drop_shadow",
-            field: "copies",
-            with: vec![("offset", json!(2.0))],
-        },
+        row("drop_shadow", "copies", vec![("offset", json!(2.0))]),
         // the lamp's place matters only while the copies step away from it
         row(
             "drop_shadow",
@@ -846,26 +842,10 @@ fn conditional() -> Vec<Conditional> {
             "y",
             vec![("offset", json!(2.0)), ("source", json!("point"))],
         ),
-        Conditional {
-            effect: "drop_shadow",
-            field: "blur",
-            with: vec![("offset", json!(2.0))],
-        },
-        Conditional {
-            effect: "drop_shadow",
-            field: "color",
-            with: vec![("offset", json!(2.0))],
-        },
-        Conditional {
-            effect: "drop_shadow",
-            field: "copy_opacity",
-            with: vec![("offset", json!(2.0))],
-        },
-        Conditional {
-            effect: "drop_shadow",
-            field: "truncate",
-            with: vec![("offset", json!(2.0))],
-        },
+        row("drop_shadow", "blur", vec![("offset", json!(2.0))]),
+        row("drop_shadow", "color", vec![("offset", json!(2.0))]),
+        row("drop_shadow", "copy_opacity", vec![("offset", json!(2.0))]),
+        row("drop_shadow", "truncate", vec![("offset", json!(2.0))]),
         Conditional {
             effect: "drop_shadow",
             field: "end_color",
