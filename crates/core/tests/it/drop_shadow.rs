@@ -169,6 +169,10 @@ fn lamp_at_the_corner(offset: f32) -> drop_shadow::Params {
 
 /// How much of a lone pixel at `place`, scaled by `factor` about the canvas point (0, 0), covers pixel `at`: a tent as wide
 /// as the factor along each axis (the pixel enlarged and read between its neighbours), worked from the geometry.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "a test picture is small: every index is exact in an f32"
+)]
 fn tent(place: (usize, usize), factor: f32, at: (usize, usize)) -> f32 {
     let along = |from: usize, to: usize| (1.0 - (to as f32 - factor * from as f32).abs() / factor).max(0.0);
     along(place.0, at.0) * along(place.1, at.1)

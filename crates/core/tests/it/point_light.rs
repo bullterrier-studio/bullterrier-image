@@ -291,7 +291,7 @@ fn a_glint_rides_on_bright_parts_only_and_is_off_by_default() -> Result<(), Erro
         specular: 0.8,
         ..plain.clone()
     };
-    assert!(point_light::Params::default().specular == 0.0);
+    assert_eq!(point_light::Params::default().specular.to_bits(), 0.0_f32.to_bits());
     let (without, with) = (lit(&plain, 0.6)?, lit(&glossy, 0.6)?);
     assert!(with.iter().zip(&without).all(|(a, b)| a >= b));
     assert!(
