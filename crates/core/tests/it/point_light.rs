@@ -301,3 +301,46 @@ fn a_glint_rides_on_bright_parts_only_and_is_off_by_default() -> Result<(), Erro
     assert_close(&lit(&glossy, 0.0)?, &grey(0.0), 1e-7, "black has no glint");
     Ok(())
 }
+
+#[test]
+fn blur_smooths_the_field_before_its_slopes_are_taken() -> Result<(), Error> {
+    let picture = grey(0.3);
+    let spike: Vec<f32> = (0..SIZE * SIZE)
+        .map(|index| f32::from(u8::from((index % SIZE, index / SIZE) == (16, 16))))
+        .collect();
+    let lamp = |blur| {
+        params(|p| {
+            (p.x, p.y, p.z, p.radius) = (0.5, 0.5, 6.4, 64.0);
+            (p.gain, p.ambient, p.height, p.blur) = (1.0, 0.5, 10.0, blur);
+        })
+    };
+    let flat_relief = run(&lamp(0.0), &flat(), &picture)?;
+    let (sharp, soft) = (run(&lamp(0.0), &spike, &picture)?, run(&lamp(2.0), &spike, &picture)?);
+    let change = |lit: &[f32], row: usize, column: usize| {
+        (lit[(row * SIZE + column) * 3] - flat_relief[(row * SIZE + column) * 3]).abs()
+    };
+    // a spike's slopes reach one pixel; its blur reaches several: three pixels away only the blurred field is lit
+    assert!(change(&sharp, 16, 19) < 1e-6);
+    assert!(change(&soft, 16, 19) > 1e-4);
+    let worst = |lit: &[f32]| (0..SIZE * SIZE).fold(0.0_f32, |most, at| most.max(change(lit, at / SIZE, at % SIZE)));
+    assert!(worst(&soft) < worst(&sharp), "blur lowers the steepest slope");
+    Ok(())
+}
+
+#[test]
+fn the_pictures_brightness_is_smoothed_a_third_as_much_as_the_field() -> Result<(), Error> {
+    // one bright pixel among grey, read as a relief at a `blur` of 3 px: the picture's share is smoothed over 1 px, so six
+    // pixels away no relief is left, while beside the pixel there is
+    let mut picture = grey(0.3);
+    let spot = (16 * SIZE + 16) * 3;
+    picture[spot..spot + 3].fill(1.0);
+    let settings = params(|p| {
+        (p.x, p.y, p.z, p.radius) = (0.5, 0.5, 6.4, 64.0);
+        (p.gain, p.ambient, p.height, p.detail, p.blur) = (1.0, 0.5, 0.0, 40.0, 3.0);
+    });
+    let (lit, level) = (run(&settings, &flat(), &picture)?, run(&settings, &flat(), &grey(0.3))?);
+    let change = |row: usize, column: usize| (lit[(row * SIZE + column) * 3] - level[(row * SIZE + column) * 3]).abs();
+    assert!(change(16, 22) < 1e-5, "six pixels away: {}", change(16, 22));
+    assert!(change(16, 18) > 1e-3, "two pixels away: {}", change(16, 18));
+    Ok(())
+}
