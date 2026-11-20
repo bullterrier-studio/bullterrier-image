@@ -15,7 +15,12 @@ pub(crate) fn srgb_to_linear(value: f32) -> f32 {
     let linear = if magnitude <= ENCODED_BREAK {
         magnitude / SLOPE
     } else {
-        ((magnitude + OFFSET) / SCALE).powf(GAMMA)
+        // worked in f64: `powf` rounds differently in each platform's libm (native, WebAssembly) by a unit in the last place,
+        // which an f32 result shows as a differing byte; an f64 result, rounded to f32, almost never does
+        #[expect(clippy::cast_possible_truncation, reason = "rounded back to the picture's f32")]
+        {
+            ((f64::from(magnitude) + f64::from(OFFSET)) / f64::from(SCALE)).powf(f64::from(GAMMA)) as f32
+        }
     };
     linear.copysign(value)
 }
@@ -26,7 +31,11 @@ pub(crate) fn linear_to_srgb(value: f32) -> f32 {
     let encoded = if magnitude <= LINEAR_BREAK {
         magnitude * SLOPE
     } else {
-        SCALE * magnitude.powf(GAMMA.recip()) - OFFSET
+        // in f64 for the same reason as `srgb_to_linear`
+        #[expect(clippy::cast_possible_truncation, reason = "rounded back to the picture's f32")]
+        {
+            (f64::from(SCALE) * f64::from(magnitude).powf(f64::from(GAMMA).recip()) - f64::from(OFFSET)) as f32
+        }
     };
     encoded.copysign(value)
 }
