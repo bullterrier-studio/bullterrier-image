@@ -245,6 +245,33 @@ impl Color {
         colour(value).map(|channels| Self(channels.map(|channel| channel as f32)))
     }
 
+    /// The colour as JSON, the one way a recipe writes a colour that was set by a program: `'#rrggbb'` when every channel
+    /// is a whole number of 255ths (what a hex spelling reads as), else the three channels as a list, each as its shortest
+    /// exact decimal. [`parse`](Self::parse) reads either back as this colour.
+    #[must_use]
+    pub fn to_json(&self) -> Value {
+        let bytes = self.0.map(|channel| (f64::from(channel) * 255.0).round());
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "a channel is from 0 to 1 and a colour holds f32"
+        )]
+        let exact = bytes
+            .iter()
+            .zip(self.0)
+            .all(|(byte, channel)| (byte / 255.0) as f32 == channel);
+        if exact {
+            #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a byte, 0..=255")]
+            let [red, green, blue] = bytes.map(|byte| byte as u8);
+            return Value::from(format!("#{red:02x}{green:02x}{blue:02x}"));
+        }
+        // the shortest decimal of an `f32`, not that `f32` widened (0.1, not 0.10000000149011612)
+        Value::from(
+            self.0
+                .map(|channel| channel.to_string().parse::<f64>().unwrap_or_default())
+                .to_vec(),
+        )
+    }
+
     /// The channels `value` writes as [`parse`](Self::parse) reads them, but as the exact decimals (`#102030` gives
     /// 16/255, not that `f32` widened): what a recipe written back as text should hold.
     #[must_use]

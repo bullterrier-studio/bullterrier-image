@@ -1,18 +1,20 @@
-//! The numbers of a recipe by address (`Recipe::numbers`, `number`, `with_value`, `with_values`): what a sweep varies. Expected values
+//! The numbers of a recipe by address (`Recipe::parameters`, `parameter`, `with_value`, `with_values`): what a sweep varies. Expected values
 //! are worked out by hand from the recipe and the ranges the effects, regions and frame document.
 
+use bullterrier_image::params::Color;
 use bullterrier_image::region::{
     Band, Bands, ColorRange, Components, LinearGradient, RadialGradient, Shards, Subject, Svg,
 };
 use bullterrier_image::{
-    Drive, Each, Entry, Error, Frame, Home, Layer, Options, Photo, Picture, Presets, Recipe, Region, Step,
+    Drive, Each, Entry, Error, Frame, Home, Layer, Options, ParameterKind, Photo, Picture, Presets, Recipe, Region,
+    Setting, Step,
 };
 use serde_json::{Value, json};
 
 use crate::common::Outcome;
 
 fn addresses(recipe: &Recipe) -> Result<Vec<String>, Error> {
-    Ok(recipe.numbers()?.into_iter().map(|number| number.address).collect())
+    Ok(recipe.parameters()?.into_iter().map(|number| number.address).collect())
 }
 
 fn json(recipe: &Recipe) -> Result<Value, serde_json::Error> {
@@ -21,6 +23,11 @@ fn json(recipe: &Recipe) -> Result<Value, serde_json::Error> {
 
 fn refused(result: Result<Recipe, Error>) -> String {
     result.err().map(|error| error.to_string()).unwrap_or_default()
+}
+
+/// A number as a setting.
+fn n(value: f64) -> Setting {
+    Setting::Number(value)
 }
 
 fn pulse() -> Recipe {
@@ -42,9 +49,9 @@ fn a_step_has_the_numbers_its_effect_declares_then_its_opacity() -> Outcome {
         found.contains(&"frame.angle".to_owned()),
         "the frame's numbers end the list: {found:?}"
     );
-    let exposure = pulse().number("grade.exposure")?;
+    let exposure = pulse().parameter("grade.exposure")?;
     assert!(
-        !exposure.whole && !exposure.cyclic && exposure.min < 0.0 && exposure.max > 0.0,
+        !exposure.whole && !exposure.cyclic && exposure.min < Some(0.0) && exposure.max > Some(0.0),
         "{exposure:?}"
     );
     Ok(())
@@ -95,7 +102,7 @@ fn a_step_is_addressed_by_its_name_its_effect_or_the_effect_and_its_number() -> 
     let by_name = Recipe::new([named]);
     assert!(addresses(&by_name)?.contains(&"pulse.exposure".to_owned()));
     assert_eq!(
-        by_name.number("grade.exposure")?.address,
+        by_name.parameter("grade.exposure")?.address,
         "pulse.exposure",
         "the only step of its effect, though named"
     );
@@ -113,7 +120,7 @@ fn a_value_is_set_in_a_copy_and_a_whole_number_takes_only_a_whole_value() -> Out
         "the original is left as it is"
     );
     let whole = Recipe::new([Step::new("slice_shift")]);
-    let bands = whole.number("slice_shift.bands")?;
+    let bands = whole.parameter("slice_shift.bands")?;
     assert!(bands.whole, "{bands:?}");
     assert_eq!(
         json(&whole.with_value("slice_shift.bands", 6.0, &Presets::new())?)?["steps"][0]["params"]["bands"],
@@ -197,7 +204,7 @@ fn an_each_step_has_its_feather_opacity_seed_and_the_numbers_of_its_looks() -> O
     );
     let feather = recipe.with_value("each.feather", 3.0, &Presets::new())?;
     assert_eq!(json(&feather)?["steps"][0]["feather"], json!(3.0));
-    assert!(recipe.number("each.seed")?.whole);
+    assert!(recipe.parameter("each.seed")?.whole);
     Ok(())
 }
 
@@ -212,7 +219,7 @@ fn the_numbers_of_a_region_and_of_the_frame_are_addressed_by_their_names() -> Ou
             ..Band::default()
         },
     );
-    assert_eq!(recipe.number("region.near.low")?.address, "region.near.low");
+    assert_eq!(recipe.parameter("region.near.low")?.address, "region.near.low");
     let moved = recipe.with_value("region.near.low", 0.4, &Presets::new())?;
     assert_eq!(json(&moved)?["regions"]["near"]["low"], json!(0.4));
     let turned = recipe.with_value("frame.angle", 400.0, &Presets::new())?;
@@ -221,7 +228,7 @@ fn the_numbers_of_a_region_and_of_the_frame_are_addressed_by_their_names() -> Ou
         json!(400.0),
         "a cyclic angle takes any value"
     );
-    assert!(recipe.number("frame.angle")?.cyclic);
+    assert!(recipe.parameter("frame.angle")?.cyclic);
     let above = refused(recipe.with_value("region.near.low", 0.9, &Presets::new()));
     assert!(
         above.contains("'region.near.low'") && above.contains("`low`"),
@@ -244,11 +251,11 @@ fn an_address_that_points_at_nothing_names_what_there_is_and_the_nearest() {
     let cases = [
         ("exposure", "not an address"),
         ("grade.exposur", "did you mean grade.exposure"),
-        ("grade.nothing", "its numbers: temperature, tint, exposure"),
+        ("grade.nothing", "its parameters: temperature, tint, exposure"),
         ("gradee.exposure", "it has: grade, region.near, frame"),
         ("region.far.low", "the recipe's regions: near"),
         ("region.near", "addressed `region.near.number`"),
-        ("frame.nothing", "'frame' has no number 'nothing'"),
+        ("frame.nothing", "'frame' has no parameter 'nothing'"),
     ];
     for (address, says) in cases {
         let said = refused(recipe.with_value(address, 0.5, &Presets::new()));
@@ -336,11 +343,13 @@ fn a_rows_range_is_the_range_the_check_holds_the_number_to() -> Outcome {
         .with_region("g", LinearGradient::default())
         .with_region("d", RadialGradient::default());
     let presets = Presets::new();
-    for number in recipe.numbers()? {
+    for number in recipe.parameters()? {
         if !(number.address.starts_with("region.") || number.address.starts_with("frame.")) || number.cyclic {
             continue;
         }
-        let (low, high) = (number.min, number.max);
+        let (Some(low), Some(high)) = (number.min, number.max) else {
+            continue; // a colour has no range
+        };
         for edge in [low, high] {
             let said = recipe.with_value(&number.address, edge, &presets);
             // `band.low` and `band.high` bound each other: the edge of one is refused by the other's current value
@@ -380,7 +389,12 @@ fn a_number_says_its_value_now_its_unit_and_what_it_does() -> Outcome {
             ..Band::default()
         },
     );
-    let value = |address: &str| recipe.number(address).map(|number| number.value);
+    let value = |address: &str| {
+        recipe.parameter(address).map(|number| match number.value {
+            Some(Setting::Number(value)) => Some(value),
+            _ => None,
+        })
+    };
     assert_eq!(value("grade.exposure")?, Some(0.3), "written");
     assert_eq!(
         value("grade.contrast")?,
@@ -402,17 +416,17 @@ fn a_number_says_its_value_now_its_unit_and_what_it_does() -> Outcome {
         None,
         "an optional number the recipe leaves unset"
     );
-    let exposure = recipe.number("grade.exposure")?;
+    let exposure = recipe.parameter("grade.exposure")?;
     assert_eq!(exposure.unit, "stops");
     assert!(
         exposure.doc.starts_with("Brightness in photographic stops"),
         "{}",
         exposure.doc
     );
-    assert_eq!(recipe.number("region.near.low")?.unit, "fraction");
-    assert_eq!(recipe.number("frame.angle")?.unit, "degrees");
-    assert!(recipe.number("frame.angle")?.doc.len() > 20);
-    assert_eq!(recipe.number("gaussian_blur.radius.levels")?.unit, "count");
+    assert_eq!(recipe.parameter("region.near.low")?.unit, "fraction");
+    assert_eq!(recipe.parameter("frame.angle")?.unit, "degrees");
+    assert!(recipe.parameter("frame.angle")?.doc.len() > 20);
+    assert_eq!(recipe.parameter("gaussian_blur.radius.levels")?.unit, "count");
     Ok(())
 }
 
@@ -434,7 +448,7 @@ fn an_address_is_located_in_a_step_a_region_or_the_frame_with_the_rest_of_it() -
     );
     let found = recipe.locate("frame.margin")?;
     assert_eq!((found.place, found.rest.as_str()), (Home::Frame, "margin"));
-    assert_eq!(found.number.address, "frame.margin");
+    assert_eq!(found.parameter.address, "frame.margin");
     Ok(())
 }
 
@@ -630,16 +644,18 @@ fn every_direction_rotation_and_length_of_a_region_or_the_frame_keeps_the_conven
         recipe = recipe.with_region(name, region);
     }
     let numbers: Vec<Item> = recipe
-        .numbers()?
+        .parameters()?
         .into_iter()
         .filter(|number| number.address.starts_with("region.") || number.address.starts_with("frame."))
-        .map(|number| Item {
-            address: number.address,
-            unit: number.unit,
-            min: number.min,
-            max: number.max,
-            cyclic: number.cyclic,
-            doc: number.doc,
+        .filter_map(|number| {
+            Some(Item {
+                min: number.min?,
+                max: number.max?,
+                address: number.address,
+                unit: number.unit,
+                cyclic: number.cyclic,
+                doc: number.doc,
+            })
         })
         .collect();
     assert_eq!(convention_problems(&numbers), Vec::<String>::new());
@@ -707,18 +723,18 @@ fn bits(recipe: &Recipe) -> Result<Vec<u32>, Error> {
 #[test]
 fn setting_every_number_to_its_own_value_gives_the_same_recipe() -> Outcome {
     for (kind, recipe) in recipes()? {
-        let before = recipe.numbers()?;
-        let own: Vec<(&str, f64)> = before
+        let before = recipe.parameters()?;
+        let own: Vec<(&str, Setting)> = before
             .iter()
             .filter_map(|number| Some((number.address.as_str(), number.value?)))
             .collect();
         assert!(own.len() > 3, "{kind}: {own:?}");
         let same = recipe.with_values(&own, &Presets::new())?;
-        assert_eq!(same.numbers()?, before, "{kind}");
+        assert_eq!(same.parameters()?, before, "{kind}");
         assert_eq!(bits(&same)?, bits(&recipe)?, "{kind} renders differently");
         for (address, value) in own {
             let one = recipe.with_value(address, value, &Presets::new())?;
-            assert_eq!(one.numbers()?, before, "{kind}: {address}");
+            assert_eq!(one.parameters()?, before, "{kind}: {address}");
         }
     }
     Ok(())
@@ -744,13 +760,15 @@ fn a_new_value_changes_exactly_that_number() -> Outcome {
     let all = recipes()?;
     for (kind, address, value) in rows {
         let recipe = &all.iter().find(|(name, _)| *name == kind).ok_or(kind)?.1;
-        let before = recipe.numbers()?;
-        let after = recipe.with_values(&[(address, value)], &Presets::new())?.numbers()?;
-        let at = recipe.number(address)?.address;
+        let before = recipe.parameters()?;
+        let after = recipe
+            .with_values(&[(address, n(value))], &Presets::new())?
+            .parameters()?;
+        let at = recipe.parameter(address)?.address;
         assert_eq!(before.len(), after.len(), "{kind}: {address}");
         for (was, now) in before.iter().zip(&after) {
             if was.address == at {
-                assert_eq!(now.value, Some(value), "{kind}: {address}");
+                assert_eq!(now.value, Some(n(value)), "{kind}: {address}");
             } else {
                 assert_eq!(was, now, "{kind}: {address} changed {}", was.address);
             }
@@ -765,22 +783,22 @@ fn several_numbers_are_set_together_and_a_rule_between_them_holds_for_the_set() 
     let presets = Presets::new();
     let moved = recipe.with_values(
         &[
-            ("region.near.low", 0.7),
-            ("region.near.high", 0.9),
-            ("grade.exposure", 0.5),
+            ("region.near.low", n(0.7)),
+            ("region.near.high", n(0.9)),
+            ("grade.exposure", n(0.5)),
         ],
         &presets,
     )?;
-    let value = |address: &str| moved.number(address).map(|number| number.value);
+    let value = |address: &str| moved.parameter(address).map(|number| number.value);
     assert_eq!(
         (
             value("region.near.low")?,
             value("region.near.high")?,
             value("grade.exposure")?
         ),
-        (Some(0.7), Some(0.9), Some(0.5))
+        (Some(n(0.7)), Some(n(0.9)), Some(n(0.5)))
     );
-    let said = refused(recipe.with_values(&[("region.near.low", 0.5), ("region.near.high", 0.3)], &presets));
+    let said = refused(recipe.with_values(&[("region.near.low", n(0.5)), ("region.near.high", n(0.3))], &presets));
     assert!(
         said.contains("'region.near.low', 'region.near.high'"),
         "neither is wrong alone, the pair is: {said}"
@@ -791,34 +809,37 @@ fn several_numbers_are_set_together_and_a_rule_between_them_holds_for_the_set() 
 #[test]
 fn nothing_is_set_unless_every_value_is_accepted() -> Outcome {
     let recipe = pulse();
-    let before = recipe.numbers()?;
+    let before = recipe.parameters()?;
     let presets = Presets::new();
     for values in [
-        [("grade.exposure", 0.5), ("grade.contrast", 99.0)],
-        [("grade.contrast", 99.0), ("grade.exposure", 0.5)],
-        [("grade.exposure", 0.5), ("grade.nope", 1.0)],
-        [("grade.exposure", 0.5), ("grade.opacity", f64::NAN)],
+        [("grade.exposure", n(0.5)), ("grade.contrast", n(99.0))],
+        [("grade.contrast", n(99.0)), ("grade.exposure", n(0.5))],
+        [("grade.exposure", n(0.5)), ("grade.nope", n(1.0))],
+        [("grade.exposure", n(0.5)), ("grade.opacity", n(f64::NAN))],
     ] {
         let said = refused(recipe.with_values(&values, &presets));
         assert!(!said.is_empty(), "{values:?} was accepted");
         assert!(!said.contains("grade.exposure"), "a good value is blamed: {said}");
     }
-    assert_eq!(recipe.numbers()?, before, "the recipe itself is left as it is");
+    assert_eq!(recipe.parameters()?, before, "the recipe itself is left as it is");
     Ok(())
 }
 
 #[test]
 fn a_value_out_of_its_range_is_refused_naming_the_address_the_range_and_the_value_never_clamped() -> Outcome {
-    let contrast = pulse().number("grade.contrast")?;
+    let contrast = pulse().parameter("grade.contrast")?;
     let presets = Presets::new();
-    for beyond in [contrast.max + 1.0, contrast.min - 1.0] {
-        let said = refused(pulse().with_values(&[("grade.contrast", beyond)], &presets));
+    let (Some(high), Some(low)) = (contrast.max, contrast.min) else {
+        return Err("a number has a range".into());
+    };
+    for beyond in [high + 1.0, low - 1.0] {
+        let said = refused(pulse().with_values(&[("grade.contrast", n(beyond))], &presets));
         assert!(
             said.contains("'grade.contrast'") && said.contains("`contrast`") && said.contains(&format!("{beyond}")),
             "{said}"
         );
         assert!(
-            said.contains(&format!("{}", contrast.max)) || said.contains(&format!("{}", contrast.min)),
+            said.contains(&format!("{high}")) || said.contains(&format!("{low}")),
             "the range is named: {said}"
         );
     }
@@ -829,9 +850,9 @@ fn a_value_out_of_its_range_is_refused_naming_the_address_the_range_and_the_valu
 fn a_whole_number_takes_a_whole_value_written_as_a_float_and_refuses_a_fraction() -> Outcome {
     let recipe = Recipe::new([Step::new("slice_shift")]);
     let presets = Presets::new();
-    let set = recipe.with_values(&[("slice_shift.bands", 3.0)], &presets)?;
-    assert_eq!(set.number("slice_shift.bands")?.value, Some(3.0));
-    let said = refused(recipe.with_values(&[("slice_shift.bands", 3.5)], &presets));
+    let set = recipe.with_values(&[("slice_shift.bands", n(3.0))], &presets)?;
+    assert_eq!(set.parameter("slice_shift.bands")?.value, Some(n(3.0)));
+    let said = refused(recipe.with_values(&[("slice_shift.bands", n(3.5))], &presets));
     assert!(
         said.contains("'slice_shift.bands'") && said.contains("whole number") && said.contains("3.5"),
         "{said}"
@@ -842,10 +863,10 @@ fn a_whole_number_takes_a_whole_value_written_as_a_float_and_refuses_a_fraction(
 #[test]
 fn a_cyclic_angle_takes_any_value_and_two_addresses_of_one_number_are_refused() -> Outcome {
     let presets = Presets::new();
-    let turned = pulse().with_values(&[("frame.angle", -725.0)], &presets)?;
-    assert_eq!(turned.number("frame.angle")?.value, Some(-725.0));
+    let turned = pulse().with_values(&[("frame.angle", n(-725.0))], &presets)?;
+    assert_eq!(turned.parameter("frame.angle")?.value, Some(n(-725.0)));
     let named = Recipe::from_json(&json!({"steps": [{"effect": "grade", "name": "pulse"}]}).to_string())?;
-    let said = refused(named.with_values(&[("pulse.exposure", 0.1), ("grade.exposure", 0.2)], &presets));
+    let said = refused(named.with_values(&[("pulse.exposure", n(0.1)), ("grade.exposure", n(0.2))], &presets));
     assert!(
         said.contains("'pulse.exposure' and 'grade.exposure'") && said.contains("same number"),
         "{said}"
@@ -855,11 +876,182 @@ fn a_cyclic_angle_takes_any_value_and_two_addresses_of_one_number_are_refused() 
 
 #[test]
 fn an_unknown_address_among_good_ones_lists_what_is_valid_and_the_nearest() {
-    let said = refused(pulse().with_values(&[("grade.exposure", 0.5), ("grade.exposur", 0.1)], &Presets::new()));
+    let said = refused(pulse().with_values(
+        &[("grade.exposure", n(0.5)), ("grade.exposur", n(0.1))],
+        &Presets::new(),
+    ));
     assert!(
         said.contains("'grade.exposur'")
-            && said.contains("its numbers:")
+            && said.contains("its parameters:")
             && said.contains("did you mean grade.exposure"),
+        "{said}"
+    );
+}
+
+// --- colours ----------------------------------------------------------------------------------------------------------
+
+fn lamp() -> Recipe {
+    Recipe::new([Step::new("point_light").param("gain", 1.0), Step::new("bloom")])
+}
+
+fn colour(spelling: Value) -> Result<Setting, Error> {
+    Setting::read("point_light.color", &spelling)
+}
+
+#[test]
+fn a_colour_is_listed_with_its_kind_value_and_no_range_and_the_numbers_stay_as_they_were() -> Outcome {
+    let recipe = lamp();
+    let found = recipe.parameter("point_light.color")?;
+    assert_eq!(found.kind, ParameterKind::Color);
+    assert_eq!(
+        found.value,
+        Some(Setting::Color(Color([1.0, 1.0, 1.0]))),
+        "the effect's default"
+    );
+    assert_eq!(
+        (found.min, found.max, found.unit.as_str(), found.whole, found.cyclic),
+        (None, None, "", false, false)
+    );
+    assert!(
+        !found.nullable && found.doc.contains("colour of the light"),
+        "{found:?}"
+    );
+    let optional = recipe.parameter("bloom.color")?;
+    assert!(optional.nullable && optional.value.is_none(), "{optional:?}");
+    let gain = recipe.parameter("point_light.gain")?;
+    assert_eq!((gain.kind, gain.value), (ParameterKind::Number, Some(n(1.0))));
+    assert!(gain.min.is_some() && gain.nullable == false);
+    assert_eq!(
+        addresses(&recipe)?
+            .iter()
+            .position(|address| address == "point_light.color"),
+        addresses(&recipe)?
+            .iter()
+            .position(|address| address == "point_light.y")
+            .map(|at| at + 1),
+        "in the order the effect declares them"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_spellings_of_a_colour_agree_and_set_the_same_recipe() -> Outcome {
+    let spellings = [
+        json!("#ff8800"),
+        json!("#f80"),
+        json!([1.0, 136.0 / 255.0, 0.0]),
+        json!(" #FF8800 "),
+    ];
+    let presets = Presets::new();
+    let set: Vec<Recipe> = spellings
+        .into_iter()
+        .map(|spelling| lamp().with_value("point_light.color", colour(spelling)?, &presets))
+        .collect::<Result<_, Error>>()?;
+    for other in &set[1..] {
+        assert_eq!(json(other)?, json(&set[0])?);
+        assert_eq!(other.parameters()?, set[0].parameters()?);
+    }
+    assert_eq!(
+        json(&set[0])?["steps"][0]["params"]["color"],
+        json!("#ff8800"),
+        "written as hex"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_colour_set_by_address_changes_the_render_and_only_that() -> Outcome {
+    let presets = Presets::new();
+    let warm = lamp().with_value("point_light.color", colour(json!("#ff8800"))?, &presets)?;
+    assert_ne!(bits(&warm)?, bits(&lamp())?, "the lamp's colour shows");
+    let same = lamp().with_value("point_light.color", colour(json!("#ffffff"))?, &presets)?;
+    assert_eq!(bits(&same)?, bits(&lamp())?, "its own value changes nothing");
+    let before = lamp().parameters()?;
+    for (was, now) in before.iter().zip(&warm.parameters()?) {
+        if was.address != "point_light.color" {
+            assert_eq!(was, now, "{} changed", was.address);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_channel_that_is_no_whole_255th_is_written_as_a_list_and_reads_back_the_same() -> Outcome {
+    let set = lamp().with_value("point_light.color", colour(json!([0.1, 0.25, 0.5]))?, &Presets::new())?;
+    assert_eq!(json(&set)?["steps"][0]["params"]["color"], json!([0.1, 0.25, 0.5]));
+    let back = Recipe::from_json(&json(&set)?.to_string())?;
+    assert_eq!(
+        back.parameter("point_light.color")?.value,
+        set.parameter("point_light.color")?.value
+    );
+    Ok(())
+}
+
+#[test]
+fn an_optional_colour_is_set_and_then_has_a_value() -> Outcome {
+    let set = lamp().with_value("bloom.color", colour(json!("#00ff00"))?, &Presets::new())?;
+    assert_eq!(
+        set.parameter("bloom.color")?.value,
+        Some(Setting::Color(Color([0.0, 1.0, 0.0])))
+    );
+    Ok(())
+}
+
+#[test]
+fn setting_every_parameter_to_its_own_value_changes_nothing_colours_included() -> Outcome {
+    let before = lamp().parameters()?;
+    let own: Vec<(&str, Setting)> = before
+        .iter()
+        .filter_map(|parameter| Some((parameter.address.as_str(), parameter.value?)))
+        .collect();
+    assert!(own.iter().any(|(_, value)| matches!(value, Setting::Color(_))));
+    let same = lamp().with_values(&own, &Presets::new())?;
+    assert_eq!(same.parameters()?, before);
+    assert_eq!(bits(&same)?, bits(&lamp())?);
+    Ok(())
+}
+
+#[test]
+fn a_bad_colour_or_the_wrong_kind_of_setting_is_refused_naming_the_address_and_the_fix() -> Outcome {
+    for bad in [
+        json!("#12"),
+        json!("red"),
+        json!([1.0, 0.5]),
+        json!([1.0, 0.5, 2.0]),
+        json!("#gg0000"),
+    ] {
+        let said = colour(bad.clone())
+            .err()
+            .map(|error| error.to_string())
+            .unwrap_or_default();
+        assert!(
+            said.starts_with("'point_light.color': ") && said.contains("'#rrggbb', '#rgb' or [r, g, b]"),
+            "{bad}: {said}"
+        );
+    }
+    let said = Setting::read("point_light.color", &json!(true))
+        .err()
+        .map(|error| error.to_string());
+    assert!(said.is_some_and(|said| said.contains("neither a number nor a colour")));
+    let presets = Presets::new();
+    let number_for_colour = refused(lamp().with_value("point_light.color", 0.5, &presets));
+    assert!(
+        number_for_colour.starts_with("'point_light.color': ") && number_for_colour.contains("is a colour"),
+        "{number_for_colour}"
+    );
+    let colour_for_number = refused(lamp().with_value("point_light.gain", Color([1.0, 0.0, 0.0]), &presets));
+    assert!(
+        colour_for_number.starts_with("'point_light.gain': ") && colour_for_number.contains("is a number"),
+        "{colour_for_number}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_unknown_colour_address_names_the_nearest_parameters() {
+    let said = refused(lamp().with_value("point_light.colour", Color([1.0, 0.0, 0.0]), &Presets::new()));
+    assert!(
+        said.starts_with("'point_light.colour': ") && said.contains("did you mean point_light.color"),
         "{said}"
     );
 }

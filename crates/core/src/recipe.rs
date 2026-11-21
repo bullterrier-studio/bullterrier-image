@@ -27,14 +27,14 @@ pub mod frame;
 mod load;
 pub(crate) mod near;
 mod needs;
-mod numbers;
+mod parameters;
 mod references;
 pub mod region;
 
 pub use drive::Drive;
 pub use frame::Frame;
 pub use needs::Needs;
-pub use numbers::{Home, Located, Number};
+pub use parameters::{Home, Located, Parameter, ParameterKind, Setting};
 pub use region::{Region, Regions};
 
 /// The keys of a step besides its effect's parameters, written the same in a file and in code: no parameter of an

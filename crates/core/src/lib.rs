@@ -82,8 +82,8 @@ pub use presets::{Preset, Presets};
 pub use recipe::file::FORMATS as RECIPE_FORMATS;
 pub use recipe::region::presets::region_presets;
 pub use recipe::{
-    Assign, BlendMode, Drive, Each, Entry, Frame, Home, Located, Needs, Number, Recipe, Region, Regions, STEP_KEYS,
-    Step, frame, region,
+    Assign, BlendMode, Drive, Each, Entry, Frame, Home, Located, Needs, Parameter, ParameterKind, Recipe, Region,
+    Regions, STEP_KEYS, Setting, Step, frame, region,
 };
 pub use registry::{effect, effects, register, unregister};
 pub use run::{Finder, Options, Photo, Stage};
