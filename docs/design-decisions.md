@@ -691,7 +691,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   next, so the room of a chain is the sum; a mask or a blend only hides, so it lessens nothing; opacity 0 hides the step, so it adds none.
   *The grown picture is not the original:* a caller that grows the picture by the room hands effects a picture whose bounds are not the content's, so
   effects that place themselves by the picture would be placed in the room. Gone with `Options::with_room` (below). *Not
-  in Python:* the facade has `Recipe.parameters()` for `numbers()`, but the return value (per-side numbers or unbounded) is a new Python type and the
+  in Python:* the facade has `Recipe.parameters()` for `Recipe::parameters()`, but the return value (per-side numbers or unbounded) is a new Python type and the
   only caller is Rust.
 - **Built: `Options::with_window(first_row, canvas_width, canvas_height)` and `Recipe::band_margin` (a public frame of reference).**
   *Why:* scene renders a looked layer band by band; every position-aware effect already reads `Place` (B1b to B3b), and the runner
@@ -1362,7 +1362,7 @@ is a smooth shading, where an error of one 16-bit unit is invisible. Every other
     (`Path.d`, `Curve.path`): only the core reads path data, so `Recipe(...)` calls `_core.check_recipe` and a bad path is
     refused when the recipe is made, not when the region is. *Cost:* every `Recipe` (and so every `with_values`) is checked
     twice, by its models and by the core. *Revisit when* the models are generated from the core's declarations (R5).
-  - *`Recipe.parameters` and `with_values` are the core's* (`Recipe::numbers`, `with_values`); Python rebuilds only what a call touched.
+  - *`Recipe.parameters` and `with_values` are the core's* (`Recipe::parameters`, `with_values`); Python rebuilds only what a call touched.
   - *`render_all` finds, the core renders.* Each map the recipes need is handed in or found once by `find_map`, then each
     recipe is rendered with the maps it knows; a single `render` takes the same path. The core is only asked for a
     finder for the subject of each piece of a `Subject` region with `per`.
@@ -1435,9 +1435,21 @@ is a smooth shading, where an error of one 16-bit unit is invisible. Every other
   serves `sweep`, a driver and an editor. *Consequence:* `name` is a step key (reserved, so no effect may have a parameter
   called it) and a name is a word that cannot start another address (`region`, `frame`, `each`), is unique in the recipe
   and is not an effect the recipe uses; a driven number is addressed by its ends, never by itself; a value out of range
-  fails at once naming the address; `sweep` takes any address; looks count from 0 like pieces. Not addressable: a
-  colour, a choice, a list, a text, a picture, `size`, the names of regions, and the fields of a table inside a region (a
-  torn `edge`, a cut's `lines`); a look takes no name, so it is reached by its place.
+  fails at once naming the address; `sweep` takes any address of a number; looks count from 0 like pieces. Not addressable:
+  a choice, a list (a palette of colours too), a text, a picture, `size`, the names of regions, a colour of a region or the
+  frame, and the fields of a table inside a region (a torn `edge`, a cut's `lines`); a look takes no name, so it is reached
+  by its place. A colour of a step is addressable (next entry).
+- **A colour is a settable kind, not three numbers; `parameters()` replaced `numbers()` (2026-11-21, BTIMG-0006).** A
+  step's `Kind::Color` parameter (`point_light.color`, `bloom.color`) is a `Parameter` of kind `color`, set in `with_values`
+  as a `Setting::Color`; a number is a `Setting::Number`. `Recipe::numbers`/`number`/`Number` became `parameters`/`parameter`/
+  `Parameter` because a function called numbers must not return colours; a `Parameter` has `kind`, `value`, `nullable`, and a
+  range only for a number. One reader, `Setting::read` over `Color::parse`, takes `'#rrggbb'`, `'#rgb'` and `[r, g, b]` (0..1)
+  and gives the same colour; it is stored as sRGB-encoded floats, as the effects hold it, and `Color::to_json` writes hex
+  where every channel is a whole 255th, else the list. *Reason:* an editor builds a colour picker from the kind and a driver
+  blends colours once, in one place, not as three floats; the shared format already names the kind. *Consequence:* breaking
+  for every caller of `numbers`; a number given for a colour (or the reverse) is refused naming the address; a colour is set,
+  never unset (leave a `nullable` colour out of the step to unset it). *Left out:* palettes (`Kind::Colors`), the colours
+  of regions and the frame, and alpha (no effect has a colour with one: `Color` gains it when one does).
 - **A field varies a parameter: `Drive(by, start, end, levels)`, rendered at levels and mixed.** A number an effect marks
   drivable (the format's `drivable`, `param(..., drivable=True)`, floats only) takes a `Drive` instead of a value: `start` where the field `by` is 0,
   `end` where it is 1. Effects do not change: the runner renders the effect at `levels` evenly spaced values and each pixel
@@ -1635,8 +1647,8 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
 - **One loader for recipe files in a run.** `pipeline.run` hands recipe files to the core (`Recipe::from_file`, then
   `Recipe::checked_from`, which names the file and the step); Python's `load_recipe` stays public API for programs. The limit:
   a picture or lookup-table path of an effect written in Python is passed as written, not made relative to the recipe's folder.
-- **Sweeps and addresses are the core's.** `Recipe::numbers`, `number` and `with_value` read the numbers of steps from the effects'
-  parameter tables and those of the frame and the regions from `REGION_ROWS` and `FRAME_ROWS` (`recipe/numbers.rs`). The checks
+- **Sweeps and addresses are the core's.** `Recipe::parameters`, `parameter` and `with_value` read the parameters of steps from the effects'
+  parameter tables and those of the frame and the regions from `REGION_ROWS` and `FRAME_ROWS` (`recipe/parameters.rs`). The checks
   of `Frame` and `Region` keep their own bounds, for readability; a parity test holds each row to its check (the edge accepted, one
   step beyond refused) and a completeness test fails for a numeric field with no row. `Recipe::with_values` sets several numbers at once, all or nothing, and Python's `Recipe.with_values` calls it:
   scene and video link the core and must not rewrite a recipe document by address, which would leak image's knowledge out of image.

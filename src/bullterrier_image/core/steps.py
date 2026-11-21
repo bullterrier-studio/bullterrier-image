@@ -15,8 +15,8 @@ Promises:
   all the runner and the cache see of it.
 - `Step.describe` gives a short readable form.
 - A number an effect declares drivable may be a `Drive` (see `params`): it is validated at every level when the step is
-  made. Every number of a recipe has an address (`Recipe.parameters`, `Recipe.parameter`), and `Recipe.with_values`
-  returns a copy with some set; a step's optional `name` addresses its numbers.
+  made. Every number, and every colour of a step, has an address (`Recipe.parameters`, `Recipe.parameter`), and
+  `Recipe.with_values` returns a copy with some set; a step's optional `name` addresses them.
 
 Dependency direction: imports the effect registry, `native` (the core's rules, which a recipe is held to when it is
 made), `framing`, `params`, `regions`, `errors` only. The recipe-file

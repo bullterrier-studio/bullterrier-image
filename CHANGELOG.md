@@ -12,6 +12,11 @@ its `Unreleased` becomes the release date.
 
 ### Changed
 
+- **BREAKING:** a colour of a step (`point_light.color`, `bloom.color`) has an address: it is a settable kind, not three numbers.
+  Rust `Recipe::numbers`, `number`, `Number` and `Located::number` are `parameters`, `parameter`, `Parameter` and
+  `Located::parameter`; `with_values` takes `&[(&str, Setting)]` (a number or a colour). Python and WebAssembly `parameters()`
+  gain `kind` (`number` or `color`) and `nullable`, and `with_values` / `withValues` take a colour as text or `[r, g, b]`.
+  A palette has no address yet.
 - **BREAKING:** `displace` `amount` is the standard deviation of a pixel's move, not the longest move (a few moves reach
   about 3 times it); the default is 4 (was 12) and the preset and example are rescaled.
 - **BREAKING:** `fog` `coverage` is the expected share the cloud covers; a given seed varies about 0.1 either way.

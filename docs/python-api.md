@@ -100,7 +100,7 @@ struct): description, unit, range, default. Validation, `fx` signatures,
 
 ## Addresses
 
-Every number of recipe has address. Program driving a look (video tool mapping beat onto bloom, frame after
+Every number and colour of recipe has address. Program driving a look (video tool mapping beat onto bloom, frame after
 frame) reads numbers and sets them without rebuilding recipe:
 
 ```python
@@ -111,10 +111,11 @@ for address, number in look.parameters().items():  # pulse.radius 24.0 px 0 500,
     print(address, number.value, number.unit, number.minimum, number.maximum, number.whole)
 
 frame_look = look.with_values({"pulse.radius": 12 + 20 * kick, "pulse.exposure.end": 0.4 * level})  # a copy
+lit = look.with_values({"point_light.color": "#ffe2b8"})  # a colour: '#rrggbb', '#rgb' or [r, g, b] from 0 to 1
 ```
 
-Every number of a recipe (not colour, choice, list, picture) has an address, so a program driving a look (video tool mapping
-a beat onto a bloom, frame after frame) can read the numbers and set them without rebuilding the recipe.
+Every number and every colour of a step (not a choice, list, palette, picture) has an address, so a program driving a look
+(video tool mapping a beat onto a bloom, frame after frame) can read them and set them without rebuilding the recipe.
 
 - A step's numbers start with its `name` (`name = "pulse"` on a `[[step]]`, `fx.bloom(name="pulse")`: letters, digits,
   underscores, one per step; address survives reordering). No name: the effect, `bloom`, when recipe has one such step, else
@@ -122,14 +123,19 @@ a beat onto a bloom, frame after frame) can read the numbers and set them withou
 - After the step: effect's numbers (`pulse.radius`), its `opacity`, `.start`, `.end`, `.levels` of a driven number
   (`pulse.radius.end`); for `each`: its `feather` and numbers of a look (`each.looks[0].radius`, counted from 0). Then
   `region.near.low` for region numbers, `frame.angle` for framing's.
-- `parameters()` lists them in recipe order, each a `Parameter`: `value` (default where recipe does not write it), `unit`,
-  `minimum`, `maximum`, `doc`, `whole` (must be whole number), `cyclic`.
+- `parameters()` lists them in recipe order, each a `Parameter`: `kind` (`"number"` or `"color"`), `value` (default where
+  recipe does not write it), `unit`, `minimum`, `maximum`, `doc`, `whole` (must be whole number), `cyclic`, `nullable`. A
+  colour's value is `"#rrggbb"` (a list `[r, g, b]` when a channel is no whole 255th), its unit is `""`, its range None.
 - `with_values` returns a new recipe (original untouched; unchanged steps, regions, frame shared), checks each value against
   the range as any recipe does (cyclic angle takes any real, stores same direction inside its turn), refuses an address the
   recipe lacks (naming it, listing valid ones and nearest). Whole number may be written `3.0`. `bt-image sweep` takes the same
   addresses.
+- A colour is set as text (`"#rrggbb"`, `"#f80"`) or `[r, g, b]` from 0 to 1: the spellings are the same colour. A colour
+  for a number, a number for a colour or a bad colour is refused naming the address. `with_values` only sets: to unset a
+  `nullable` colour (`bloom.color`), replace the step without it. A palette (a list of colours), and the colours of
+  regions and the frame, have no address yet.
 - All or nothing: every address and value is checked before any is set, and a rule between numbers set together (`low` at most
-  `high`) holds for the set. The setter is the core's, `Recipe::with_values(&[(address, value)], presets)` in Rust, which
+  `high`) holds for the set. The setter is the core's, `Recipe::with_values(&[(address, Setting)], presets)` in Rust, which
   Python calls.
 
 ## One look at any size
