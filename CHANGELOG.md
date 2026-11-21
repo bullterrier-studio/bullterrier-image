@@ -38,6 +38,9 @@ its `Unreleased` becomes the release date.
 
 ### Added
 
+- `Recipe::close_band_margin`: the rows of margin a window needs when its rows need only look the same as the whole render's
+  (within 32 of 65,535 on a value of 0 to 1), which also clears steps that sum a blur by a Fourier transform or round a
+  position by its row; `band_margin` stays exact.
 - `Options::with_band(rows)` and Python `band=`: render in bands of rows, the whole render's pixels (within float rounding, 1e-4), and
   memory no longer grows with the picture.
 
