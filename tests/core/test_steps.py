@@ -1148,7 +1148,13 @@ def test_a_colour_is_a_parameter_of_kind_color_and_the_numbers_stay_numbers():
 
 
 def test_a_colour_is_set_by_address_in_any_spelling_and_they_agree():
-    spellings = ["#ff8800", "#f80", " #FF8800 ", [1.0, 136 / 255, 0.0], (1.0, 136 / 255, 0.0)]
+    spellings: list[str | list[float] | tuple[float, ...]] = [
+        "#ff8800",
+        "#f80",
+        " #FF8800 ",
+        [1.0, 136 / 255, 0.0],
+        (1.0, 136 / 255, 0.0),
+    ]
     looks = [_lamp().with_values({"point_light.color": spelling}) for spelling in spellings]
     for other in looks[1:]:
         assert other.to_dict() == looks[0].to_dict()
