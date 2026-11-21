@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use bullterrier_image::documentation::general;
-use bullterrier_image::{Error, Options, Presets, Recipe, Tile, contact_sheet, write};
+use bullterrier_image::{Error, Options, ParameterKind, Presets, Recipe, Tile, contact_sheet, write};
 use clap::Args as ClapArgs;
 
 use crate::Console;
@@ -89,7 +89,13 @@ fn variants(recipe: &Recipe, args: &Args, presets: &Presets) -> Result<Vec<(Stri
             general(start)
         )));
     }
-    let number = recipe.number(&args.target)?;
+    let number = recipe.parameter(&args.target)?;
+    if number.kind != ParameterKind::Number {
+        return Err(Error::Recipe(format!(
+            "'{}': a sweep varies a number from START to END, and this is a colour",
+            args.target
+        )));
+    }
     let mut values = linspace(start, end, args.count);
     if number.whole {
         values = values.into_iter().map(f64::round_ties_even).collect();

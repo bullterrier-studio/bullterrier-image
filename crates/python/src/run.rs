@@ -4,12 +4,13 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use bullterrier_image::{
-    Entry, Error, ErrorKind, Finder, Image, Layer, MapKind, Options, Photo, Presets, Recipe, Stage,
+    Entry, Error, ErrorKind, Finder, Image, Layer, MapKind, Options, ParameterKind, Photo, Presets, Recipe, Setting,
+    Stage,
 };
 use numpy::{AllowTypeChange, PyArray1, PyArray2, PyArray3, PyArrayLike2, PyArrayMethods, PyUntypedArrayMethods};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBool, PyDict, PyList, PyTuple};
+use pyo3::types::{PyBool, PyDict, PyList, PyString, PyTuple};
 use serde_json::{Value, json};
 
 use super::lut::tables_of;
@@ -180,32 +181,39 @@ pub(crate) fn known_maps(recipe: &Bound<'_, PyDict>) -> PyResult<Vec<String>> {
     Ok(recipe_of(recipe)?.known_maps().into_iter().map(str::to_owned).collect())
 }
 
-/// A number of a recipe as a dict: `address`, `value` (none if unset), `unit`, `doc`, `whole`, `cyclic`, `min` and `max`.
-fn number_dict(number: &bullterrier_image::Number) -> Value {
+/// A parameter of a recipe as a dict: `address`, `kind` (`"number"` or `"color"`), `value` (a number, a colour as `'#rrggbb'`
+/// or `[r, g, b]`, or none if unset), `unit`, `doc`, `whole`, `cyclic`, `nullable`, and `min` and `max` (none for a colour).
+fn parameter_dict(parameter: &bullterrier_image::Parameter) -> Value {
     json!({
-        "address": number.address,
-        "value": number.value,
-        "unit": number.unit,
-        "doc": number.doc,
-        "whole": number.whole,
-        "cyclic": number.cyclic,
-        "min": number.min,
-        "max": number.max,
+        "address": parameter.address,
+        "kind": match parameter.kind {
+            ParameterKind::Color => "color",
+            _ => "number",
+        },
+        "value": parameter.value.as_ref().map(Setting::to_json),
+        "unit": parameter.unit,
+        "doc": parameter.doc,
+        "whole": parameter.whole,
+        "cyclic": parameter.cyclic,
+        "nullable": parameter.nullable,
+        "min": parameter.min,
+        "max": parameter.max,
     })
 }
 
-/// Every number of `recipe` (a dict, as for `render`) that can be set, in the order of the recipe: a list of dicts as
-/// `locate` gives under `number`. See `Recipe::numbers` in the core for the addresses.
+/// Every parameter of `recipe` (a dict, as for `render`) that can be set, in the order of the recipe: a list of dicts as
+/// `locate` gives under `parameter`. See `Recipe::parameters` in the core for the addresses.
 ///
 /// `CoreError` if a step names an effect that is not registered.
 #[pyfunction]
-pub(crate) fn numbers<'py>(py: Python<'py>, recipe: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyAny>> {
-    let all = recipe_of(recipe)?.numbers().map_err(core_error)?;
-    from_json(py, &Value::Array(all.iter().map(number_dict).collect()))
+pub(crate) fn parameters<'py>(py: Python<'py>, recipe: &Bound<'py, PyDict>) -> PyResult<Bound<'py, PyAny>> {
+    let all = recipe_of(recipe)?.parameters().map_err(core_error)?;
+    from_json(py, &Value::Array(all.iter().map(parameter_dict).collect()))
 }
 
-/// The number of `recipe` (a dict, as for `render`) at `address` and where it lives: `{"place": ["step", index] |
-/// ["region", name] | ["frame"], "rest": str, "number": {address, value, unit, doc, whole, cyclic, min, max}}`.
+/// The parameter of `recipe` (a dict, as for `render`) at `address` and where it lives: `{"place": ["step", index] |
+/// ["region", name] | ["frame"], "rest": str, "parameter": {address, kind, value, unit, doc, whole, cyclic, nullable, min,
+/// max}}`.
 ///
 /// `CoreError` of kind `recipe` naming the address, what is there and the nearest addresses, when it points at nothing.
 #[pyfunction]
@@ -218,17 +226,18 @@ pub(crate) fn locate<'py>(py: Python<'py>, recipe: &Bound<'py, PyDict>, address:
     };
     from_json(
         py,
-        &json!({"place": place, "rest": found.rest, "number": number_dict(&found.number)}),
+        &json!({"place": place, "rest": found.rest, "parameter": parameter_dict(&found.parameter)}),
     )
 }
 
-/// `recipe` (a dict, as for `render`) with each number at an address of `values` (address to number) set, as
+/// `recipe` (a dict, as for `render`) with each parameter at an address of `values` (address to a number, or to a colour as
+/// text `'#rrggbb'`, `'#rgb'` or a list of three numbers) set, as
 /// `Recipe::with_values` in the core does, with the presets the core ships none of: only what the call changed, as a list
 /// of `["step", index, entry]`, `["region", name, region]` and `["frame", None, frame]`, each in the form `recipe` is
 /// written in, one for every step, region and the frame that an address reaches.
 ///
-/// `CoreError` of kind `recipe` naming the address when one points at nothing, a value is not a number or the recipe
-/// refuses a value; nothing is returned then.
+/// `CoreError` of kind `recipe` naming the address when one points at nothing, a value is neither a number nor a colour or
+/// the recipe refuses a value; nothing is returned then.
 #[pyfunction]
 pub(crate) fn with_values<'py>(
     py: Python<'py>,
@@ -239,17 +248,24 @@ pub(crate) fn with_values<'py>(
     let mut set = Vec::new();
     for (address, value) in values {
         let address = address.extract::<String>()?;
-        let number = value.extract::<f64>().map_err(|_| {
-            core_error(Error::Recipe(format!(
-                "'{address}': {} is not a number",
-                value.repr().map_or_else(|_| "that".to_owned(), |text| text.to_string())
-            )))
-        })?;
-        set.push((address, number));
+        let setting = if value.is_instance_of::<PyString>()
+            || value.is_instance_of::<PyList>()
+            || value.is_instance_of::<PyTuple>()
+        {
+            Setting::read(&address, &to_json(&value)?).map_err(core_error)?
+        } else {
+            Setting::Number(value.extract::<f64>().map_err(|_| {
+                core_error(Error::Recipe(format!(
+                    "'{address}': {} is neither a number nor a colour; give a number, or a colour as '#rrggbb', '#rgb' or [r, g, b]",
+                    value.repr().map_or_else(|_| "that".to_owned(), |text| text.to_string())
+                )))
+            })?)
+        };
+        set.push((address, setting));
     }
-    let asked: Vec<(&str, f64)> = set
+    let asked: Vec<(&str, Setting)> = set
         .iter()
-        .map(|(address, number)| (address.as_str(), *number))
+        .map(|(address, setting)| (address.as_str(), *setting))
         .collect();
     let changed = serde_json::to_value(recipe.with_values(&asked, &Presets::new()).map_err(core_error)?)
         .map_err(|error| core_error(Error::Recipe(error.to_string())))?;

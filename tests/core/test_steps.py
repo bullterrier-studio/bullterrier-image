@@ -410,17 +410,17 @@ BAD_ADDRESSES = {
     ),
     "a number the step has not": (
         {"pulse.gian": 1.0},
-        r"'pulse\.gian'.*'pulse' has no number 'gian'.*gain, offset, taps, opacity",
+        r"'pulse\.gian'.*'pulse' has no parameter 'gian'.*gain, offset, taps, opacity",
     ),
-    "a number that is not a number": ({"pulse.mode": 1.0}, r"'pulse\.mode'.*no number 'mode'"),
+    "a number that is not a number": ({"pulse.mode": 1.0}, r"'pulse\.mode'.*no parameter 'mode'"),
     "a driven number by itself": ({"gain_probe#2.gain": 1.0}, r"'gain_probe#2\.gain'.*driven.*gain\.start.*gain\.end"),
     "the end of a number that is not driven": ({"pulse.gain.end": 1.0}, r"'pulse\.gain\.end'.*not driven"),
     "a region the recipe has not": ({"region.gone.low": 0.1}, r"'region\.gone\.low'.*no region 'gone'.*g, near"),
     "a number of a region it has not": (
         {"region.near.nope": 0.1},
-        r"'region\.near\.nope'.*no number 'nope'.*low, high, feather",
+        r"'region\.near\.nope'.*no parameter 'nope'.*low, high, feather",
     ),
-    "a frame number it has not": ({"frame.nope": 0.1}, r"'frame\.nope'.*no number 'nope'.*angle"),
+    "a frame number it has not": ({"frame.nope": 0.1}, r"'frame\.nope'.*no parameter 'nope'.*angle"),
     "a number out of its range": ({"pulse.gain": 9.0}, r"pulse_?.*`gain`.*<= 4.*9"),
     "an end out of the range of the number": ({"gain_probe#2.gain.end": 9.0}, r"gain_probe.*`gain`.*<= 4.*9"),
     "levels of one": ({"gain_probe#2.gain.levels": 1}, r"levels"),
@@ -1131,3 +1131,42 @@ def test_a_step_naming_a_region_only_its_recipe_declares_is_accepted_alone_and_r
     with pytest.raises(RecipeError, match="named"):
         Recipe([step], name="without", size=None)
     assert Recipe([step], name="with", size=None, regions={"named": region}).steps == (step,)
+
+
+def _lamp() -> Recipe:
+    return Recipe([Step("point_light"), Step("bloom")], size=None)
+
+
+def test_a_colour_is_a_parameter_of_kind_color_and_the_numbers_stay_numbers():
+    found = _lamp().parameters()
+    colour, optional, gain = found["point_light.color"], found["bloom.color"], found["point_light.gain"]
+    assert (colour.kind, colour.value, colour.unit) == ("color", "#ffffff", "")
+    assert (colour.minimum, colour.maximum, colour.nullable) == (None, None, False)
+    assert (optional.nullable, optional.value) == (True, None)
+    assert gain.kind == "number"
+    assert gain.minimum is not None
+
+
+def test_a_colour_is_set_by_address_in_any_spelling_and_they_agree():
+    spellings = ["#ff8800", "#f80", " #FF8800 ", [1.0, 136 / 255, 0.0], (1.0, 136 / 255, 0.0)]
+    looks = [_lamp().with_values({"point_light.color": spelling}) for spelling in spellings]
+    for other in looks[1:]:
+        assert other.to_dict() == looks[0].to_dict()
+    assert looks[0].parameters()["point_light.color"].value == "#ff8800"
+    assert looks[0].parameters()["bloom.color"] == _lamp().parameters()["bloom.color"]
+
+
+@pytest.mark.parametrize(
+    ("address", "value", "match"),
+    [
+        ("point_light.color", "#12", r"'point_light\.color'.*not a colour.*'#rrggbb'"),
+        ("point_light.color", [1.0, 2.0, 0.0], r"'point_light\.color'.*not a colour"),
+        ("point_light.color", 0.5, r"'point_light\.color'.*is a colour"),
+        ("point_light.gain", "#fff", r"'point_light\.gain'.*is a number"),
+        ("point_light.color", None, r"'point_light\.color'.*neither a number nor a colour"),
+        ("point_light.colour", "#fff", r"did you mean point_light\.color"),
+    ],
+)
+def test_a_bad_colour_is_refused_naming_the_address_and_the_fix(address, value, match):
+    with pytest.raises(RecipeError, match=match):
+        _lamp().with_values({address: value})

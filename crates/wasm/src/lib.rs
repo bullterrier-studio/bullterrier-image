@@ -29,15 +29,22 @@ export interface Rendered {
     data: Uint8ClampedArray;
 }
 
-/** A number of a recipe that can be set, by address (`recipe.parameters()`, `recipe.withValues`). */
+/**
+ * A parameter of a recipe that can be set, by address (`recipe.parameters()`, `recipe.withValues`): a number (`kind` is
+ * "number") or a colour ("color": `value` is a text like #rrggbb, or `[r, g, b]` from 0 to 1 when a channel is no whole 255th;
+ * `unit` is "" and `min`, `max` are `null`). `value` is `null` for an optional parameter the recipe leaves unset
+ * (`nullable` marks an optional colour; `withValues` sets a colour and never unsets it).
+ */
 export interface RecipeParameter {
-    value: number | null;
+    kind: "number" | "color";
+    value: number | string | number[] | null;
     unit: string;
-    min: number;
-    max: number;
+    min: number | null;
+    max: number | null;
     meaning: string;
     whole: boolean;
     cyclic: boolean;
+    nullable: boolean;
 }
 
 /** A parameter of an effect, as the core declares it (`kind` is "float", "int", "bool", "choice", "color", ...). */
@@ -65,8 +72,8 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "number")]
     pub type Pixels;
 
-    /// The numbers to set, by address.
-    #[wasm_bindgen(typescript_type = "Record<string, number>")]
+    /// The numbers and colours to set, by address (a colour as `"#rrggbb"`, `"#rgb"` or `[r, g, b]`).
+    #[wasm_bindgen(typescript_type = "Record<string, number | string | number[]>")]
     pub type Values;
 
     /// What a render is asked for.
@@ -236,56 +243,76 @@ impl Recipe {
         serde_json::to_string(&self.0).map_err(|error| thrown_for(&image::Error::Recipe(error.to_string())))
     }
 
-    /// Every number of the recipe that can be set, by address, in the order of the recipe (`halftone.cell`; as Python's
-    /// `Recipe.parameters`): an object of the address to `{ value, unit, min, max, meaning, whole, cyclic }`, what a page
-    /// needs for a slider each. `value` is `null` for an optional number the recipe leaves unset.
+    /// Every number and colour of the recipe that can be set, by address, in the order of the recipe (`halftone.cell`,
+    /// `point_light.color`; as Python's `Recipe.parameters`): an object of the address to `{ kind, value, unit, min, max,
+    /// meaning, whole, cyclic, nullable }`, what a page needs for a slider or a colour picker each. `value` is `null` for
+    /// an optional parameter the recipe leaves unset.
     ///
     /// # Errors
     /// `UnknownEffectError` for a step of an effect that does not exist (a loaded recipe has none).
     #[wasm_bindgen(unchecked_return_type = "Record<string, RecipeParameter>")]
     pub fn parameters(&self) -> Result<JsValue, JsValue> {
         let all = Object::new();
-        for number in raised(self.0.numbers())? {
+        for parameter in raised(self.0.parameters())? {
             let found = Object::new();
-            let value = number.value.map_or(JsValue::NULL, JsValue::from_f64);
+            let value = match parameter.value {
+                Some(setting) => JSON::parse(&setting.to_json().to_string())?,
+                None => JsValue::NULL,
+            };
+            let kind = match parameter.kind {
+                image::ParameterKind::Color => "color",
+                _ => "number",
+            };
             for (key, member) in [
+                ("kind", kind.into()),
                 ("value", value),
-                ("unit", number.unit.into()),
-                ("min", number.min.into()),
-                ("max", number.max.into()),
-                ("meaning", number.doc.into()),
-                ("whole", number.whole.into()),
-                ("cyclic", number.cyclic.into()),
+                ("unit", parameter.unit.into()),
+                ("min", parameter.min.map_or(JsValue::NULL, JsValue::from_f64)),
+                ("max", parameter.max.map_or(JsValue::NULL, JsValue::from_f64)),
+                ("meaning", parameter.doc.into()),
+                ("whole", parameter.whole.into()),
+                ("cyclic", parameter.cyclic.into()),
+                ("nullable", parameter.nullable.into()),
             ] {
                 Reflect::set(&found, &key.into(), &member)?;
             }
-            Reflect::set(&all, &number.address.into(), &found)?;
+            Reflect::set(&all, &parameter.address.into(), &found)?;
         }
         Ok(all.into())
     }
 
-    /// A copy of the recipe with each number at an address of `values` set (as Python's `Recipe.with_values`): the
-    /// recipe itself is left as it is.
+    /// A copy of the recipe with each parameter at an address of `values` set (as Python's `Recipe.with_values`): a number,
+    /// or a colour as `"#rrggbb"`, `"#rgb"` or `[r, g, b]`. The recipe itself is left as it is.
     ///
     /// # Errors
-    /// A `TypeError` naming `values` or an address unless they are an object of numbers; `RecipeError` naming the
-    /// address for an address that points at nothing or a value the recipe refuses (never clamped).
+    /// A `TypeError` naming `values` unless it is an object; `RecipeError` naming the address for an address that points
+    /// at nothing, a value that is neither a number nor a colour, or a value the recipe refuses (never clamped).
     #[wasm_bindgen(js_name = withValues)]
     pub fn with_values(&self, values: &Values) -> Result<Recipe, JsValue> {
         let given: &JsValue = values.as_ref();
         let object = given
             .dyn_ref::<Object>()
-            .ok_or_else(|| refuse("values", "an object of addresses to numbers", given))?;
+            .ok_or_else(|| refuse("values", "an object of addresses to numbers or colours", given))?;
         let mut set = Vec::new();
         for address in Object::keys(object) {
             let address = address.as_string().unwrap_or_default();
             let value = Reflect::get(object, &JsValue::from_str(&address))?;
-            let number = value.as_f64().ok_or_else(|| refuse(&address, "a number", &value))?;
-            set.push((address, number));
+            let json = if let Some(number) = value.as_f64() {
+                serde_json::Value::from(number)
+            } else if value.is_string() || js_sys::Array::is_array(&value) {
+                JSON::stringify(&value)
+                    .ok()
+                    .and_then(|text| text.as_string())
+                    .and_then(|text| serde_json::from_str(&text).ok())
+                    .unwrap_or(serde_json::Value::Null)
+            } else {
+                return Err(refuse(&address, "a number or a colour", &value));
+            };
+            set.push((address.clone(), raised(image::Setting::read(&address, &json))?));
         }
-        let asked: Vec<(&str, f64)> = set
+        let asked: Vec<(&str, image::Setting)> = set
             .iter()
-            .map(|(address, number)| (address.as_str(), *number))
+            .map(|(address, setting)| (address.as_str(), *setting))
             .collect();
         let presets = raised(image::Presets::shipped())?;
         raised(self.0.with_values(&asked, &presets)).map(Recipe)

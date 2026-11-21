@@ -96,9 +96,25 @@ test("the numbers of a recipe are listed by address and set by address, as in Py
   assert.equal(failure(() => recipe.withValues({ "halftone.cell": -1 })).name, "RecipeError");
   assert.match(failure(() => recipe.withValues({ "halftone.cell": -1 })).message, /halftone\.cell/);
   assert.equal(failure(() => recipe.withValues({ nope: 1 })).name, "RecipeError");
-  assert.match(failure(() => recipe.withValues({ "halftone.cell": "9" })).message, /halftone\.cell/);
-  assert.equal(failure(() => recipe.withValues({ "halftone.cell": "9" })).name, "TypeError");
+  assert.match(failure(() => recipe.withValues({ "halftone.cell": true })).message, /halftone\.cell/);
+  assert.equal(failure(() => recipe.withValues({ "halftone.cell": true })).name, "TypeError");
+  assert.equal(failure(() => recipe.withValues({ "halftone.cell": "9" })).name, "RecipeError"); // text is a colour
   assert.equal(failure(() => recipe.withValues(4)).name, "TypeError");
+});
+
+test("a colour is listed with kind color and set by address in any spelling", () => {
+  const lamp = Recipe.fromJson(JSON.stringify({ steps: [{ effect: "point_light" }, { effect: "bloom" }] }));
+  const color = lamp.parameters()["point_light.color"];
+  assert.deepEqual([color.kind, color.value, color.unit, color.min, color.max, color.nullable], ["color", "#ffffff", "", null, null, false]);
+  assert.equal(lamp.parameters()["bloom.color"].nullable, true);
+  assert.equal(lamp.parameters()["bloom.color"].value, null);
+  assert.equal(lamp.parameters()["point_light.gain"].kind, "number");
+  const set = [{ "point_light.color": "#ff8800" }, { "point_light.color": "#f80" }, { "point_light.color": [1, 136 / 255, 0] }]
+    .map((values) => lamp.withValues(values));
+  for (const other of set) assert.equal(other.toJson(), set[0].toJson());
+  assert.equal(set[0].parameters()["point_light.color"].value, "#ff8800");
+  assert.match(failure(() => lamp.withValues({ "point_light.color": "#12" })).message, /point_light\.color.*not a colour/);
+  assert.match(failure(() => lamp.withValues({ "point_light.color": 0.5 })).message, /point_light\.color.*is a colour/);
 });
 
 test("a recipe is checked when it is loaded", () => {

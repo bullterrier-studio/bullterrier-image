@@ -47,19 +47,24 @@ _ADDRESS_WORDS = ("region", "frame", "each")  # what an address starts with besi
 
 @dataclass(frozen=True)
 class Parameter:
-    """One number of a recipe, as `Recipe.parameters` lists it: its `value` now (None for an optional number the recipe
-    leaves unset, such as the framing's `aspect`), its `unit` (`px`, `fraction`, `count`...) and range, what it does
-    (`doc`), whether it must be a whole number (`whole`: a count, a seed) and whether it wraps (`cyclic`: an angle
-    whose range is one turn and that takes any value, wrapped into it). The unit and range are those of the number's
-    own declaration, so a control that maps a signal onto it can scale to them and stay inside, or wrap if cyclic."""
+    """One parameter of a recipe, as `Recipe.parameters` lists it: a number (`kind` is `"number"`) or a colour
+    (`"color"`). Its `value` now (None for an optional one the recipe leaves unset, such as the framing's `aspect` or a
+    `nullable` colour; a colour is `"#rrggbb"`, or `[r, g, b]` from 0 to 1 when a channel is no whole 255th), its `unit`
+    (`px`, `fraction`, `count`...; empty for a colour) and range (None for a colour), what it does (`doc`), whether it
+    must be a whole number (`whole`: a count, a seed) and whether it wraps (`cyclic`: an angle whose range is one turn
+    and that takes any value, wrapped into it). The unit and range are those of the number's own declaration, so a
+    control that maps a signal onto it can scale to them and stay inside, or wrap if cyclic. A colour is set, never
+    unset, by `with_values`; to unset a `nullable` one, replace the step without it."""
 
-    value: float | None
+    value: float | str | list[float] | None
     unit: str
     minimum: float | None
     maximum: float | None
     doc: str
     whole: bool = False
     cyclic: bool = False
+    kind: Literal["number", "color"] = "number"
+    nullable: bool = False
 
 
 @dataclass(frozen=True, init=False, kw_only=True)
@@ -644,23 +649,26 @@ class Recipe:
         return Recipe(merged.pop("steps"), **merged)
 
     def parameters(self) -> dict[str, Parameter]:
-        """Every number of the recipe that can be set, by address, in the order of the recipe: the numbers of each step
-        (`pulse.gain`; for a driven one `pulse.gain.start`, `.end` and `.levels`), its `opacity`, an `Each`'s `feather`
-        and its looks' numbers (`each.looks[0].gain`), then the numbers of each region (`region.near.low`), then of the
-        frame (`frame.angle`). A step is addressed by its `name`, else by its effect (`gain`) when the recipe has one
-        such step, else by the effect and its number among them (`gain#2`; an `Each` is `each`, `each#2`); the other
-        forms an address may take are listed in `with_values`. Each is described by a `Parameter`: its value now (at its
+        """Every parameter of the recipe that can be set, numbers and colours, by address, in the order of the recipe:
+        those of each step (`pulse.gain`, `point_light.color`; for a driven number `pulse.gain.start`, `.end` and
+        `.levels`), its `opacity`, an `Each`'s `feather` and its looks' parameters (`each.looks[0].gain`), then the
+        numbers of each region (`region.near.low`), then of the frame (`frame.angle`). A palette (a list of colours) has
+        no address yet. A step is addressed by its `name`, else by its effect (`gain`) when the recipe has one such
+        step, else by the effect and its number among them (`gain#2`; an `Each` is `each`, `each#2`); the other forms
+        an address may take are listed in `with_values`. Each is described by a `Parameter`: its value now (at its
         default where the recipe does not write it), unit, range and what it does. The core knows the addresses
-        (`Recipe::numbers`)."""
-        return {found["address"]: _parameter(found) for found in native.numbers(self._document())}
+        (`Recipe::parameters`)."""
+        return {found["address"]: _parameter(found) for found in native.parameters(self._document())}
 
     def parameter(self, address: str) -> Parameter:
-        """The number at `address` (see `parameters`; any form an address may take); RecipeError naming the address
+        """The parameter at `address` (see `parameters`; any form an address may take); RecipeError naming the address
         when there is none, with what is valid."""
-        return _parameter(native.locate(self._document(), address)["number"])
+        return _parameter(native.locate(self._document(), address)["parameter"])
 
-    def with_values(self, values: Mapping[str, float]) -> "Recipe":
-        """A copy of the recipe with each number at an address of `values` set to its value; the recipe itself is left
+    def with_values(self, values: Mapping[str, float | str | Sequence[float]]) -> "Recipe":
+        """A copy of the recipe with each parameter at an address of `values` set to its value (a number, or a colour as
+        `"#rrggbb"`, `"#f80"` or `[r, g, b]` from 0 to 1, whose spellings are all the same colour; a colour for a number
+        or a number for a colour is refused naming the address); the recipe itself is left
         as it is, and every step, region and frame that is not touched is shared with the copy. An address is a key of
         `parameters`, or reaches the same number as one: a step by its effect (`gain.radius`) when the recipe has one,
         or by effect and number (`gain#1.radius`, counted from 1 among the steps of that effect). A whole-number value
@@ -689,7 +697,15 @@ class Recipe:
 
 
 def _parameter(found: Mapping[str, Any]) -> Parameter:
-    """The `Parameter` that the core's description `found` of a number gives."""
+    """The `Parameter` that the core's description `found` of a parameter gives."""
     return Parameter(
-        found["value"], found["unit"], found["min"], found["max"], found["doc"], found["whole"], found["cyclic"]
+        found["value"],
+        found["unit"],
+        found["min"],
+        found["max"],
+        found["doc"],
+        found["whole"],
+        found["cyclic"],
+        found["kind"],
+        found["nullable"],
     )
