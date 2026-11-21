@@ -258,7 +258,7 @@ impl Color {
         let exact = bytes
             .iter()
             .zip(self.0)
-            .all(|(byte, channel)| (byte / 255.0) as f32 == channel);
+            .all(|(byte, channel)| ((byte / 255.0) as f32).to_bits() == channel.to_bits());
         if exact {
             #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a byte, 0..=255")]
             let [red, green, blue] = bytes.map(|byte| byte as u8);

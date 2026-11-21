@@ -894,8 +894,8 @@ fn lamp() -> Recipe {
     Recipe::new([Step::new("point_light").param("gain", 1.0), Step::new("bloom")])
 }
 
-fn colour(spelling: Value) -> Result<Setting, Error> {
-    Setting::read("point_light.color", &spelling)
+fn colour(spelling: &Value) -> Result<Setting, Error> {
+    Setting::read("point_light.color", spelling)
 }
 
 #[test]
@@ -920,7 +920,7 @@ fn a_colour_is_listed_with_its_kind_value_and_no_range_and_the_numbers_stay_as_t
     assert!(optional.nullable && optional.value.is_none(), "{optional:?}");
     let gain = recipe.parameter("point_light.gain")?;
     assert_eq!((gain.kind, gain.value), (ParameterKind::Number, Some(n(1.0))));
-    assert!(gain.min.is_some() && gain.nullable == false);
+    assert!(gain.min.is_some() && !gain.nullable);
     assert_eq!(
         addresses(&recipe)?
             .iter()
@@ -945,7 +945,7 @@ fn the_spellings_of_a_colour_agree_and_set_the_same_recipe() -> Outcome {
     let presets = Presets::new();
     let set: Vec<Recipe> = spellings
         .into_iter()
-        .map(|spelling| lamp().with_value("point_light.color", colour(spelling)?, &presets))
+        .map(|spelling| lamp().with_value("point_light.color", colour(&spelling)?, &presets))
         .collect::<Result<_, Error>>()?;
     for other in &set[1..] {
         assert_eq!(json(other)?, json(&set[0])?);
@@ -962,9 +962,9 @@ fn the_spellings_of_a_colour_agree_and_set_the_same_recipe() -> Outcome {
 #[test]
 fn a_colour_set_by_address_changes_the_render_and_only_that() -> Outcome {
     let presets = Presets::new();
-    let warm = lamp().with_value("point_light.color", colour(json!("#ff8800"))?, &presets)?;
+    let warm = lamp().with_value("point_light.color", colour(&json!("#ff8800"))?, &presets)?;
     assert_ne!(bits(&warm)?, bits(&lamp())?, "the lamp's colour shows");
-    let same = lamp().with_value("point_light.color", colour(json!("#ffffff"))?, &presets)?;
+    let same = lamp().with_value("point_light.color", colour(&json!("#ffffff"))?, &presets)?;
     assert_eq!(bits(&same)?, bits(&lamp())?, "its own value changes nothing");
     let before = lamp().parameters()?;
     for (was, now) in before.iter().zip(&warm.parameters()?) {
@@ -977,7 +977,7 @@ fn a_colour_set_by_address_changes_the_render_and_only_that() -> Outcome {
 
 #[test]
 fn a_channel_that_is_no_whole_255th_is_written_as_a_list_and_reads_back_the_same() -> Outcome {
-    let set = lamp().with_value("point_light.color", colour(json!([0.1, 0.25, 0.5]))?, &Presets::new())?;
+    let set = lamp().with_value("point_light.color", colour(&json!([0.1, 0.25, 0.5]))?, &Presets::new())?;
     assert_eq!(json(&set)?["steps"][0]["params"]["color"], json!([0.1, 0.25, 0.5]));
     let back = Recipe::from_json(&json(&set)?.to_string())?;
     assert_eq!(
@@ -989,7 +989,7 @@ fn a_channel_that_is_no_whole_255th_is_written_as_a_list_and_reads_back_the_same
 
 #[test]
 fn an_optional_colour_is_set_and_then_has_a_value() -> Outcome {
-    let set = lamp().with_value("bloom.color", colour(json!("#00ff00"))?, &Presets::new())?;
+    let set = lamp().with_value("bloom.color", colour(&json!("#00ff00"))?, &Presets::new())?;
     assert_eq!(
         set.parameter("bloom.color")?.value,
         Some(Setting::Color(Color([0.0, 1.0, 0.0])))
@@ -1012,7 +1012,7 @@ fn setting_every_parameter_to_its_own_value_changes_nothing_colours_included() -
 }
 
 #[test]
-fn a_bad_colour_or_the_wrong_kind_of_setting_is_refused_naming_the_address_and_the_fix() -> Outcome {
+fn a_bad_colour_or_the_wrong_kind_of_setting_is_refused_naming_the_address_and_the_fix() {
     for bad in [
         json!("#12"),
         json!("red"),
@@ -1020,10 +1020,7 @@ fn a_bad_colour_or_the_wrong_kind_of_setting_is_refused_naming_the_address_and_t
         json!([1.0, 0.5, 2.0]),
         json!("#gg0000"),
     ] {
-        let said = colour(bad.clone())
-            .err()
-            .map(|error| error.to_string())
-            .unwrap_or_default();
+        let said = colour(&bad).err().map(|error| error.to_string()).unwrap_or_default();
         assert!(
             said.starts_with("'point_light.color': ") && said.contains("'#rrggbb', '#rgb' or [r, g, b]"),
             "{bad}: {said}"
@@ -1044,7 +1041,6 @@ fn a_bad_colour_or_the_wrong_kind_of_setting_is_refused_naming_the_address_and_t
         colour_for_number.starts_with("'point_light.gain': ") && colour_for_number.contains("is a number"),
         "{colour_for_number}"
     );
-    Ok(())
 }
 
 #[test]
