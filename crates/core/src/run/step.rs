@@ -516,10 +516,18 @@ pub(super) fn cut_pieces(pieces: Arc<Labels>, part: &Part) -> Arc<Labels> {
 /// The rows of margin `entry` (at `place`, as `step 2`) needs when it runs on a window of its canvas at `ratio` working pixels per
 /// design pixel, or none if a window cannot make it: an `each` step, a driven step, one that reads a map or the pieces of a
 /// partition (a band's own maps are not the canvas's) and one whose effect reads the whole picture. Parameters only.
+/// With `close`, a step whose window is the whole render's rows only to within float rounding (a blur summed by a Fourier
+/// transform, a position rounded by its row) has its ordinary margin; without it, such a step has none.
 ///
 /// # Errors
 /// What preparing the entry refuses for its parameters: [`Error::UnknownEffect`], [`Error::Params`], [`Error::Invalid`].
-pub(super) fn band_margin(presets: &Presets, ratio: f64, entry: &Entry, place: &str) -> Result<Option<usize>, Error> {
+pub(super) fn band_margin(
+    presets: &Presets,
+    ratio: f64,
+    entry: &Entry,
+    place: &str,
+    close: bool,
+) -> Result<Option<usize>, Error> {
     let Entry::Step(step) = entry else {
         return Ok(None);
     };
@@ -533,7 +541,14 @@ pub(super) fn band_margin(presets: &Presets, ratio: f64, entry: &Entry, place: &
     }
     let given = presets.under(step, place)?;
     match runs(&*effect, step, &given, ratio, place)? {
-        Runs::One { scaled } => Ok(effect.footprint(&scaled)?.exact_margin()),
+        Runs::One { scaled } => {
+            let footprint = effect.footprint(&scaled)?;
+            Ok(if close {
+                footprint.margin()
+            } else {
+                footprint.exact_margin()
+            })
+        }
         Runs::Driven { .. } => Ok(None),
     }
 }

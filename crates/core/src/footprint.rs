@@ -25,7 +25,8 @@ pub enum Footprint {
     Radius(f64),
     /// As [`Radius`](Self::Radius) (`0` for an effect that reads only its own pixel), and the effect sums a blur by a
     /// Fourier transform, whose sum depends on the rows it is given: a window of rows differs from the whole render in the
-    /// last bits (measured up to 7.3e-5), so [`exact_margin`](Self::exact_margin) is none.
+    /// last bits (measured up to 7.3e-5), so [`exact_margin`](Self::exact_margin) is none (a window that need only look the
+    /// same: [`Recipe::close_band_margin`](crate::Recipe::close_band_margin)).
     Fourier(f64),
     /// As [`Radius`](Self::Radius), and the effect reads rows at a distance too fine for every row to carry (see
     /// `ops::shift::rows_exact`): the position it reads rounds by the row it is worked out from, so a window of rows that

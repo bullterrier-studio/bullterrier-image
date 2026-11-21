@@ -87,7 +87,7 @@ rows beyond the canvas, a side of 0, and a `frame` or `size` (they change the ro
 caller's query: the rows to hand each side of a band (the steps' margins add), none for a recipe a window cannot make: a `frame` or `size`, a step that
 reads the whole picture, an `each` or driven step, one with a `mask`, `partition` or field parameter (the maps of a band are not the canvas's), or one
 that sums a blur by the Fourier transform (`Footprint::Fourier`, from a reach of 16 working px, or a kernel of more than 128 taps: its sum depends on the
-rows it is given), or reads rows at a distance of less than 2^-26 px (`Footprint::Rounded`: `echo`'s `dy`; the position rounds by the row). What it clears is exact: the rows of a window are the whole render's, byte for byte. (`Options::with_band` stays within 1e-4.)
+rows it is given), or reads rows at a distance of less than 2^-26 px (`Footprint::Rounded`: `echo`'s `dy`; the position rounds by the row). What it clears is exact: the rows of a window are the whole render's, byte for byte. (`Options::with_band` stays within 1e-4.) `Recipe::close_band_margin(presets, longest_side)` is the same query for a window that need only look the same: it also clears `Footprint::Fourier` and `Footprint::Rounded` steps, whose rows are the whole render's to within 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit level; each such step, a later step that raises contrast multiplies it); where `band_margin` has an answer, the two agree and the window is exact.
 `tests/it/window.rs` renders every effect it clears as windows of band plus margin against the whole render, byte for byte, and a table of recipes on
 both sides of the Fourier switch. Not in Python.
 

@@ -1759,3 +1759,19 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   (pixels per metre, `round(dpi / 0.0254)`: 300 dpi reads back as 299.9994) right after `IHDR`, JPEG a JFIF density in whole dots
   per inch. A WebP holds no resolution and refuses `dpi` (`BackendUnavailable`) instead of dropping it. Files without `dpi`
   are byte-identical to before. *Reason:* DPI says how a file prints, not how a picture looks, so it is never in a recipe.
+
+## A window that need only look the same: `Recipe::close_band_margin` (2026-11-21)
+
+**`band_margin` stays exact; `close_band_margin` is the same query with each step's ordinary `Footprint::margin` where
+`exact_margin` has none (Fourier and Rounded).** A caller that needs the whole render's rows byte for byte asks the first; one
+that needs them to look the same (a layer drawn for the rows a mask leaves, an editor's preview of a part) asks the second. Where the
+exact one answers, the two agree. *Bound:* 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit level) for each such step, tested over
+every cleared effect at its defaults and limits on canvases of 131, 481 and 30,001 rows (`tests/it/window.rs`: a margin of 0 fails
+it with 235 problems, so the windows do cut the canvas). *Measured* (windows of 45 percent of the rows, middle, top and bottom): on
+a photo of 0.5 megapixel, at most 1.3 of 65,535 over 49 settings (`liquid_metal` the worst); on a noise picture of 4.5 megapixels,
+`liquid_metal` 14, a halftone of cell 12 and `sigma` 2 under 0.1, a blur of 40 under 0.1, a blur followed by `grade` contrast 3
+0.04. Nobody who looked at the whole render and a window of it side by side at 100 percent saw a difference. *Not bounded:* a later
+step that raises contrast multiplies the difference by its gain, so the bound is for each Fourier or Rounded step, not for a
+recipe. *Why 32:* the worst measured at export size is 14, so 32 leaves a factor of two; a bound that holds only at the sizes
+measured first would break at a larger one.
+

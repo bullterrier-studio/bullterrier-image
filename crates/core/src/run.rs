@@ -81,12 +81,34 @@ impl Recipe {
     /// whole picture (an effect whose [`Footprint`](crate::Footprint) is `Whole`), a driven step, an `each` step, or one
     /// with a `mask`, a `partition` or a field parameter: a map or the pieces of a band are not the canvas's. It is none too
     /// for a step that sums a blur by a Fourier transform ([`Footprint::Fourier`](crate::Footprint::Fourier): a blur
-    /// reaching 16 working px or more, or a kernel of more than 128 taps), whose sum depends on the rows it is given. It
+    /// reaching 16 working px or more, or a kernel of more than 128 taps), whose sum depends on the rows it is given (see
+    /// [`close_band_margin`](Self::close_band_margin) for a window that need only look the same). It
     /// reads parameters only and loads no picture or table. `longest_side` is as for [`spread`](Self::spread).
     ///
     /// # Errors
     /// Whatever [`Recipe::checked`] refuses the recipe for, and [`Error::Recipe`] for a `longest_side` of 0.
     pub fn band_margin(&self, presets: &Presets, longest_side: u32) -> Result<Option<usize>, Error> {
+        self.window_margin(presets, longest_side, false)
+    }
+
+    /// [`band_margin`](Self::band_margin) for a window that need only look the same: the rows of the band in what a window
+    /// returns are the rows of the whole picture's render to within 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit
+    /// level), not byte for byte. It also clears a step that sums a blur by a Fourier transform
+    /// ([`Footprint::Fourier`](crate::Footprint::Fourier)) or rounds a position by its row
+    /// ([`Footprint::Rounded`](crate::Footprint::Rounded)), which have no exact margin; where [`band_margin`](Self::band_margin)
+    /// has one, this is the same number and the window is exact. The answer is none for the same recipes otherwise.
+    ///
+    /// The bound is for each such step: measured at most 14 of 65,535 (`liquid_metal` on a noise picture of 4.5 megapixels),
+    /// 1.3 on a photo of 0.5 megapixel, and far less for a blur or a halftone. A step after it that raises contrast
+    /// multiplies the difference by its gain.
+    ///
+    /// # Errors
+    /// As [`band_margin`](Self::band_margin).
+    pub fn close_band_margin(&self, presets: &Presets, longest_side: u32) -> Result<Option<usize>, Error> {
+        self.window_margin(presets, longest_side, true)
+    }
+
+    fn window_margin(&self, presets: &Presets, longest_side: u32, close: bool) -> Result<Option<usize>, Error> {
         if longest_side == 0 {
             return Err(Error::Recipe("`longest_side` must be >= 1, got 0".to_owned()));
         }
@@ -94,7 +116,7 @@ impl Recipe {
         let ratio = ratio_of(f64::from(longest_side));
         let mut total = 0_usize;
         for (index, entry) in self.steps.iter().enumerate() {
-            match step::band_margin(presets, ratio, entry, &format!("step {}", index + 1))? {
+            match step::band_margin(presets, ratio, entry, &format!("step {}", index + 1), close)? {
                 Some(margin) => total = total.saturating_add(margin),
                 None => return Ok(None),
             }

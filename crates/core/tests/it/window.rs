@@ -628,3 +628,100 @@ fn a_halftone_of_every_screen_geometry_reads_no_further_than_its_margin_says() -
     }
     Ok(())
 }
+
+/// How far a window of a step that sums a blur by a Fourier transform, or rounds a position by its row, may be from the whole
+/// render: 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit level). Measured at most 14 of 65,535 (`liquid_metal` on a noise
+/// picture of 4.5 megapixels) and 1.3 on a photo of 0.5 megapixel.
+const CLOSE: f32 = 32.0 / 65_535.0;
+
+/// A recipe `close_band_margin` clears and `band_margin` does not gives the rows of the whole render to within [`CLOSE`]; one both
+/// clear has the same margin (and a window of it is exact: the tests above).
+#[test]
+fn a_close_margin_gives_the_rows_of_the_whole_render_within_a_tolerance_where_the_exact_margin_is_none() -> Outcome {
+    let (mut close_only, mut both, mut windowed_short, mut problems) = (0, 0, 0, Vec::new());
+    for (canvas, settings) in [
+        (SMALL, variants as fn(&bullterrier_image::params::Table) -> Vec<Setting>),
+        (TALL, variants),
+        (TALL, awkward),
+        (FINE, fine),
+    ] {
+        let values = varied(canvas.height, canvas.width);
+        let longest = u32::try_from(canvas.height)?;
+        for name in core_effects()? {
+            let one = effect(&name)?;
+            if one.inputs().contains(&Input::Partition) || !one.fields().is_empty() {
+                continue;
+            }
+            // the very tall canvas is for the one step that rounds a position by its row
+            if canvas.height == FINE.height && name != "echo" {
+                continue;
+            }
+            let table = one.params();
+            for setting in settings(&table) {
+                if table.check(&name, &setting).is_err() {
+                    continue;
+                }
+                let recipe = Recipe::new([step_of(&name, &setting)]);
+                let (exact, close) = (
+                    recipe.band_margin(&Presets::new(), longest)?,
+                    recipe.close_band_margin(&Presets::new(), longest)?,
+                );
+                let Some(margin) = close else {
+                    assert_eq!(
+                        exact, None,
+                        "{name}: a recipe the close margin refuses has no exact one"
+                    );
+                    continue;
+                };
+                if exact.is_some() {
+                    // the exact windows are the oracle of the tests above
+                    assert_eq!(exact, close, "{name}: where both clear, the margins are the same");
+                    both += 1;
+                    continue;
+                }
+                close_only += 1;
+                // a window and its margin that hold the whole canvas prove nothing
+                windowed_short += usize::from(margin * 2 < canvas.height);
+                if let Some(found) = first_problem(canvas, &values, &recipe, margin, CLOSE, Options::default())? {
+                    problems.push(format!("{name} {}: {found}", Value::Object(setting)));
+                }
+            }
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "{} problems:\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
+    assert!(close_only > 20 && both > 200, "{close_only} close only, {both} both");
+    assert!(
+        windowed_short > 15,
+        "only {windowed_short} close-only cases cut the canvas"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_recipe_a_window_cannot_make_has_no_close_margin_either() -> Outcome {
+    let presets = Presets::new();
+    let mut sized = Recipe::new([grade()]);
+    sized.size = Some(200);
+    let mut framed = Recipe::new([grade()]);
+    framed.frame = Frame {
+        angle: 17.0,
+        ..Frame::default()
+    };
+    for recipe in [Recipe::new([Step::new("auto_levels"), grade()]), sized, framed] {
+        assert_eq!(recipe.close_band_margin(&presets, 131)?, None);
+    }
+    // a blur summed by a Fourier transform: no exact margin, a close one
+    let blur = Recipe::new([Step::new("gaussian_blur").param("radius", 40.0)]);
+    assert_eq!(blur.band_margin(&presets, 131)?, None);
+    assert!(blur.close_band_margin(&presets, 131)?.is_some());
+    assert!(matches!(
+        Recipe::new([grade()]).close_band_margin(&presets, 0),
+        Err(bullterrier_image::Error::Recipe(why)) if why.contains("longest_side")
+    ));
+    Ok(())
+}
