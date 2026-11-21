@@ -1335,6 +1335,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   `parameters_are_read.rs`: the default method is a diffusion one, so the parameter changes the picture alone (a row would
   fail as stale); a behaviour test covers that it changes every row-scanned kernel and no other method (`dot_diffusion` and `riemersma` ignore it).
 
+### Lighting passes convert sRGB by table
+
+`point_light` (the only lighting pass that converts) reads `srgb_to_linear_fast` and `linear_to_srgb_fast`
+(`ops/colorspace.rs`): a 4096-interval table over 0..1 built with the exact f64 functions, linear interpolation in f32. Beyond
+0..1 and for NaN they call the exact function. Error against exact over 0..1: `linear_to_srgb` 1.1 sixteen-bit units (0.004 of
+an 8-bit level), `srgb_to_linear` under 0.01 unit. A 541 x 750 pass fell from 30 to 12 ms (six f64 `powf` a pixel were
+three quarters of it). Table and interpolation are plain IEEE operations, so native and WebAssembly agree. *Reason:* a light
+is a smooth shading, where an error of one 16-bit unit is invisible. Every other effect keeps the exact functions
+(`grade`, Oklab, blends): their results are pinned and other code reads the converted values, not only shows them.
+
 ## Fixing defects
 
 - **A fix removes the cause; it does not add a defence.** The bug is reproduced at the public interface, fixed where the invalid state is created (a stricter parameter model, one source of truth, a removed path),

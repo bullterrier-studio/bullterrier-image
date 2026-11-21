@@ -14,6 +14,9 @@ use crate::common::compare::assert_close;
 use crate::common::pictures::{ramp, varied};
 use crate::common::pixels::run_with_field;
 
+/// The colour conversions run by lookup table: within 1.1 sixteen-bit units (1.7e-5) of the exact ones, so against an
+/// oracle of exact maths a pixel is within two of them.
+const LUT: f32 = 2e-5;
 const SIZE: usize = 32;
 /// Field gained per px along `plane`.
 const RISE: f32 = 0.005;
@@ -127,7 +130,7 @@ fn no_light_and_full_ambient_leave_the_picture_as_it_was() -> Result<(), Error> 
     for field in [flat(), plane(30.0), disc] {
         for detail in [0.0, 6.0] {
             let settings = params(|p| (p.gain, p.ambient, p.detail) = (0.0, 1.0, detail));
-            assert_close(&run(&settings, &field, &picture)?, &picture, 1e-5, "gain 0, ambient 1");
+            assert_close(&run(&settings, &field, &picture)?, &picture, LUT, "gain 0, ambient 1");
         }
     }
     Ok(())
@@ -143,7 +146,7 @@ fn over_a_flat_relief_the_light_is_the_fall_off_window_of_the_distance() -> Resu
     // under the lamp, in the middle, and (beyond the reach of 28.8 px) in the far corner
     for (column, row) in [(0, 0), (10, 20), (SIZE - 1, SIZE - 1)] {
         let want = expected(&settings, (column, row), (0.0, (0.0, 0.0)), [0.4; 3]);
-        assert_close(&pixel(&out, column, row), &want, 1e-5, &format!("pixel {column},{row}"));
+        assert_close(&pixel(&out, column, row), &want, LUT, &format!("pixel {column},{row}"));
     }
     let dimmed = to_srgb(to_linear(0.4) * 0.4);
     assert_close(
@@ -173,7 +176,7 @@ fn a_surface_is_lit_by_the_angle_between_its_normal_and_the_lamp() -> Result<(),
                 assert_close(
                     &pixel(&out, column, row),
                     &want,
-                    1e-5,
+                    LUT,
                     &format!("direction {direction} at {column},{row} (middle {middle})"),
                 );
             }
@@ -229,7 +232,7 @@ fn a_negative_gain_takes_the_light_away_and_never_adds() -> Result<(), Error> {
             (0.0, (0.0, 0.0)),
             [picture[at], picture[at + 1], picture[at + 2]],
         );
-        assert_close(&pixel(&out, column, row), &want, 1e-5, "hand tone");
+        assert_close(&pixel(&out, column, row), &want, LUT, "hand tone");
     }
     Ok(())
 }
@@ -266,7 +269,7 @@ fn the_pictures_own_brightness_is_a_fine_relief_that_detail_makes_tall() -> Resu
             assert_close(
                 &pixel(&out, column, row),
                 &want,
-                1e-5,
+                LUT,
                 &format!("detail at {column},{row}"),
             );
         }
@@ -278,7 +281,7 @@ fn the_pictures_own_brightness_is_a_fine_relief_that_detail_makes_tall() -> Resu
     for column in INSIDE {
         let level = column as f32 / (SIZE as f32 - 1.0);
         let want = expected(&plain, (column, 16), (0.0, (0.0, 0.0)), [level; 3]);
-        assert_close(&pixel(&out, column, 16), &want, 1e-5, "no detail, flat");
+        assert_close(&pixel(&out, column, 16), &want, LUT, "no detail, flat");
     }
     Ok(())
 }
@@ -394,5 +397,48 @@ fn a_px_value_is_design_px_so_the_look_matches_at_two_frame_sizes() -> Result<()
         unscaled > 5.0 * scaled,
         "raw px would drift {unscaled} against {scaled}"
     );
+    Ok(())
+}
+
+/// The lookup table is for the lighting passes only: `grade`, which also converts to and from linear light, keeps the
+/// exact conversions, bit for bit (values pinned from the exact code before the table came in).
+#[test]
+fn grade_keeps_the_exact_conversions() -> Result<(), Error> {
+    let levels = [0.0, 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0];
+    let pixels: Vec<[f32; 3]> = levels.iter().map(|&level| [level; 3]).collect();
+    let graded = crate::common::pixels::run(
+        &bullterrier_image::effects::grade::Params {
+            temperature: 1.0,
+            ..Default::default()
+        },
+        &pixels,
+    )?;
+    let bits: Vec<u32> = graded.iter().map(|pixel| pixel[2].to_bits()).collect();
+    assert_eq!(bits, PINNED_GRADE_BITS);
+    Ok(())
+}
+
+const PINNED_GRADE_BITS: [u32; 8] = [
+    0,
+    1_008_981_760,
+    1_031_428_024,
+    1_043_441_624,
+    1_052_293_167,
+    1_057_771_065,
+    1_059_656_372,
+    1_060_913_243,
+];
+
+/// With no light, no gloss and ambient 0.7 every pixel is the picture dimmed in linear light, whatever its size; the
+/// table-driven conversions stay within `LUT` of the exact maths over the whole 0..1 range of values.
+#[test]
+fn the_conversion_table_stays_within_a_sixteen_bit_unit_at_any_size() -> Result<(), Error> {
+    for (height, width) in [(16, 16), (37, 91)] {
+        let picture = varied(height, width);
+        let settings = params(|p| (p.gain, p.ambient, p.specular) = (0.0, 0.7, 0.0));
+        let out = run_with_field(&settings, "field", &vec![0.0; height * width], height, width, &picture)?;
+        let want: Vec<f32> = picture.iter().map(|&value| to_srgb(to_linear(value) * 0.7)).collect();
+        assert_close(&out, &want, LUT, &format!("{height}x{width}"));
+    }
     Ok(())
 }

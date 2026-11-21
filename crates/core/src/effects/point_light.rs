@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::blur::{gaussian_filter_plane, is_fourier};
 use crate::ops::color::luminance;
-use crate::ops::colorspace::{linear_to_srgb, srgb_to_linear};
+use crate::ops::colorspace::{linear_to_srgb_fast, srgb_to_linear_fast};
 use crate::ops::edge::Edge;
 use crate::ops::relief::shade_slopes;
 use crate::params::{Color, FieldName, Params};
@@ -195,7 +195,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             let gloss = params.specular * params.gain.max(0.0) * glint * luminance(pixel);
             let mut lit_pixel = [0.0; 3];
             for channel in 0..3 {
-                let linear = srgb_to_linear(pixel[channel]);
+                let linear = srgb_to_linear_fast(pixel[channel]);
                 let base = linear * params.ambient;
                 let light = params.gain * lit * params.color.0[channel];
                 let lamp_result = if light >= 0.0 {
@@ -204,7 +204,8 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                 } else {
                     (base * (1.0 + light)).max(0.0)
                 };
-                lit_pixel[channel] = linear_to_srgb((lamp_result + gloss * params.color.0[channel]).clamp(0.0, 1.0));
+                lit_pixel[channel] =
+                    linear_to_srgb_fast((lamp_result + gloss * params.color.0[channel]).clamp(0.0, 1.0));
             }
             lit_pixel
         },

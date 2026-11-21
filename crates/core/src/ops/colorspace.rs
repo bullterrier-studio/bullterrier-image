@@ -40,6 +40,54 @@ pub(crate) fn linear_to_srgb(value: f32) -> f32 {
     encoded.copysign(value)
 }
 
+/// Entries per unit of the lookup tables below (4096 intervals over 0..1).
+const TABLE_STEPS: usize = 4096; // constant: table resolution; linear_to_srgb errs by at most 1.1 sixteen-bit units
+
+/// The exact conversion `convert` sampled at `i / TABLE_STEPS`, built with the exact f64 functions, so every platform
+/// holds the same table.
+fn table(convert: fn(f32) -> f32) -> Vec<f32> {
+    #[expect(clippy::cast_precision_loss, reason = "i is at most 4096")]
+    (0..=TABLE_STEPS)
+        .map(|i| convert(i as f32 / TABLE_STEPS as f32))
+        .collect()
+}
+
+/// `table` read at `value` in 0..1 by linear interpolation, in f32 (plain IEEE operations, equal on every platform).
+fn interpolated(table: &[f32], magnitude: f32) -> f32 {
+    #[expect(clippy::cast_precision_loss, reason = "TABLE_STEPS is 4096")]
+    let at = magnitude * TABLE_STEPS as f32;
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "0 <= at <= 4096")]
+    let below = (at as usize).min(TABLE_STEPS - 1);
+    #[expect(clippy::cast_precision_loss, reason = "below is at most 4095")]
+    let fraction = at - below as f32;
+    let (low, high) = (table[below], table[below + 1]);
+    low + (high - low) * fraction
+}
+
+/// [`srgb_to_linear`] by table, for the lighting passes: within 0.01 of a sixteen-bit unit for 0..1; outside it (HDR,
+/// negative) and for NaN it is the exact function.
+pub(crate) fn srgb_to_linear_fast(value: f32) -> f32 {
+    static TABLE: std::sync::OnceLock<Vec<f32>> = std::sync::OnceLock::new();
+    let magnitude = value.abs();
+    if magnitude <= 1.0 {
+        interpolated(TABLE.get_or_init(|| table(srgb_to_linear)), magnitude).copysign(value)
+    } else {
+        srgb_to_linear(value)
+    }
+}
+
+/// [`linear_to_srgb`] by table, for the lighting passes: within 1.1 sixteen-bit units for 0..1; outside it and for NaN
+/// it is the exact function.
+pub(crate) fn linear_to_srgb_fast(value: f32) -> f32 {
+    static TABLE: std::sync::OnceLock<Vec<f32>> = std::sync::OnceLock::new();
+    let magnitude = value.abs();
+    if magnitude <= 1.0 {
+        interpolated(TABLE.get_or_init(|| table(linear_to_srgb)), magnitude).copysign(value)
+    } else {
+        linear_to_srgb(value)
+    }
+}
+
 /// The NTSC YIQ of television (FCC 47 CFR 73.682): row 0 gives Y, the luma (the Rec. 601 weights), row 1 I, the
 /// orange-cyan axis of the colour, row 2 Q, its green-magenta axis; a grey has I = Q = 0.
 const RGB_TO_YIQ: [[f64; 3]; 3] = [
