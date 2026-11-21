@@ -30,6 +30,7 @@ mod needs;
 mod parameters;
 mod references;
 pub mod region;
+mod rows;
 
 pub use drive::Drive;
 pub use frame::Frame;

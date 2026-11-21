@@ -1648,7 +1648,7 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   `Recipe::checked_from`, which names the file and the step); Python's `load_recipe` stays public API for programs. The limit:
   a picture or lookup-table path of an effect written in Python is passed as written, not made relative to the recipe's folder.
 - **Sweeps and addresses are the core's.** `Recipe::parameters`, `parameter` and `with_value` read the parameters of steps from the effects'
-  parameter tables and those of the frame and the regions from `REGION_ROWS` and `FRAME_ROWS` (`recipe/parameters.rs`). The checks
+  parameter tables and those of the frame and the regions from `REGION_ROWS` and `FRAME_ROWS` (`recipe/rows.rs`). The checks
   of `Frame` and `Region` keep their own bounds, for readability; a parity test holds each row to its check (the edge accepted, one
   step beyond refused) and a completeness test fails for a numeric field with no row. `Recipe::with_values` sets several numbers at once, all or nothing, and Python's `Recipe.with_values` calls it:
   scene and video link the core and must not rewrite a recipe document by address, which would leak image's knowledge out of image.
