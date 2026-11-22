@@ -119,6 +119,13 @@ fn a_recipe_of_kernels_crosses_once_each_way_and_a_cpu_step_adds_one_of_each() -
     assert_eq!((one_cpu_step.uploads, one_cpu_step.downloads), (2, 2));
     // a picture of 20 x 30 is 600 pixels: sent as 3 floats a pixel and read back as 4
     assert_eq!(one_cpu_step.bytes, 2 * 600 * 12 + 2 * 600 * 16);
+    // a mask is a map sent to the device: one float a pixel, counted as an upload of its own
+    gpu.reset_transfers();
+    let masked = Recipe::new([Step::new("levels").param("black", 0.2).mask("light")]);
+    rendered(&gpu, &photo, &masked, Options::default())?;
+    let with_mask = gpu.transfers();
+    assert_eq!((with_mask.uploads, with_mask.downloads), (2, 1));
+    assert_eq!(with_mask.bytes, 600 * 12 + 600 * 4 + 600 * 16);
     Ok(())
 }
 
@@ -309,6 +316,46 @@ fn a_picture_wider_than_the_device_dispatches_is_refused_naming_both_sizes() -> 
     assert!(
         error.to_string().contains("1 x 1048561") && error.to_string().contains("a side"),
         "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_picture_of_more_pixels_than_the_callers_device_holds_is_refused_naming_both_sizes() -> Outcome {
+    if gpu().is_none() {
+        return Ok(());
+    }
+    // a caller's device whose storage buffers hold 64 KiB: 4,096 pixels of 16 bytes
+    let (device, queue) = block_on(async {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions::default())
+            .await?;
+        let required_limits = wgpu::Limits {
+            max_storage_buffer_binding_size: 64 * 1024,
+            ..wgpu::Limits::downlevel_defaults()
+        };
+        let descriptor = wgpu::DeviceDescriptor {
+            required_limits,
+            ..Default::default()
+        };
+        Ok::<_, Box<dyn std::error::Error>>(adapter.request_device(&descriptor).await?)
+    })?;
+    assert_eq!(device.limits().max_storage_buffer_binding_size, 64 * 1024);
+    let small = bullterrier_image::Gpu::new(device, queue)?;
+    assert_eq!(small.largest_picture(), 4096);
+    // a square, so the count of pixels is over and no side is
+    let fits = seeded(64, 64, 0);
+    assert!(block_on(small.upload(&Picture::new(64, 64, &fits)?)).is_ok());
+    let over = seeded(65, 65, 0);
+    let error = block_on(small.upload(&Picture::new(65, 65, &over)?))
+        .err()
+        .ok_or("over the device")?;
+    assert_eq!(error.kind(), ErrorKind::Gpu, "{error}");
+    let said = error.to_string();
+    assert!(
+        said.contains("65 x 65") && said.contains("4225 pixels") && said.contains("4096") && said.contains("CPU"),
+        "{said}"
     );
     Ok(())
 }
