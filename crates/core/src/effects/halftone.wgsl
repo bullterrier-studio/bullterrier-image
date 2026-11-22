@@ -21,13 +21,7 @@ struct Block {
 const TURN: f32 = 6.283185307179586;
 const FULL: f32 = 2.0;
 
-// a product rounded to f32 before it is added to anything, as Rust rounds it. The device would otherwise fuse a product and the
-// sum that follows into one multiply-add with a single rounding, which puts a pixel on the other side of a cell's edge exactly
-// where the CPU's two roundings leave it on the edge (`px == py` on a 45 degree screen: the CPU's v is 0, a fused one is not). The
-// bits pass through an integer `or` with a zero the compiler cannot see (the header's last word), which no multiply-add absorbs.
-fn times(a: f32, b: f32) -> f32 {
-    return bitcast<f32>(bitcast<u32>(a * b) | settings.header._pad1);
-}
+// `times` (prelude.wgsl) rounds a product on its own, as Rust does, so a pixel lands on the CPU's side of a cell's edge.
 
 // ---- the geometry of a screen (`Geometry`): the pixel's place in cells and back
 

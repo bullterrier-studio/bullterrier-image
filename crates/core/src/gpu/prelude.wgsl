@@ -84,3 +84,24 @@ fn locate(index: i32, len: i32, rule: i32) -> i32 {
     let at = ((index % period) + period) % period;
     return select(period - at, at, at < len);
 }
+
+// `a * b` rounded on its own. Metal fuses `a * b + c` (or `c - a * b`) into one multiply-add with a single rounding, which the CPU never
+// does: where a result is decided by an edge (which cell of a screen a pixel is in) or by the exact orbit of an iteration, the two
+// roundings must be kept. The bits pass through an integer `or` with a zero the compiler cannot see (the header's last word), which
+// no multiply-add absorbs (lessons L25).
+fn times(a: f32, b: f32) -> f32 {
+    return bitcast<f32>(bitcast<u32>(a * b) | settings.header._pad1);
+}
+
+// the colour at position `t` (0 to 1) along `count` colours evenly spaced, stored from `first` in `data` (red, green, blue each):
+// `ramp::at` of the CPU's `ops/ramp.rs`
+fn ramp_at(first: u32, count: u32, t: f32) -> vec3<f32> {
+    let last = count - 1u;
+    let position = t * f32(last);
+    let below = min(u32(position), last - 1u);
+    let share = position - f32(below);
+    let at = first + 3u * below;
+    let lower = vec3<f32>(data[at], data[at + 1u], data[at + 2u]);
+    let upper = vec3<f32>(data[at + 3u], data[at + 4u], data[at + 5u]);
+    return lower * (1.0 - share) + upper * share;
+}
