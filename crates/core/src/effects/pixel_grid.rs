@@ -54,44 +54,73 @@ pub struct Params {
     pub keep_brightness: bool,
 }
 
-/// The picture on the grid. The share of each pixel a stripe lights is worked out in `f64`, as the shares of whole
-/// rows and columns, then mixed in with `amount`.
-#[expect(clippy::cast_possible_truncation, reason = "the gain is applied to f32 pictures")]
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    let cell = f64::from(params.cell);
-    let amount = f64::from(params.amount);
-    let gap = f64::from(params.gap);
-    let stripe = cell / CHANNELS;
-    let margin = gap * stripe / 2.0; // half the gap is free on each side of a stripe
-    // The lengths that stay lit, worked out so that none can be negative: a gap of at most 1 leaves a row more than
-    // two thirds of the cell and a stripe `1 - gap` of itself, which is exactly nothing at the documented maximum.
-    let lit_rows = cell - 2.0 * margin;
-    let lit_stripe = stripe * (1.0 - gap);
-    // the cells start at the top of the canvas, whatever rows of it the picture holds
-    let rows = lit(
-        inputs.place(picture).first_row,
-        picture.height(),
-        cell,
-        margin,
-        lit_rows,
-    );
-    let columns: Vec<[f64; 3]> = {
-        let channel = |index: f64| lit(0, picture.width(), cell, index * stripe + margin, lit_stripe);
+/// The lengths a stripe of the grid keeps lit, and half the gap kept free on each side of one (px): the pixel's own maths on
+/// the CPU, the GPU's table. `mean_gain` is what `keep_brightness` divides the gains by.
+struct Grid {
+    cell: f64,
+    stripe: f64,
+    margin: f64,
+    lit_rows: f64,
+    lit_stripe: f64,
+    mean_gain: Option<f64>,
+}
+
+impl Grid {
+    fn new(params: &Params) -> Self {
+        let cell = f64::from(params.cell);
+        let amount = f64::from(params.amount);
+        let gap = f64::from(params.gap);
+        let stripe = cell / CHANNELS;
+        let margin = gap * stripe / 2.0; // half the gap is free on each side of a stripe
+        // The lengths that stay lit, worked out so that none can be negative: a gap of at most 1 leaves a row more than
+        // two thirds of the cell and a stripe `1 - gap` of itself, which is exactly nothing at the documented maximum.
+        let lit_rows = cell - 2.0 * margin;
+        let lit_stripe = stripe * (1.0 - gap);
+        let mean_gain = if params.keep_brightness {
+            // each channel is lit over its stripe's share of a cell less the gap's border, in both directions
+            let lit_share = lit_rows / cell * lit_stripe / cell;
+            // a gap of 1 at amount 1 lights nothing: black stays black, so there is no gain to divide by
+            Some(1.0 - amount * (1.0 - lit_share)).filter(|&mean| mean > 0.0)
+        } else {
+            None
+        };
+        Self {
+            cell,
+            stripe,
+            margin,
+            lit_rows,
+            lit_stripe,
+            mean_gain,
+        }
+    }
+
+    /// The share of each of the `count` rows from `first` that a stripe lights.
+    fn rows(&self, first: usize, count: usize) -> Vec<f64> {
+        lit(first, count, self.cell, self.margin, self.lit_rows)
+    }
+
+    /// The share of each of the `count` columns that the red, green and blue stripes light.
+    fn columns(&self, count: usize) -> Vec<[f64; 3]> {
+        let channel = |index: f64| lit(0, count, self.cell, index * self.stripe + self.margin, self.lit_stripe);
         let [red, green, blue] = [0.0, 1.0, 2.0].map(channel);
         red.iter()
             .zip(&green)
             .zip(&blue)
             .map(|((&r, &g), &b)| [r, g, b])
             .collect()
-    };
-    let mean_gain = if params.keep_brightness {
-        // each channel is lit over its stripe's share of a cell less the gap's border, in both directions
-        let lit_share = lit_rows / cell * lit_stripe / cell;
-        // a gap of 1 at amount 1 lights nothing: black stays black, so there is no gain to divide by
-        Some(1.0 - amount * (1.0 - lit_share)).filter(|&mean| mean > 0.0)
-    } else {
-        None
-    };
+    }
+}
+
+/// The picture on the grid. The share of each pixel a stripe lights is worked out in `f64`, as the shares of whole
+/// rows and columns, then mixed in with `amount`.
+#[expect(clippy::cast_possible_truncation, reason = "the gain is applied to f32 pictures")]
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    let amount = f64::from(params.amount);
+    let grid = Grid::new(params);
+    // the cells start at the top of the canvas, whatever rows of it the picture holds
+    let rows = grid.rows(inputs.place(picture).first_row, picture.height());
+    let columns = grid.columns(picture.width());
+    let mean_gain = grid.mean_gain;
     picture.map_at(|row, column, pixel| {
         [0, 1, 2].map(|channel| {
             let share = rows[row] * columns[column][channel];
@@ -117,4 +146,23 @@ fn lit(first: usize, count: usize, period: f64, start: f64, length: f64) -> Vec<
     (first..first + count)
         .map(|index| lit_below(index + 1) - lit_below(index))
         .collect()
+}
+
+/// The grid on the GPU (`pixel_grid.wgsl`): the CPU's own shares of each row and column as a table.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    use crate::ops::cast::single;
+    crate::gpu::Kernel::new(include_str!("pixel_grid.wgsl"), |params: &Params, _: &crate::gpu::Header| {
+        let divisor = Grid::new(params).mean_gain.map_or(1.0, single);
+        vec![[params.amount, divisor, 0.0, 0.0]]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let grid = Grid::new(params);
+        let rows = grid.rows(header.place().first_row, header.height as usize);
+        let columns = grid.columns(header.width as usize);
+        rows.into_iter()
+            .chain(columns.into_iter().flatten())
+            .map(crate::ops::cast::single)
+            .collect()
+    })
 }
