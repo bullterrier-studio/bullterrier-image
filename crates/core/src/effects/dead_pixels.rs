@@ -10,7 +10,7 @@ use crate::effect::{Category, Input, Meta};
 use crate::ops::length;
 use crate::ops::random::Rng;
 use crate::params::{Color, Params};
-use crate::{Image, Inputs, Picture};
+use crate::{Image, Inputs, Picture, Place};
 
 /// Where `dead_pixels` sits in the catalogue.
 pub(crate) const META: Meta = Meta {
@@ -63,9 +63,8 @@ enum Cell {
     Dead,
 }
 
-/// The picture with its faulty pixels.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    let place = inputs.place(picture);
+/// The faulty cells of the canvas `place` lies on, by their number (row after row of cells), and the cells of a row.
+fn faulty_cells(place: Place, params: &Params) -> (HashMap<usize, Cell>, usize) {
     let size = params.size.cast_unsigned() as usize;
     // the cells are those of the canvas: exactly `count` of them (at most 100000, the parameter's maximum) are drawn once
     // from the seed, whichever rows are rendered, and the picture takes those in its rows
@@ -74,11 +73,19 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let faulty = Rng::seeded(params.seed).shuffled(cells, (params.count.cast_unsigned() as usize).min(cells));
     // the first `count` x `stuck` of them (halves to the even number) are stuck
     let stuck = length::whole(length::float(faulty.len()) * f64::from(params.stuck));
-    let grid: HashMap<usize, Cell> = faulty
+    let grid = faulty
         .iter()
         .enumerate()
         .map(|(rank, &cell)| (cell, if rank < stuck { Cell::Stuck } else { Cell::Dead }))
         .collect();
+    (grid, columns)
+}
+
+/// The picture with its faulty pixels.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    let place = inputs.place(picture);
+    let size = params.size.cast_unsigned() as usize;
+    let (grid, columns) = faulty_cells(place, params);
     picture.map_at(
         |row, column, pixel| match grid.get(&((place.first_row + row) / size * columns + column / size)) {
             None => pixel,
@@ -86,4 +93,34 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             Some(Cell::Dead) => [0.0; 3], // constant: a dead pixel emits no light
         },
     )
+}
+
+/// The faulty pixels on the GPU (`dead_pixels.wgsl`): the CPU's own shuffle says which cells are faulty (a table with a number
+/// for every cell: 0 sound, 1 stuck, 2 dead), the kernel looks the pixel's cell up. The picture is otherwise untouched.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("dead_pixels.wgsl"), |params: &Params, header: &crate::gpu::Header| {
+        let place = header.place();
+        let [red, green, blue] = params.color.0;
+        let columns = place.canvas_width.div_ceil(params.size.cast_unsigned() as usize);
+        vec![
+            [red, green, blue, 0.0],
+            [
+                f32::from_bits(params.size.cast_unsigned()),
+                f32::from_bits(u32::try_from(columns).unwrap_or(u32::MAX)),
+                0.0,
+                0.0,
+            ],
+        ]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let place = header.place();
+        let size = params.size.cast_unsigned() as usize;
+        let (grid, columns) = faulty_cells(place, params);
+        let mut cells = vec![0.0_f32; place.canvas_height.div_ceil(size) * columns];
+        for (cell, state) in grid {
+            cells[cell] = if state == Cell::Stuck { 1.0 } else { 2.0 };
+        }
+        cells
+    })
 }
