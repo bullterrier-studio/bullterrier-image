@@ -56,6 +56,15 @@ fn mix3(seed: u32, a: u32, b: u32, c: u32) -> vec2<u32> {
     return splitmix_word(u64_add(u64_xor(state, vec2<u32>(c, 0u)), GOLDEN));
 }
 
+// `mix(seed, &[a, b, c, d])`, each word below 2^32
+fn mix4(seed: u32, a: u32, b: u32, c: u32, d: u32) -> vec2<u32> {
+    var state = splitmix_word(u64_add(vec2<u32>(seed, 0u), GOLDEN));
+    state = splitmix_word(u64_add(u64_xor(state, vec2<u32>(a, 0u)), GOLDEN));
+    state = splitmix_word(u64_add(u64_xor(state, vec2<u32>(b, 0u)), GOLDEN));
+    state = splitmix_word(u64_add(u64_xor(state, vec2<u32>(c, 0u)), GOLDEN));
+    return splitmix_word(u64_add(u64_xor(state, vec2<u32>(d, 0u)), GOLDEN));
+}
+
 // `mix(seed, &[a])` and `mix(seed, &[a, b])`
 fn mix1(seed: u32, a: u32) -> vec2<u32> {
     let state = splitmix_word(u64_add(vec2<u32>(seed, 0u), GOLDEN));

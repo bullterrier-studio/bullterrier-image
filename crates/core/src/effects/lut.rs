@@ -58,15 +58,15 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
             let size = table.map_or(0, crate::Lut::size);
             let (low, high) = table.map_or(([0.0; 3], [1.0; 3]), |table| (table.domain_min(), table.domain_max()));
             let pad = |colour: [f32; 3]| [colour[0], colour[1], colour[2], 0.0];
-            Some(crate::gpu::Encoded {
-                block: vec![
+            Some(crate::gpu::Encoded::new(
+                vec![
                     [f32::from_bits(u32::try_from(size).unwrap_or(u32::MAX)), 0.0, 0.0, 0.0],
                     pad(low),
                     pad(high),
                     [params.amount, 0.0, 0.0, 0.0],
                 ],
-                table: table.map(|table| table.entries().iter().flatten().copied().collect()),
-            })
+                table.map(|table| table.entries().iter().flatten().copied().collect()),
+            ))
         },
     )
 }

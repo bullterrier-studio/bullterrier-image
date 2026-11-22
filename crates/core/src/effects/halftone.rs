@@ -467,6 +467,24 @@ pub(crate) fn data(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) 
 }
 
 /// The dot screen drawn on `picture`, each pixel as `O` keeps it, and the number of inks.
+/// The inks `params` prints with, and how many screens that takes.
+fn inks_of(params: &Params) -> (Inks, usize) {
+    let paper = params.paper.0;
+    let inks = match params.separation {
+        Separation::None => Inks::new(paper, &[]),
+        Separation::Cmyk => Inks::cmyk(paper),
+        Separation::Spot => Inks::new(paper, &params.inks.iter().map(|ink| ink.0).collect::<Vec<_>>()),
+        Separation::Rgb => Inks::rgb(),
+    };
+    let count = match params.separation {
+        Separation::None => 1,
+        Separation::Cmyk => MOST_INKS,
+        Separation::Spot => params.inks.len().min(MOST_INKS),
+        Separation::Rgb => 3, // constant: red, green and blue
+    };
+    (inks, count)
+}
+
 fn draw<O: Kept>(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> (Vec<O>, usize) {
     let (height, width) = (picture.height(), picture.width());
     // the screen is laid on the canvas, of which the picture holds the rows from `first_row`
@@ -486,18 +504,7 @@ fn draw<O: Kept>(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) ->
         picture.pixels()
     };
     let paper = params.paper.0;
-    let inks = match params.separation {
-        Separation::None => Inks::new(paper, &[]),
-        Separation::Cmyk => Inks::cmyk(paper),
-        Separation::Spot => Inks::new(paper, &params.inks.iter().map(|ink| ink.0).collect::<Vec<_>>()),
-        Separation::Rgb => Inks::rgb(),
-    };
-    let count = match params.separation {
-        Separation::None => 1,
-        Separation::Cmyk => MOST_INKS,
-        Separation::Spot => params.inks.len().min(MOST_INKS),
-        Separation::Rgb => 3, // constant: red, green and blue
-    };
+    let (inks, count) = inks_of(params);
     let screens = screens(params, place, count);
     let ink_is_bright = luminance(paper) < params.paper_threshold;
     let spot = spot_of(params, inputs);
@@ -572,4 +579,116 @@ fn draw<O: Kept>(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) ->
         }
     });
     (pixels, count)
+}
+
+/// The settings `halftone`'s kernel runs: a square or wavy screen with no paper specks. The concentric screens (`rings`,
+/// `spiral`, `rays`) need polar maths the CPU keeps, and the specks' draws are on 64-bit floats' bits: the CPU runs them (counted).
+#[cfg(feature = "gpu")]
+fn on_gpu(params: &Params) -> bool {
+    matches!(params.screen, Screen::Grid | Screen::Wave) && params.specks == 0.0
+}
+
+/// The reach of the blur the tone is read through is long enough for the CPU to make it with the Fourier transform: the
+/// kernel is then given the blurred picture, read back and sent again.
+#[cfg(feature = "gpu")]
+fn blurred_by_cpu(params: &Params) -> bool {
+    params.sigma > 0.0
+        && crate::ops::blur::is_fourier(
+            f64::from(cast::single(f64::from(params.cell))) * f64::from(params.sigma),
+            f64::from(params.truncate),
+        )
+}
+
+/// What `halftone.wgsl` is given: the screens and inks the CPU's own code makes, the spot's tables, and the tone's blur (its
+/// weights, summed on the device, or the picture the CPU blurred).
+#[cfg(feature = "gpu")]
+fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<'_>) -> Option<crate::gpu::Encoded> {
+    use crate::ops::edge::Extension;
+    let word = |value: usize| f32::from_bits(u32::try_from(value).unwrap_or(u32::MAX));
+    let place = header.place();
+    let cell = cast::single(f64::from(params.cell));
+    let (inks, count) = inks_of(params);
+    let turned = screens(params, place, count);
+    let table = spot_of(params, given.inputs).table();
+    // the tone is read through the CPU's own blur
+    let extension = params.edge.extension(params.constant_value);
+    let sigma = f64::from(cell) * f64::from(params.sigma);
+    let truncate = f64::from(params.truncate);
+    let half = if params.sigma > 0.0 {
+        crate::ops::blur::weights(sigma, truncate)
+    } else {
+        vec![1.0]
+    };
+    let mut numbers: Vec<f32> = Vec::new();
+    let (mode, offset) = if half.len() == 1 {
+        (0, 0)
+    } else if crate::ops::blur::is_fourier_half(&half) {
+        (2, 0)
+    } else {
+        numbers.extend(half.iter().map(|&weight| cast::single(weight)));
+        (1, 0)
+    };
+    let spot_at = numbers.len();
+    numbers.extend(&table.numbers);
+    let picture_at = numbers.len();
+    if mode == 2 {
+        let image = given.picture?;
+        numbers.extend(
+            crate::ops::blur::gaussian_filter(&image.as_picture(), sigma, truncate, extension)
+                .iter()
+                .flatten(),
+        );
+    }
+    let rule = match extension {
+        Extension::Reflect => 0,
+        Extension::Nearest => 1,
+        Extension::Mirror => 2,
+        Extension::Wrap => 3,
+        Extension::Constant(_) => 4,
+    };
+    let (geometry, amplitude, wavelength) = match params.screen {
+        Screen::Wave => (1, params.amplitude, params.wavelength),
+        _ => (0, 0.0, 1.0),
+    };
+    let separation = match params.separation {
+        Separation::None => 0,
+        Separation::Cmyk => 1,
+        Separation::Spot => 2,
+        Separation::Rgb => 3,
+    };
+    let paper = params.paper.0;
+    let ink = params.ink.map_or([0.0; 4], |ink| [ink.0[0], ink.0[1], ink.0[2], 1.0]);
+    let fitting = Inks::fitting();
+    let mut block = vec![
+        [cell, 1.0 / cell, 1.0 / params.feather, 0.0],
+        [word(separation), word(count), word(geometry), word(table.code as usize)],
+        [word(mode), word(half.len() - 1), word(rule), word(if mode == 2 { picture_at } else { offset })],
+        [word(spot_at), word(table.numbers.len()), word(table.matrix.0), word(table.matrix.1)],
+        [table.aspect, amplitude, wavelength, params.ink_floor],
+        [paper[0], paper[1], paper[2], f32::from(u8::from(luminance(paper) < params.paper_threshold))],
+        ink,
+        [params.dot_gain, params.ink_noise, params.constant_value, f32::from_bits(params.seed)],
+        fitting,
+    ];
+    let mut screens: Vec<[f32; 4]> = turned
+        .iter()
+        .map(|screen| [screen.sin, screen.cos, screen.shift[0], screen.shift[1]])
+        .collect();
+    screens.resize(MOST_INKS, [0.0; 4]);
+    block.extend(screens);
+    block.extend(inks.through().iter().map(|through| [through[0], through[1], through[2], 0.0]));
+    let encoded = crate::gpu::Encoded::new(block, Some(numbers));
+    Some(if mode == 2 { encoded.counting_table() } else { encoded })
+}
+
+/// The dot screen on the GPU (`halftone.wgsl`), within 3e-4 of the CPU (measured at most 9e-5): the CPU's own f32 maths for the
+/// screen, the dot and the inks, its own weights for the blur of a short reach and its own blur, read back, for a long one. The
+/// bound is looser than the default because the inks are unmixed by 64 sweeps of coordinate descent per cell, whose f32 rounding
+/// differs on the device, and the dot's edge ramp multiplies a difference of amount by the cell over the feather.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::planned(include_str!("halftone.wgsl"), plan)
+        .only_where(on_gpu)
+        .reading_picture(blurred_by_cpu)
+        .with_bound(3e-4)
 }

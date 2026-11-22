@@ -62,3 +62,25 @@ fn linear_to_srgb(c: vec3<f32>) -> vec3<f32> {
 fn sign_of(c: vec3<f32>) -> vec3<f32> {
     return select(vec3<f32>(1.0), vec3<f32>(-1.0), c < vec3<f32>(0.0));
 }
+
+// the index of the sample of a line of `len` that lies at `index`, however far outside it, by the CPU's rule for what lies
+// beyond an edge (`Extension::locate`, `ops/edge.rs`): 0 reflect (the edge sample repeated), 1 nearest, 2 mirror (about the
+// edge sample), 3 wrap
+fn locate(index: i32, len: i32, rule: i32) -> i32 {
+    if rule == 1 {
+        return clamp(index, 0, len - 1);
+    }
+    if rule == 3 {
+        return ((index % len) + len) % len;
+    }
+    if rule == 0 {
+        let at = ((index % (2 * len)) + 2 * len) % (2 * len);
+        return select(2 * len - 1 - at, at, at < len);
+    }
+    if len == 1 {
+        return 0;
+    }
+    let period = 2 * (len - 1);
+    let at = ((index % period) + period) % period;
+    return select(period - at, at, at < len);
+}

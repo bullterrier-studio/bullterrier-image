@@ -82,6 +82,25 @@ pub(crate) type Block = Vec<[f32; 4]>;
 pub(crate) struct Encoded {
     pub(crate) block: Block,
     pub(crate) table: Option<Vec<f32>>,
+    /// Whether the table is a picture the CPU made (counted as an upload) and not a few numbers.
+    pub(crate) counted: bool,
+}
+
+impl Encoded {
+    /// A kernel's `block` and the `table` of numbers it reads, if any.
+    pub(crate) const fn new(block: Block, table: Option<Vec<f32>>) -> Self {
+        Self {
+            block,
+            table,
+            counted: false,
+        }
+    }
+
+    /// This, its table a picture the CPU made: sent counted, as any picture sent to the device is.
+    pub(crate) const fn counting_table(mut self) -> Self {
+        self.counted = true;
+        self
+    }
 }
 
 /// What a planning kernel is given besides its parameters and the picture's header: the step's `Inputs` (the tables and
@@ -167,6 +186,14 @@ impl<P> Kernel<P> {
         self
     }
 
+    /// This kernel held to `bound` instead of the default, which the effect's file says why beside the call: the largest
+    /// difference from the CPU's output, on a value of 0 to 1 (at most an eighth of an 8-bit level, which the parity test
+    /// holds every bound to).
+    pub(crate) const fn with_bound(mut self, bound: f32) -> Self {
+        self.bound = bound;
+        self
+    }
+
     /// This kernel reading `table` as its `data` (a curve's pieces, a list of marks the CPU's own generator drew), worked out
     /// from the parameters and the picture's header.
     pub(crate) const fn with_table(mut self, table: fn(&P, &Header) -> Vec<f32>) -> Self {
@@ -239,10 +266,10 @@ impl GpuKernel {
                     check(&params, given.inputs)?;
                 }
                 Ok(match how {
-                    How::Pure { block, table } => Some(Encoded {
-                        block: block(&params, header),
-                        table: table.map(|table| table(&params, header)),
-                    }),
+                    How::Pure { block, table } => Some(Encoded::new(
+                        block(&params, header),
+                        table.map(|table| table(&params, header)),
+                    )),
                     How::Planned(plan) => plan(&params, header, given),
                 })
             }),

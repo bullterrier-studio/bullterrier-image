@@ -44,8 +44,12 @@ fn given() -> Result<(Arc<Image>, Arc<Lut>), Error> {
 }
 
 /// Compound cases the effect's own table refuses by design, so the CPU renders none (`dither`'s last choices are `tiles` with
-/// `spot` separation and a `block`, each a refusal): the case is held by the others.
-const REFUSED_BY_DESIGN: [(&str, &str); 1] = [("dither", "every parameter at its last value")];
+/// `spot` separation and a `block`; `halftone`'s third are a teal paper under inks that print over it): the case is held by the
+/// others.
+const REFUSED_BY_DESIGN: [(&str, &str); 2] = [
+    ("dither", "every parameter at its last value"),
+    ("halftone", "every parameter at its third value"),
+];
 
 /// The effects that have a kernel.
 fn with_kernels() -> Vec<String> {

@@ -5,6 +5,7 @@
 
 mod dither;
 mod gradient_map;
+mod halftone;
 mod lut;
 mod parity;
 mod reduce;

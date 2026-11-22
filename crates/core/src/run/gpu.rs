@@ -216,7 +216,7 @@ async fn steps_on(
     let mut index = 0;
     while index < steps.len() {
         // a step that reads the picture is given it read back first, and its plan may leave the step to the CPU
-        let mut planned = None;
+        let mut first_encoding = None;
         let mut read_back = None;
         if reads(index) {
             let seen = gpu.download(&current).await?;
@@ -225,9 +225,9 @@ async fn steps_on(
                     inputs: &step.inputs,
                     picture: Some(&seen),
                 };
-                planned = step.kernel.encode(step.params, &header, &given)?;
+                first_encoding = step.kernel.encode(step.params, &header, &given)?;
             }
-            if planned.is_none() {
+            if first_encoding.is_none() {
                 read_back = Some(seen);
             }
         }
@@ -257,11 +257,11 @@ async fn steps_on(
                             }
                             None => None,
                         };
-                        let encoded = match planned.take() {
-                            Some(encoded) if at == index => encoded,
+                        let encoding = match first_encoding.take() {
+                            Some(first) if at == index => first,
                             _ => plain_encoding(step, &header)?,
                         };
-                        current = kernel_step(gpu, &mut encoder, step, encoded, mask, &current, header)?;
+                        current = kernel_step(gpu, &mut encoder, step, encoding, mask, &current, header);
                         regions.release(at);
                     }
                     gpu.queue().submit([encoder.finish()]);
@@ -314,13 +314,13 @@ fn kernel_step(
     gpu: &Gpu,
     encoder: &mut wgpu::CommandEncoder,
     step: &GpuStep<'_>,
-    Encoded { block, table }: Encoded,
+    Encoded { block, table, counted }: Encoded,
     mask: Option<Arc<Layer>>,
     current: &GpuImage,
     header: Header,
-) -> Result<GpuImage, Error> {
+) -> GpuImage {
     let (height, width) = (current.height(), current.width());
-    let table = table.map(|table| gpu.send(&table, false));
+    let table = table.map(|table| gpu.send(&table, counted));
     let after = gpu.picture_buffer(height, width);
     gpu.dispatch(
         encoder,
@@ -335,13 +335,7 @@ fn kernel_step(
         },
     );
     if step.overlay.is_plain() {
-        return Ok(GpuImage::from_buffer(
-            gpu.clone(),
-            height,
-            width,
-            current.has_alpha(),
-            after,
-        ));
+        return GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), after);
     }
     let mask = mask.map(|mask| gpu.send(mask.values(), true));
     let laid = gpu.picture_buffer(height, width);
@@ -367,11 +361,5 @@ fn kernel_step(
             other: Some(&after),
         },
     );
-    Ok(GpuImage::from_buffer(
-        gpu.clone(),
-        height,
-        width,
-        current.has_alpha(),
-        laid,
-    ))
+    GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), laid)
 }

@@ -8,26 +8,6 @@ struct Block {
     ints: vec4<i32>,    // the whole part of the source column's offset; the edge rule (0 reflect, 1 nearest, 2 mirror, 3 wrap); the remainder of a slid row's canvas row by 2
 }
 
-// the column of the row that lies at `index`, however far outside it (`Extension::locate`)
-fn locate(index: i32, len: i32, rule: i32) -> i32 {
-    if rule == 1 {
-        return clamp(index, 0, len - 1);
-    }
-    if rule == 3 {
-        return ((index % len) + len) % len;
-    }
-    if rule == 0 {
-        let at = ((index % (2 * len)) + 2 * len) % (2 * len);
-        return select(2 * len - 1 - at, at, at < len);
-    }
-    if len == 1 {
-        return 0;
-    }
-    let period = 2 * (len - 1);
-    let at = ((index % period) + period) % period;
-    return select(period - at, at, at < len);
-}
-
 @compute @workgroup_size(16, 16)
 fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if !inside(id) {

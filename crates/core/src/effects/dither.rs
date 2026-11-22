@@ -800,6 +800,7 @@ fn on_gpu(params: &Params) -> bool {
 /// What `dither.wgsl` is given: the CPU's own palette (found in the picture it is given back for `photo`), its order of
 /// lightness and the screen's ranks, worked out by the code `render` runs.
 #[cfg(feature = "gpu")]
+#[expect(clippy::unnecessary_wraps, reason = "the signature of a plan, which may leave a step to the CPU")]
 fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<'_>) -> Option<crate::gpu::Encoded> {
     let word = f32::from_bits;
     let size = (header.height as usize, header.width as usize);
@@ -837,10 +838,7 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
         .chain(order.1.iter().map(|&place| f32::from(place)))
         .chain(screen.ranks)
         .collect();
-    Some(crate::gpu::Encoded {
-        block,
-        table: Some(table),
-    })
+    Some(crate::gpu::Encoded::new(block, Some(table)))
 }
 
 /// The ordered and noise methods on the GPU (`dither.wgsl`), within 1e-4 of the CPU: the dots, the matching and the screen's

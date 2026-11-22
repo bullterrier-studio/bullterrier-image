@@ -530,6 +530,70 @@ fn ratio(paper: [f32; 3], colour: [f32; 3]) -> [f32; 3] {
     [0, 1, 2].map(|channel| (colour[channel] / paper[channel].max(LOWEST_RATIO)).clamp(LOWEST_RATIO, 1.0))
 }
 
+/// What a GPU kernel needs of the CPU's inks and spots (`halftone.wgsl`), read from the CPU's own values.
+#[cfg(feature = "gpu")]
+impl Inks {
+    /// The share of each channel's light that gets through each ink.
+    pub(crate) const fn through(&self) -> &[[f32; 3]; MOST_INKS] {
+        &self.through
+    }
+
+    /// The numbers the unmixing is worked with: the floor of a ratio, the sweeps, the snap to 0 or 1 and the index of black.
+    pub(crate) fn fitting() -> [f32; 4] {
+        [
+            LOWEST_RATIO,
+            cast::single(float_of(SWEEPS)),
+            SNAP,
+            cast::single(float_of(BLACK)),
+        ]
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn float_of(count: usize) -> f64 {
+    crate::ops::length::float(count)
+}
+
+/// A spot as a kernel reads it.
+#[cfg(feature = "gpu")]
+pub(crate) struct SpotTable {
+    /// 0 round, 1 line, 2 square, 3 ellipse, 4 diamond, 5 euclidean, 6 matrix.
+    pub(crate) code: u32,
+    /// The ellipse's aspect.
+    pub(crate) aspect: f32,
+    /// The sorted values an ellipse or euclidean spot's levels are read from, or a matrix's ranks.
+    pub(crate) numbers: Vec<f32>,
+    /// A matrix's rows and columns.
+    pub(crate) matrix: (usize, usize),
+}
+
+#[cfg(feature = "gpu")]
+impl Spot {
+    /// This spot as numbers a kernel reads.
+    pub(crate) fn table(&self) -> SpotTable {
+        let (code, aspect, numbers, matrix) = match self {
+            Self::Round => (0, 1.0, Vec::new(), (0, 0)),
+            Self::Line => (1, 1.0, Vec::new(), (0, 0)),
+            Self::Square => (2, 1.0, Vec::new(), (0, 0)),
+            Self::Ellipse { aspect, levels } => (3, *aspect, levels.clone(), (0, 0)),
+            Self::Diamond => (4, 1.0, Vec::new(), (0, 0)),
+            Self::Euclidean { levels } => (5, 1.0, levels.clone(), (0, 0)),
+            Self::Matrix { ranks, rows, columns } => (
+                6,
+                1.0,
+                ranks.iter().map(|&rank| f32::from(rank)).collect(),
+                (*rows, *columns),
+            ),
+        };
+        SpotTable {
+            code,
+            aspect,
+            numbers,
+            matrix,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
