@@ -15,13 +15,18 @@ use crate::Error;
 
 mod image;
 mod kernel;
+mod reduce;
 
 pub use image::GpuImage;
 pub use kernel::GpuKernel;
 pub(crate) use kernel::{Bindings, Block, Encoded, Header, Kernel};
+pub use reduce::{MOST_BINS, Plane, Reduction};
 
 /// The WGSL every kernel is compiled with: the binding layout, index helpers, the sRGB transfer and the luma weights.
 const PRELUDE: &str = include_str!("gpu/prelude.wgsl");
+
+/// The CPU's seeded random numbers in WGSL (`gpu/random.wgsl`), after the prelude in every kernel.
+const RANDOM: &str = include_str!("gpu/random.wgsl");
 
 /// The side of a workgroup: 16 x 16 invocations, one a pixel.
 const GROUP: u32 = 16; // constant: the `@workgroup_size(16, 16)` of every kernel (prelude.wgsl)
@@ -377,7 +382,7 @@ impl Gpu {
             .or_insert_with(|| {
                 let module = self.device().create_shader_module(wgpu::ShaderModuleDescriptor {
                     label: Some(name),
-                    source: wgpu::ShaderSource::Wgsl(format!("{PRELUDE}\n{wgsl}").into()),
+                    source: wgpu::ShaderSource::Wgsl(format!("{PRELUDE}\n{RANDOM}\n{wgsl}").into()),
                 });
                 self.device().create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
                     label: Some(name),
@@ -392,14 +397,42 @@ impl Gpu {
     }
 
     /// Records into `encoder` one run of the kernel `name` (`wgsl` after the prelude) over a picture of `header`'s size,
-    /// with its parameter `block` and `bindings`.
+    /// with its parameter `block` and `bindings`: a workgroup for every 16 x 16 pixels.
     pub(crate) fn dispatch(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        kernel: (&'static str, &str),
+        header: Header,
+        block: &[[f32; 4]],
+        bindings: &Bindings<'_>,
+    ) {
+        let groups = (header.width.div_ceil(GROUP), header.height.div_ceil(GROUP));
+        self.record(encoder, kernel, header, block, bindings, groups);
+    }
+
+    /// Records into `encoder` one run of the kernel `name` in `groups` workgroups of its own shape (a reduction's: one
+    /// dimension, not a picture's two), with its parameter `block` and `bindings`.
+    pub(crate) fn dispatch_groups(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        kernel: (&'static str, &str),
+        header: Header,
+        block: &[[f32; 4]],
+        bindings: &Bindings<'_>,
+        groups: usize,
+    ) {
+        let groups = u32::try_from(groups).unwrap_or(u32::MAX);
+        self.record(encoder, kernel, header, block, bindings, (groups, 1));
+    }
+
+    fn record(
         &self,
         encoder: &mut wgpu::CommandEncoder,
         (name, wgsl): (&'static str, &str),
         header: Header,
         block: &[[f32; 4]],
         bindings: &Bindings<'_>,
+        (across, down): (u32, u32),
     ) {
         let pipeline = self.pipeline(name, wgsl);
         let uniform = header.with_block(block);
@@ -443,7 +476,7 @@ impl Gpu {
         });
         pass.set_pipeline(&pipeline);
         pass.set_bind_group(0, &group, &[]);
-        pass.dispatch_workgroups(header.width.div_ceil(GROUP), header.height.div_ceil(GROUP), 1);
+        pass.dispatch_workgroups(across, down, 1);
     }
 
     /// A new command encoder.

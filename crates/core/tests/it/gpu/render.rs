@@ -113,7 +113,13 @@ fn a_recipe_of_kernels_crosses_once_each_way_and_a_cpu_step_adds_one_of_each() -
     assert_eq!((all_kernels.uploads, all_kernels.downloads), (1, 1));
     gpu.reset_transfers();
     let mut steps = five_kernels().steps;
-    steps.insert(2, Recipe::new([Step::new("vignette")]).steps.remove(0));
+    // error diffusion is serial: it stays on the CPU, whatever else gets a kernel
+    steps.insert(
+        2,
+        Recipe::new([Step::new("dither").param("method", "floyd_steinberg")])
+            .steps
+            .remove(0),
+    );
     rendered(&gpu, &photo, &Recipe::new(steps), Options::default())?;
     let one_cpu_step = gpu.transfers();
     assert_eq!((one_cpu_step.uploads, one_cpu_step.downloads), (2, 2));
@@ -233,7 +239,10 @@ fn a_cut_out_chained_on_the_device_keeps_its_alpha_through_kernel_laid_and_cpu_s
     for (what, step) in [
         ("a kernel step", kernel()),
         ("a laid step", kernel().opacity(0.5).blend_mode(BlendMode::Screen)),
-        ("a step on the CPU", Step::new("vignette")),
+        (
+            "a step on the CPU",
+            Step::new("dither").param("method", "floyd_steinberg"),
+        ),
     ] {
         let next = block_on(gpu.render_from(&held, &Recipe::new([step]), &Presets::new(), Options::default()))?;
         assert_eq!(next.channels(), 4, "{what}");

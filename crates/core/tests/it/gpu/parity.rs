@@ -9,7 +9,7 @@ use bullterrier_image::region::LinearGradient;
 use bullterrier_image::{Drive, Input, Layer, Options, Photo, Picture, Presets, Recipe, Step, effect, effects};
 use serde_json::Value;
 
-use super::{gpu, largest_gap, rendered};
+use super::{assert_finite, gpu, largest_gap, rendered};
 use crate::common::pictures::varied_seeded;
 
 const SIZES: [(usize, usize); 3] = [(1, 1), (17, 13), (64, 48)];
@@ -107,11 +107,13 @@ fn ramp(height: usize, width: usize) -> Vec<f32> {
 }
 
 /// The cases of the effect `name`: its defaults; each parameter alone at each value it is tried at; every parameter at its
-/// first value, then its last, at once (the extremes compound); each drivable parameter driven by a map (the depth ramp);
+/// first value, then its last, then each of the two between, at once (the extremes and the middles compound); each drivable parameter driven by a map (the depth ramp);
 /// and every drivable parameter at once driven by a field the recipe makes (a linear gradient region).
 fn cases_of(name: &str, fields: &[bullterrier_image::params::Field]) -> Vec<Case> {
     let mut cases = vec![Case::of("defaults", Step::new(name))];
     let (mut lows, mut highs) = (Step::new(name), Step::new(name));
+    // the parameters that only matter together (a reflect with a repeat of one does nothing) meet in the values between
+    let (mut firsts_between, mut seconds_between) = (Step::new(name), Step::new(name));
     let mut by_field = Step::new(name);
     let mut drivable = false;
     for field in fields {
@@ -119,6 +121,8 @@ fn cases_of(name: &str, fields: &[bullterrier_image::params::Field]) -> Vec<Case
         if let (Some(low), Some(high)) = (values.first(), values.last()) {
             lows = lows.param(field.name, low.clone());
             highs = highs.param(field.name, high.clone());
+            firsts_between = firsts_between.param(field.name, values.get(1).unwrap_or(low).clone());
+            seconds_between = seconds_between.param(field.name, values.get(2).unwrap_or(low).clone());
         }
         // a drive from the parameter's first interior value to its second: inside every rule another parameter sets
         if field.drivable
@@ -142,6 +146,8 @@ fn cases_of(name: &str, fields: &[bullterrier_image::params::Field]) -> Vec<Case
     cases.extend([
         Case::of("every parameter at its first value", lows),
         Case::of("every parameter at its last value", highs),
+        Case::of("every parameter at its second value", firsts_between),
+        Case::of("every parameter at its third value", seconds_between),
     ]);
     if drivable {
         cases.push(Case {
@@ -151,6 +157,17 @@ fn cases_of(name: &str, fields: &[bullterrier_image::params::Field]) -> Vec<Case
         });
     }
     cases
+}
+
+/// Says the largest gap a kernel showed against its bound, when `BT_GPU_GAPS` is set (the bounds measured, for the docs).
+#[expect(
+    clippy::print_stderr,
+    reason = "the measured gaps are the output of a run that asks for them"
+)]
+fn report_gap(name: &str, worst: f32, bound: f32) {
+    if std::env::var_os("BT_GPU_GAPS").is_some() {
+        eprintln!("gap {name}: {worst:e} of {bound:e}");
+    }
 }
 
 #[test]
@@ -168,6 +185,7 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
         let fields = found.params().fields;
         let cases = cases_of(&name, &fields);
         let mut compared = std::collections::BTreeMap::<&str, usize>::new();
+        let mut worst = 0.0_f32;
         for (seed, case) in cases.iter().enumerate() {
             for &(height, width) in &SIZES {
                 let values = seeded(height, width, seed);
@@ -191,6 +209,9 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
                     );
                 }
                 let (cpu, on_gpu) = (cpu.into_values(), on_gpu.into_values());
+                // named first, so a NaN says which effect and case wrote it
+                let context = format!("{name} {}: {:?} at {height} x {width}", case.what, case.recipe.steps);
+                assert_finite(&on_gpu, &format!("the GPU's picture of {context}"));
                 let (gap, at) = largest_gap(&cpu, &on_gpu);
                 assert!(
                     gap <= bound,
@@ -201,9 +222,11 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
                     cpu[at],
                     gpu.adapter()
                 );
+                worst = worst.max(gap);
                 *compared.entry(case.what.as_str()).or_default() += 1;
             }
         }
+        report_gap(&name, worst, bound);
         // the floor: every parameter, every drive and every compound case was compared at least once
         let never: Vec<&str> = cases
             .iter()

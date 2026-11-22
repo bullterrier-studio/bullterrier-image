@@ -209,7 +209,7 @@ impl Gpu {
     }
 
     /// The picture of `height` x `width` in `buffer` read back, four floats a pixel.
-    async fn read(&self, buffer: &wgpu::Buffer, height: usize, width: usize) -> Result<Vec<f32>, Error> {
+    pub(super) async fn read(&self, buffer: &wgpu::Buffer, height: usize, width: usize) -> Result<Vec<f32>, Error> {
         let size = picture_bytes(height, width);
         let staging = self
             .guarded("read a picture back", || {

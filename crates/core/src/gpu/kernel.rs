@@ -35,6 +35,15 @@ impl Header {
         Self::new(height, width, Place::new(height, width, 0), 1.0)
     }
 
+    /// Where the picture lies on its canvas.
+    pub(crate) const fn place(&self) -> Place {
+        Place {
+            canvas_height: self.place[0] as usize,
+            canvas_width: self.place[1] as usize,
+            first_row: self.place[2] as usize,
+        }
+    }
+
     /// The bytes of the uniform: this header (32 bytes) and then `block`, little-endian as WGSL reads them.
     pub(crate) fn with_block(self, block: &[[f32; 4]]) -> Vec<u8> {
         let words = [
@@ -121,13 +130,6 @@ impl<P> Kernel<P> {
     /// parity test holds the rest, and the defaults must be accepted.
     pub(crate) const fn only_where(mut self, only: fn(&P) -> bool) -> Self {
         self.only = Some(only);
-        self
-    }
-
-    /// This kernel held to `bound` instead of the default 1e-4: the largest difference from the CPU's f32 output on a value
-    /// of 0 to 1. Say beside the call why the kernel cannot meet the default (the CPU works in f64, say).
-    pub(crate) const fn with_bound(mut self, bound: f32) -> Self {
-        self.bound = bound;
         self
     }
 }
