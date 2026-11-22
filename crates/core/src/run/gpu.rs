@@ -191,6 +191,7 @@ async fn photo_on(
 
 /// `steps` run on `start`, the working picture on `gpu` (`working` on the CPU, if it is there: the regions are made from
 /// it), each step as its kernel where it has one, else on the CPU, on `threads` threads, between a readback and an upload.
+/// The result keeps `start`'s alpha: effects never see it.
 ///
 /// # Errors
 /// [`Error::Recipe`] for no steps; why a region could not be made, an effect failed, or the device failed.
@@ -251,6 +252,11 @@ async fn steps_on(
             let after = par::install(threads, || {
                 steps[index].apply(&picture, ratio, regions, &working.unwrap_or(picture), (0, origin))
             })??;
+            // effects never see alpha: the step's picture takes the one it was given
+            let after = match before.alpha() {
+                Some(alpha) => after.with_alpha(alpha.to_vec()),
+                None => after,
+            };
             current = gpu.upload_image(&after).await?;
             regions.release(index);
             index += 1;
@@ -260,7 +266,7 @@ async fn steps_on(
 }
 
 /// Records `step` run on `current` into `encoder`, and its result laid over `current` by its blend mode, opacity and
-/// `mask` (none: the whole of it) unless it is plain; the picture it makes.
+/// `mask` (none: the whole of it) unless it is plain; the picture it makes, with `current`'s alpha.
 fn kernel_step(
     gpu: &Gpu,
     encoder: &mut wgpu::CommandEncoder,
@@ -286,7 +292,13 @@ fn kernel_step(
         },
     );
     if step.overlay.is_plain() {
-        return Ok(GpuImage::from_buffer(gpu.clone(), height, width, false, after));
+        return Ok(GpuImage::from_buffer(
+            gpu.clone(),
+            height,
+            width,
+            current.has_alpha(),
+            after,
+        ));
     }
     let mask = mask.map(|mask| gpu.send(mask.values(), true));
     let laid = gpu.picture_buffer(pixel_bytes(height, width));
@@ -312,5 +324,11 @@ fn kernel_step(
             other: Some(&after),
         },
     );
-    Ok(GpuImage::from_buffer(gpu.clone(), height, width, false, laid))
+    Ok(GpuImage::from_buffer(
+        gpu.clone(),
+        height,
+        width,
+        current.has_alpha(),
+        laid,
+    ))
 }

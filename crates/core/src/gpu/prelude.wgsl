@@ -34,9 +34,9 @@ fn pixel_index(id: vec3<u32>) -> u32 {
     return id.y * settings.header.width + id.x;
 }
 
-// writes `rgb` as the pixel `i` of the destination: an effect's output carries no alpha (it is 1)
+// writes `rgb` as the pixel `i` of the destination, with the source's alpha: effects never see alpha, a picture keeps it
 fn store(i: u32, rgb: vec3<f32>) {
-    dest[i] = vec4<f32>(rgb, 1.0);
+    dest[i] = vec4<f32>(rgb, source[i].a);
 }
 
 // the Rec. 709 weights of red, green and blue in brightness (`ops/color.rs`, `LUMA`)

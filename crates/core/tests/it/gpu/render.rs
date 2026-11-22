@@ -209,6 +209,42 @@ fn a_cut_out_made_on_the_device_has_the_cpus_alpha() -> Outcome {
 }
 
 #[test]
+fn a_cut_out_chained_on_the_device_keeps_its_alpha_through_kernel_laid_and_cpu_steps() -> Outcome {
+    let Some(gpu) = gpu() else { return Ok(()) };
+    let values = seeded(9, 14, 8);
+    let photo = Photo::new(Picture::new(9, 14, &values)?);
+    let mut cut = Recipe::new([Step::new("grade").param("contrast", 1.2)]);
+    cut.frame = Frame {
+        transparent: Transparent::Circle,
+        ..Frame::default()
+    };
+    let held = block_on(gpu.render(&photo, &cut, &Presets::new(), Options::default()))?;
+    let alpha = |image: Image| {
+        image
+            .into_values()
+            .chunks(4)
+            .map(|pixel| pixel[3])
+            .collect::<Vec<f32>>()
+    };
+    let cut_alpha = alpha(block_on(gpu.download(&held))?);
+    // the circle's corners are clear and its middle is opaque: an alpha of all ones would not pass for it
+    assert!(cut_alpha.contains(&0.0) && cut_alpha.contains(&1.0), "{cut_alpha:?}");
+    let kernel = || Step::new("levels").param("black", 0.1);
+    for (what, step) in [
+        ("a kernel step", kernel()),
+        ("a laid step", kernel().opacity(0.5).blend_mode(BlendMode::Screen)),
+        ("a step on the CPU", Step::new("vignette")),
+    ] {
+        let next = block_on(gpu.render_from(&held, &Recipe::new([step]), &Presets::new(), Options::default()))?;
+        assert_eq!(next.channels(), 4, "{what}");
+        let back = block_on(gpu.download(&next))?;
+        assert_eq!(back.channels(), 4, "{what}");
+        assert_eq!(first_bit_difference(&alpha(back), &cut_alpha), None, "{what}");
+    }
+    Ok(())
+}
+
+#[test]
 fn a_gpu_render_refuses_the_options_it_does_not_take_naming_them() -> Outcome {
     let Some(gpu) = gpu() else { return Ok(()) };
     let values = seeded(8, 8, 0);

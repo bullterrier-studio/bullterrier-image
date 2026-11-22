@@ -78,6 +78,11 @@ impl GpuImage {
         )
     }
 
+    /// Whether it has alpha.
+    pub(crate) const fn has_alpha(&self) -> bool {
+        self.alpha
+    }
+
     pub(crate) const fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
     }
