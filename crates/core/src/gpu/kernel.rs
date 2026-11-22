@@ -100,7 +100,7 @@ enum How<P> {
         table: Option<fn(&P, &Header) -> Vec<f32>>,
     },
     /// With what only the CPU's own code can make (see [`Given`]).
-    Planned(fn(&P, &Header, &Given<'_>) -> Encoded),
+    Planned(fn(&P, &Header, &Given<'_>) -> Option<Encoded>),
 }
 
 impl<P> Clone for How<P> {
@@ -148,8 +148,9 @@ impl<P> Kernel<P> {
 
     /// The kernel whose WGSL is `wgsl` and whose block and table `plan` makes from the parameters, the header and what only
     /// the CPU can make: the step's `Inputs`, and the picture if the kernel [reads it](Self::reading_picture). The plan calls
-    /// the CPU's own functions, so the definition stays in one place.
-    pub(crate) const fn planned(wgsl: &'static str, plan: fn(&P, &Header, &Given<'_>) -> Encoded) -> Self {
+    /// the CPU's own functions, so the definition stays in one place. A plan of a kernel that reads the picture may answer
+    /// `None` for a picture it cannot hold to the bound (the stretch of a nearly flat one): the step runs on the CPU, counted.
+    pub(crate) const fn planned(wgsl: &'static str, plan: fn(&P, &Header, &Given<'_>) -> Option<Encoded>) -> Self {
         Self {
             wgsl,
             how: How::Planned(plan),
@@ -185,7 +186,8 @@ impl<P> Kernel<P> {
 }
 
 /// How a step of the effect called `name` turns its parameters into what its kernel is given.
-type Encode = Box<dyn Fn(&serde_json::Value, &Header, &Given<'_>) -> Result<Encoded, crate::Error> + Send + Sync>;
+type Encode =
+    Box<dyn Fn(&serde_json::Value, &Header, &Given<'_>) -> Result<Option<Encoded>, crate::Error> + Send + Sync>;
 
 /// Whether the kernel runs the parameters of a step.
 type Runs = Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>;
@@ -237,10 +239,10 @@ impl GpuKernel {
                     check(&params, given.inputs)?;
                 }
                 Ok(match how {
-                    How::Pure { block, table } => Encoded {
+                    How::Pure { block, table } => Some(Encoded {
                         block: block(&params, header),
                         table: table.map(|table| table(&params, header)),
-                    },
+                    }),
                     How::Planned(plan) => plan(&params, header, given),
                 })
             }),
@@ -266,7 +268,8 @@ impl GpuKernel {
         (self.name, self.wgsl)
     }
 
-    /// What the kernel is given for a step run with `params` (complete and scaled, as `Effect::apply` takes them).
+    /// What the kernel is given for a step run with `params` (complete and scaled, as `Effect::apply` takes them); none if its
+    /// plan leaves the step to the CPU.
     ///
     /// # Errors
     /// [`Error::Params`] for parameters that do not read back, else what the effect's `check` refuses.
@@ -275,7 +278,7 @@ impl GpuKernel {
         params: &serde_json::Value,
         header: &Header,
         given: &Given<'_>,
-    ) -> Result<Encoded, crate::Error> {
+    ) -> Result<Option<Encoded>, crate::Error> {
         (self.encode)(params, header, given)
     }
 

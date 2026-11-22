@@ -226,21 +226,35 @@ fn quantile(values: &mut [f32], q: f64, method: QuantileMethod) -> f64 {
     }
 }
 
-/// The picture with its brightness stretched and mapped onto the stops.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let mixed = |stop: [f32; 3]| {
-        if params.space == Space::Oklab {
-            rgb_to_oklab(stop)
-        } else {
-            stop
-        }
-    };
-    let stops: Vec<[f32; 3]> = params.stops.iter().map(|stop| mixed(stop.0)).collect();
+/// The stops, in the space the colours between them are mixed in.
+fn mixed_stops(params: &Params) -> Vec<[f32; 3]> {
+    params
+        .stops
+        .iter()
+        .map(|stop| {
+            if params.space == Space::Oklab {
+                rgb_to_oklab(stop.0)
+            } else {
+                stop.0
+            }
+        })
+        .collect()
+}
+
+/// The stretch of `picture`: the brightness that maps to the first stop (the `shadow_clip` quantile of its brightness) and the
+/// span from there to the one that maps to the last (the `highlight_clip` quantile), never below [`FLAT`].
+fn stretch(picture: &Picture<'_>, params: &Params) -> (f64, f64) {
     let mut brightness: Vec<f32> = picture.pixels().iter().map(|&pixel| luminance(pixel)).collect();
     let method = params.quantile_method;
     let dark = quantile(&mut brightness, f64::from(params.shadow_clip), method);
     let bright = quantile(&mut brightness, 1.0 - f64::from(params.highlight_clip), method);
-    let span = (bright - dark).max(FLAT);
+    (dark, (bright - dark).max(FLAT))
+}
+
+/// The picture with its brightness stretched and mapped onto the stops.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+    let stops = mixed_stops(params);
+    let (dark, span) = stretch(picture, params);
     picture.map(|pixel| {
         let position = ((f64::from(luminance(pixel)) - dark) / span).clamp(0.0, 1.0);
         let colour = ramp::at(&stops, single(position));
@@ -251,4 +265,39 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
             colour
         }
     })
+}
+
+/// The least span of brightness the kernel stretches: a pixel's brightness on the device may differ from the CPU's by an f32
+/// step (6e-8) and the first clip point is rounded to f32 (3e-8), so the position along the gradient differs by up to 5e-5
+/// here, inside the kernel's bound; below it the step runs on the CPU.
+#[cfg(feature = "gpu")]
+const MIN_SPAN_ON_GPU: f64 = 2e-3; // constant: 9e-8 over 2e-3, under half the 1e-4 bound
+
+/// The map on the GPU (`gradient_map.wgsl`): the CPU's own clip points, found on the picture read back (an exact order
+/// statistic of the brightness is a sort, which the device has no cheaper way to repeat than one readback), then the stretch
+/// and the ramp per pixel.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::planned(
+        include_str!("gradient_map.wgsl"),
+        |params: &Params, _: &crate::gpu::Header, given: &crate::gpu::Given<'_>| {
+            let image = given.picture?;
+            let (dark, span) = stretch(&image.as_picture(), params);
+            // a brightness that differs by one f32 step on the device (a multiply-add the compiler fused) moves a pixel by
+            // that step over the span: the CPU keeps a nearly flat picture's stretch, the device cannot
+            if span < MIN_SPAN_ON_GPU {
+                return None;
+            }
+            let stops = mixed_stops(params);
+            let count = u32::try_from(stops.len()).unwrap_or(u32::MAX);
+            Some(crate::gpu::Encoded {
+                block: vec![
+                    [single(dark), single(span), f32::from(u8::from(params.space == Space::Oklab)), 0.0],
+                    [f32::from_bits(count), 0.0, 0.0, 0.0],
+                ],
+                table: Some(stops.into_iter().flatten().collect()),
+            })
+        },
+    )
+    .reading_picture(|_: &Params| true)
 }

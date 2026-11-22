@@ -4,6 +4,7 @@
 //! part of the adapter's name the tests must find (CI sets `llvmpipe`, Mesa's software Vulkan).
 
 mod dither;
+mod gradient_map;
 mod parity;
 mod reduce;
 mod render;

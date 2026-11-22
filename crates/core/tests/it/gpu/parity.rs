@@ -18,9 +18,10 @@ use crate::common::pictures::varied_seeded;
 
 const SIZES: [(usize, usize); 3] = [(1, 1), (17, 13), (64, 48)];
 
-/// The effects whose defaults the kernel leaves to the CPU (`dither`'s is a serial method): their default step reads the picture
-/// back and sends it again, so they move two pictures each way, not one.
-const DEFAULTS_ON_CPU: [&str; 1] = ["dither"];
+/// The effects whose default step moves more than the picture up once and back once, as (uploads, downloads), and why: `dither`'s
+/// default is a serial method, which the CPU runs between a readback and an upload; `gradient_map` reads the picture back for
+/// its clip points (`reading_picture`).
+const DEFAULT_TRANSFERS: [(&str, (u64, u64)); 2] = [("dither", (2, 2)), ("gradient_map", (1, 2))];
 
 /// The name of the picture every photo of this test is given (a 4 x 4 one: a matrix of 16 distinct greys, and a strip of one
 /// tile), and of its lookup table (3 entries a side, not the identity).
@@ -237,13 +238,17 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
                 };
                 gpu.reset_transfers();
                 let on_gpu = rendered(&gpu, &photo, &case.recipe, Options::default())?;
-                if case.what == "defaults" {
-                    // the kernel ran on the device: a step left to the CPU would read the picture back and send it again
+                if case.what == "defaults" && (height, width) == SIZES[SIZES.len() - 1] {
+                    // on the largest picture (a one-pixel one is flat, which `gradient_map` leaves to the CPU) the kernel ran on the
+                    // device: a step left to the CPU would read the picture back and send it again
                     let moved = gpu.transfers();
-                    let each_way = if DEFAULTS_ON_CPU.contains(&name.as_str()) { 2 } else { 1 };
+                    let expected = DEFAULT_TRANSFERS
+                        .iter()
+                        .find(|(effect, _)| *effect == name)
+                        .map_or((1, 1), |&(_, moved)| moved);
                     assert_eq!(
                         (moved.uploads, moved.downloads),
-                        (each_way, each_way),
+                        expected,
                         "{name} with its defaults ran on the CPU inside the GPU render, or not as its table says"
                     );
                 }

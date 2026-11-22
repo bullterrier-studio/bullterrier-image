@@ -215,17 +215,29 @@ async fn steps_on(
     let mut current = start;
     let mut index = 0;
     while index < steps.len() {
+        // a step that reads the picture is given it read back first, and its plan may leave the step to the CPU
+        let mut planned = None;
+        let mut read_back = None;
+        if reads(index) {
+            let seen = gpu.download(&current).await?;
+            if let Some(step) = &plan[index] {
+                let given = Given {
+                    inputs: &step.inputs,
+                    picture: Some(&seen),
+                };
+                planned = step.kernel.encode(step.params, &header, &given)?;
+            }
+            if planned.is_none() {
+                read_back = Some(seen);
+            }
+        }
+        let on_device = plan[index].is_some() && read_back.is_none();
         // a run of kernels ends at a step on the CPU, or before one that reads the picture (which starts the next run)
         let end = (index..steps.len())
             .find(|&at| plan[at].is_none() || (at > index && reads(at)))
             .unwrap_or(steps.len());
-        if end > index {
-            // a run of kernels: one encoder, one submission. A step that reads the picture is given it read back first
-            let seen = if reads(index) {
-                Some(gpu.download(&current).await?)
-            } else {
-                None
-            };
+        if on_device {
+            // a run of kernels: one encoder, one submission
             let first = current;
             current = gpu
                 .guarded("run a step", || {
@@ -245,8 +257,11 @@ async fn steps_on(
                             }
                             None => None,
                         };
-                        let sight = seen.as_ref().filter(|_| step.kernel.reads_picture(step.params));
-                        current = kernel_step(gpu, &mut encoder, step, mask, &current, header, sight)?;
+                        let encoded = match planned.take() {
+                            Some(encoded) if at == index => encoded,
+                            _ => plain_encoding(step, &header)?,
+                        };
+                        current = kernel_step(gpu, &mut encoder, step, encoded, mask, &current, header)?;
                         regions.release(at);
                     }
                     gpu.queue().submit([encoder.finish()]);
@@ -256,7 +271,10 @@ async fn steps_on(
             index = end;
         } else {
             // a step on the CPU, run as a render without the GPU runs it
-            let before = gpu.download(&current).await?;
+            let before = match read_back {
+                Some(seen) => seen,
+                None => gpu.download(&current).await?,
+            };
             let picture = before.as_picture();
             let after = par::install(threads, || {
                 steps[index].apply(&picture, ratio, regions, &working.unwrap_or(picture), (0, origin))
@@ -274,23 +292,34 @@ async fn steps_on(
     Ok(current)
 }
 
+/// What `step`'s kernel is given when it does not read the picture: it must give something, as only a kernel that reads the
+/// picture may leave a step to the CPU.
+///
+/// # Errors
+/// [`Error::Params`] for parameters that do not read back, what the effect's `check` refuses; [`Error::Gpu`] for a kernel
+/// that gave nothing without having read the picture (a defect of the kernel).
+fn plain_encoding(step: &GpuStep<'_>, header: &Header) -> Result<Encoded, Error> {
+    let given = Given {
+        inputs: &step.inputs,
+        picture: None,
+    };
+    step.kernel.encode(step.params, header, &given)?.ok_or_else(|| {
+        Error::Gpu("a kernel that does not read the picture left a step to the CPU: a defect of the kernel".to_owned())
+    })
+}
+
 /// Records `step` run on `current` into `encoder`, and its result laid over `current` by its blend mode, opacity and
 /// `mask` (none: the whole of it) unless it is plain; the picture it makes, with `current`'s alpha.
 fn kernel_step(
     gpu: &Gpu,
     encoder: &mut wgpu::CommandEncoder,
     step: &GpuStep<'_>,
+    Encoded { block, table }: Encoded,
     mask: Option<Arc<Layer>>,
     current: &GpuImage,
     header: Header,
-    seen: Option<&crate::Image>,
 ) -> Result<GpuImage, Error> {
     let (height, width) = (current.height(), current.width());
-    let given = Given {
-        inputs: &step.inputs,
-        picture: seen,
-    };
-    let Encoded { block, table } = step.kernel.encode(step.params, &header, &given)?;
     let table = table.map(|table| gpu.send(&table, false));
     let after = gpu.picture_buffer(height, width);
     gpu.dispatch(

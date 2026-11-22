@@ -1837,7 +1837,9 @@ measured first would break at a larger one.
     `reads_picture`, the picture itself, read back by the executor first (one counted download; the run of kernels
     before it is submitted, the one after it starts from the same device picture). The kernel calls the CPU's own function
     on them and puts the result in its `data` table, so the definition stays in one place and there is no second
-    implementation to drift. A kernel that does not plan is still `Kernel::new(wgsl, params -> block)`.
+    implementation to drift. A plan that read the picture may also answer *none*: the step then runs on the CPU, counted, on
+    the picture already read (`gradient_map` does for a picture whose brightness span is under 2e-3: a pixel's brightness
+    differs by an f32 step on the device, which the stretch divides by the span). A kernel that does not plan is still `Kernel::new(wgsl, params -> block)`.
     *Why a readback and not the reduction for the quantiles:* an exact order statistic of f32 values is not a histogram of
     bins: it is a radix select, 4 dependent passes of 256-bin counts per clip point (about 16 round trips for the two points
     of two clips), each a wait on the device, to save one picture readback (6.6 ms at 1080p) in a step whose CPU
