@@ -103,23 +103,44 @@ fn escape_count(mut z: (f32, f32), c: (f32, f32), iterations: i32) -> Option<f64
     None
 }
 
+/// Where the plane's points lie on the canvas: the point of a column and of a canvas row, as the single precision numbers the orbit
+/// starts from (the CPU's, to the bit: the orbit is chaotic, so a point a rounding off may escape at another step).
+struct View {
+    centre: (f64, f64),
+    half: (f64, f64),
+    step: f64,
+}
+
+impl View {
+    fn of(place: crate::Place, params: &Params) -> Self {
+        let (height, width) = (place.canvas_height, place.canvas_width);
+        Self {
+            // plane units per pixel; the picture's centre is the point (x, y), rows run downwards and the imaginary axis up
+            step: VIEW_SPAN / f64::from(params.zoom) / length::float(height.min(width)),
+            centre: (f64::from(params.x), f64::from(params.y)),
+            half: (length::float(width - 1) / 2.0, length::float(height - 1) / 2.0),
+        }
+    }
+
+    fn real(&self, column: usize) -> f32 {
+        single(self.centre.0 + (length::float(column) - self.half.0) * self.step)
+    }
+
+    fn imaginary(&self, canvas_row: usize) -> f32 {
+        single(self.centre.1 - (length::float(canvas_row) - self.half.1) * self.step)
+    }
+}
+
 /// The fractal, in the picture's size: the picture is used only for its height and width.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     // the view is centred on the canvas, of which the picture holds the rows from `first_row`
     let place = inputs.place(picture);
-    let (height, width, first_row) = (place.canvas_height, place.canvas_width, place.first_row);
-    // plane units per pixel; the picture's centre is the point (x, y), rows run downwards and the imaginary axis up
-    let step = VIEW_SPAN / f64::from(params.zoom) / length::float(height.min(width));
-    let (centre_x, centre_y) = (f64::from(params.x), f64::from(params.y));
-    let (half_width, half_height) = (length::float(width - 1) / 2.0, length::float(height - 1) / 2.0);
+    let view = View::of(place, params);
     let constant = (params.c_real, params.c_imag);
     let stops: Vec<[f32; 3]> = params.colors.iter().map(|colour| colour.0).collect();
     let period = f64::from(params.period);
     picture.map_at(|row, column, _| {
-        let point = (
-            single(centre_x + (length::float(column) - half_width) * step),
-            single(centre_y - (length::float(first_row + row) - half_height) * step),
-        );
+        let point = (view.real(column), view.imaginary(place.first_row + row));
         let count = match params.kind {
             Kind::Julia => escape_count(point, constant, params.iterations),
             Kind::Mandelbrot => escape_count((0.0, 0.0), point, params.iterations),
@@ -129,5 +150,34 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             let position = 1.0 - (1.0 - (count / period).rem_euclid(2.0)).abs();
             ramp::at(&stops, single(position))
         })
+    })
+}
+
+/// The fractal on the GPU (`fractal.wgsl`): the orbit is the CPU's, step for step in single precision (each product rounded on its
+/// own, `times`), from the very same start points (a table: one for each column and each canvas row), so a point escapes at the
+/// same step. The smooth count and the colour are worked in f32 and agree to its precision: about a ten-thousandth of a level
+/// for a point that escapes after 2000 steps at a period of 1.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("fractal.wgsl"), |params: &Params, _: &crate::gpu::Header| {
+        let [red, green, blue] = params.interior.0;
+        vec![
+            [params.c_real, params.c_imag, params.period, 0.0],
+            [red, green, blue, 0.0],
+            [
+                f32::from_bits(params.iterations.cast_unsigned()),
+                f32::from_bits(u32::from(params.kind == Kind::Julia)),
+                f32::from_bits(u32::try_from(params.colors.len()).unwrap_or(2)),
+                0.0,
+            ],
+        ]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let place = header.place();
+        let view = View::of(place, params);
+        let mut table: Vec<f32> = (0..place.canvas_width).map(|column| view.real(column)).collect();
+        table.extend((0..place.canvas_height).map(|row| view.imaginary(row)));
+        table.extend(params.colors.iter().flat_map(|colour| colour.0));
+        table
     })
 }
