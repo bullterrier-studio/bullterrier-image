@@ -36,7 +36,7 @@ impl Remap {
 
     /// The remap as a GPU kernel's block, `levels.wgsl`'s: (black, span, exponent, output black), (reach, 0, 0, 0).
     #[cfg(feature = "gpu")]
-    pub(crate) fn block(&self) -> Vec<[f32; 4]> {
+    pub(crate) fn block(&self) -> crate::gpu::Block {
         vec![
             [self.black, self.span, self.exponent, self.output_black],
             [self.reach, 0.0, 0.0, 0.0],

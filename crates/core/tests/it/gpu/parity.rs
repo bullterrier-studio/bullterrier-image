@@ -99,11 +99,19 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters() 
         let found = effect(&name)?;
         let bound = found.kernel().map_or(0.0, bullterrier_image::GpuKernel::bound);
         let mut cases = vec![Step::new(name.as_str())];
+        // every parameter at once at the first, then the last, value it is tried at: the extremes compound
+        let (mut lows, mut highs) = (Step::new(name.as_str()), Step::new(name.as_str()));
         for field in found.params().fields {
-            for value in tried(field.kind, field.min.as_ref(), field.max.as_ref(), field.choices) {
+            let values = tried(field.kind, field.min.as_ref(), field.max.as_ref(), field.choices);
+            if let (Some(low), Some(high)) = (values.first(), values.last()) {
+                lows = lows.param(field.name, low.clone());
+                highs = highs.param(field.name, high.clone());
+            }
+            for value in values {
                 cases.push(Step::new(name.as_str()).param(field.name, value));
             }
         }
+        cases.extend([lows, highs]);
         let mut compared = 0;
         for (seed, step) in cases.into_iter().enumerate() {
             let recipe = Recipe::new([step.clone()]);

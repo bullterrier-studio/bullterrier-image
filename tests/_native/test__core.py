@@ -99,6 +99,7 @@ def test_a_python_function_registered_as_an_effect_is_listed_described_and_run_b
             "opacity": 0.5,
             "inputs": [],
             "fields": {},
+            "gpu": False,
         }
         out = _core.apply("probe_double", PIXEL, {"amount": 3, "label": "x"})
     np.testing.assert_allclose(out, PIXEL * 2)

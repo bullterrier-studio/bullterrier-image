@@ -1815,8 +1815,9 @@ measured first would break at a larger one.
   with a GPU (they run on the CPU only).
 - **The bound:** each kernel states one (`GpuKernel::bound`, default 1e-4 on the f32 output; a looser one is written beside
   the kernel with its reason). `grade`'s balance and `curves` work in f64 on the CPU (L22); WGSL has no f64, and the default
-  still holds: largest gaps measured on Metal 3e-7 (`grade`), 1.2e-7 (`curves`), 2e-6 (`color_balance`), 6e-8 (`levels`,
-  `channel_mixer`). WGSL's `pow` is undefined at 0, so `levels` guards it (the parity pictures hold exact 0s and 1s). Recipe
+  still holds: largest gaps measured on Metal, one parameter at a time, 3e-7 (`grade`), 1.2e-7 (`curves`), 2e-6
+  (`color_balance`), 6e-8 (`levels`, `channel_mixer`); `grade` with exposure, contrast and saturation high together, 1.4e-5
+  (a review's random combinations, up to 1.8e-5). WGSL's `pow` is undefined at 0, so `levels` guards it (the parity pictures hold exact 0s and 1s). Recipe
   budget (interim): at most 1/255 a channel after 8-bit rounding on 99.9% of values, 2/255 on all, tested on the five-kernel
   chain and demo 31's recipe (two of its steps on the CPU).
 - **Tests run on a GPU in CI**: `poe rust-test-gpu` (the core's whole suite built with the feature, `tests/it/gpu/` among it)

@@ -131,15 +131,8 @@ fn curves(params: &Params) -> (Curve, [Curve; 3]) {
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     use crate::ops::cast::single;
     crate::gpu::Kernel::new(include_str!("curves.wgsl"), |_| {
-        vec![
-            [
-                single(INPUTS[0]),
-                single(INPUTS[1]),
-                single(INPUTS[2]),
-                single(INPUTS[3]),
-            ],
-            [single(INPUTS[4]), 0.0, 0.0, 0.0],
-        ]
+        let [black, shadows, midtones, highlights, white] = INPUTS.map(single);
+        vec![[black, shadows, midtones, highlights], [white, 0.0, 0.0, 0.0]]
     })
     .with_table(|params: &Params| {
         let (master, channels) = curves(params);

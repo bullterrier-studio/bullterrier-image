@@ -8,6 +8,7 @@ struct Block {
     keep: vec4<f32>,       // x: 1 if the luma is kept
 }
 
+// the cubic Hermite smoothstep, 3x^2 - 2x^3, of the hand-over's argument held to 0..1 (a standard constant)
 fn handover(luma: f32, centre: f32, width: f32) -> f32 {
     let x = clamp((luma - centre) / width + 0.5, 0.0, 1.0);
     return x * x * (3.0 - 2.0 * x);

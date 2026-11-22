@@ -202,14 +202,15 @@ fn a_cut_out_made_on_the_device_has_the_cpus_alpha() -> Outcome {
     let cpu = photo.render(&recipe, &Presets::new(), Options::default())?;
     let resident = gpu.render_blocking(&photo, &recipe, &Presets::new(), Options::default())?;
     assert_eq!(resident.channels(), 4);
-    let alpha = |image: Image| {
-        image
-            .into_values()
-            .chunks(4)
-            .map(|pixel| pixel[3])
-            .collect::<Vec<f32>>()
-    };
-    assert_eq!(alpha(gpu.download_blocking(&resident)?), alpha(cpu));
+    let (on_gpu, cpu) = (gpu.download_blocking(&resident)?.into_values(), cpu.into_values());
+    let alpha = |values: &[f32]| values.chunks(4).map(|pixel| pixel[3]).collect::<Vec<f32>>();
+    assert_eq!(alpha(&on_gpu), alpha(&cpu));
+    let gap = cpu
+        .iter()
+        .zip(&on_gpu)
+        .map(|(one, other)| (one - other).abs())
+        .fold(0.0_f32, f32::max);
+    assert!(gap <= 1e-4, "the colour too: gap {gap:e}");
     Ok(())
 }
 
@@ -270,5 +271,72 @@ fn a_picture_of_one_gpu_is_refused_by_another() -> Outcome {
         .err()
         .ok_or("another context")?;
     assert!(error.to_string().contains("another Gpu"), "{error}");
+    Ok(())
+}
+
+/// An effect of the CPU that remembers the threads it painted rows on.
+struct Painter {
+    name: String,
+    threads: std::sync::Mutex<std::collections::HashSet<std::thread::ThreadId>>,
+}
+
+impl bullterrier_image::Effect for Painter {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn category(&self) -> bullterrier_image::Category {
+        bullterrier_image::Category::Utilities
+    }
+
+    fn apply(
+        &self,
+        picture: &Picture<'_>,
+        _params: &serde_json::Value,
+        _inputs: &bullterrier_image::Inputs<'_>,
+    ) -> Result<Image, Error> {
+        Ok(picture.map_at(|_, column, pixel| {
+            if column == 0 {
+                self.threads
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(std::thread::current().id());
+            }
+            pixel
+        }))
+    }
+}
+
+#[test]
+fn the_cpu_steps_of_a_render_kept_on_the_device_use_the_threads_asked_for() -> Outcome {
+    let Some(gpu) = gpu() else { return Ok(()) };
+    let caller = std::thread::current().id();
+    let values = seeded(1000, 40, 6);
+    let photo = Photo::new(Picture::new(1000, 40, &values)?);
+    let options = Options::default().with_threads(4);
+    for (index, from_resident) in [false, true].into_iter().enumerate() {
+        let painter = std::sync::Arc::new(Painter {
+            name: format!("gpu_render_threads_{index}"),
+            threads: std::sync::Mutex::default(),
+        });
+        bullterrier_image::register(painter.clone())?;
+        let recipe = Recipe::new([Step::new(painter.name.as_str()).opacity(1.0), Step::new("levels")]);
+        if from_resident {
+            let start = gpu.upload(&Picture::new(1000, 40, &values)?)?;
+            gpu.render_from_blocking(&start, &recipe, &Presets::new(), options.clone())?;
+        } else {
+            gpu.render_blocking(&photo, &recipe, &Presets::new(), options.clone())?;
+        }
+        bullterrier_image::unregister(&painter.name);
+        let rows_on = painter
+            .threads
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        assert!(
+            !rows_on.is_empty() && !rows_on.contains(&caller),
+            "from a resident picture: {from_resident}"
+        );
+    }
     Ok(())
 }

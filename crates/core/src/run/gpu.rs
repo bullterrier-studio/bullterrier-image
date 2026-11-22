@@ -14,6 +14,7 @@ use super::step::{GpuStep, Prepared, prepare};
 use super::{Photo, Run};
 use crate::gpu::{Bindings, Encoded, Header};
 use crate::ops::cast::single;
+use crate::ops::par;
 use crate::{BlendMode, Error, Frame, Gpu, GpuImage, Image, Layer, Picture, Presets, Recipe};
 
 /// The kernel that lays a step's result over its input (`ops/blend.rs` `lay`).
@@ -112,7 +113,16 @@ impl Gpu {
             .collect::<Result<Vec<_>, _>>()?;
         let mut regions = Evaluator::new(&recipe.regions, BTreeMap::new(), BTreeMap::new(), ratio, None);
         let origin = Origin::whole(height, width);
-        steps_on(self, steps, ratio, origin, &mut regions, None, image.share()).await
+        steps_on(
+            self,
+            steps,
+            (ratio, origin),
+            options.threads(),
+            &mut regions,
+            None,
+            image.share(),
+        )
+        .await
     }
 
     /// [`render_from`](Self::render_from), blocking until the picture is made.
@@ -209,24 +219,34 @@ async fn photo_on(
         cut,
         mut regions,
         ..
-    } = photo.start(recipe, presets, options)?;
+    } = par::install(options.threads(), || photo.start(recipe, presets, options))??;
     let picture = working.picture();
     gpu.fits(picture.height(), picture.width())?;
     let start = gpu.upload(&picture)?;
-    let image = steps_on(gpu, steps.collect(), ratio, origin, &mut regions, Some(picture), start).await?;
+    let threads = options.threads();
+    let image = steps_on(
+        gpu,
+        steps.collect(),
+        (ratio, origin),
+        threads,
+        &mut regions,
+        Some(picture),
+        start,
+    )
+    .await?;
     Ok((image, cut))
 }
 
 /// `steps` run on `start`, the working picture on `gpu` (`working` on the CPU, if it is there: the regions are made from
-/// it), each step as its kernel where it has one, else on the CPU between a readback and an upload.
+/// it), each step as its kernel where it has one, else on the CPU, on `threads` threads, between a readback and an upload.
 ///
 /// # Errors
 /// [`Error::Recipe`] for no steps; why a region could not be made, an effect failed, or the device failed.
 async fn steps_on(
     gpu: &Gpu,
     steps: Vec<Prepared>,
-    ratio: f64,
-    origin: Origin,
+    (ratio, origin): (f64, Origin),
+    threads: usize,
     regions: &mut Evaluator,
     working: Option<Picture<'_>>,
     start: GpuImage,
@@ -276,7 +296,9 @@ async fn steps_on(
             // a step on the CPU, run as a render without the GPU runs it
             let before = gpu.download(&current).await?;
             let picture = before.as_picture();
-            let after = steps[index].apply(&picture, ratio, regions, &working.unwrap_or(picture), (0, origin))?;
+            let after = par::install(threads, || {
+                steps[index].apply(&picture, ratio, regions, &working.unwrap_or(picture), (0, origin))
+            })??;
             current = gpu.upload_image(&after)?;
             regions.release(index);
             index += 1;

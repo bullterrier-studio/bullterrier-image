@@ -17,6 +17,7 @@ fn overlay(b: vec3<f32>, s: vec3<f32>) -> vec3<f32> {
     return select(screen(s, 2.0 * b - 1.0), multiply(s, 2.0 * b), b <= vec3<f32>(0.5));
 }
 
+// the W3C soft light: D(x) = ((16 x - 12) x + 4) x up to 0.25, the square root above (constants of the spec)
 fn soft_light(b: vec3<f32>, s: vec3<f32>) -> vec3<f32> {
     let curve = select(sqrt(b), ((16.0 * b - 12.0) * b + 4.0) * b, b <= vec3<f32>(0.25));
     let darker = b - (1.0 - 2.0 * s) * b * (1.0 - b);

@@ -309,17 +309,17 @@ impl Options {
     #[cfg(feature = "gpu")]
     pub(super) fn gpu_takes(&self) -> Result<(), Error> {
         let refused = if self.band.is_some() {
-            Some("with_band")
+            Some("`with_band` (Python: `band=`)")
         } else if self.window.is_some() {
-            Some("with_window")
+            Some("`with_window`")
         } else if self.room != [0; 4] {
-            Some("with_room")
+            Some("`with_room`")
         } else {
             None
         };
         match refused {
             Some(option) => Err(Error::Gpu(format!(
-                "a GPU render does not take `{option}` yet: render on the CPU (no `with_gpu`) for it"
+                "a GPU render does not take {option} yet: render on the CPU (no GPU) for it"
             ))),
             None => Ok(()),
         }

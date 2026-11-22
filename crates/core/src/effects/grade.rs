@@ -90,7 +90,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
 
 /// The grade on the GPU (`grade.wgsl`): the gains and the exposure's factor worked out here, as `render` does. The CPU
 /// works the sRGB transfer of the colour balance in f64 (see `ops/colorspace.rs`) and WGSL has no f64: the default bound
-/// holds it (3e-7 measured on Metal).
+/// holds it (measured on Metal: 3e-7 one parameter at a time, 1.4e-5 with exposure, contrast and saturation high together).
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     crate::gpu::Kernel::new(include_str!("grade.wgsl"), |params: &Params| {

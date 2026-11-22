@@ -50,7 +50,7 @@ def test_the_gpu_names_its_adapter(gpu):
 
 @needs_gpu
 def test_a_gpu_render_refuses_a_band_as_a_gpu_error_naming_it(gpu):
-    with pytest.raises(GpuError, match="with_band"):
+    with pytest.raises(GpuError, match="band="):
         render(photo(), Recipe([Step("grade")]), band=8, gpu=gpu)
 
 

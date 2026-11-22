@@ -64,10 +64,13 @@ pub(crate) struct Bindings<'a> {
     pub(crate) other: Option<&'a wgpu::Buffer>,
 }
 
+/// A kernel's uniform block: its parameters as vec4s.
+pub(crate) type Block = Vec<[f32; 4]>;
+
 /// The parameters a kernel's uniform block holds (vec4s, so the layout is the same in Rust and WGSL with no padding rule to
 /// keep), and the floats of its `data` binding, if it reads any (a table).
 pub(crate) struct Encoded {
-    pub(crate) block: Vec<[f32; 4]>,
+    pub(crate) block: Block,
     pub(crate) table: Option<Vec<f32>>,
 }
 
@@ -75,7 +78,7 @@ pub(crate) struct Encoded {
 /// its `<effect>.wgsl` (the prelude's bindings and helpers, its `struct Block` and `fn main`).
 pub(crate) struct Kernel<P> {
     wgsl: &'static str,
-    block: fn(&P) -> Vec<[f32; 4]>,
+    block: fn(&P) -> Block,
     table: Option<fn(&P) -> Vec<f32>>,
     bound: f32,
 }
@@ -96,7 +99,7 @@ const DEFAULT_BOUND: f32 = 1e-4; // constant: the GPU decision's bound for a per
 impl<P> Kernel<P> {
     /// The kernel whose WGSL is `wgsl` and whose uniform block `block` makes from the effect's parameters, held to the
     /// default bound, 1e-4.
-    pub(crate) const fn new(wgsl: &'static str, block: fn(&P) -> Vec<[f32; 4]>) -> Self {
+    pub(crate) const fn new(wgsl: &'static str, block: fn(&P) -> Block) -> Self {
         Self {
             wgsl,
             block,
