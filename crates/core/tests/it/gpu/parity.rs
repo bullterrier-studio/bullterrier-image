@@ -1,9 +1,11 @@
 //! Every effect with a GPU kernel matches its CPU render within the bound the kernel states: seeded pictures (with exact
 //! 0s and 1s among their values), each parameter at its minimum, default, maximum and two values between, every choice
-//! and switch, at sizes that are and are not multiples of a workgroup.
+//! and switch, each drivable parameter driven by a map and all of them by a field the recipe makes, at sizes that are
+//! and are not multiples of a workgroup. A new kernel inherits every case; every case must be compared at least once.
 
 use bullterrier_image::params::{Kind, Scalar};
-use bullterrier_image::{Options, Photo, Picture, Presets, Recipe, Step, effect, effects};
+use bullterrier_image::region::LinearGradient;
+use bullterrier_image::{Drive, Input, Layer, Options, Photo, Picture, Presets, Recipe, Step, effect, effects};
 use serde_json::Value;
 
 use super::{gpu, largest_gap, rendered};
@@ -75,52 +77,126 @@ fn every_kernel_names_a_bound_of_at_most_an_eighth_of_an_8_bit_level() -> crate:
     Ok(())
 }
 
+/// A case of the parity test: the recipe, what it compares (a parameter's name, or how a step is driven), and whether the
+/// photo carries the depth ramp its drives read.
+struct Case {
+    what: String,
+    recipe: Recipe,
+    depth: bool,
+}
+
+impl Case {
+    fn of(what: impl Into<String>, step: Step) -> Self {
+        Self {
+            what: what.into(),
+            recipe: Recipe::new([step]),
+            depth: false,
+        }
+    }
+}
+
+/// A depth map of `height` x `width` rising from 0 at the first pixel to 1 at the last, so a drive takes every level.
+fn ramp(height: usize, width: usize) -> Vec<f32> {
+    let last = (height * width).saturating_sub(1).max(1);
+    #[expect(clippy::cast_precision_loss, reason = "a small picture's pixel index")]
+    (0..height * width).map(|at| at as f32 / last as f32).collect()
+}
+
+/// The cases of the effect `name`: its defaults; each parameter alone at each value it is tried at; every parameter at its
+/// first value, then its last, at once (the extremes compound); each drivable parameter driven by a map (the depth ramp);
+/// and every drivable parameter at once driven by a field the recipe makes (a linear gradient region).
+fn cases_of(name: &str, fields: &[bullterrier_image::params::Field]) -> Vec<Case> {
+    let mut cases = vec![Case::of("defaults", Step::new(name))];
+    let (mut lows, mut highs) = (Step::new(name), Step::new(name));
+    let mut by_field = Step::new(name);
+    let mut drivable = false;
+    for field in fields {
+        let values = tried(field.kind, field.min.as_ref(), field.max.as_ref(), field.choices);
+        if let (Some(low), Some(high)) = (values.first(), values.last()) {
+            lows = lows.param(field.name, low.clone());
+            highs = highs.param(field.name, high.clone());
+        }
+        // a drive from the parameter's first interior value to its second: inside every rule another parameter sets
+        if field.drivable
+            && let (Some(start), Some(end)) = (
+                values.get(1).and_then(Value::as_f64),
+                values.get(2).and_then(Value::as_f64),
+            )
+        {
+            drivable = true;
+            cases.push(Case {
+                what: format!("{} driven by a map", field.name),
+                recipe: Recipe::new([Step::new(name).param(field.name, Drive::new("depth", start, end).levels(4))]),
+                depth: true,
+            });
+            by_field = by_field.param(field.name, Drive::new("field", end, start).levels(3));
+        }
+        for value in values {
+            cases.push(Case::of(field.name, Step::new(name).param(field.name, value)));
+        }
+    }
+    cases.extend([
+        Case::of("every parameter at its first value", lows),
+        Case::of("every parameter at its last value", highs),
+    ]);
+    if drivable {
+        cases.push(Case {
+            what: "every drivable parameter driven by a field".to_owned(),
+            recipe: Recipe::new([by_field]).with_region("field", LinearGradient::default()),
+            depth: false,
+        });
+    }
+    cases
+}
+
 #[test]
-fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters() -> crate::common::Outcome {
+fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_and_drives() -> crate::common::Outcome {
     let Some(gpu) = gpu() else { return Ok(()) };
     let presets = Presets::new();
     for name in with_kernels() {
         let found = effect(&name)?;
         let bound = found.kernel().map_or(0.0, bullterrier_image::GpuKernel::bound);
-        let mut cases = vec![Step::new(name.as_str())];
-        // every parameter at once at the first, then the last, value it is tried at: the extremes compound
-        let (mut lows, mut highs) = (Step::new(name.as_str()), Step::new(name.as_str()));
-        for field in found.params().fields {
-            let values = tried(field.kind, field.min.as_ref(), field.max.as_ref(), field.choices);
-            if let (Some(low), Some(high)) = (values.first(), values.last()) {
-                lows = lows.param(field.name, low.clone());
-                highs = highs.param(field.name, high.clone());
-            }
-            for value in values {
-                cases.push(Step::new(name.as_str()).param(field.name, value));
-            }
-        }
-        cases.extend([lows, highs]);
-        let mut compared = 0;
-        for (seed, step) in cases.into_iter().enumerate() {
-            let recipe = Recipe::new([step.clone()]);
+        // a kernel's effect that read a field or a partition would need its own case here
+        assert!(
+            found.fields().is_empty() && !found.inputs().contains(&Input::Partition),
+            "{name}: give this harness a case for its field or partition"
+        );
+        let fields = found.params().fields;
+        let cases = cases_of(&name, &fields);
+        let mut compared = std::collections::BTreeMap::<&str, usize>::new();
+        for (seed, case) in cases.iter().enumerate() {
             for &(height, width) in &SIZES {
                 let values = seeded(height, width, seed);
-                let photo = Photo::new(Picture::new(height, width, &values)?);
+                let mut photo = Photo::new(Picture::new(height, width, &values)?);
+                if case.depth {
+                    photo = photo.with_map("depth", Layer::new(height, width, ramp(height, width))?)?;
+                }
                 // a value the table refuses with the others at their defaults (a point past another) is no case
-                let Ok(cpu) = photo.render(&recipe, &presets, Options::default()) else {
+                let Ok(cpu) = photo.render(&case.recipe, &presets, Options::default()) else {
                     continue;
                 };
-                let on_gpu = rendered(&gpu, &photo, &recipe, Options::default())?;
+                let on_gpu = rendered(&gpu, &photo, &case.recipe, Options::default())?;
                 let (cpu, on_gpu) = (cpu.into_values(), on_gpu.into_values());
                 let (gap, at) = largest_gap(&cpu, &on_gpu);
                 assert!(
                     gap <= bound,
-                    "{name} {:?} at {height} x {width}: value {at} is {} on the GPU, {} on the CPU (gap {gap:e}, bound {bound:e}, {})",
-                    step.params,
+                    "{name} {}: {:?} at {height} x {width}: value {at} is {} on the GPU, {} on the CPU (gap {gap:e}, bound {bound:e}, {})",
+                    case.what,
+                    case.recipe.steps,
                     on_gpu[at],
                     cpu[at],
                     gpu.adapter()
                 );
-                compared += 1;
+                *compared.entry(case.what.as_str()).or_default() += 1;
             }
         }
-        assert!(compared >= 3 * 5, "{name}: only {compared} renders compared");
+        // the floor: every parameter, every drive and every compound case was compared at least once
+        let never: Vec<&str> = cases
+            .iter()
+            .map(|case| case.what.as_str())
+            .filter(|what| !compared.contains_key(what))
+            .collect();
+        assert!(never.is_empty(), "{name}: never compared: {never:?}");
     }
     Ok(())
 }
