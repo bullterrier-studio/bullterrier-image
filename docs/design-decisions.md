@@ -1847,6 +1847,20 @@ measured first would break at a larger one.
   kernel at each parameter's ends and between, the extremes compounded, each drivable parameter driven by a map and all of
   them by a field the recipe makes (a driven step runs on the CPU today, so these hold the executor's choice and a later
   GPU drive to the bound), each case compared at least once; every gap through one helper that fails on a NaN.
+- **Supported platforms, and who falls back (BTIMG-0015).** macOS (Metal) and the browser (WebGPU) only: on lavapipe the test
+  process crashed in the Vulkan loader about 4 runs in 10, and simplicity wins over covering Linux and Windows. `Gpu::request`
+  and `Gpu::new` ask one check in `gpu.rs` first, before any adapter or device work, and any other system is `Error::Gpu`
+  (`GpuError`) naming it. The one exception is CI's: `BT_GPU=llvmpipe` allows Linux, so the lavapipe job runs every GPU test.
+  The library has no automatic mode; the fallback belongs to the app:
+
+  ```python
+  try:
+      gpu = bt.Gpu()
+  except bt.GpuError as why:
+      warnings.warn(f"GPU not available, rendering on the CPU: {why}")
+      gpu = None
+  image = bt.render(photo, recipe, gpu=gpu)  # gpu=None is the CPU
+  ```
 - **Tests run on a GPU in CI**: `poe rust-test-gpu` (the core's whole suite built with the feature, `tests/it/gpu/` among it)
   in `check`, and in CI's GPU job on Mesa's lavapipe; `BT_GPU` says what the machine has (`none`: the GPU tests return early
   and `rust-test-gpu` ends with a banner counting them, as Rust has no skip at run time; else part of the adapter's name,

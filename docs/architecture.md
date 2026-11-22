@@ -118,7 +118,7 @@ that wants it continuous orders the halos last. Regions (`mask`, fields, partiti
 window's canvas; with `with_band` the runner's bands compose. Refused (`Error::Recipe`, naming `room`): a room that leaves no box, and a `frame` or `size`. `tests/it/room.rs`
 renders every effect on a grown picture (its edge repeated) against the box alone: bit for bit for a boxed step, and inside its margin and spread for the others. Not in Python.
 
-**GPU** (feature `gpu`; `crates/core/src/gpu.rs`, `gpu/`, `run/gpu.rs`; why: design-decisions, "GPU backend"). The CPU
+**GPU** (feature `gpu`; `crates/core/src/gpu.rs`, `gpu/`, `run/gpu.rs`; why: design-decisions, "GPU backend"). Supported on macOS (Metal) and the browser (WebGPU) only: `gpu.rs`'s one platform check refuses anything else before any device work. The CPU
 renders are the plain calls (`photo.render`); a GPU render is a call on the context, the one place that chooses it. Every GPU
 call is `async`, with no blocking twin; `Options` are plain data (`Copy`). The CPU is the reference and byte promises are CPU
 promises.
