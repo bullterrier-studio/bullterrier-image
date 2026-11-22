@@ -494,7 +494,7 @@ mod tests {
         match supported(os, test_bed) {
             Ok(()) => None,
             Err(Error::Gpu(message)) => Some(message),
-            Err(other) => panic!("a platform is refused as Error::Gpu, not {other:?}"),
+            Err(other) => unreachable!("a platform is refused as Error::Gpu, not {other:?}"),
         }
     }
 
@@ -502,7 +502,9 @@ mod tests {
     fn macos_is_supported_and_other_systems_are_refused_naming_themselves() {
         assert_eq!(refusal("macos", false), None);
         for os in ["linux", "windows", "freebsd"] {
-            let message = refusal(os, false).unwrap_or_else(|| panic!("{os} is refused"));
+            let Some(message) = refusal(os, false) else {
+                unreachable!("{os} is refused")
+            };
             assert!(message.contains(&format!("this is {os}")), "{message}");
             assert!(message.contains("macOS and the browser"), "{message}");
         }
