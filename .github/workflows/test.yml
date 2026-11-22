@@ -54,6 +54,10 @@ jobs:
         run: cargo fetch --locked
       - name: Install the locked dependencies (builds the Rust extension)
         run: uv sync --locked
+      # the tests that run a model (a stand-in one) load the ONNX Runtime library `bt-image install onnx` keeps; they never
+      # download it (tests/conftest.py `onnx_runtime`)
+      - name: Install the ONNX Runtime library
+        run: uv run --locked bt-image install onnx --runtime-only --yes
       - name: Rust tests (cargo test)
         run: uv run --locked poe rust-test
       # -ra lists every skipped or expected-failing test with its reason; --durations shows what makes the run slow

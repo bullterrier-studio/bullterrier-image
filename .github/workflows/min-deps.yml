@@ -39,6 +39,10 @@ jobs:
       # metadata too, which building the extension does not download. The gates and tests below run cargo offline.
       - name: Fetch the locked crates (cargo fetch)
         run: cargo fetch --locked
+      # the tests that run a model (a stand-in one) load the ONNX Runtime library `bt-image install onnx` keeps; they never
+      # download it (tests/conftest.py `onnx_runtime`)
+      - name: Install the ONNX Runtime library
+        run: uv run --locked bt-image install onnx --runtime-only --yes
       # the runner has no GPU: BT_GPU=none says so, and the GPU tests say they were skipped (docs/development.md)
       - name: Tests on the lowest allowed dependencies (pytest; skips and the 10 slowest tests are listed)
         env:
