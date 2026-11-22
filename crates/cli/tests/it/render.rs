@@ -20,8 +20,14 @@ fn scene(name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
     Ok(root)
 }
 
+/// `relative` (folders split by `/`) under `root`, joined part by part: the path as the CLI prints it, in the platform's
+/// own separators.
 fn at(root: &Path, relative: &str) -> String {
-    root.join(relative).to_string_lossy().into_owned()
+    relative
+        .split('/')
+        .fold(root.to_path_buf(), |path, part| path.join(part))
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[test]

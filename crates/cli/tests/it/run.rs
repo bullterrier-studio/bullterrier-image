@@ -8,7 +8,7 @@ fn a_run_writes_the_results_and_prints_the_report_page() -> Outcome {
     let file = project(&root, false)?;
     let ran = bt(&["run", &file.to_string_lossy()]);
     assert_eq!(ran.code, 0, "{}", ran.err);
-    assert_eq!(ran.out.trim(), root.join("out/index.html").to_string_lossy());
+    assert_eq!(ran.out.trim(), root.join("out").join("index.html").to_string_lossy());
     assert!(root.join("out/a/warm.jpg").is_file() && root.join("out/index.html").is_file());
     assert!(ran.err.contains("1 results: 0 failed, 0 with warnings"), "{}", ran.err);
     Ok(())
