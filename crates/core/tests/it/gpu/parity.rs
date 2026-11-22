@@ -60,10 +60,13 @@ fn tried(kind: Kind, min: Option<&Scalar>, max: Option<&Scalar>, choices: &[&str
 }
 
 #[test]
-fn the_effects_with_kernels_are_the_five_per_pixel_colour_effects() {
-    let mut names = with_kernels();
-    names.sort();
-    assert_eq!(names, ["channel_mixer", "color_balance", "curves", "grade", "levels"]);
+fn the_foundation_effects_have_kernels_and_a_foreign_one_has_none() {
+    let names = with_kernels();
+    for name in ["channel_mixer", "color_balance", "curves", "grade", "levels"] {
+        assert!(names.iter().any(|have| have == name), "{name} has no kernel: {names:?}");
+    }
+    // a kernel is an effect's own business: the catalogue names what has one (`gpu` in `fx`, tested in Python)
+    assert!(names.iter().all(|name| effect(name).is_ok()), "{names:?}");
 }
 
 #[test]
@@ -176,7 +179,17 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
                 let Ok(cpu) = photo.render(&case.recipe, &presets, Options::default()) else {
                     continue;
                 };
+                gpu.reset_transfers();
                 let on_gpu = rendered(&gpu, &photo, &case.recipe, Options::default())?;
+                if case.what == "defaults" {
+                    // the kernel ran on the device: a step left to the CPU would read the picture back and send it again
+                    let moved = gpu.transfers();
+                    assert_eq!(
+                        (moved.uploads, moved.downloads),
+                        (1, 1),
+                        "{name} with its defaults ran on the CPU inside the GPU render"
+                    );
+                }
                 let (cpu, on_gpu) = (cpu.into_values(), on_gpu.into_values());
                 let (gap, at) = largest_gap(&cpu, &on_gpu);
                 assert!(

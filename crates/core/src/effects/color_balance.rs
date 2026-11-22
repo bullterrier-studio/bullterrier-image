@@ -100,7 +100,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
 /// width, and whether luma is kept.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("color_balance.wgsl"), |params: &Params| {
+    crate::gpu::Kernel::new(include_str!("color_balance.wgsl"), |params: &Params, _: &crate::gpu::Header| {
         let [shadows, midtones, highlights] =
             [params.shadows, params.midtones, params.highlights].map(|colour| colour.0.map(|value| value - NEUTRAL));
         vec![

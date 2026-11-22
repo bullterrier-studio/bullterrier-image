@@ -137,7 +137,7 @@ impl Prepared {
         if !step.fields.is_empty() || step.partition.is_some() {
             return None;
         }
-        step.effect.kernel().map(|kernel| GpuStep {
+        step.effect.kernel().filter(|kernel| kernel.runs(scaled)).map(|kernel| GpuStep {
             kernel,
             params: scaled,
             overlay: &step.overlay,

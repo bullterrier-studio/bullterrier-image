@@ -78,8 +78,9 @@ pub(crate) struct Encoded {
 /// its `<effect>.wgsl` (the prelude's bindings and helpers, its `struct Block` and `fn main`).
 pub(crate) struct Kernel<P> {
     wgsl: &'static str,
-    block: fn(&P) -> Block,
-    table: Option<fn(&P) -> Vec<f32>>,
+    block: fn(&P, &Header) -> Block,
+    table: Option<fn(&P, &Header) -> Vec<f32>>,
+    only: Option<fn(&P) -> bool>,
     bound: f32,
 }
 
@@ -98,24 +99,44 @@ const DEFAULT_BOUND: f32 = 1e-4; // constant: the GPU decision's bound for a per
 impl<P> Kernel<P> {
     /// The kernel whose WGSL is `wgsl` and whose uniform block `block` makes from the effect's parameters, held to the
     /// default bound, 1e-4.
-    pub(crate) const fn new(wgsl: &'static str, block: fn(&P) -> Block) -> Self {
+    pub(crate) const fn new(wgsl: &'static str, block: fn(&P, &Header) -> Block) -> Self {
         Self {
             wgsl,
             block,
             table: None,
+            only: None,
             bound: DEFAULT_BOUND,
         }
     }
 
-    /// This kernel reading `table` of the parameters as its `data` (a curve's pieces).
-    pub(crate) const fn with_table(mut self, table: fn(&P) -> Vec<f32>) -> Self {
+    /// This kernel reading `table` as its `data` (a curve's pieces, a list of marks the CPU's own generator drew), worked out
+    /// from the parameters and the picture's header.
+    pub(crate) const fn with_table(mut self, table: fn(&P, &Header) -> Vec<f32>) -> Self {
         self.table = Some(table);
+        self
+    }
+
+    /// This kernel running only for the parameters `only` accepts; a step with any other runs on the CPU (counted), as one
+    /// of an effect with no kernel does. For a setting the kernel does not do (a blur, a serial scan): the kernel's
+    /// parity test holds the rest, and the defaults must be accepted.
+    pub(crate) const fn only_where(mut self, only: fn(&P) -> bool) -> Self {
+        self.only = Some(only);
+        self
+    }
+
+    /// This kernel held to `bound` instead of the default 1e-4: the largest difference from the CPU's f32 output on a value
+    /// of 0 to 1. Say beside the call why the kernel cannot meet the default (the CPU works in f64, say).
+    pub(crate) const fn with_bound(mut self, bound: f32) -> Self {
+        self.bound = bound;
         self
     }
 }
 
 /// How a step of the effect called `name` turns its parameters into what its kernel is given.
-type Encode = Box<dyn Fn(&serde_json::Value) -> Result<Encoded, crate::Error> + Send + Sync>;
+type Encode = Box<dyn Fn(&serde_json::Value, &Header) -> Result<Encoded, crate::Error> + Send + Sync>;
+
+/// Whether the kernel runs the parameters of a step.
+type Runs = Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>;
 
 /// The GPU kernel of one of the core's own effects (see [`Effect::kernel`](crate::Effect::kernel)): what the executor of a
 /// GPU render runs for its steps, held to a stated bound of the CPU's output. Only the core makes them; an effect that
@@ -125,6 +146,7 @@ pub struct GpuKernel {
     wgsl: &'static str,
     bound: f32,
     encode: Encode,
+    runs: Runs,
 }
 
 impl std::fmt::Debug for GpuKernel {
@@ -144,18 +166,23 @@ impl GpuKernel {
             wgsl,
             block,
             table,
+            only,
             bound,
         } = kernel;
         Self {
             name,
             wgsl,
             bound,
-            encode: Box::new(move |params| {
+            encode: Box::new(move |params, header| {
                 let params = P::deserialize(params).map_err(|source| crate::Error::Params { effect: name, source })?;
                 Ok(Encoded {
-                    block: block(&params),
-                    table: table.map(|table| table(&params)),
+                    block: block(&params, header),
+                    table: table.map(|table| table(&params, header)),
                 })
+            }),
+            // parameters that do not read back are not the kernel's to judge: the CPU run reports them
+            runs: Box::new(move |params| {
+                only.is_none_or(|only| P::deserialize(params).is_ok_and(|params| only(&params)))
             }),
         }
     }
@@ -173,7 +200,12 @@ impl GpuKernel {
     }
 
     /// What the kernel is given for a step run with `params` (complete and scaled, as `Effect::apply` takes them).
-    pub(crate) fn encode(&self, params: &serde_json::Value) -> Result<Encoded, crate::Error> {
-        (self.encode)(params)
+    pub(crate) fn encode(&self, params: &serde_json::Value, header: &Header) -> Result<Encoded, crate::Error> {
+        (self.encode)(params, header)
+    }
+
+    /// Whether the kernel runs a step with `params`: not one with a setting it leaves to the CPU.
+    pub(crate) fn runs(&self, params: &serde_json::Value) -> bool {
+        (self.runs)(params)
     }
 }

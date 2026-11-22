@@ -93,7 +93,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
 /// holds it (measured on Metal: 3e-7 one parameter at a time, 1.4e-5 with exposure, contrast and saturation high together).
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("grade.wgsl"), |params: &Params| {
+    crate::gpu::Kernel::new(include_str!("grade.wgsl"), |params: &Params, _: &crate::gpu::Header| {
         let (gains, balanced) =
             colour_balance(params.temperature, params.tint).map_or(([1.0; 3], 0.0), |gains| (gains, 1.0));
         vec![

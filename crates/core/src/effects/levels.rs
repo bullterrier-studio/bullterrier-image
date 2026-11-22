@@ -70,5 +70,5 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
 /// The remap on the GPU: the same numbers, worked out once here (`levels.wgsl`).
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("levels.wgsl"), |params: &Params| remap(params).block())
+    crate::gpu::Kernel::new(include_str!("levels.wgsl"), |params: &Params, _: &crate::gpu::Header| remap(params).block())
 }

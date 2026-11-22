@@ -272,7 +272,7 @@ fn kernel_step(
     header: Header,
 ) -> Result<GpuImage, Error> {
     let (height, width) = (current.height(), current.width());
-    let Encoded { block, table } = step.kernel.encode(step.params)?;
+    let Encoded { block, table } = step.kernel.encode(step.params, &header)?;
     let table = table.map(|table| gpu.send(&table, false));
     let after = gpu.picture_buffer(height, width);
     gpu.dispatch(
