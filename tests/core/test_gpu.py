@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from bullterrier_image import Gpu, GpuError, Recipe, RecipeError, Step, fx, render, render_all
+from bullterrier_image.core import native
 
 NO_GPU = os.environ.get("BT_GPU") == "none"
 needs_gpu = pytest.mark.skipif(NO_GPU, reason="BT_GPU=none: this machine has no GPU")
@@ -55,7 +56,10 @@ def test_a_gpu_render_refuses_a_band_as_a_recipe_error_naming_it_never_a_gpu_err
     assert not isinstance(refused.value, GpuError)
 
 
-def test_the_effects_say_which_run_on_the_gpu():
-    assert fx.grade.gpu
-    assert fx.levels.gpu
-    assert not fx.vignette.gpu
+def test_every_effect_says_it_runs_on_the_gpu_exactly_when_the_core_has_a_kernel_for_it():
+    on_gpu = {name for name in fx.__all__ if getattr(fx, name).gpu}
+    with_kernels = {name for name in fx.__all__ if native.effect(name)["gpu"]}
+    assert on_gpu == with_kernels
+    # some effects have a kernel and most do not: neither side of the comparison is trivially everything or nothing
+    assert "grade" in on_gpu
+    assert "vignette" not in on_gpu
