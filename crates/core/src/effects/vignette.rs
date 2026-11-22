@@ -96,3 +96,20 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         [0, 1, 2].map(|channel| (f64::from(pixel[channel]) * (1.0 - shade) + tint[channel] * shade) as f32)
     })
 }
+
+/// The vignette on the GPU (`vignette.wgsl`): the same distance and smoothstep, the exponent and its reciprocal worked out
+/// here in f64.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    use crate::ops::cast::single;
+    crate::gpu::Kernel::new(include_str!("vignette.wgsl"), |params: &Params, _: &crate::gpu::Header| {
+        let exponent = if params.roundness > 0.0 { 2.0 / f64::from(params.roundness) } else { 0.0 };
+        let reach = if exponent > 0.0 { exponent.recip() } else { 0.0 };
+        let [red, green, blue] = params.color.0;
+        vec![
+            [params.amount, params.radius, params.feather, single(exponent)],
+            [single(reach), 0.0, 0.0, 0.0],
+            [red, green, blue, 0.0],
+        ]
+    })
+}
