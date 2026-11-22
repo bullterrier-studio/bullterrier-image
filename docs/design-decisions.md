@@ -1880,3 +1880,5 @@ measured first would break at a larger one.
   End to end is the transfers (f32 both ways: 25 MB up, 33 MB back, and the conversion on the CPU); the work stays on the
   device across a chain, which is where the GPU pays: the five-kernel chain is 8.7 ms there against 40 ms on every core.
   A cheap per-pixel effect (`channel_mixer`) is faster on the CPU end to end: the backend is a choice of the caller.
+
+- **Chaining with another library (2026-11-22):** the packages share wgpu's device, so the picture's storage is a documented public contract, not an internal: `GpuImage::buffer` (read only) and `Gpu::adopt(buffer, height, width, alpha)` (nothing is uploaded, nothing counted; a too-small buffer is `Error::Inputs`). The layout (`vec4<f32>` a pixel, straight alpha) may still change to half floats by a change of this pair's docs and a minor version.

@@ -45,6 +45,9 @@ its `Unreleased` becomes the release date.
 - **The GPU backend runs on macOS and in the browser only.** `Gpu::request` and `Gpu::new` (Python `Gpu()`) on any other system
   fail at once with `Error::Gpu` (`GpuError`) naming it ("the GPU backend supports macOS and the browser; this is linux"); an
   app that wants the GPU where it exists catches it and renders on the CPU. CI's software-Vulkan job (`BT_GPU=llvmpipe`) is the one exception.
+- `GpuImage::buffer` and `Gpu::adopt` (feature `gpu`): another library on the same wgpu device reads a picture's storage
+  buffer (`vec4<f32>` a pixel, straight alpha) and hands one back as a `GpuImage`, so a chain between libraries needs no
+  readback.
 - **A GPU backend** (Rust feature `gpu`, in the wheel): `Gpu` (`request`, or `new` on a caller's wgpu device), `GpuImage`,
   `Gpu::render` and `render_from` (pictures kept on the device, alpha kept), `Gpu::download`, `Gpu::transfers`; every GPU
   call is `async` (block with `pollster::block_on`); `Options` holds no GPU. `ErrorKind::Gpu` means only that this
