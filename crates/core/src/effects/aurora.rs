@@ -87,11 +87,8 @@ pub struct Params {
     pub seed: u32,
 }
 
-/// The aurora, in the picture's size: the picture is used only for its height and width.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    // the curtain's base is a share of the canvas's height, and a row is counted from the canvas's top
-    let place = inputs.place(picture);
-    let (rows, width) = (place.canvas_height, place.canvas_width);
+/// The curtain's wobble and its rays at each of the `width` columns: the ripple of the base, and each column's share of light.
+fn columns(width: usize, params: &Params) -> (Vec<f32>, Vec<f64>) {
     // constant: a one-row field, so the noise runs along the picture only
     let along = |spacing: f32, stream| {
         field_rows(
@@ -115,6 +112,15 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         .into_iter()
         .map(|z| 1.0 - f64::from(params.rays) * (1.0 - ndtr(f64::from(z))))
         .collect();
+    (ripple, ray)
+}
+
+/// The aurora, in the picture's size: the picture is used only for its height and width.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the curtain's base is a share of the canvas's height, and a row is counted from the canvas's top
+    let place = inputs.place(picture);
+    let (rows, width) = (place.canvas_height, place.canvas_width);
+    let (ripple, ray) = columns(width, params);
     let stops: Vec<[f32; 3]> = params.colors.iter().map(|colour| colour.0).collect();
     let sky = params.sky.0;
     let (base, tall, falloff) = (
@@ -130,5 +136,29 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             cast::single((above + 0.5).clamp(0.0, 1.0) * (1.0 - up).clamp(0.0, 1.0).powf(falloff) * ray[column]);
         let colour = ramp::at(&stops, cast::single(up.clamp(0.0, 1.0)));
         [0, 1, 2].map(|channel| sky[channel] + brightness * (colour[channel] - sky[channel]))
+    })
+}
+
+/// The aurora on the GPU (`aurora.wgsl`): the noise along the picture is one line (the CPU makes it, a table a column wide), and a
+/// pixel works out its height up the curtain and its colour in single precision, so the edge's one-pixel ramp is within
+/// the precision of a row number (an f32 of a few thousand: about a ten-thousandth of a level on a 4000 px picture).
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("aurora.wgsl"), |params: &Params, header: &crate::gpu::Header| {
+        let single = cast::single;
+        let rows = length::float(header.place().canvas_height);
+        let sky = params.sky.0;
+        vec![
+            [single(f64::from(params.base) * rows), params.waviness, params.height, params.falloff],
+            [sky[0], sky[1], sky[2], 0.0],
+            [f32::from_bits(u32::try_from(params.colors.len()).unwrap_or(2)), 0.0, 0.0, 0.0],
+        ]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let (ripple, ray) = columns(header.place().canvas_width, params);
+        let mut table = ripple;
+        table.extend(ray.into_iter().map(cast::single));
+        table.extend(params.colors.iter().flat_map(|colour| colour.0));
+        table
     })
 }
