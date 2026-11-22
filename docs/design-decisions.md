@@ -1816,10 +1816,45 @@ measured first would break at a larger one.
   `unsafe impl`, which `#![forbid(unsafe_code)]` refuses, and vec4s need no padding rule in either language. Every number
   worked out once per render (spans, exponents, the gains, PCHIP coefficients) is worked out in Rust, so the kernel does only
   per-pixel maths. `Effect::kernel()` (None by default) gives it as an opaque `GpuKernel`; a Python or foreign effect has
-  none, so the trait changes nothing for them. A kernel's effect has no `check`: `build.rs` fails on an effect file that
-  declares both (BTIMG-0014; before, the kernel was dropped without a word). *Rejected:* running `check` in `prepare` on
-  both backends: a `check` reads the step's `Inputs` (pictures, maps), which only the CPU run builds, so the rule would
-  live in two places; one rule at the source keeps it in one.
+  none, so the trait changes nothing for them. A kernel's effect keeps its `check`, and a GPU render runs it (BTIMG-0010, see
+  "What a kernel is given" below; BTIMG-0014 had made `build.rs` refuse an effect file with both, because the GPU run never
+  called `check`).
+- **What a kernel is given (BTIMG-0010).** One shape for every kernel; each step of it is the answer to a question the
+  per-pixel effects ask:
+  - *The picture's header* (size, where it lies on its canvas, working px per design px): every kernel's encode step takes it,
+    so a kernel never needs a parameter that the picture already tells (vignette's centre, gradient's canvas, interlace's field).
+  - *A setting the kernel does not do* (`Kernel::only_where`): the step runs on the CPU, counted, like an effect with no kernel;
+    the kernel's parity test holds the rest, and the effect's defaults must be accepted unless its table row says otherwise
+    (`dither`'s default is a serial method).
+  - *A statistic of the picture* the kernel's own pixels do not make (a sum, extremes, a histogram): the public
+    `Gpu::reduce` and `Gpu::histogram` (fixed tree, exact counts, only the answer comes back). They serve a caller who steers a
+    render from the picture; no per-pixel kernel needs one inside the executor today, because the three effects that depend on the
+    picture need more than a number.
+  - *What only the CPU's own code can make* (`Kernel::planned`): `dither`'s `photo` palette (k-means over the dots), `gradient_map`'s
+    clip points (numpy's quantile definitions over the sorted brightness), `lut`'s loaded 3D table and `dither`'s
+    `matrix` ranks. One hook serves all three: the kernel's encode step is also given the step's `Inputs` (the tables and
+    pictures it names, the place and the size ratio, exactly what the CPU's `apply` gets) and, if the kernel says
+    `reads_picture`, the picture itself, read back by the executor first (one counted download; the run of kernels
+    before it is submitted, the one after it starts from the same device picture). The kernel calls the CPU's own function
+    on them and puts the result in its `data` table, so the definition stays in one place and there is no second
+    implementation to drift. A kernel that does not plan is still `Kernel::new(wgsl, params -> block)`.
+    *Why a readback and not the reduction for the quantiles:* an exact order statistic of f32 values is not a histogram of
+    bins: it is a radix select, 4 dependent passes of 256-bin counts per clip point (about 16 round trips for the two points
+    of two clips), each a wait on the device, to save one picture readback (6.6 ms at 1080p) in a step whose CPU
+    definition is a sort; the counted readback is exact with no new kernel. A reduction is the better answer where the
+    answer is a number the kernel's own maths needs (a total, an extreme): none of the planned three is.
+    *Why not three special cases:* each of the three needs the step's inputs, and two of them the picture; a `with_table`
+    that took the `Inputs` would still not reach the picture, and a `with_palette` or `with_quantiles` would be a hook for
+    one effect.
+  - *`check` runs on the GPU too.* The effect's `check` (a refused setting: `matrix` missing, a strip not a whole number of
+    tiles) belongs to the effect, not to a backend: `Native::with_kernel` hands the kernel the effect's `check`, and the
+    kernel's encode step runs it on the step's `Inputs` before it builds anything, as `apply` does. So a refused run is
+    refused identically on both, from one function, and the build rule that kept `check` and `kernel` apart is gone.
+    *Rejected:* an exception ("dither declares a kernel and a check") and copying the check's tests into the kernel.
+  - *Seeded randomness* is the CPU's generator ported (`gpu/random.wgsl`, bit for bit on 32-bit words); a threshold or a
+    noise value a kernel draws is the CPU's.
+  - *A table the CPU derives in f64* (`gradient`'s offsets, a separable kernel's weights, a palette in Oklab) is made on the
+    CPU and sent as `data`; WGSL has no f64 and `powf` differs per platform (lessons L22).
 - **One executor.** `begin()` stays on the CPU (frame, resize, maps, prepared steps); the working picture is sent once; a run
   of steps with kernels is recorded into one command encoder and submitted together, each laid over its input by the `lay`
   kernel (`ops/blend.rs` formula for formula: modes, opacity, mask uploaded as a map) unless plain. A step whose effect has no
