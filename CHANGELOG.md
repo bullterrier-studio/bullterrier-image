@@ -12,6 +12,10 @@ its `Unreleased` becomes the release date.
 
 ### Changed
 
+- `bt-image install onnx` (and a download the library allows) takes ONNX Runtime 1.23.2 from Microsoft's wheel on PyPI:
+  the GitHub releases it came from are gone (404). No wheel of 1.23.2 exists for Windows on arm64, so none is pinned there:
+  set `BT_IMAGE_ONNX_LIB`. Rust: `Runtime.entry` (the library's path in the wheel) and `Runtime::file()` replace `file`
+  and `archive`; `Archive` is gone.
 - **BREAKING:** a colour of a step (`point_light.color`, `bloom.color`) has an address: it is a settable kind, not three numbers.
   Rust `Recipe::numbers`, `number`, `Number` and `Located::number` are `parameters`, `parameter`, `Parameter` and
   `Located::parameter`; `with_values` takes `&[(&str, Setting)]` (a number or a colour). Python and WebAssembly `parameters()`

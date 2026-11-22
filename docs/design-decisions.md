@@ -1654,12 +1654,15 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   step beyond refused) and a completeness test fails for a numeric field with no row. `Recipe::with_values` sets several numbers at once, all or nothing, and Python's `Recipe.with_values` calls it:
   scene and video link the core and must not rewrite a recipe document by address, which would leak image's knowledge out of image.
 - **`install onnx`, `models` and `doctor` are the CLI's half of "ONNX is optional".** The package pins ONNX Runtime 1.23.2 (the
-  newest release that publishes macOS on Intel, Linux and Windows on x86-64 and arm64) with the size and SHA-256 of each
-  platform's archive (`finding/runtime.rs`); `install` downloads the archive through the verified `download::fetch`, takes the
-  one library file out of its `lib` folder and keeps it in the cache folder, `onnxruntime-1.23.2/` beside the models. The library
-  is found as: `BT_IMAGE_ONNX_LIB`, else the kept file, else (with downloads allowed) a download, else an error naming
-  `bt-image install onnx`. The CLI asks before downloading (`--yes` skips it; no answer is no), the library never asks. The
-  console script still points `BT_IMAGE_ONNX_LIB` at the installed Python `onnxruntime` until that dependency goes (R6e).
+  newest release that publishes macOS on Intel) with the size and SHA-256 of each platform's wheel on PyPI
+  (`finding/runtime.rs`); `install` downloads the wheel through the verified `download::fetch`, takes the one library
+  file out of it (`onnxruntime/capi/`) and keeps it in the cache folder, `onnxruntime-1.23.2/` beside the models. The
+  library is found as: `BT_IMAGE_ONNX_LIB`, else the kept file, else (with downloads allowed) a download, else an error
+  naming `bt-image install onnx`. The CLI asks before downloading (`--yes` skips it; no answer is no), the library never
+  asks.
+  *Why the wheel:* the GitHub releases the pins named first answered 404 (2026-11-22: the repository is gone); PyPI
+  keeps every file it published, under its SHA-256, and the wheel holds the C library of the same release. 1.23.2 has no
+  Windows arm64 wheel, so that platform has no pin and takes `BT_IMAGE_ONNX_LIB`.
   `--cache DIR` moves the folder, for the three commands.
 
 - **Pydantic out (E7 batch 6, 2026-11-11).** Every rule a value must obey is the core's (`Table::check`, `Step::check`,
