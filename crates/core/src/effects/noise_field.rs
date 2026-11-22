@@ -373,3 +373,40 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let stops: Vec<[f32; 3]> = params.colors.iter().map(|colour| colour.0).collect();
     picture.map_at(|row, column, _| ramp::at(&stops, place_on_ramp[row * width + column]))
 }
+
+/// The 'value' noise on the GPU (`noise_field.wgsl`, with `ops/noise.wgsl` and `ops/gauss.wgsl`) when nothing warps it: the noise at the
+/// pixel, its rank on the normal curve and the colour ramp. The other kinds are standardised over the picture they make, a whole-picture
+/// statistic, and a warp reads the noise between pixels: the CPU runs those (counted), and so the default, 'perlin'.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(
+        concat!(
+            include_str!("../ops/noise.wgsl"),
+            include_str!("../ops/gauss.wgsl"),
+            include_str!("noise_field.wgsl")
+        ),
+        |params: &Params, _: &crate::gpu::Header| {
+            vec![[
+                f32::from_bits(params.seed),
+                f32::from_bits(u32::try_from(params.colors.len()).unwrap_or(2)),
+                0.0,
+                0.0,
+            ]]
+        },
+    )
+    .with_table(|params: &Params, _: &crate::gpu::Header| {
+        let mut table = Fractal {
+            spacing: f64::from(params.scale),
+            octaves: params.octaves.cast_unsigned(),
+            persistence: f64::from(params.persistence),
+            lacunarity: f64::from(params.lacunarity),
+            seed: params.seed,
+            origin: 0.0, // constant: a lattice point on the first pixel
+        }
+        .octave_table();
+        // the colours are read from after the octaves: their count first, as 1 + 2 each, makes the offset the kernel needs
+        table.extend(params.colors.iter().flat_map(|colour| colour.0));
+        table
+    })
+    .only_where(|params: &Params| params.kind == Kind::Value && params.warp <= 0.0)
+}
