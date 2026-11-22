@@ -116,3 +116,60 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         )
     })
 }
+
+/// The gradient on the GPU (`gradient.wgsl`): the CPU's f64 offsets of each column and row from the gradient's centre as a
+/// table (then the colour stops), the f32 repeat and ramp on the device.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    use crate::ops::cast::single;
+    use crate::ops::length::float;
+    crate::gpu::Kernel::new(include_str!("gradient.wgsl"), |params: &Params, _: &crate::gpu::Header| {
+        let kind = match params.kind {
+            Kind::Linear => 0.0,
+            Kind::Radial => 1.0,
+            Kind::Conic => 2.0,
+        };
+        let start = f64::from(params.angle).to_radians();
+        let stops = u32::try_from(params.colors.len()).unwrap_or(u32::MAX);
+        vec![
+            [kind, single(start), float_to_f32(params.repeat), f32::from(u8::from(params.reflect))],
+            [f32::from_bits(stops), 0.0, 0.0, 0.0],
+        ]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let place = header.place();
+        let (high, wide) = (float(place.canvas_height), float(place.canvas_width));
+        let (x, y) = (f64::from(params.x), f64::from(params.y));
+        let (sin, cos) = f64::from(params.angle).to_radians().sin_cos();
+        let extent = wide * cos.abs() + high * sin.abs();
+        let reach = f64::from(params.radius) * high.min(wide);
+        let columns = (0..header.width as usize).map(|column| float(column) + 0.5);
+        let rows = (place.first_row..place.first_row + header.height as usize).map(|row| float(row) + 0.5);
+        let (across, down): (Vec<f64>, Vec<f64>) = match params.kind {
+            Kind::Linear => (
+                columns.map(|at| (at - wide / 2.0) * cos / extent).collect(),
+                rows.map(|at| (at - high / 2.0) * sin / extent).collect(),
+            ),
+            Kind::Radial => (
+                columns.map(|at| (at - x * wide) / reach).collect(),
+                rows.map(|at| (at - y * high) / reach).collect(),
+            ),
+            Kind::Conic => (
+                columns.map(|at| at - x * wide).collect(),
+                rows.map(|at| at - y * high).collect(),
+            ),
+        };
+        across
+            .into_iter()
+            .chain(down)
+            .map(single)
+            .chain(params.colors.iter().flat_map(|colour| colour.0))
+            .collect()
+    })
+}
+
+/// `value` as an f32, a small count.
+#[cfg(feature = "gpu")]
+fn float_to_f32(value: i32) -> f32 {
+    crate::ops::cast::single(f64::from(value))
+}
