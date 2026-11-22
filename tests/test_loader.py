@@ -460,6 +460,12 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
     (tmp_path / "assets" / "shapes.svg").write_text(SHAPES_SVG, encoding="utf-8")
     (tmp_path / "recipes").mkdir()
     loaded = load_recipe(_write(tmp_path / "recipes", SHAPES_FILE))
+    # the SVG beside the recipe, its path joined to the recipe's folder as the platform joins paths (on Windows
+    # `recipes\../assets/shapes.svg`): compared as the file it names, the rest as written
+    shapes = loaded.regions["shapes"]
+    assert isinstance(shapes, Svg)
+    found = shapes.file
+    assert Path(found).resolve() == (tmp_path / "assets" / "shapes.svg").resolve()
     written = Recipe(
         name="look",
         size=64,
@@ -469,7 +475,7 @@ def test_cuts_path_and_svg_regions_load_as_the_recipe_written_in_python_and_the_
                 edge=Edge(style="torn", amount=0.01),
             ),
             "blob": PathRegion(d="M 0.1 0.1 H 0.6 V 0.7 Z", samples=8),
-            "shapes": Svg(file=str(tmp_path / "recipes" / "../assets/shapes.svg"), max_shapes=50),
+            "shapes": Svg(file=found, max_shapes=50),
             "ring": Pick(of="shapes", pieces=["ring", 0]),
         },
         steps=[
