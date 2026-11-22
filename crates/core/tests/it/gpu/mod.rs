@@ -49,6 +49,48 @@ pub(crate) fn rendered(gpu: &Gpu, photo: &Photo<'_>, recipe: &Recipe, options: O
     })
 }
 
+/// The largest difference between `cpu` and `gpu` (pictures of one size), value by value, and where it is: the one gap
+/// every GPU test takes.
+///
+/// # Panics
+/// If their lengths differ or either holds a value that is not finite: a NaN is no colour, and a maximum would drop it.
+pub(crate) fn largest_gap(cpu: &[f32], gpu: &[f32]) -> (f32, usize) {
+    assert_eq!(cpu.len(), gpu.len(), "the pictures differ in length");
+    assert_finite(cpu, "the CPU's picture");
+    assert_finite(gpu, "the GPU's picture");
+    cpu.iter()
+        .zip(gpu)
+        .map(|(one, other)| (one - other).abs())
+        .enumerate()
+        .fold(
+            (0.0, 0),
+            |(gap, at), (index, here)| if here > gap { (here, index) } else { (gap, at) },
+        )
+}
+
+/// # Panics
+/// If a value of `values` (`what`) is NaN or an infinity, naming the first.
+pub(crate) fn assert_finite(values: &[f32], what: &str) {
+    let first = values.iter().position(|value| !value.is_finite());
+    assert!(
+        first.is_none(),
+        "{what} holds {} at value {first:?}",
+        first.map_or(0.0, |at| values[at])
+    );
+}
+
+#[test]
+fn the_gap_of_two_pictures_is_their_largest_difference_and_a_non_finite_value_fails_it() {
+    assert_eq!(largest_gap(&[0.0, 0.5, 1.0], &[0.0, 0.25, 0.875]), (0.25, 1));
+    assert_eq!(largest_gap(&[0.5], &[0.5]), (0.0, 0));
+    for bad in [f32::NAN, f32::INFINITY] {
+        let caught = std::panic::catch_unwind(|| largest_gap(&[0.5, 0.5], &[0.5, bad]));
+        assert!(caught.is_err(), "{bad} on the GPU passed");
+        let caught = std::panic::catch_unwind(|| largest_gap(&[bad, 0.5], &[0.5, 0.5]));
+        assert!(caught.is_err(), "{bad} on the CPU passed");
+    }
+}
+
 #[test]
 fn the_adapter_is_the_one_bt_gpu_names_and_holds_a_picture() {
     // `fresh` checks the name; a device holds at least WebGPU's default binding, 128 MiB, 8 Mi pixels

@@ -6,7 +6,7 @@ use bullterrier_image::params::{Kind, Scalar};
 use bullterrier_image::{Options, Photo, Picture, Presets, Recipe, Step, effect, effects};
 use serde_json::Value;
 
-use super::{gpu, rendered};
+use super::{gpu, largest_gap, rendered};
 use crate::common::pictures::varied_seeded;
 
 const SIZES: [(usize, usize); 3] = [(1, 1), (17, 13), (64, 48)];
@@ -54,22 +54,6 @@ fn tried(kind: Kind, min: Option<&Scalar>, max: Option<&Scalar>, choices: &[&str
         Kind::Color => ["#000000", "#ffffff", "#2a9d8f"].map(Value::from).to_vec(),
         _ => Vec::new(),
     }
-}
-
-/// The largest difference between `cpu` and `gpu`, value by value, and where it is.
-fn largest_gap(cpu: &[f32], gpu: &[f32]) -> (f32, usize) {
-    assert_eq!(cpu.len(), gpu.len());
-    cpu.iter()
-        .zip(gpu)
-        .map(|(one, other)| (one - other).abs())
-        .enumerate()
-        .fold((0.0, 0), |(gap, at), (index, here)| {
-            if here > gap || here.is_nan() {
-                (here, index)
-            } else {
-                (gap, at)
-            }
-        })
 }
 
 #[test]

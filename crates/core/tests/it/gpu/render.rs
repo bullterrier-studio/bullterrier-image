@@ -10,7 +10,7 @@ use bullterrier_image::{BlendMode, Error, ErrorKind, Frame, Image, Options, Phot
 use super::parity::seeded;
 use pollster::block_on;
 
-use super::{fresh, gpu, rendered};
+use super::{assert_finite, fresh, gpu, largest_gap, rendered};
 use crate::common::Outcome;
 use crate::common::compare::first_bit_difference;
 
@@ -41,8 +41,13 @@ fn dog() -> Result<Image, Error> {
 
 /// The share of the values of `cpu` and `gpu` (pictures of one size) whose 8-bit levels differ by more than 1, and the
 /// largest difference in levels.
+///
+/// # Panics
+/// If their lengths differ or either holds a value that is not finite (a clamp would make a level of a NaN).
 fn levels_apart(cpu: &[f32], gpu: &[f32]) -> (f64, u8) {
     assert_eq!(cpu.len(), gpu.len());
+    assert_finite(cpu, "the CPU's picture");
+    assert_finite(gpu, "the GPU's picture");
     let level = |value: f32| {
         #[expect(
             clippy::cast_possible_truncation,
@@ -149,11 +154,7 @@ fn a_step_laid_over_its_input_by_opacity_mask_and_each_blend_mode_matches_the_cp
             .render(&recipe, &Presets::new(), Options::default())?
             .into_values();
         let on_gpu = rendered(&gpu, &photo, &recipe, Options::default())?.into_values();
-        let gap = cpu
-            .iter()
-            .zip(&on_gpu)
-            .map(|(one, other)| (one - other).abs())
-            .fold(0.0_f32, f32::max);
+        let (gap, _) = largest_gap(&cpu, &on_gpu);
         assert!(gap <= 1e-4, "{step:?}: gap {gap:e}");
     }
     Ok(())
@@ -174,11 +175,7 @@ fn a_picture_rendered_on_the_device_stays_there_for_the_next_recipe() -> Outcome
     let whole = photo
         .render(&five_kernels(), &Presets::new(), Options::default())?
         .into_values();
-    let gap = whole
-        .iter()
-        .zip(&chained)
-        .map(|(one, other)| (one - other).abs())
-        .fold(0.0_f32, f32::max);
+    let (gap, _) = largest_gap(&whole, &chained);
     assert!(gap <= 5e-4, "five kernels' bounds: gap {gap:e}");
     Ok(())
 }
@@ -199,11 +196,7 @@ fn a_cut_out_made_on_the_device_has_the_cpus_alpha() -> Outcome {
     let (on_gpu, cpu) = (block_on(gpu.download(&resident))?.into_values(), cpu.into_values());
     let alpha = |values: &[f32]| values.chunks(4).map(|pixel| pixel[3]).collect::<Vec<f32>>();
     assert_eq!(alpha(&on_gpu), alpha(&cpu));
-    let gap = cpu
-        .iter()
-        .zip(&on_gpu)
-        .map(|(one, other)| (one - other).abs())
-        .fold(0.0_f32, f32::max);
+    let (gap, _) = largest_gap(&cpu, &on_gpu);
     assert!(gap <= 1e-4, "the colour too: gap {gap:e}");
     Ok(())
 }
