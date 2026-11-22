@@ -16,6 +16,11 @@ its `Unreleased` becomes the release date.
   `gpu.render(&photo, ..).await` (a `GpuImage`), read back with `gpu.download(..).await`. Every GPU call is `async`
   (`upload` and `upload_image` too); `request_blocking`, `render_blocking`, `render_from_blocking` and `download_blocking`
   are gone: block with `pollster::block_on`. Python's `render(..., gpu=)` is unchanged.
+- **BREAKING:** `ErrorKind::Gpu` (Python `GpuError`) means only that this machine's GPU cannot (no adapter, a missing limit,
+  a picture past the device, a lost device). An option a GPU render does not take (`band=`, `with_window`, `with_room`) and a
+  `render_from` that needs a resample or a map are `Recipe` (`RecipeError`); a `GpuImage` given to another context is
+  `Inputs`.
+- A picture chained on the GPU (`render_from`) keeps its alpha; it came back with three channels.
 
 - **BREAKING:** a colour of a step (`point_light.color`, `bloom.color`) has an address: it is a settable kind, not three numbers.
   Rust `Recipe::numbers`, `number`, `Number` and `Located::number` are `parameters`, `parameter`, `Parameter` and
@@ -45,7 +50,7 @@ its `Unreleased` becomes the release date.
 
 - **A GPU backend** (Rust feature `gpu`, in the wheel): `Gpu` (`request`, or `new` on a caller's wgpu device), `GpuImage`,
   `Gpu::render` and `render_from` (pictures kept on the device), `Gpu::download`, `Gpu::transfers`. Python: `Gpu()`,
-  `render(..., gpu=)`, `GpuError`, `fx.<effect>.gpu`. Kernels: `levels`, `grade`, `curves`, `channel_mixer`,
+  `render(..., gpu=)`, `GpuError`, `fx.<effect>.gpu`, `Gpu.largest_picture`. Kernels: `levels`, `grade`, `curves`, `channel_mixer`,
   `color_balance` and a step's blend mode, opacity and mask, each within 1e-4 of the CPU; other steps run on the CPU inside
   a GPU render.
 
