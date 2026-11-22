@@ -1,4 +1,4 @@
-//! Kernels that place something by a position in single precision (a line's offset, the curtain's edge, a bump's reach): on a picture
+//! Kernels that place something by a position in single precision (a line's offset, the curtain's edge, a bump's reach, a noise's lattice): on a picture
 //! thousands of pixels across the position has the precision of an f32 of that size, and the result stays within the kernel's
 //! bound. The generic parity test's pictures are tens of pixels across; these are 3000 px long in each direction.
 
@@ -15,6 +15,9 @@ fn recipes() -> Vec<(&'static str, Recipe)> {
         ("engraving", Recipe::new([step("engraving").param("bend", 0.0).param("angle", 71.0).param("spacing", 2.0)])),
         ("aurora", Recipe::new([step("aurora").param("height", 3000.0).param("waviness", 400.0)])),
         ("lens_flare", Recipe::new([step("lens_flare").param("x", 0.9).param("y", 0.8)])),
+        ("paper_texture", Recipe::new([step("paper_texture").param("scale", 3.0)])),
+        ("fog", Recipe::new([step("fog").param("scale", 3.0)])),
+        ("noise_field", Recipe::new([step("noise_field").param("kind", "value").param("scale", 3.0)])),
         ("light_leak", Recipe::new([step("light_leak").param("angle", 37.0).param("size", 80.0)])),
     ]
 }

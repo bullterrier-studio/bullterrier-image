@@ -47,6 +47,25 @@ pub(crate) struct Fractal {
 }
 
 impl Fractal {
+    /// The octaves for a kernel (`ops/noise.wgsl`): how many are kept, then the lattice spacing and the weight of each, as
+    /// [`field_rows`] works them out in f64.
+    #[cfg(feature = "gpu")]
+    pub(crate) fn octave_table(&self) -> Vec<f32> {
+        let mut kept = Vec::new();
+        let mut weight = 1.0; // constant: the coarsest octave counts in full
+        for octave in 0..self.octaves {
+            let spacing = self.spacing / self.lacunarity.powi(octave.cast_signed());
+            if spacing < 1.0 {
+                break;
+            }
+            kept.extend([cast::single(spacing), cast::single(weight)]);
+            weight *= self.persistence;
+        }
+        let mut table = vec![cast::single(length::float(kept.len() / 2))];
+        table.extend(kept);
+        table
+    }
+
     /// A number no value of [`field_rows`] reaches, from the lattice alone: a pixel's value is a sum of lattice values read
     /// with Catmull-Rom weights, divided by its own deviation. The weights of an axis sum to at most 5/4 in size, so
     /// the sum of the octaves is at most `(5/4)^2 x (the octave weights)` (lattice values are within -1..1), and the

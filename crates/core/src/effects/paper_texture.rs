@@ -104,6 +104,17 @@ fn wave(positions: std::ops::Range<usize>, axis: u64, params: &Params) -> Vec<f6
         .collect()
 }
 
+/// How the weave and the fibres mix: what a sum of the two axes' waves is multiplied by to have variance 1, and the shares of the
+/// weave and the fibres.
+fn mixing(params: &Params) -> (f64, f64, f64) {
+    // each wave has mean 0 and variance 1/2 (a cosine), times 1/3 more for a linen thread's strength (a uniform 0..1 has
+    // second moment 1/3); the two axes are independent, so the weave has variance 2 x that, and is divided by its root
+    let wave_variance: f64 = if params.kind == Kind::Linen { 1.0 / 6.0 } else { 0.5 }; // constant: linen thread variance derived in the comment above
+    let (weave_share, fibre_share) = (f64::from(1.0 - params.fibre).sqrt(), f64::from(params.fibre).sqrt());
+    // weave and fibres are independent with variance 1 each, so their mix with shares whose squares sum to 1 has it too
+    ((2.0 * wave_variance).sqrt().recip(), weave_share, fibre_share)
+}
+
 /// The picture with the texture laid over it.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let (height, width) = (picture.height(), picture.width());
@@ -127,14 +138,10 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             wave(first_row..first_row + height, 0, params),
             wave(0..width, 1, params),
         );
-        // each wave has mean 0 and variance 1/2 (a cosine), times 1/3 more for a linen thread's strength (a uniform 0..1 has
-        // second moment 1/3); the two axes are independent, so the weave has variance 2 x that, and is divided by its root
-        let wave_variance: f64 = if params.kind == Kind::Linen { 1.0 / 6.0 } else { 0.5 }; // constant: linen thread variance derived in the comment above
-        let (weave_share, fibre_share) = (f64::from(1.0 - params.fibre).sqrt(), f64::from(params.fibre).sqrt());
-        // weave and fibres are independent with variance 1 each, so their mix with shares whose squares sum to 1 has it too
+        let (weave_scale, weave_share, fibre_share) = mixing(params);
         texture = (0..height * width)
             .map(|at| {
-                let weave = (down[at / width] + across[at % width]) / (2.0 * wave_variance).sqrt();
+                let weave = (down[at / width] + across[at % width]) * weave_scale;
                 cast::single(weave_share * weave + fibre_share * f64::from(texture[at]))
             })
             .collect();
@@ -142,5 +149,52 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     picture.map_at(|row, column, pixel| {
         let gain = 1.0 + params.amount * texture[row * width + column];
         pixel.map(|level| (level * gain).clamp(0.0, 1.0))
+    })
+}
+
+/// The texture on the GPU (`paper_texture.wgsl`, with `ops/noise.wgsl`): the fibres are the CPU's value noise, a lattice read by cubic
+/// convolution, worked in f32 per pixel from the same seeded hash; the weave is two lines of cosines (the CPU makes them: a number a
+/// row and a number a column). The noise's position is told in single precision, so on a picture thousands of pixels across with
+/// lattice points a few pixels apart it is within about a ten-thousandth (tests/it/gpu/wide.rs).
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(
+        concat!(
+            include_str!("../ops/noise.wgsl"),
+            include_str!("paper_texture.wgsl")
+        ),
+        |params: &Params, _: &crate::gpu::Header| {
+            let (_, weave_share, fibre_share) = mixing(params);
+            let single = cast::single;
+            vec![
+                [params.amount, single(weave_share), single(fibre_share), 0.0],
+                [f32::from_bits(params.seed), f32::from_bits(u32::from(params.kind != Kind::Paper)), 0.0, 0.0],
+            ]
+        },
+    )
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let (scale, _, _) = mixing(params);
+        let (height, width, first_row) = (header.height as usize, header.width as usize, header.place().first_row);
+        let mut table: Vec<f32> = if params.kind == Kind::Paper {
+            vec![0.0; height + width]
+        } else {
+            wave(first_row..first_row + height, 0, params)
+                .into_iter()
+                .chain(wave(0..width, 1, params))
+                .map(|value| cast::single(value * scale))
+                .collect()
+        };
+        table.extend(
+            Fractal {
+                spacing: f64::from(params.scale),
+                octaves: params.octaves.cast_unsigned(),
+                persistence: f64::from(params.persistence),
+                lacunarity: f64::from(params.lacunarity),
+                seed: params.seed,
+                origin: 0.0, // constant: a lattice point on the first pixel
+            }
+            .octave_table(),
+        );
+        table
     })
 }
