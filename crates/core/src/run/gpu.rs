@@ -12,7 +12,7 @@ use super::regions::Evaluator;
 use super::size::{Origin, ratio_for};
 use super::step::{GpuStep, Prepared, prepare};
 use super::{Photo, Run};
-use crate::gpu::{Bindings, Encoded, Header};
+use crate::gpu::{Bindings, Encoded, Given, Header};
 use crate::ops::cast::single;
 use crate::ops::par;
 use crate::{BlendMode, Error, Frame, Gpu, GpuImage, Layer, Picture, Presets, Recipe};
@@ -204,16 +204,28 @@ async fn steps_on(
         return Err(Error::Recipe("a recipe needs at least one step".to_owned()));
     }
     let (height, width) = (start.height(), start.width());
-    let header = Header::new(height, width, crate::Place::new(height, width, 0), ratio);
-    let plan: Vec<Option<GpuStep<'_>>> = steps.iter().map(Prepared::on_gpu).collect();
+    let place = crate::Place::new(height, width, 0);
+    let header = Header::new(height, width, place, ratio);
+    let plan: Vec<Option<GpuStep<'_>>> = steps.iter().map(|step| step.on_gpu(ratio, place)).collect();
+    let reads = |at: usize| {
+        plan[at]
+            .as_ref()
+            .is_some_and(|step| step.kernel.reads_picture(step.params))
+    };
     let mut current = start;
     let mut index = 0;
     while index < steps.len() {
+        // a run of kernels ends at a step on the CPU, or before one that reads the picture (which starts the next run)
         let end = (index..steps.len())
-            .find(|&at| plan[at].is_none())
+            .find(|&at| plan[at].is_none() || (at > index && reads(at)))
             .unwrap_or(steps.len());
         if end > index {
-            // a run of kernels: one encoder, one submission
+            // a run of kernels: one encoder, one submission. A step that reads the picture is given it read back first
+            let seen = if reads(index) {
+                Some(gpu.download(&current).await?)
+            } else {
+                None
+            };
             let first = current;
             current = gpu
                 .guarded("run a step", || {
@@ -233,7 +245,8 @@ async fn steps_on(
                             }
                             None => None,
                         };
-                        current = kernel_step(gpu, &mut encoder, step, mask, &current, header)?;
+                        let sight = seen.as_ref().filter(|_| step.kernel.reads_picture(step.params));
+                        current = kernel_step(gpu, &mut encoder, step, mask, &current, header, sight)?;
                         regions.release(at);
                     }
                     gpu.queue().submit([encoder.finish()]);
@@ -270,9 +283,14 @@ fn kernel_step(
     mask: Option<Arc<Layer>>,
     current: &GpuImage,
     header: Header,
+    seen: Option<&crate::Image>,
 ) -> Result<GpuImage, Error> {
     let (height, width) = (current.height(), current.width());
-    let Encoded { block, table } = step.kernel.encode(step.params, &header)?;
+    let given = Given {
+        inputs: &step.inputs,
+        picture: seen,
+    };
+    let Encoded { block, table } = step.kernel.encode(step.params, &header, &given)?;
     let table = table.map(|table| gpu.send(&table, false));
     let after = gpu.picture_buffer(height, width);
     gpu.dispatch(

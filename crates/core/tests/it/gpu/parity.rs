@@ -6,13 +6,45 @@
 
 use bullterrier_image::params::{Kind, Scalar};
 use bullterrier_image::region::LinearGradient;
-use bullterrier_image::{Drive, Input, Layer, Options, Photo, Picture, Presets, Recipe, Step, effect, effects};
+use bullterrier_image::{
+    Drive, Error, Image, Input, Layer, Lut, Options, Photo, Picture, Presets, Recipe, Step, effect, effects,
+};
+use std::sync::Arc;
+
 use serde_json::Value;
 
 use super::{assert_finite, gpu, largest_gap, rendered};
 use crate::common::pictures::varied_seeded;
 
 const SIZES: [(usize, usize); 3] = [(1, 1), (17, 13), (64, 48)];
+
+/// The effects whose defaults the kernel leaves to the CPU (`dither`'s is a serial method): their default step reads the picture
+/// back and sends it again, so they move two pictures each way, not one.
+const DEFAULTS_ON_CPU: [&str; 1] = ["dither"];
+
+/// The name of the picture every photo of this test is given (a 4 x 4 one: a matrix of 16 distinct greys, and a strip of one
+/// tile), and of its lookup table (3 entries a side, not the identity).
+const PICTURE: &str = "m";
+const TABLE: &str = "table";
+
+/// The picture and table named above.
+fn given() -> Result<(Arc<Image>, Arc<Lut>), Error> {
+    let greys: Vec<f32> = [9_u8, 3, 12, 0, 7, 11, 4, 8, 13, 1, 14, 2, 5, 15, 6, 10]
+        .iter()
+        .flat_map(|&level| [f32::from(level) / 15.0; 3])
+        .collect();
+    let entries = (0..27_u16)
+        .map(|at| [0, 1, 2].map(|channel| f32::from((at * 7 + channel * 11) % 13) / 12.0))
+        .collect();
+    Ok((
+        Arc::new(Image::new(4, 4, &greys)?),
+        Arc::new(Lut::new(3, [0.0; 3], [1.0; 3], entries)?),
+    ))
+}
+
+/// Compound cases the effect's own table refuses by design, so the CPU renders none (`dither`'s last choices are `tiles` with
+/// `spot` separation and a `block`, each a refusal): the case is held by the others.
+const REFUSED_BY_DESIGN: [(&str, &str); 1] = [("dither", "every parameter at its last value")];
 
 /// The effects that have a kernel.
 fn with_kernels() -> Vec<String> {
@@ -55,6 +87,9 @@ fn tried(kind: Kind, min: Option<&Scalar>, max: Option<&Scalar>, choices: &[&str
         Kind::Bool => vec![Value::from(true), Value::from(false)],
         Kind::Choice => choices.iter().map(|&choice| Value::from(choice)).collect(),
         Kind::Color => ["#000000", "#ffffff", "#2a9d8f"].map(Value::from).to_vec(),
+        // the names of what `given` gives every photo
+        Kind::Picture => vec![Value::from(PICTURE)],
+        Kind::Lut => vec![Value::from(TABLE)],
         _ => Vec::new(),
     }
 }
@@ -189,7 +224,10 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
         for (seed, case) in cases.iter().enumerate() {
             for &(height, width) in &SIZES {
                 let values = seeded(height, width, seed);
-                let mut photo = Photo::new(Picture::new(height, width, &values)?);
+                let (picture, table) = given()?;
+                let mut photo = Photo::new(Picture::new(height, width, &values)?)
+                    .with_image(PICTURE, picture)
+                    .with_lut(TABLE, table);
                 if case.depth {
                     photo = photo.with_map("depth", Layer::new(height, width, ramp(height, width))?)?;
                 }
@@ -202,10 +240,11 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
                 if case.what == "defaults" {
                     // the kernel ran on the device: a step left to the CPU would read the picture back and send it again
                     let moved = gpu.transfers();
+                    let each_way = if DEFAULTS_ON_CPU.contains(&name.as_str()) { 2 } else { 1 };
                     assert_eq!(
                         (moved.uploads, moved.downloads),
-                        (1, 1),
-                        "{name} with its defaults ran on the CPU inside the GPU render"
+                        (each_way, each_way),
+                        "{name} with its defaults ran on the CPU inside the GPU render, or not as its table says"
                     );
                 }
                 let (cpu, on_gpu) = (cpu.into_values(), on_gpu.into_values());
@@ -232,6 +271,7 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters_an
             .iter()
             .map(|case| case.what.as_str())
             .filter(|what| !compared.contains_key(what))
+            .filter(|what| !REFUSED_BY_DESIGN.contains(&(name.as_str(), what)))
             .collect();
         assert!(never.is_empty(), "{name}: never compared: {never:?}");
     }

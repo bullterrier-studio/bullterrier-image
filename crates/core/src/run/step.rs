@@ -131,7 +131,7 @@ impl Prepared {
     /// field or a partition, and one whose effect has no kernel. The whole picture is the part it runs on (a GPU render
     /// has no room or window).
     #[cfg(feature = "gpu")]
-    pub(super) fn on_gpu(&self) -> Option<GpuStep<'_>> {
+    pub(super) fn on_gpu(&self, ratio: f64, place: crate::Place) -> Option<GpuStep<'_>> {
         let Self::Step(step) = self else { return None };
         let Runs::One { scaled } = &step.runs else { return None };
         if !step.fields.is_empty() || step.partition.is_some() {
@@ -143,6 +143,8 @@ impl Prepared {
             .map(|kernel| GpuStep {
                 kernel,
                 params: scaled,
+                // what `apply` offers a step with no field or partition: its tables and pictures, the place, the ratio
+                inputs: step.plain_inputs(ratio, place),
                 overlay: &step.overlay,
             })
     }
@@ -165,6 +167,7 @@ impl Prepared {
 pub(super) struct GpuStep<'a> {
     pub(super) kernel: &'a crate::GpuKernel,
     pub(super) params: &'a Value,
+    pub(super) inputs: Inputs<'a>,
     pub(super) overlay: &'a Overlay,
 }
 
@@ -393,6 +396,19 @@ impl StepRun {
         }
     }
 
+    /// The inputs of this step with no map: its tables and pictures, the picture's place and the size ratio. What `offering`
+    /// starts from, and what a GPU render's kernel is given.
+    fn plain_inputs(&self, ratio: f64, place: crate::Place) -> Inputs<'_> {
+        let mut offered = Inputs::default().with_size_ratio(ratio).with_place(place);
+        for (parameter, lut) in &self.luts {
+            offered = offered.with_lut(parameter.as_str(), lut);
+        }
+        for (parameter, image) in &self.pictures {
+            offered = offered.with_image(parameter.as_str(), image);
+        }
+        offered
+    }
+
     /// `then` given the inputs this step offers its effect: the selections it names made by `regions` for `working` and cut
     /// to `part`, its tables and pictures, the pieces of its partition and the size ratio.
     fn offering<T>(
@@ -407,15 +423,9 @@ impl StepRun {
         for (parameter, region) in &self.fields {
             fields.push((parameter, cut(regions.selection(region, working)?, part)));
         }
-        let mut offered = Inputs::default().with_size_ratio(ratio).with_place(part.place);
+        let mut offered = self.plain_inputs(ratio, part.place);
         for (parameter, layer) in &fields {
             offered = offered.with_field(parameter.as_str(), layer);
-        }
-        for (parameter, lut) in &self.luts {
-            offered = offered.with_lut(parameter.as_str(), lut);
-        }
-        for (parameter, image) in &self.pictures {
-            offered = offered.with_image(parameter.as_str(), image);
         }
         let partition = self
             .partition

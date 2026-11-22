@@ -774,3 +774,81 @@ pub(crate) fn data(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) 
         colours: made.palette,
     })
 }
+
+/// The settings `dither`'s kernel runs: the ordered and noise methods drawing from a palette. The error-diffusion methods
+/// and `riemersma` carry error from pixel to pixel, `dot_diffusion` takes its classes in turn, a `block` picks a pair of
+/// colours for each block, 'spot' separation prints overlapping inks and `tiles` draws a tile for each dot: the CPU runs
+/// them (counted).
+#[cfg(feature = "gpu")]
+fn on_gpu(params: &Params) -> bool {
+    params.separation == Separation::None
+        && params.block == 0
+        && matches!(
+            params.method,
+            Method::Bayer2
+                | Method::Bayer4
+                | Method::Bayer
+                | Method::Clustered
+                | Method::Clustered45
+                | Method::BlueNoise
+                | Method::WhiteNoise
+                | Method::GameboyCamera
+                | Method::Matrix
+        )
+}
+
+/// What `dither.wgsl` is given: the CPU's own palette (found in the picture it is given back for `photo`), its order of
+/// lightness and the screen's ranks, worked out by the code `render` runs.
+#[cfg(feature = "gpu")]
+fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<'_>) -> crate::gpu::Encoded {
+    let word = f32::from_bits;
+    let size = (header.height as usize, header.width as usize);
+    let cell = whole(f64::from(params.cell)).max(1);
+    let grid = (size.0.div_ceil(cell), size.1.div_ceil(cell));
+    let palette = if let Some(image) = given.picture {
+        let dots = averaged(image.as_picture().pixels(), size, cell);
+        colours(&dots, &in_space(&dots, params.space), params)
+    } else {
+        colours(&[], &[], params)
+    };
+    let matched = in_space(&palette, params.space);
+    let order = crate::ops::dither::lightness_order(&Choices::new(&matched, None));
+    let Some(screen) = thresholds(params.method, params, grid, given.inputs).map(|thresholds| thresholds.screen()) else {
+        unreachable!("the kernel runs ordered methods only (`on_gpu`)")
+    };
+    let words = |values: [usize; 4]| values.map(|value| word(u32::try_from(value).unwrap_or(u32::MAX)));
+    let block = vec![
+        words([cell, grid.0, grid.1, palette.len()]),
+        words([
+            crate::ops::dither::candidates(params.pattern),
+            screen.count,
+            screen.seed.map_or(0, |seed| seed as usize),
+            usize::from(screen.seed.is_some()),
+        ]),
+        words([screen.size.0, screen.size.1, screen.shift.0, screen.shift.1]),
+        words([usize::from(params.space == Space::Oklab), 0, 0, 0]),
+    ];
+    let table = matched
+        .iter()
+        .chain(&palette)
+        .flatten()
+        .copied()
+        .chain(order.0.iter().map(|&index| f32::from(index)))
+        .chain(order.1.iter().map(|&place| f32::from(place)))
+        .chain(screen.ranks)
+        .collect();
+    crate::gpu::Encoded {
+        block,
+        table: Some(table),
+    }
+}
+
+/// The ordered and noise methods on the GPU (`dither.wgsl`), within 1e-4 of the CPU: the dots, the matching and the screen's
+/// threshold are the CPU's maths in f32. A dot whose distances to two palette colours differ by less than f32 rounding may
+/// pick the other, which shows as a different pixel, not as a drift: parity pictures have no such dots.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::planned(include_str!("dither.wgsl"), plan)
+        .only_where(on_gpu)
+        .reading_picture(|params: &Params| params.palette == Palette::Photo)
+}

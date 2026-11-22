@@ -660,7 +660,44 @@ pub(crate) struct Thresholds<'a> {
 /// The ranks of white noise: a pixel's rank is one of this many levels.
 const NOISE_LEVELS: usize = 1 << 16; // constant: a rank is 16 bits
 
+/// A screen as a GPU kernel reads it (`dither.wgsl`).
+#[cfg(feature = "gpu")]
+pub(crate) struct Screen {
+    /// The tile's ranks, row after row; none for noise, which a kernel draws.
+    pub(crate) ranks: Vec<f32>,
+    /// The tile's, or for noise the picture's, rows and columns.
+    pub(crate) size: (usize, usize),
+    /// How many ranks there are.
+    pub(crate) count: usize,
+    /// The shift (rows, columns), in dots.
+    pub(crate) shift: (usize, usize),
+    /// The seed of a noise screen.
+    pub(crate) seed: Option<u32>,
+}
+
 impl Thresholds<'_> {
+    /// These thresholds as a kernel reads them.
+    #[cfg(feature = "gpu")]
+    pub(crate) fn screen(&self) -> Screen {
+        let (ranks, size, seed) = match &self.source {
+            Source::Tiled {
+                ranks, rows, columns, ..
+            } => (
+                ranks.iter().map(|&rank| f32::from(rank)).collect(),
+                (*rows, *columns),
+                None,
+            ),
+            Source::Noise { seed, size } => (Vec::new(), *size, Some(*seed)),
+        };
+        Screen {
+            ranks,
+            size,
+            count: self.count(),
+            shift: self.shift,
+            seed,
+        }
+    }
+
     fn count(&self) -> usize {
         match &self.source {
             Source::Tiled { count, .. } => *count,
@@ -839,6 +876,24 @@ fn bayer(wanted: usize) -> Vec<u16> {
 /// would resolve the tile's levels finer and cost more.
 const CANDIDATES: usize = 16; // constant: the common form of Knoll's mixing uses 16 candidates
 
+/// How many candidates an ordered dither mixes a pixel from at `amount` of the pattern: 1 + round(15 `amount`).
+pub(crate) fn candidates(amount: f32) -> usize {
+    #[expect(clippy::cast_precision_loss, reason = "a small constant")]
+    let extra = (CANDIDATES - 1) as f64;
+    1 + whole(f64::from(amount) * extra)
+}
+
+/// The palette's indices, darkest first (ties in palette order), and the place of each index in that order.
+pub(crate) fn lightness_order(palette: &Choices<'_>) -> (Vec<u8>, Vec<u8>) {
+    let mut darkest_first: Vec<u8> = (0..=u8::MAX).take(palette.len()).collect();
+    darkest_first.sort_by(|&a, &b| palette[usize::from(a)][0].total_cmp(&palette[usize::from(b)][0]));
+    let mut place = vec![0_u8; palette.len()];
+    for (at, &index) in darkest_first.iter().enumerate() {
+        place[usize::from(index)] = u8::try_from(at).unwrap_or(u8::MAX);
+    }
+    (darkest_first, place)
+}
+
 /// The palette colour chosen for each pixel of `values` (`height` x `width`, row after row) by ordered dithering: indices
 /// into `palette`, for any palette (not only one that runs from dark to light).
 ///
@@ -858,16 +913,8 @@ pub(crate) fn ordered(
     amount: f32,
 ) -> Vec<u8> {
     let count = thresholds.count();
-    #[expect(clippy::cast_precision_loss, reason = "a small constant")]
-    let extra = (CANDIDATES - 1) as f64;
-    let steps = 1 + whole(f64::from(amount) * extra);
-    // palette indices, darkest first (ties in palette order), and the place of each in that order
-    let mut darkest_first: Vec<u8> = (0..=u8::MAX).take(palette.len()).collect();
-    darkest_first.sort_by(|&a, &b| palette[usize::from(a)][0].total_cmp(&palette[usize::from(b)][0]));
-    let mut place = vec![0_u8; palette.len()];
-    for (at, &index) in darkest_first.iter().enumerate() {
-        place[usize::from(index)] = u8::try_from(at).unwrap_or(u8::MAX);
-    }
+    let steps = candidates(amount);
+    let (darkest_first, place) = lightness_order(palette);
     let mut chosen = vec![0; height * width];
     par::rows(&mut chosen, width, |first_row, band| {
         let mut mix = [0_u8; CANDIDATES];

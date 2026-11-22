@@ -3,6 +3,7 @@
 //! to the file `BT_GPU_SKIPS` names, which `poe rust-test-gpu` counts aloud (`tools/gpu_skips.py`); any other value is
 //! part of the adapter's name the tests must find (CI sets `llvmpipe`, Mesa's software Vulkan).
 
+mod dither;
 mod parity;
 mod reduce;
 mod render;

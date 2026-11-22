@@ -19,7 +19,7 @@ mod reduce;
 
 pub use image::GpuImage;
 pub use kernel::GpuKernel;
-pub(crate) use kernel::{Bindings, Block, Encoded, Header, Kernel};
+pub(crate) use kernel::{Bindings, Block, Encoded, Given, Header, Kernel};
 pub use reduce::{MOST_BINS, Plane, Reduction};
 
 /// The WGSL every kernel is compiled with: the binding layout, index helpers, the sRGB transfer and the luma weights.

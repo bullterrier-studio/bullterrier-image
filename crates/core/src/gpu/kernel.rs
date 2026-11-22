@@ -1,6 +1,7 @@
 //! What a kernel run is given: the uniform header every kernel reads, then its own block, and the buffers it binds.
 
-use crate::Place;
+use crate::effect::Check;
+use crate::{Image, Inputs, Place};
 
 /// The first part of every kernel's uniform (`Header` in prelude.wgsl): the picture's size, where it lies on its canvas and
 /// working pixels per design pixel.
@@ -83,13 +84,40 @@ pub(crate) struct Encoded {
     pub(crate) table: Option<Vec<f32>>,
 }
 
+/// What a planning kernel is given besides its parameters and the picture's header: the step's `Inputs` (the tables and
+/// pictures it names, its place and size ratio, as the CPU's `apply` is given them) and, for a kernel that
+/// [reads the picture](Kernel::reading_picture), the picture itself, read back first (one counted download).
+pub(crate) struct Given<'a> {
+    pub(crate) inputs: &'a Inputs<'a>,
+    pub(crate) picture: Option<&'a Image>,
+}
+
+/// How a kernel turns a step's parameters into what it is given.
+enum How<P> {
+    /// From the parameters and the header alone: the block and, if it reads one, the table.
+    Pure {
+        block: fn(&P, &Header) -> Block,
+        table: Option<fn(&P, &Header) -> Vec<f32>>,
+    },
+    /// With what only the CPU's own code can make (see [`Given`]).
+    Planned(fn(&P, &Header, &Given<'_>) -> Encoded),
+}
+
+impl<P> Clone for How<P> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<P> Copy for How<P> {}
+
 /// What a file in `src/effects/` declares to run its effect on the GPU: `pub(crate) fn kernel() -> Kernel<Params>`, beside
 /// its `<effect>.wgsl` (the prelude's bindings and helpers, its `struct Block` and `fn main`).
 pub(crate) struct Kernel<P> {
     wgsl: &'static str,
-    block: fn(&P, &Header) -> Block,
-    table: Option<fn(&P, &Header) -> Vec<f32>>,
+    how: How<P>,
     only: Option<fn(&P) -> bool>,
+    sees: Option<fn(&P) -> bool>,
     bound: f32,
 }
 
@@ -111,17 +139,39 @@ impl<P> Kernel<P> {
     pub(crate) const fn new(wgsl: &'static str, block: fn(&P, &Header) -> Block) -> Self {
         Self {
             wgsl,
-            block,
-            table: None,
+            how: How::Pure { block, table: None },
             only: None,
+            sees: None,
             bound: DEFAULT_BOUND,
         }
+    }
+
+    /// The kernel whose WGSL is `wgsl` and whose block and table `plan` makes from the parameters, the header and what only
+    /// the CPU can make: the step's `Inputs`, and the picture if the kernel [reads it](Self::reading_picture). The plan calls
+    /// the CPU's own functions, so the definition stays in one place.
+    pub(crate) const fn planned(wgsl: &'static str, plan: fn(&P, &Header, &Given<'_>) -> Encoded) -> Self {
+        Self {
+            wgsl,
+            how: How::Planned(plan),
+            only: None,
+            sees: None,
+            bound: DEFAULT_BOUND,
+        }
+    }
+
+    /// This kernel's plan reads the picture for the parameters `when` accepts (a palette found in it, quantiles of it): the
+    /// executor submits the work before it and reads the picture back, counted, to give it as `Given::picture`.
+    pub(crate) const fn reading_picture(mut self, when: fn(&P) -> bool) -> Self {
+        self.sees = Some(when);
+        self
     }
 
     /// This kernel reading `table` as its `data` (a curve's pieces, a list of marks the CPU's own generator drew), worked out
     /// from the parameters and the picture's header.
     pub(crate) const fn with_table(mut self, table: fn(&P, &Header) -> Vec<f32>) -> Self {
-        self.table = Some(table);
+        if let How::Pure { table: slot, .. } = &mut self.how {
+            *slot = Some(table);
+        }
         self
     }
 
@@ -135,7 +185,7 @@ impl<P> Kernel<P> {
 }
 
 /// How a step of the effect called `name` turns its parameters into what its kernel is given.
-type Encode = Box<dyn Fn(&serde_json::Value, &Header) -> Result<Encoded, crate::Error> + Send + Sync>;
+type Encode = Box<dyn Fn(&serde_json::Value, &Header, &Given<'_>) -> Result<Encoded, crate::Error> + Send + Sync>;
 
 /// Whether the kernel runs the parameters of a step.
 type Runs = Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>;
@@ -149,6 +199,7 @@ pub struct GpuKernel {
     bound: f32,
     encode: Encode,
     runs: Runs,
+    reads: Runs,
 }
 
 impl std::fmt::Debug for GpuKernel {
@@ -163,28 +214,42 @@ impl std::fmt::Debug for GpuKernel {
 
 impl GpuKernel {
     /// The kernel `kernel` of the effect called `name`, whose parameters are read as `P`.
-    pub(crate) fn of<P: serde::de::DeserializeOwned + 'static>(name: &'static str, kernel: Kernel<P>) -> Self {
+    pub(crate) fn of<P: serde::de::DeserializeOwned + 'static>(
+        name: &'static str,
+        kernel: Kernel<P>,
+        check: Option<Check<P>>,
+    ) -> Self {
         let Kernel {
             wgsl,
-            block,
-            table,
+            how,
             only,
+            sees,
             bound,
         } = kernel;
         Self {
             name,
             wgsl,
             bound,
-            encode: Box::new(move |params, header| {
+            encode: Box::new(move |params, header, given| {
                 let params = P::deserialize(params).map_err(|source| crate::Error::Params { effect: name, source })?;
-                Ok(Encoded {
-                    block: block(&params, header),
-                    table: table.map(|table| table(&params, header)),
+                // the effect's own refusal, the one `apply` makes, before anything is built
+                if let Some(check) = check {
+                    check(&params, given.inputs)?;
+                }
+                Ok(match how {
+                    How::Pure { block, table } => Encoded {
+                        block: block(&params, header),
+                        table: table.map(|table| table(&params, header)),
+                    },
+                    How::Planned(plan) => plan(&params, header, given),
                 })
             }),
             // parameters that do not read back are not the kernel's to judge: the CPU run reports them
             runs: Box::new(move |params| {
                 only.is_none_or(|only| P::deserialize(params).is_ok_and(|params| only(&params)))
+            }),
+            reads: Box::new(move |params| {
+                sees.is_some_and(|sees| P::deserialize(params).is_ok_and(|params| sees(&params)))
             }),
         }
     }
@@ -202,8 +267,21 @@ impl GpuKernel {
     }
 
     /// What the kernel is given for a step run with `params` (complete and scaled, as `Effect::apply` takes them).
-    pub(crate) fn encode(&self, params: &serde_json::Value, header: &Header) -> Result<Encoded, crate::Error> {
-        (self.encode)(params, header)
+    ///
+    /// # Errors
+    /// [`Error::Params`] for parameters that do not read back, else what the effect's `check` refuses.
+    pub(crate) fn encode(
+        &self,
+        params: &serde_json::Value,
+        header: &Header,
+        given: &Given<'_>,
+    ) -> Result<Encoded, crate::Error> {
+        (self.encode)(params, header, given)
+    }
+
+    /// Whether the kernel's plan reads the picture for a step with `params` (see [`Kernel::reading_picture`]).
+    pub(crate) fn reads_picture(&self, params: &serde_json::Value) -> bool {
+        (self.reads)(params)
     }
 
     /// Whether the kernel runs a step with `params`: not one with a setting it leaves to the CPU.

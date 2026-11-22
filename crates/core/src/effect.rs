@@ -300,7 +300,7 @@ fn no_data(name: &str) -> Error {
 }
 
 /// The refusal an effect's file declares: `Err` for a run its parameters and inputs cannot make.
-type Check<P> = fn(&P, &Inputs<'_>) -> Result<(), Error>;
+pub(crate) type Check<P> = fn(&P, &Inputs<'_>) -> Result<(), Error>;
 
 /// What an effect's file declares as `data`: what it makes beside its picture.
 type DataOf<P> = fn(&Picture<'_>, &P, &Inputs<'_>) -> Result<Data, Error>;
@@ -367,7 +367,7 @@ impl<P: Declared> Native<P> {
     where
         P: DeserializeOwned + 'static,
     {
-        self.kernel = Some(crate::GpuKernel::of(self.name, kernel));
+        self.kernel = Some(crate::GpuKernel::of(self.name, kernel, self.check));
         self
     }
 
@@ -424,7 +424,6 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
 
     #[cfg(feature = "gpu")]
     fn kernel(&self) -> Option<&crate::GpuKernel> {
-        // an effect file with both a kernel and a `check` fails the build (build.rs)
         self.kernel.as_ref()
     }
 
