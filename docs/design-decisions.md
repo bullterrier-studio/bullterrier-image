@@ -1857,6 +1857,19 @@ measured first would break at a larger one.
     noise value a kernel draws is the CPU's.
   - *A table the CPU derives in f64* (`gradient`'s offsets, a separable kernel's weights, a palette in Oklab) is made on the
     CPU and sent as `data`; WGSL has no f64 and `powf` differs per platform (lessons L22).
+  - *What stays on the CPU, counted* (BTIMG-0010 so far): `dither`'s error-diffusion methods, `riemersma` and `dot_diffusion` (a
+    pixel's result depends on the ones before it), a `block` (a pair of colours chosen for each block), 'spot' separation and
+    `tiles`; `gradient_map` for a picture whose brightness span is under 2e-3; `halftone`'s `rings`, `spiral` and `rays` screens
+    (polar maths) and `specks` (draws on the bits of 64-bit floats). `halftone`'s blur is summed on the device for a reach
+    under 16 px and made by the CPU, read back and sent as a counted table, for a longer one.
+  - *Equal to the CPU where it is a decision, not a drift.* An edge a pixel falls on (the cell of a screen, the nearest palette
+    colour) is the CPU's only if the rounding is: the device fuses `a * b + c` into one rounding, so `px * cos - py * sin` is not 0
+    on the diagonal of a 45 degree screen where the CPU's is, and the pixel lands in the next cell (a whole dot's tone off,
+    not 1e-6). `halftone.wgsl`'s `times` passes the product through an integer `or` with a zero the compiler cannot see, which
+    no multiply-add absorbs; a dot exactly equidistant from two palette colours in `dither` is the same hazard and is not
+    guarded (the kernel's tests draw none). Bounds: `halftone` 3e-4 (measured at most 9e-5: the inks are unmixed by 64 sweeps
+    of coordinate descent per cell, whose f32 rounding differs, and the dot's ramp multiplies it by cell over feather);
+    `dither` exact on every case measured; `interlace`, `lut`, `selective_color` 1e-7 to 5e-6.
 - **One executor.** `begin()` stays on the CPU (frame, resize, maps, prepared steps); the working picture is sent once; a run
   of steps with kernels is recorded into one command encoder and submitted together, each laid over its input by the `lay`
   kernel (`ops/blend.rs` formula for formula: modes, opacity, mask uploaded as a map) unless plain. A step whose effect has no
@@ -1877,7 +1890,7 @@ measured first would break at a larger one.
   (`color_balance`), 6e-8 (`levels`, `channel_mixer`); `grade` with exposure, contrast and saturation high together, 1.4e-5
   (a review's random combinations, up to 1.8e-5). WGSL's `pow` is undefined at 0, so `levels` guards it (the parity pictures hold exact 0s and 1s). Recipe
   budget (interim): at most 1/255 a channel after 8-bit rounding on 99.9% of values, 2/255 on all, tested on the five-kernel
-  chain and demo 31's recipe (two of its steps on the CPU).
+  chain, demo 31's recipe, a 1-bit Bayer dither, a Game Boy palette and a CMYK halftone, the last four whole on the device (one upload, one readback; `tests/it/gpu/recipes.rs`).
 - **What parity cannot see:** set-up code both paths share (`Remap::new`, the curve pieces, `colour_balance`'s gains,
   `prepare`'s scaling) is worked out once in Rust and handed to both, so a bug there makes the same wrong picture on both
   and parity passes. Those rest on the CPU tests of each effect, by design. The harness (`tests/it/gpu/parity.rs`): every

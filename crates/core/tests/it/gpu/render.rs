@@ -35,7 +35,7 @@ fn five_kernels() -> Recipe {
 }
 
 /// The dog of the examples, as a photo.
-fn dog() -> Result<Image, Error> {
+pub(super) fn dog() -> Result<Image, Error> {
     bullterrier_image::read(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/photos/bullterrier.jpeg"))
 }
 
@@ -44,7 +44,7 @@ fn dog() -> Result<Image, Error> {
 ///
 /// # Panics
 /// If their lengths differ or either holds a value that is not finite (a clamp would make a level of a NaN).
-fn levels_apart(cpu: &[f32], gpu: &[f32]) -> (f64, u8) {
+pub(super) fn levels_apart(cpu: &[f32], gpu: &[f32]) -> (f64, u8) {
     assert_eq!(cpu.len(), gpu.len());
     assert_finite(cpu, "the CPU's picture");
     assert_finite(gpu, "the GPU's picture");
