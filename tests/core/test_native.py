@@ -12,6 +12,7 @@ from bullterrier_image.core import native
 from bullterrier_image.errors import (
     BackendUnavailableError,
     DepthNotFoundError,
+    GpuError,
     ImageReadError,
     ImageWriteError,
     InvalidImageError,
@@ -38,6 +39,7 @@ RAISED_AS = {
     "backend_unavailable": BackendUnavailableError,
     "lut": LutError,
     "project": ProjectError,
+    "gpu": GpuError,
 }
 
 

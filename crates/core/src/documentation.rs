@@ -13,7 +13,8 @@ const INDENT: &str = "    ";
 
 /// The documentation of the effect called `name`: its description, then a "Parameters" section with every basic parameter's
 /// type, unit, range, default and meaning, then an "Advanced parameters" section (or, without `advanced`, one line counting
-/// them), then a "Step opacity" section if a step of it has an opacity other than 1 by default, then a "Presets" section
+/// them), then a "Step opacity" section if a step of it has an opacity other than 1 by default, a "GPU" section if it has a
+/// GPU kernel (feature `gpu`), then a "Presets" section
 /// (the presets of `presets`, in the order written) if it has any.
 ///
 /// # Errors
@@ -34,6 +35,14 @@ pub fn effect(name: &str, presets: &Presets, advanced: bool) -> Result<String, E
             text,
             "\n\nStep opacity\n------------\n{shown}: a step of this effect is mixed in at {shown} unless it sets its own \
              `opacity`, which replaces this."
+        );
+    }
+    #[cfg(feature = "gpu")]
+    if let Some(kernel) = found.kernel() {
+        let _ = write!(
+            text,
+            "\n\nGPU\n---\nA GPU render runs it as a kernel, within {} of the CPU's values.",
+            kernel.bound()
         );
     }
     let names = presets.names(name);

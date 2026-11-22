@@ -52,10 +52,12 @@ from .loader import with_files
 
 class _Effect(Protocol):
     """What `fx.<effect>` is: called with the effect's parameters and the step keys, all by keyword, it returns the
-    `Step`; `presets` is the effect's presets, {preset: {parameter: value}}."""
+    `Step`; `presets` is the effect's presets, {preset: {parameter: value}}; `gpu` whether a GPU render runs it as a
+    kernel (else on the CPU, between a readback and an upload)."""
 
     __name__: str
     presets: dict[str, dict[str, Any]]
+    gpu: bool
 
     def __call__(self, **values: Any) -> Step: ...
 
@@ -118,9 +120,10 @@ def _builder(name: str, function: Callable) -> _Effect:
     build.__doc__ = registry.documentation(name)
     # the effect's presets, `{preset: {parameter: value}}`: a function attribute, which mypy does not model
     build.presets = {preset: dict(found.params) for preset, found in registry.presets(name).items()}  # type: ignore[attr-defined]
+    build.gpu = registry.on_gpu(name)  # type: ignore[attr-defined]
     # `inspect.signature` reads this documented hook, which mypy does not model on functions
     build.__signature__ = _signature(name).replace(return_annotation="Step")  # type: ignore[attr-defined]
-    return cast("_Effect", build)  # `presets` was given above
+    return cast("_Effect", build)  # `presets` and `gpu` were given above
 
 
 def _signature(name: str) -> inspect.Signature:

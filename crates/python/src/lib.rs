@@ -4,6 +4,8 @@
 mod data;
 mod files;
 mod finding;
+#[cfg(feature = "gpu")]
+mod gpu;
 mod lut;
 mod palette;
 mod pipeline;
@@ -53,6 +55,10 @@ mod _core {
 
     #[pymodule_export]
     use super::lut::PyLut;
+
+    #[cfg(feature = "gpu")]
+    #[pymodule_export]
+    use super::gpu::PyGpu;
 
     #[pymodule_export]
     use super::palette::{named_palettes, palette};
@@ -230,8 +236,8 @@ fn summary(effect: &str) -> PyResult<String> {
 }
 
 /// What the effect called `effect` says about itself: a dict `{"name": str, "category": str, "opacity": float,
-/// "inputs": [str], "fields": {str: str}}`, where `fields` maps each parameter that names a field to the field a step
-/// that does not set it uses.
+/// "inputs": [str], "fields": {str: str}, "gpu": bool}`, where `fields` maps each parameter that names a field to the field a step
+/// that does not set it uses, and `gpu` says whether a GPU render runs it as a kernel (else on the CPU).
 ///
 /// `CoreError` if there is no effect of that name.
 #[pyfunction]
@@ -251,8 +257,20 @@ fn effect<'py>(py: Python<'py>, effect: &str) -> PyResult<Bound<'py, PyAny>> {
             "opacity": effect.opacity(),
             "inputs": inputs,
             "fields": fields,
+            "gpu": has_kernel(&*effect),
         }),
     )
+}
+
+/// Whether `effect` has a GPU kernel: never in a build without the GPU backend.
+fn has_kernel(effect: &dyn Effect) -> bool {
+    #[cfg(feature = "gpu")]
+    return effect.kernel().is_some();
+    #[cfg(not(feature = "gpu"))]
+    {
+        let _ = effect;
+        false
+    }
 }
 
 /// The names recipes and effects are described with, in the order the catalogue lists them: a dict `{"categories":

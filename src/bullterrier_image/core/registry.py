@@ -344,6 +344,13 @@ def opacity(name: str) -> float:
     return get(name).opacity
 
 
+def on_gpu(name: str) -> bool:
+    """Whether a GPU render runs the effect `name` as a kernel (only some of the core's own effects have one). KeyError
+    like `get`."""
+    get(name)
+    return bool(native.effect(name)["gpu"])
+
+
 def inputs(name: str) -> tuple[str, ...]:
     """The injected inputs (from `INPUTS`) the effect called `name` declares, e.g. ("partition",) (KeyError like
     `get`)."""

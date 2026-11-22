@@ -339,6 +339,10 @@ blue_from_blue : number, ratio, -3 to 3, default 1.0
     Weight of input blue in output blue (-3..3): 1 keeps it as it is (the default), 0
     removes it, above 1 amplifies it, a negative weight inverts it.
 
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
+
 Presets
 -------
 infrared : False-colour infrared: green is read as red, so foliage and bright greens turn pink and pale.
@@ -423,6 +427,10 @@ preserve_luminosity : true or false, default True
     changes (Photoshop's 'Preserve Luminosity'); off, a push toward a lighter or darker
     colour also lightens or darkens. Where a channel reaches 0 or 1 the luma is only
     kept as far as the clipping allows.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
 
 Presets
 -------
@@ -536,6 +544,10 @@ blue_highlights : number, fraction, 0 to 1, default 0.75
     The blue curve's output for the input three quarters of the way up (0..1; 0.75 =
     unchanged), applied after the master curve: raising it adds blue to the highlights,
     lowering it takes blue away. Its ends stay at black and white.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
 
 Presets
 -------
@@ -1653,6 +1665,10 @@ vibrance : number (drivable), fraction, 0 to 1, default 0.0
     at 0.2 goes to 0.36 while one at 0.9 only reaches 0.99. Greys and fully saturated
     colours stay as they are; colours are never made duller.
 
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
+
 Presets
 -------
 white_balance : White balance: corrects a warm (orange) cast and a slight magenta tint. For a cool cast use a positive temperature."""
@@ -2324,6 +2340,10 @@ output_black : number (drivable), fraction, 0 to 1, default 0.0
     the tones are reversed.
 output_white : number, fraction, 0 to 1, default 1.0
     The brightest value that can be output (0..1): lowering it dims the whites.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
 
 Presets
 -------

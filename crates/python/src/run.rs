@@ -66,10 +66,14 @@ use super::{
 /// picture): the same picture, in less memory for a run of steps that read a bounded neighbourhood of a pixel. A `band`
 /// of 0 is a `CoreError` of kind `recipe`.
 ///
+/// `gpu` is a `Gpu` to render on (none: the CPU): the same picture, held to each kernel's bound instead of the CPU's
+/// bytes; a step whose effect has no kernel runs on the CPU between a readback and an upload. A GPU render takes no
+/// `band` (a `CoreError` of kind `gpu`). `threads` then applies to the CPU's part of the work.
+///
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.
 #[pyfunction]
-#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=Count(1), band=None))]
+#[pyo3(signature = (rgb, recipe, *, maps=None, finders=None, luts=None, pictures=None, presets=None, size=None, threads=Count(1), band=None, gpu=None))]
 #[expect(
     clippy::too_many_arguments,
     reason = "the arguments are the Python function's keywords"
@@ -86,12 +90,13 @@ pub(crate) fn render<'py>(
     size: Option<Count<SIZE>>,
     threads: Count<THREADS>,
     band: Option<Count<BAND>>,
+    gpu: Option<&Bound<'py, PyAny>>,
 ) -> PyResult<Bound<'py, PyArray3<f32>>> {
     let readonly = photo_array(rgb)?;
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders, luts, pictures)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = options_of(size, threads, band)?;
+    let options = on_gpu(options_of(size, threads, band)?, gpu)?;
     let image = py
         .detach(|| photo.render(&recipe, &presets, options))
         .map_err(core_error)?;
@@ -408,6 +413,26 @@ pub(super) fn options_of(
         options = options.with_band(rows);
     }
     Ok(options)
+}
+
+/// `options` with the render on `gpu`, a `Gpu`, if one is given.
+///
+/// # Errors
+/// A `TypeError` if `gpu` is no `Gpu`; a `ValueError` for a build without the GPU backend.
+fn on_gpu(options: Options, gpu: Option<&Bound<'_, PyAny>>) -> PyResult<Options> {
+    let Some(gpu) = gpu else { return Ok(options) };
+    #[cfg(feature = "gpu")]
+    {
+        let gpu = gpu.cast::<super::gpu::PyGpu>()?;
+        Ok(options.with_gpu(&gpu.get().gpu))
+    }
+    #[cfg(not(feature = "gpu"))]
+    {
+        let _ = (options, gpu);
+        Err(value_error(
+            "this build of the extension has no GPU backend (feature `gpu`)",
+        ))
+    }
 }
 
 pub(crate) const SIZE: u8 = 0;

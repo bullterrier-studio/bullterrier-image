@@ -31,11 +31,13 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr__` imports each name on first use
     from . import fx, imageio, recipe
+    from .core.gpu import Gpu
     from .core.values import Lut, Picture
     from .errors import (
         BackendUnavailableError,
         BullterrierImageError,
         DepthNotFoundError,
+        GpuError,
         ImageReadError,
         ImageWriteError,
         InvalidImageError,
@@ -99,10 +101,11 @@ if TYPE_CHECKING:  # what type checkers and editors see; at run time `__getattr_
 _HOMES = {
     ".": ("fx", "imageio", "recipe"),
     ".errors": (
-        "BackendUnavailableError", "BullterrierImageError", "DepthNotFoundError", "ImageReadError", "ImageWriteError",
-        "InvalidImageError", "LutError", "MapNotFoundError", "NonFiniteImageError", "ProjectError", "RecipeError",
-        "SubjectNotFoundError", "UnknownEffectError",
+        "BackendUnavailableError", "BullterrierImageError", "DepthNotFoundError", "GpuError", "ImageReadError",
+        "ImageWriteError", "InvalidImageError", "LutError", "MapNotFoundError", "NonFiniteImageError", "ProjectError",
+        "RecipeError", "SubjectNotFoundError", "UnknownEffectError",
     ),
+    ".core.gpu": ("Gpu",),
     ".core.values": ("Lut", "Picture"),
     ".finding.depth": ("depth_finder", "depth_map", "inverse_depth"),
     ".finding.subject": ("subject_finder", "subject_matte"),
@@ -166,6 +169,8 @@ __all__ = [
     "Finder",
     "Framing",
     "Given",
+    "Gpu",
+    "GpuError",
     "Grid",
     "ImageReadError",
     "ImageWriteError",

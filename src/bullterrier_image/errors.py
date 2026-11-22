@@ -13,6 +13,7 @@ __all__ = [
     "BackendUnavailableError",
     "BullterrierImageError",
     "DepthNotFoundError",
+    "GpuError",
     "ImageReadError",
     "ImageWriteError",
     "InvalidImageError",
@@ -43,6 +44,12 @@ class ProjectError(BullterrierImageError, ValueError):
     checkout without the template or an example recipe, an effect name that is taken or cannot be one. Raised when
     the project is made or read (or, for that photo, when it is processed), naming the file (if any), the setting and
     the value."""
+
+
+class GpuError(BullterrierImageError, RuntimeError):
+    """The GPU backend cannot do what was asked: no GPU adapter on this machine, a limit the device lacks, a picture
+    larger than it holds, or an option a GPU render does not take yet (`band`). The message names the cause; the same
+    render without `gpu=` runs on the CPU."""
 
 
 class UnknownEffectError(RecipeError, KeyError):

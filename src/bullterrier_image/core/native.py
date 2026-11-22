@@ -15,6 +15,7 @@ from bullterrier_image.errors import (
     BackendUnavailableError,
     BullterrierImageError,
     DepthNotFoundError,
+    GpuError,
     ImageReadError,
     ImageWriteError,
     InvalidImageError,
@@ -41,6 +42,7 @@ _RAISED_AS: dict[str, type[BullterrierImageError]] = {
     "backend_unavailable": BackendUnavailableError,
     "lut": LutError,
     "project": ProjectError,
+    "gpu": GpuError,
 }
 
 
@@ -83,6 +85,7 @@ shipped_looks = entry(_core.shipped_looks)
 register = entry(_core.register)
 unregister = entry(_core.unregister)
 render = entry(_core.render)
+gpu = entry(_core.Gpu)
 trace = entry(_core.trace)
 check_recipe = entry(_core.check_recipe)
 check = entry(_core.check)

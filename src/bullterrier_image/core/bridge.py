@@ -11,6 +11,7 @@ The stages `trace` returns are the core's, as tuples; naming them is `recipe.tra
 """
 
 from collections.abc import Mapping, Sequence
+from functools import partial
 from typing import Any
 
 import numpy as np
@@ -39,6 +40,7 @@ def render(
     size: int | None = None,
     threads: int = 1,
     band: int | None = None,
+    gpu: Any = None,
 ) -> np.ndarray:
     """`recipe` run on the photo `rgb` by the core: the picture it makes, (h, w, 3), or (h, w, 4) (RGB and straight
     alpha) when its frame cuts the picture out.
@@ -63,7 +65,7 @@ def render(
     needs a map and neither the map nor a finder was given, the finder returns None, or the map is not (h, w) or not
     within 0..1.
     """
-    return render_all(rgb, [recipe], maps=maps, finders=finders, size=size, threads=threads, band=band)[0]
+    return render_all(rgb, [recipe], maps=maps, finders=finders, size=size, threads=threads, band=band, gpu=gpu)[0]
 
 
 def render_all(
@@ -75,10 +77,13 @@ def render_all(
     size: int | None = None,
     threads: int = 1,
     band: int | None = None,
+    gpu: Any = None,
 ) -> list[np.ndarray]:
     """Each recipe of `recipes` run on the photo `rgb`, as `render` does; each map is found at most once, however many
-    recipes need it. A name in `maps` or `finders` that is no map of any recipe is a RecipeError."""
-    return _each(native.render, rgb, recipes, maps, finders, size, threads, band)
+    recipes need it. A name in `maps` or `finders` that is no map of any recipe is a RecipeError. `gpu`: the core's
+    `Gpu` to render on (None: the CPU)."""
+    run = native.render if gpu is None else partial(native.render, gpu=gpu)
+    return _each(run, rgb, recipes, maps, finders, size, threads, band)
 
 
 def trace(

@@ -160,3 +160,7 @@ jobs:
         env:
           BT_GPU: llvmpipe
         run: uv run --locked poe rust-test-gpu
+      - name: The Python package's GPU tests on lavapipe (pytest tests/core/test_gpu.py)
+        env:
+          BT_GPU: llvmpipe
+        run: uv run --locked pytest -q -n 0 -ra tests/core/test_gpu.py

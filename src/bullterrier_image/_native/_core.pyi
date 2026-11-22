@@ -12,6 +12,7 @@ __all__ = [
     "RECIPE_FORMATS",
     "Characters",
     "CoreError",
+    "Gpu",
     "Lut",
     "apply",
     "characters",
@@ -99,6 +100,17 @@ class Lut:
     @property
     def domain_max(self) -> tuple[float, float, float]: ...
     def table(self) -> np.ndarray: ...
+
+@final
+class Gpu:
+    def __new__(cls) -> Gpu: ...
+    @property
+    def adapter(self) -> str: ...
+    @property
+    def largest_picture(self) -> int: ...
+    @property
+    def transfers(self) -> dict[str, int]: ...
+    def reset_transfers(self) -> None: ...
 
 def apply(
     effect: str,
@@ -218,6 +230,7 @@ def render(
     size: int | None = None,
     threads: int = ...,
     band: int | None = None,
+    gpu: Gpu | None = None,
 ) -> np.ndarray: ...
 def trace(
     rgb: np.ndarray,
