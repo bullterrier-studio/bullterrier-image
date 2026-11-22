@@ -1,7 +1,7 @@
 """`Gpu`: the Rust core's GPU context, which a render is given as `gpu=`.
 
 Interface:
-    Gpu()            -> a context on this machine's GPU; GpuError when it has none
+    Gpu()            -> a context on this machine's GPU; GpuError when it has none or the platform is not macOS
     held(gpu)        -> the core's context of a `Gpu`, or None: what `render` hands the core
 """
 

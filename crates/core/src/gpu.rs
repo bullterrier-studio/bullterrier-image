@@ -117,10 +117,10 @@ async fn adapter_of(instance: &wgpu::Instance) -> Result<wgpu::Adapter, Error> {
         })
 }
 
-/// Whether the GPU backend supports operating system `os` (`std::env::consts::OS`): macOS (Metal). The browser (WebGPU) is
-/// supported too, but has no OS name: [`require_supported_platform`] skips this check there. `test_bed` is the one
-/// exception, for CI only: Linux on Mesa's software Vulkan (`BT_GPU=llvmpipe`) is the only free GPU runner, so the GPU
-/// tests run there.
+/// Whether the GPU backend supports operating system `os` (`std::env::consts::OS`): macOS (Metal). The browser
+/// (WebGPU) is supported too, but has no OS name: [`require_supported_platform`] skips this check there. `test_bed` is
+/// the one exception, for CI only: Linux on Mesa's software Vulkan (`BT_GPU=llvmpipe`) is the only free GPU runner,
+/// so the GPU tests run there.
 fn supported(os: &str, test_bed: bool) -> Result<(), Error> {
     if os == "macos" || (os == "linux" && test_bed) {
         return Ok(());
@@ -146,8 +146,8 @@ impl Gpu {
     /// storage buffer (so the largest picture is what the adapter holds, not WebGPU's default of 128 MiB).
     ///
     /// # Errors
-    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), if there is no adapter, or it
-    /// gives no device.
+    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), if there is no adapter,
+    /// or it gives no device.
     pub async fn request() -> Result<Self, Error> {
         require_supported_platform()?;
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
@@ -174,8 +174,9 @@ impl Gpu {
     /// it.
     ///
     /// # Errors
-    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), or naming the limit, if the device allows fewer storage buffers a shader stage, bindings a group or
-    /// invocations a workgroup than the core's kernels use.
+    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), or naming the limit, if
+    /// the device allows fewer storage buffers a shader stage, bindings a group or invocations a workgroup than the
+    /// core's kernels use.
     pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Result<Self, Error> {
         require_supported_platform()?;
         let limits = device.limits();
