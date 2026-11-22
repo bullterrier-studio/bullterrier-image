@@ -118,6 +118,33 @@ that wants it continuous orders the halos last. Regions (`mask`, fields, partiti
 window's canvas; with `with_band` the runner's bands compose. Refused (`Error::Recipe`, naming `room`): a room that leaves no box, and a `frame` or `size`. `tests/it/room.rs`
 renders every effect on a grown picture (its edge repeated) against the box alone: bit for bit for a boxed step, and inside its margin and spread for the others. Not in Python.
 
+**GPU** (feature `gpu`; `crates/core/src/gpu.rs`, `gpu/`, `run/gpu.rs`; why: design-decisions, "GPU backend"). One backend
+choice, the render options; the CPU is the reference and byte promises are CPU promises.
+
+```text
+let gpu = Gpu::request_blocking()?;                       // or Gpu::new(device, queue): the caller's wgpu device
+let options = Options::default().with_size(1080).with_gpu(&gpu);
+let image: Image = photo.render(&recipe, &presets, options.clone())?;             // on the GPU, one readback
+let resident: GpuImage = gpu.render_blocking(&photo, &recipe, &presets, options)?; // stays on the device
+let next = gpu.render_from_blocking(&resident, &recipe2, &presets, Options::default())?;
+let back: Image = gpu.download_blocking(&next)?;          // async: `download`, `render`, `render_from`, `request`
+```
+
+`Gpu` (Clone, shared; equal only as clones): the device and queue, pipelines by kernel name, the largest picture, a transfer
+count; wgpu calls run in error scopes (`Gpu::guarded`), so a failure is `Error::Gpu`. `GpuImage`: one `vec4<f32>` a pixel in a
+storage buffer, straight alpha, owned by its `Gpu` (another's is refused). Upload: 3 or 4 floats a pixel, spread by the
+`unpack` kernel; readback: a copy and a map. A kernel: `gpu/prelude.wgsl` (bindings: 0 uniform `Header` then the effect's
+`Block` of vec4s, 1 `source`, 2 `dest`, 3 `data` floats, 4 `other` picture; `inside`, `pixel_index`, `store`, `luminance`,
+the sRGB transfer) plus its own `main`, `@workgroup_size(16, 16)`. An effect file declares `fn kernel() -> Kernel<Params>`
+(WGSL, the block from `Params`, an optional table, default bound 1e-4) beside `<effect>.wgsl`; `build.rs` adds it under the
+feature, `Native` erases it into the public `GpuKernel` that `Effect::kernel` returns (None for every other effect). The
+executor (`run/gpu.rs`): `begin()` on the CPU, the working picture uploaded once, runs of kernel steps (`Prepared::on_gpu`:
+a plain step of an effect with a kernel, no drive, field or partition) recorded into one encoder, each laid over its input by
+`gpu/lay.wgsl` unless plain; any other step through `Prepared::apply` between a readback and an upload. `frame.transparent`:
+`Cut` after the readback, or `gpu/alpha.wgsl` for `Gpu::render`. Refused by name (`Error::Gpu`): `with_band`, `with_window`,
+`with_room`; `trace`, `region_map` and the data calls with a GPU; `render_from` with a `frame`, another `size` or a map. Tests:
+`tests/it/gpu/` (`poe rust-test-gpu`; `BT_GPU`, `docs/development.md`); Python: `bt.Gpu`, `render(..., gpu=)`.
+
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`
 (`finders={"subject": ...}`); the core's `Photo` takes the same (`with_map`, `with_finder`). `subject`, `depth` and `light` (made
 from the working picture: framed and sized, before any step) are built in, and `background` is 1 - `subject`; any other map is a recipe's `given` region.

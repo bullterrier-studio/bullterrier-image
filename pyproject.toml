@@ -157,6 +157,7 @@ rust-test-gpu = { cmd = "python tools/run_capped.py -- cargo test -p bullterrier
 rust-test-release = { cmd = "python tools/run_capped.py -- cargo test --release --locked --quiet -p bullterrier-image --test vectorised", help = "Run the timing guard that only an optimised build can run: the pixel loops stay vectorised" }
 rust-test-full = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast -- --ignored --test-threads=1", help = "Run the Rust tests that only the full tier runs (the whole matrices), under the memory cap" }
 # A crate's Rust integration tests are one binary (tests/it/main.rs); tools/check_rust_test_layout.py, the table [tool.rust-tests.own-binaries]
+bench-gpu = { cmd = "python tools/run_capped.py -- cargo run --release --locked --quiet -p bullterrier-image --features gpu --example bench_gpu", help = "Time each GPU kernel and their chain at 1920 x 1080: CPU one thread and all cores, GPU end to end and on the device (needs a GPU)" }
 rust-test-layout = { cmd = "python tools/check_rust_test_layout.py", help = "Check that the Rust integration tests are one binary per crate (tests/it/)" }
 dead-code = { cmd = "vulture src", help = "Find dead code in src (vulture)" }
 # The project's own gates and the steps only `full` runs: the template ships these two lines as no-ops and never changes

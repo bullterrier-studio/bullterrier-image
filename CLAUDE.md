@@ -67,6 +67,9 @@ _native    home of the Rust extension `_native._core`, beside errors          (i
 - Outside a pool a kernel runs inline, and `Effect::apply` takes no thread parameter.
 - Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count).
 - Never add real complexity for the last bit: if a kernel's rounding differs between runs with no visible effect, compare within a small tolerance.
+- **GPU** (feature `gpu`, `docs/architecture.md` "GPU"): byte promises (threads, bands, windows, WebAssembly) are CPU promises. A
+  new effect is written for the CPU first; a GPU kernel (`fn kernel() -> Kernel<Params>` and `<effect>.wgsl`) may follow, with its
+  bound beside it (default 1e-4; a looser one says why) and held to it by `tests/it/gpu/parity.rs`. Effects never touch a device.
 
 Imports flow **downward only** (import-linter: contracts in `pyproject.toml`, run by `tests/test_layering.py` and
 `uv run lint-imports`). A forbidden import means the code is in the wrong layer: move it.
@@ -96,7 +99,7 @@ Those rules apply here. What follows is image's own, or where it needs a rule di
 7. **Layering and the contract are tests**, run over every effect automatically.
 8. **Errors:** callers catch `BullterrierImageError` (`bullterrier_image.errors`). Library code raises a subclass
    (`RecipeError`, `UnknownEffectError`, `MapNotFoundError` with `SubjectNotFoundError` and `DepthNotFoundError`,
-   `BackendUnavailableError`, `ImageReadError`, `ImageWriteError`, `LutError`, `InvalidImageError` with `NonFiniteImageError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
+   `BackendUnavailableError`, `ImageReadError`, `ImageWriteError`, `LutError`, `InvalidImageError` with `NonFiniteImageError`, `GpuError`), never a bare `ValueError`, for anything a caller, recipe or photo can get wrong;
    each also inherits the matching builtin. A broken effect definition (caught at import) is a programming error: plain
    `ValueError`/`TypeError`.
 

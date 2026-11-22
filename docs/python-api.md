@@ -48,6 +48,12 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   bytes at any number. To render many photos at once keep 1 and use your own threads: the GIL is released while the core
   works. `step.apply` and `fx.<effect>` use 1. `bt-image` (`render`, `sheet`, `sweep`, `steps`, `run`) and the gallery render one picture at a
   time, so they use every core.
+- **GPU.** `gpu = bt.Gpu()` takes this machine's GPU (Metal, Vulkan or Direct3D 12; none is a `GpuError`); `render(photo,
+  recipe, gpu=gpu)` (also `render_all`) returns the same float32 array, held to each kernel's bound (1e-4) instead of the
+  CPU's bytes. A step whose effect has no kernel runs on the CPU between a readback and an upload: `fx.<effect>.gpu` says
+  which do (`levels`, `grade`, `curves`, `channel_mixer`, `color_balance`). `gpu.transfers` counts what crossed
+  (`{"uploads", "downloads", "bytes"}`, one each for an all-kernel recipe; `gpu.reset_transfers()`), `gpu.adapter` names the
+  device. A GPU render takes no `band` (`GpuError`); `threads` applies to its CPU part. Share one `Gpu` between renders.
 - **One effect.** `fx.bloom(radius=12).apply(photo)` is `render(photo, Recipe([step]))`, and takes what `render` takes
   (`maps`, `finders`, `size`); `render(photo, step)` too. The recipe is a `Recipe` or a `Step`, `render_all` takes a list
   or tuple of `Recipe`; anything else (a list of steps, a look's name, swapped arguments) is a `RecipeError` naming the fix.

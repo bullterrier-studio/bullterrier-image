@@ -12,6 +12,8 @@ its `Unreleased` becomes the release date.
 
 ### Changed
 
+- **BREAKING:** Rust `Options` is no longer `Copy` (it can hold a `Gpu`); clone it to render twice with the same options.
+
 - **BREAKING:** a colour of a step (`point_light.color`, `bloom.color`) has an address: it is a settable kind, not three numbers.
   Rust `Recipe::numbers`, `number`, `Number` and `Located::number` are `parameters`, `parameter`, `Parameter` and
   `Located::parameter`; `with_values` takes `&[(&str, Setting)]` (a number or a colour). Python and WebAssembly `parameters()`
@@ -37,6 +39,12 @@ its `Unreleased` becomes the release date.
 - `_core.register` requires a `table=`; the `foreign` arguments of `numbers` and `locate` are gone.
 
 ### Added
+
+- **A GPU backend** (Rust feature `gpu`, in the wheel): `Gpu` (`request`, or `new` on a caller's wgpu device), `GpuImage`,
+  `Options::with_gpu`, `Gpu::render` and `render_from` (pictures kept on the device), `Gpu::transfers`. Python: `Gpu()`,
+  `render(..., gpu=)`, `GpuError`, `fx.<effect>.gpu`. Kernels: `levels`, `grade`, `curves`, `channel_mixer`,
+  `color_balance` and a step's blend mode, opacity and mask, each within 1e-4 of the CPU; other steps run on the CPU inside
+  a GPU render.
 
 - `Recipe::close_band_margin`: the rows of margin a window needs when its rows need only look the same as the whole render's
   (within 32 of 65,535 on a value of 0 to 1), which also clears steps that sum a blur by a Fourier transform or round a

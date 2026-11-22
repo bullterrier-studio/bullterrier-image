@@ -55,6 +55,11 @@ rustfft = { workspace = true, features = ["wasm_simd"] }
 peak_alloc.workspace = true
 proptest.workspace = true
 
+# `uv run poe bench-gpu`: the GPU backend's timings at 1080p
+[[example]]
+name = "bench_gpu"
+required-features = ["gpu"]
+
 # the identity of the core: a hash of its sources, computed at build time (`build.rs`)
 [build-dependencies]
 sha2.workspace = true

@@ -836,9 +836,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   `focus_blur` exceed 200 ms there. WASM SIMD (`simd128`) changed nothing then, because the per-pixel loops were not
   vectorised (fixed, see the next point). The image looks of a shirt-print demo as one recipe (grade, blue-noise dither,
   outline, gradient, halftone, grain) take 105 ms native and 154 ms in WASM. The core's `.wasm` is 5.4 MB after
-  `wasm-opt`, 1.25 MB brotli. *Conclusion:* no GPU is needed for a live preview; the order is a smaller preview (about
+  `wasm-opt`, 1.25 MB brotli. *Conclusion (2026-11-16):* no GPU is needed for a slider preview; the order is a smaller preview (about
   0.5 MP) with a render on slider release for the slow class, then the missed vectorisation and the sampler (both done,
-  next point) and the Fourier blur at preview size.
+  next point) and the Fourier blur at preview size. A live graph at 60 fps is another bar, which a GPU backend now meets for
+  the per-pixel looks: see "GPU backend (BTIMG-0009)".
 
 - **Pixel loops vectorise only when the compiler can see the buffers do not overlap (2026-11-17).** `Picture::map` and
   `map_at` run each band through a `#[inline(never)]` helper that takes the output and input as slices: inlined into the
@@ -874,8 +875,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   `SubjectNotFoundError`), with the core's message. *Rejected:* a second recipe format for JavaScript (a recipe is the
   recipe document); the subject finder in the browser (`ort` loads its library with `dlopen`: the cut-out is made elsewhere
   and handed in with `options.maps` of `render`); returning float pixels (4x the bytes, and the native export rounds to 8 bits anyway);
-  threads (workers and `SharedArrayBuffer` need cross-origin isolation, and the budget below is met on one); a GPU path (a
-  second implementation of every effect: see the spike above). *Limits:* a render blocks the thread that calls it (a page
+  threads (workers and `SharedArrayBuffer` need cross-origin isolation, and the budget below is met on one); a GPU path in
+  this package for now (the WebAssembly package on WebGPU is a later ticket of the GPU backend: see "GPU backend (BTIMG-0009)"). *Limits:* a render blocks the thread that calls it (a page
   uses a worker when it must not); the photo is converted to floats once, by `new Photo`, and every render resamples it to
   `size`, so a page keeps the photo near the preview size; the package is 8 MB uncompressed; a recipe naming a file on disk
   (an svg region, a `.cube` table, a picture by path) fails in the browser, as no file system is there (a picture and a table
@@ -1148,8 +1149,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   ids, `ops/par.rs`), and a caller that renders frames side by side used cores for each one over. A pool is made the
   first time a count is asked for and kept for the life of the process (idle threads, at most one pool per count), and
   every render at that count shares it: `with_threads(n)` means the process's n threads, not n for this render. *No feature flag:* rayon is a plain dependency (MIT or
-  Apache-2.0, small). *No GPU yet:* the CPU benchmark below is the baseline to beat, and the effects are still mostly
-  numpy; revisit after the E-batches. *Numbers* (M4, 1080p, 12-step all-native look, 543 ms at 1 thread): 294 ms at 2,
+  Apache-2.0, small). *Threads and the GPU:* the CPU benchmark below is the baseline the GPU backend is measured
+  against; a GPU render uses threads for its CPU part only (see "GPU backend (BTIMG-0009)"). *Numbers* (M4, 1080p, 12-step all-native look, 543 ms at 1 thread): 294 ms at 2,
   204 at 4, 145 at 10 (3.7x); laying a step is memory bound (2.4x at 10), grade 4.3x. In the Python-bodied recipes of
   today, effects are about 70 percent of the time and stay single-threaded, so the gain is small until they are ported;
   whole renders from Python threads side by side scale 2.8x at 4 and 3.6x at 10.
@@ -1775,3 +1776,64 @@ step that raises contrast multiplies the difference by its gain, so the bound is
 recipe. *Why 32:* the worst measured at export size is 14, so 32 leaves a factor of two; a bound that holds only at the sizes
 measured first would break at a larger one.
 
+## GPU backend (BTIMG-0009, 2026-11-22)
+
+- **The CPU is the reference; the GPU is an option of a render, held to a bound.** Feature `gpu` (off for pure Rust callers:
+  compile time; on in the wheel). One choice: `Options::with_gpu(&gpu)`; `Photo::render` returns the same `Image` type on
+  both backends, the recipe and its parameters are the same, and nothing falls back silently (no adapter, a picture past the
+  device, an option the GPU path does not take: `Error::Gpu`, naming the cause). Byte promises (any thread count, bands,
+  windows, WebAssembly against native) stay CPU promises. *Rejected:* an `auto` backend (the result would need to say which
+  ran); a GPU-only effect.
+- **`Gpu` wraps the caller's device and queue** (`Gpu::new`), or takes its own (`Gpu::request`: the high-performance
+  adapter, asking for its own storage-buffer limits so a picture is as large as the device holds, not WebGPU's 128 MiB). It
+  holds the pipelines (compiled by kernel name the first time), the adapter's name, the largest picture and a transfer
+  count. It sets no handler on a caller's device: wgpu calls run inside error scopes, so a validation or memory error is an
+  `Error::Gpu`, not wgpu's panic. `Clone` shares it; two are equal only as clones (so `Options` compare a GPU by identity).
+- **`Options` lost `Copy`** to hold a `Gpu`: a backend is an option like the size and the threads. Public calls still take
+  `Options` by value (built at the call, `Options::default().with_size(..)`); a caller rendering twice clones.
+- **`GpuImage`: the picture on the device is image's**, straight alpha, the levels `Image` holds, stored as one `vec4<f32>` a
+  pixel in a storage buffer (private, so half floats can come later). No texture and no hardware filtering: kernels read
+  pixels with the CPU's maths. An upload sends 3 floats a pixel and a kernel spreads them into vec4 (a fifth fewer bytes,
+  and an upload proves a dispatch); a readback copies the vec4s.
+- **Effects declare kernels, never devices.** An effect file may have `fn kernel() -> Kernel<Params>` and `<effect>.wgsl`
+  (found by `build.rs` as `render` is; compiled with the feature only): the WGSL after a shared prelude (one binding layout:
+  uniform header with the picture's size, place and design ratio, then the effect's block; source, destination, a float
+  table and a second picture; the sRGB transfer and Rec. 709 luma of `ops/`), and a function from the typed `Params` to
+  the block. *Deviation from the ticket:* the block is `Vec<[f32; 4]>`, not a `bytemuck::Pod` struct: the derive emits
+  `unsafe impl`, which `#![forbid(unsafe_code)]` refuses, and vec4s need no padding rule in either language. Every number
+  worked out once per render (spans, exponents, the gains, PCHIP coefficients) is worked out in Rust, so the kernel does only
+  per-pixel maths. `Effect::kernel()` (None by default) gives it as an opaque `GpuKernel`; a Python or foreign effect has
+  none, so the trait changes nothing for them. A kernel's effect has no `check` (a kernel would skip it).
+- **One executor.** `begin()` stays on the CPU (frame, resize, maps, prepared steps); the working picture is sent once; a run
+  of steps with kernels is recorded into one command encoder and submitted together, each laid over its input by the `lay`
+  kernel (`ops/blend.rs` formula for formula: modes, opacity, mask uploaded as a map) unless plain. A step whose effect has no
+  kernel, a driven step, an `each` step and one with a field or partition run exactly as on the CPU (`Prepared::apply`)
+  between a readback and an upload, each counted (`Gpu::transfers`). `frame.transparent`: on the CPU after the readback of
+  `render`, a small kernel for the resident `Gpu::render`. `Gpu::render_from` chains from a picture already there: no `frame`,
+  no other `size` (a resample kernel is BTIMG-0012), no maps. No rayon around GPU work.
+- **Refused for now, by name:** `with_band`, `with_window` and `with_room` on the GPU; `trace`, `region_map` and the data calls
+  with a GPU (they run on the CPU only).
+- **The bound:** each kernel states one (`GpuKernel::bound`, default 1e-4 on the f32 output; a looser one is written beside
+  the kernel with its reason). `grade`'s balance and `curves` work in f64 on the CPU (L22); WGSL has no f64, and the default
+  still holds: largest gaps measured on Metal 3e-7 (`grade`), 1.2e-7 (`curves`), 2e-6 (`color_balance`), 6e-8 (`levels`,
+  `channel_mixer`). WGSL's `pow` is undefined at 0, so `levels` guards it (the parity pictures hold exact 0s and 1s). Recipe
+  budget (interim): at most 1/255 a channel after 8-bit rounding on 99.9% of values, 2/255 on all, tested on the five-kernel
+  chain and demo 31's recipe (two of its steps on the CPU).
+- **Tests run on a GPU in CI**: `poe rust-test-gpu` (the core's whole suite built with the feature, `tests/it/gpu/` among it)
+  in `check`, and in CI's GPU job on Mesa's lavapipe; `BT_GPU` says what the machine has (`none`: the GPU tests skip and say
+  so; else part of the adapter's name, which the tests check). `test.yml`'s runners have no GPU and set `none`.
+- **Numbers** (`poe bench-gpu`, release, M4, 1920 x 1080, load 6 to 8, minimum of 9 runs, ms; "on the device": a picture
+  already there, the steps and a readback, less a readback alone, 6.6 ms):
+
+  | recipe | CPU 1 thread | CPU all cores | GPU end to end | GPU on the device |
+  |---|---|---|---|---|
+  | levels | 20.2 | 4.1 | 14.6 | 1.1 |
+  | grade | 133.8 | 25.7 | 14.3 | 1.1 |
+  | curves | 38.2 | 6.9 | 16.4 | 3.3 |
+  | channel_mixer | 1.3 | 0.7 | 14.5 | 1.1 |
+  | color_balance | 3.6 | 0.9 | 14.3 | 1.4 |
+  | chain of five | 194.3 | 39.7 | 21.0 | 8.7 |
+
+  End to end is the transfers (f32 both ways: 25 MB up, 33 MB back, and the conversion on the CPU); the work stays on the
+  device across a chain, which is where the GPU pays: the five-kernel chain is 8.7 ms there against 40 ms on every core.
+  A cheap per-pixel effect (`channel_mixer`) is faster on the CPU end to end: the backend is a choice of the caller.
