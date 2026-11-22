@@ -643,8 +643,8 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
         Extension::Reflect => 0,
         Extension::Nearest => 1,
         Extension::Mirror => 2,
-        Extension::Wrap => 3,
-        Extension::Constant(_) => 4,
+        Extension::Wrap => 3,        // constant: the edge's code in halftone.wgsl
+        Extension::Constant(_) => 4, // constant: the edge's code in halftone.wgsl
     };
     let (geometry, amplitude, wavelength) = match params.screen {
         Screen::Wave => (1, params.amplitude, params.wavelength),
@@ -654,9 +654,10 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
         Separation::None => 0,
         Separation::Cmyk => 1,
         Separation::Spot => 2,
-        Separation::Rgb => 3,
+        Separation::Rgb => 3, // constant: the separation's code in halftone.wgsl
     };
     let paper = params.paper.0;
+    // constant: a vec4 of the block holds a colour and its weight
     let ink = params.ink.map_or([0.0; 4], |ink| [ink.0[0], ink.0[1], ink.0[2], 1.0]);
     let fitting = Inks::fitting();
     let mut block = vec![
@@ -690,11 +691,12 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
         ],
         fitting,
     ];
+    // constant: a screen is one vec4 of the block
     let mut screens: Vec<[f32; 4]> = turned
         .iter()
         .map(|screen| [screen.sin, screen.cos, screen.shift[0], screen.shift[1]])
         .collect();
-    screens.resize(MOST_INKS, [0.0; 4]);
+    screens.resize(MOST_INKS, [0.0; 4]); // constant: an unused screen is an empty vec4
     block.extend(screens);
     block.extend(
         inks.through()
@@ -714,5 +716,5 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     crate::gpu::Kernel::planned(include_str!("halftone.wgsl"), plan)
         .only_where(on_gpu)
         .reading_picture(blurred_by_cpu)
-        .with_bound(3e-4)
+        .with_bound(3e-4) // constant: measured gap 9e-5, see design-decisions
 }

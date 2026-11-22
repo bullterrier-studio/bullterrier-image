@@ -103,12 +103,12 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
             Extension::Reflect => 0,
             Extension::Nearest => 1,
             Extension::Mirror => 2,
-            Extension::Wrap | Extension::Constant(_) => 3,
+            Extension::Wrap | Extension::Constant(_) => 3, // constant: the edge's code in ntsc.wgsl
         };
         let turn = std::f64::consts::TAU * f64::from(params.phase);
         let column = |matrix: fn([f32; 3]) -> [f32; 3], axis: usize| {
             let mut unit = [0.0_f32; 3];
-            unit[axis] = 1.0;
+            unit[axis] = 1.0; // constant: a unit vector's one
             let [one, two, three] = matrix(unit);
             [one, two, three, 0.0]
         };

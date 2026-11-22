@@ -821,6 +821,7 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
     else {
         unreachable!("the kernel runs ordered methods only (`on_gpu`)")
     };
+    // constant: a vec4 of the block holds four words
     let words = |values: [usize; 4]| values.map(|value| word(u32::try_from(value).unwrap_or(u32::MAX)));
     let block = vec![
         words([cell, grid.0, grid.1, palette.len()]),

@@ -179,7 +179,11 @@ persistence : number, ratio, 0 to 1, default 0.5
 lacunarity : number, ratio, 1 to 4, default 2.0
     How much finer each layer is than the one before: the lattice spacing is divided by
     this per layer. 1 = every layer the same size, 2 = each half as coarse, larger =
-    detail drops off faster in size."""
+    detail drops off faster in size.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -481,7 +485,11 @@ thickness : number, fraction, 0.05 to 1, default 0.5
 color : colour, default '#000000'
     The ink.
 paper : colour, default '#ffffff'
-    The paper between lines. Tones darker than it get ink."""
+    The paper between lines. Tones darker than it get ink.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0004 of the CPU's values."""
     ...
 
 @_effect
@@ -591,7 +599,11 @@ color : colour, default '#ffffff'
     pixel.
 seed : whole number, count, 0 to 4294967295, default 0
     Chooses where the faulty pixels are and which of them are stuck; the same seed and
-    count give the same picture, another seed another one."""
+    count give the same picture, another seed another one.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -1046,6 +1058,10 @@ specks : number, density, 0 to 5, default 0.0
 speck_size : number, px, 1 to 10, default 3.0
     With 'spot' separation: the diameter in px of a paper speck.
 
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
+
 Presets
 -------
 posterize : Posterize: each channel snapped to a few levels (4 each); hard colour separations. Set `palette` cube2 to cube6 for 2 to 6 levels.
@@ -1307,7 +1323,11 @@ smooth : number, px, 0 to 100, default 6.0
 color : colour, default '#000000'
     The ink.
 paper : colour, default '#ffffff'
-    The paper between lines. Tones darker than it get ink."""
+    The paper between lines. Tones darker than it get ink.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0004 of the CPU's values."""
     ...
 
 @_effect
@@ -1560,6 +1580,10 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     from outside: 'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about
     the edge pixel), 'nearest' (the edge pixel repeated), 'wrap' (the opposite edge).
 
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
+
 Presets
 -------
 smoke : Rising smoke or steam: soft plumes that thicken toward the bottom and curl as they rise; raise amount or change color for denser smoke."""
@@ -1605,7 +1629,11 @@ period : number, count, 1 to 1000, default 24.0
     `colors`; they then run back, so the bands cycle without a seam. Smaller = more,
     thinner bands.
 interior : colour, default '#000000'
-    The colour of the points that never escape: the inside of the set."""
+    The colour of the points that never escape: the inside of the set.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -1713,6 +1741,10 @@ reflect : true or false, default False
     instead of jumping from the last colour back to the first. Has no effect with
     `repeat` 1.
 
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
+
 Presets
 -------
 fill : Flat colour fill (black; set colors for another). To replace the background: mask = "background"."""
@@ -1750,6 +1782,10 @@ quantile_method : one of 'linear', 'lower', 'higher', 'nearest', 'midpoint', 'in
     `interpolated_inverted_cdf`, `hazen`, `weibull`, `median_unbiased` and
     `normal_unbiased` are the textbook sample-quantile definitions (Hyndman and Fan).
     Only visible on small or flat pictures.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
 
 Presets
 -------
@@ -1827,6 +1863,10 @@ edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     'reflect' (mirrored, edge pixel repeated), 'mirror' (mirrored about the edge pixel),
     'nearest' (the edge pixel repeated), 'wrap' (the opposite edge, so the grain tiles
     seamlessly).
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
 
 Presets
 -------
@@ -1968,7 +2008,11 @@ edge : one of 'reflect', 'constant', 'nearest', 'mirror', 'wrap', default 'refle
     repeated), 'wrap' (the opposite edge), 'constant' (`constant_value`).
 constant_value : number, fraction, 0 to 1, default 0.0
     The brightness (0..1) assumed beyond the edge when edge is 'constant'; ignored
-    otherwise."""
+    otherwise.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0003 of the CPU's values."""
     ...
 
 @_effect
@@ -2014,7 +2058,11 @@ Advanced parameters
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'nearest'
     What fills the gap the slide opens at the side: 'nearest' holds the row's last pixel
     there, 'wrap' brings back what left on the other side, 'reflect' mirrors the row
-    (the edge pixel repeated once), 'mirror' mirrors it about the edge pixel."""
+    (the edge pixel repeated once), 'mirror' mirrors it about the edge pixel.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -2288,7 +2336,11 @@ spacing : number, ratio, 0 to 3, default 0.45
 ring_width : number, px, 1 to 300, default 12.0
     How far each side of its radius the ring reaches, in px tuned for a picture about
     480 px high: it falls smoothly from full brightness on the radius to nothing this
-    far off. Raising it makes a wider, softer ring."""
+    far off. Raising it makes a wider, softer ring.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -2378,7 +2430,11 @@ blobs : whole number, count, 1 to 16, default 3
     one wash; raising it gives a more even, wider leak.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same leak (the same patches in the same
-    places), another seed a different one."""
+    places), another seed a different one.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -2516,7 +2572,11 @@ file : lookup table, default Lut.identity(2)
     between the table's entries are interpolated trilinearly.
 amount : number (drivable), fraction, 0 to 1, default 1.0
     How much of the table's grade shows: 0 leaves the picture unchanged, 0.5 is the
-    midway between the picture and the graded one, 1 is the table as written."""
+    midway between the picture and the graded one, 1 is the table as written.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -2650,6 +2710,10 @@ seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always gives the same picture, another seed a different
     one.
 
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
+
 Presets
 -------
 plasma : Classic plasma: crossed sine waves, each layer folded by the one before, in a vivid colour wheel."""
@@ -2684,7 +2748,11 @@ truncate : number, ratio, 1 to 10, default 4.0
 edge : one of 'reflect', 'nearest', 'mirror', 'wrap', default 'reflect'
     What colour is smeared in from beyond the left and right edges: 'reflect' the
     picture mirrored (edge pixel repeated), 'nearest' its edge pixel repeated, 'mirror'
-    mirrored about the edge pixel, 'wrap' the opposite side."""
+    mirrored about the edge pixel, 'wrap' the opposite side.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -2770,7 +2838,11 @@ lacunarity : number, ratio, 1 to 4, default 2.0
 fibre : number, fraction, 0 to 1, default 0.3
     For 'canvas' and 'linen', the share of the texture's variance that comes from the
     random fibres rather than the weave: 0 = a pure, regular weave, 1 = no weave (the
-    same as 'paper'). Ignored for 'paper'."""
+    same as 'paper'). Ignored for 'paper'.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -2907,7 +2979,11 @@ radius : number, fraction, 0 to 0.75, default 0.3
     'checks' and 'grid'.
 feather : number, px, 0 to 32, default 1.0
     The width of the soft edge in px, centred on the shape's border and blended
-    linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes."""
+    linearly: 0 = hard (jagged) edges, 1 = anti-aliased, larger = blurred shapes.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -3032,7 +3108,11 @@ keep_brightness : true or false, default False
     the average brightness is kept and raising `amount` or `gap` shows the grid without
     dimming the picture (a lit stripe is lifted above the picture's own value and clips
     at 1 where that is already bright; with `gap` 1 and `amount` 1 nothing is lit and
-    the picture is black). False = the grid only ever darkens, as an LCD does."""
+    the picture is black). False = the grid only ever darkens, as an LCD does.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -3539,7 +3619,11 @@ softness : number, fraction, 0 to 1, default 0.0
     of 0.5 the darkness swells and fades along sin^2, darkest in the middle of a line
     and nothing in the middle of a gap, as on a CRT. In between, each edge fades over
     `softness` x the narrower of a line and a gap, either side of the hard edge. It
-    keeps the average darkening of the picture: only its shape changes."""
+    keeps the average darkening of the picture: only its shape changes.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -3582,6 +3666,10 @@ lightness : number, fraction, -1 to 1, default 0.0
     Brightness (HSV value) of the selected colours, -1..1: -1 takes them all the way to
     black, +1 all the way to the full value, 0 keeps it; a value of 0.5 closes half the
     gap in that direction.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
 
 Presets
 -------
@@ -3718,6 +3806,10 @@ band_min_height : number, px, 0 to 2000, default 4.8
 band_max_height : number, px, 0 to 2000, default 28.8
     The tallest a band can be, in px, 0 to 2000, tuned for a picture about 480 px high.
     Raising it gives taller bands.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values.
 
 Presets
 -------
@@ -4017,7 +4109,11 @@ fill : colour, default '#f5f0e6'
     0..1.
 seed : whole number, count, 0 to 4294967295, default 0
     Random seed: the same seed always tears the same line (each side its own), another
-    seed a different one."""
+    seed a different one.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...
 
 @_effect
@@ -4106,5 +4202,9 @@ roundness : number, fraction, 0 to 1, default 1.0
     corner; in between, a rounded rectangle.
 color : colour, default '#000000'
     The colour the edges fade to: '#rrggbb', '#rgb' or [r, g, b] 0..1. Black darkens,
-    white lightens."""
+    white lightens.
+
+GPU
+---
+A GPU render runs it as a kernel, within 0.0001 of the CPU's values."""
     ...

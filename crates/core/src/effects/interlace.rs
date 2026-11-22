@@ -100,7 +100,7 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
                 crate::ops::edge::Edge::Reflect => 0,
                 crate::ops::edge::Edge::Nearest => 1,
                 crate::ops::edge::Edge::Mirror => 2,
-                crate::ops::edge::Edge::Wrap => 3,
+                crate::ops::edge::Edge::Wrap => 3, // constant: the edge's code in interlace.wgsl
             };
             let int = |value: i64| f32::from_bits(i32::try_from(value).unwrap_or(i32::MAX).cast_unsigned());
             #[expect(

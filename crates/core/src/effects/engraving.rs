@@ -131,5 +131,5 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
         },
     )
     .only_where(|params: &Params| params.bend <= 0.0)
-    .with_bound(4e-4)
+    .with_bound(4e-4) // constant: measured gap 2.8e-6, see design-decisions
 }

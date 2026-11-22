@@ -539,6 +539,7 @@ impl Inks {
     }
 
     /// The numbers the unmixing is worked with: the floor of a ratio, the sweeps, the snap to 0 or 1 and the index of black.
+    // constant: a vec4 of the block holds the four fitted values
     pub(crate) fn fitting() -> [f32; 4] {
         [
             LOWEST_RATIO,
@@ -571,15 +572,16 @@ pub(crate) struct SpotTable {
 impl Spot {
     /// This spot as numbers a kernel reads.
     pub(crate) fn table(&self) -> SpotTable {
+        // constant: each spot's code in halftone.wgsl
         let (code, aspect, numbers, matrix) = match self {
             Self::Round => (0, 1.0, Vec::new(), (0, 0)),
             Self::Line => (1, 1.0, Vec::new(), (0, 0)),
             Self::Square => (2, 1.0, Vec::new(), (0, 0)),
-            Self::Ellipse { aspect, levels } => (3, *aspect, levels.clone(), (0, 0)),
-            Self::Diamond => (4, 1.0, Vec::new(), (0, 0)),
-            Self::Euclidean { levels } => (5, 1.0, levels.clone(), (0, 0)),
+            Self::Ellipse { aspect, levels } => (3, *aspect, levels.clone(), (0, 0)), // constant: the spot's code in halftone.wgsl
+            Self::Diamond => (4, 1.0, Vec::new(), (0, 0)), // constant: the spot's code in halftone.wgsl
+            Self::Euclidean { levels } => (5, 1.0, levels.clone(), (0, 0)), // constant: the spot's code in halftone.wgsl
             Self::Matrix { ranks, rows, columns } => (
-                6,
+                6, // constant: the spot's code in halftone.wgsl
                 1.0,
                 ranks.iter().map(|&rank| f32::from(rank)).collect(),
                 (*rows, *columns),

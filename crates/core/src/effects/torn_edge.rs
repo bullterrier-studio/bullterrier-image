@@ -120,6 +120,7 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let (height, width) = (header.place().canvas_height, header.place().canvas_width);
         // top and bottom a value a column, left and right a value a canvas row
+        // constant: the four sides' codes in torn_edge.wgsl
         [(width, 0), (width, 1), (height, 2), (height, 3)]
             .into_iter()
             .flat_map(|(length, side)| distances(length, side, params))

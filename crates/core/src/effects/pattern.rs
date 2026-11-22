@@ -124,7 +124,7 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
                 Kind::Stripes => 0.0,
                 Kind::Checks => 1.0,
                 Kind::Dots => 2.0,
-                Kind::Grid => 3.0,
+                Kind::Grid => 3.0, // constant: the kind's code in pattern.wgsl
             };
             let [fr, fg, fb] = params.foreground.0;
             let [br, bg, bb] = params.background.0;
