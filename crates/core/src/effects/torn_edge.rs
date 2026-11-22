@@ -104,3 +104,22 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         if torn { params.fill.0 } else { pixel }
     })
 }
+
+/// The tear on the GPU (`torn_edge.wgsl`): the four sides' distances come from the CPU's own noise (a line of it a side: the cost
+/// of a row, not of the picture), sent as a table; a pixel is compared with them as on the CPU, in single precision, so the
+/// same pixels are torn.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("torn_edge.wgsl"), |params: &Params, _: &crate::gpu::Header| {
+        let [red, green, blue] = params.fill.0;
+        vec![[red, green, blue, 0.0]]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let (height, width) = (header.place().canvas_height, header.place().canvas_width);
+        // top and bottom a value a column, left and right a value a canvas row
+        [(width, 0), (width, 1), (height, 2), (height, 3)]
+            .into_iter()
+            .flat_map(|(length, side)| distances(length, side, params))
+            .collect()
+    })
+}
