@@ -120,6 +120,36 @@ fn an_archive_without_the_library_is_refused_naming_the_fix_and_leaves_nothing()
 }
 
 #[test]
+fn a_damaged_library_in_a_verified_archive_is_refused_as_damaged_and_leaves_nothing() -> Outcome {
+    // stored, not compressed, so a flipped byte of the library fails its CRC when it is read; the archive's own
+    // checksum is of the damaged bytes, so the download verifies
+    let mut writer = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let stored = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    writer.start_file(ENTRY, stored)?;
+    writer.write_all(b"THE LIBRARY")?;
+    let mut bytes = writer.finish()?.into_inner();
+    let at = bytes
+        .windows(11)
+        .position(|window| window == b"THE LIBRARY")
+        .ok_or("the library's bytes")?;
+    bytes[at] ^= 1;
+    let release = runtime(&serve(bytes.clone())?, &bytes, ENTRY);
+    let cache = folder("damaged")?;
+    let refused = install(&release, &cache);
+    assert!(
+        matches!(&refused, Err(Error::BackendUnavailable(message)) if message.contains("damaged")),
+        "{refused:?}"
+    );
+    let kept = path(&cache, &release);
+    assert_eq!(
+        names(kept.parent().ok_or("parent")?)?,
+        Vec::<String>::new(),
+        "no partial file"
+    );
+    Ok(())
+}
+
+#[test]
 fn an_archive_that_is_not_the_pinned_one_is_refused() -> Outcome {
     let bytes = zipped(&[(ENTRY, b"x")])?;
     let mut release = runtime(&serve(bytes.clone())?, &bytes, ENTRY);
@@ -155,37 +185,23 @@ fn the_library_is_the_named_one_else_the_kept_one_else_an_error_that_says_how_to
 
 #[test]
 fn each_platform_with_a_wheel_pins_that_wheel_of_the_release_and_its_library() {
-    // (os, arch, the wheel's platform tag on PyPI, the library in it): ONNX Runtime 1.23.2 publishes no Windows arm64 wheel
+    // (os, arch, the wheel's platform tag on PyPI): ONNX Runtime 1.23.2 publishes no Windows arm64 wheel
     let wheels = [
-        (
-            "macos",
-            "aarch64",
-            "macosx_13_0_arm64",
-            "onnxruntime/capi/libonnxruntime.1.23.2.dylib",
-        ),
-        (
-            "macos",
-            "x86_64",
-            "macosx_13_0_x86_64",
-            "onnxruntime/capi/libonnxruntime.1.23.2.dylib",
-        ),
-        (
-            "linux",
-            "x86_64",
-            "manylinux_2_27_x86_64",
-            "onnxruntime/capi/libonnxruntime.so.1.23.2",
-        ),
-        (
-            "linux",
-            "aarch64",
-            "manylinux_2_27_aarch64",
-            "onnxruntime/capi/libonnxruntime.so.1.23.2",
-        ),
-        ("windows", "x86_64", "win_amd64", "onnxruntime/capi/onnxruntime.dll"),
+        ("macos", "aarch64", "macosx_13_0_arm64"),
+        ("macos", "x86_64", "macosx_13_0_x86_64"),
+        ("linux", "x86_64", "manylinux_2_27_x86_64"),
+        ("linux", "aarch64", "manylinux_2_27_aarch64"),
+        ("windows", "x86_64", "win_amd64"),
     ];
+    // where a wheel keeps the library, named as ONNX Runtime names it on each system
+    let library = |os: &str| match os {
+        "macos" => format!("onnxruntime/capi/libonnxruntime.{VERSION}.dylib"),
+        "linux" => format!("onnxruntime/capi/libonnxruntime.so.{VERSION}"),
+        _ => "onnxruntime/capi/onnxruntime.dll".to_owned(),
+    };
     let releases = bullterrier_image::finding::runtime::runtimes();
     assert_eq!(releases.len(), wheels.len());
-    for (os, arch, tag, entry) in wheels {
+    for (os, arch, tag) in wheels {
         let found: Vec<&Runtime> = releases
             .iter()
             .filter(|release| release.os == os && release.arch == arch)
@@ -201,7 +217,7 @@ fn each_platform_with_a_wheel_pins_that_wheel_of_the_release_and_its_library() {
                 "{os} on {arch}: {}",
                 release.url
             );
-            assert_eq!(release.entry, entry, "{os} on {arch}");
+            assert_eq!(release.entry, library(os), "{os} on {arch}");
             assert_eq!(release.sha256.len(), 64, "{os} on {arch}");
         }
     }

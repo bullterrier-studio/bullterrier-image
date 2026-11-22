@@ -5,6 +5,7 @@
 //! one library file out of it and keeps that file in the cache folder, where [`library`] finds it. The library file is
 //! loaded, never run, and the wheel's Python code is never used.
 
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
 use super::{download, onnx};
@@ -33,7 +34,7 @@ pub struct Runtime {
 impl Runtime {
     /// The name of the library file: the last part of [`entry`](Self::entry).
     #[must_use]
-    pub fn file(&self) -> &'static str {
+    pub(crate) fn file(&self) -> &'static str {
         self.entry.rsplit('/').next().unwrap_or(self.entry)
     }
 }
@@ -149,8 +150,9 @@ pub fn install(runtime: &Runtime, cache: &Path) -> Result<PathBuf, Error> {
     }
     let fail = |why: String| {
         Error::BackendUnavailable(format!(
-            "cannot install ONNX Runtime {VERSION} from {}: {why}; download it by hand and save the library as {}",
+            "cannot install ONNX Runtime {VERSION} from {}: {why}; download it by hand and save its {} as {}",
             runtime.url,
+            runtime.entry,
             target.display()
         ))
     };
@@ -162,20 +164,29 @@ pub fn install(runtime: &Runtime, cache: &Path) -> Result<PathBuf, Error> {
     let taken = take(runtime, &archive, &folder);
     drop(std::fs::remove_file(&archive)); // best effort: the archive is not needed once the library is out
     let temporary = taken.map_err(fail)?;
-    std::fs::rename(&temporary, &target)
-        .map_err(|error| fail(format!("cannot save {} ({error})", target.display())))?;
+    std::fs::rename(&temporary, &target).map_err(|error| {
+        drop(std::fs::remove_file(&temporary)); // best effort: a partial file is never used
+        fail(format!("cannot save {} ({error})", target.display()))
+    })?;
     Ok(target)
 }
 
-/// The library file of the archive at `archive`, written into `folder` under a temporary name; its path.
+/// The library file of the archive at `archive`, written into `folder` under a temporary name; its path. The library
+/// is read whole before anything is written, so a damaged one leaves no file.
 fn take(runtime: &Runtime, archive: &Path, folder: &Path) -> Result<PathBuf, String> {
     let opened = std::fs::File::open(archive).map_err(|error| format!("cannot read the archive ({error})"))?;
     let mut zip = zip::ZipArchive::new(opened).map_err(|error| format!("the archive is damaged ({error})"))?;
     let mut entry = zip
         .by_name(runtime.entry)
         .map_err(|error| format!("the archive holds no {} ({error})", runtime.entry))?;
+    let mut library = Vec::new();
+    entry
+        .read_to_end(&mut library)
+        .map_err(|error| format!("the archive is damaged ({error})"))?;
     let temporary = folder.join(format!(".{}.{}.part", runtime.file(), std::process::id()));
-    let mut out = std::fs::File::create(&temporary).map_err(|error| format!("cannot write ({error})"))?;
-    std::io::copy(&mut entry, &mut out).map_err(|error| format!("cannot write ({error})"))?;
+    std::fs::write(&temporary, &library).map_err(|error| {
+        drop(std::fs::remove_file(&temporary)); // best effort: a partial file is never used
+        format!("cannot write ({error})")
+    })?;
     Ok(temporary)
 }
