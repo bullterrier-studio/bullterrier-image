@@ -167,7 +167,7 @@ jobs:
           "$bin/bt-image" --version
           "$bin/bt-image" --help
           # the project's own smoke command (the template never changes this line)
-          "$bin/python" -c "from PIL import Image; Image.new('RGB', (96, 64), (200, 120, 40)).save('photo.png')"
+          "$bin/python" -c "import numpy as np; from bullterrier_image import imageio; imageio.save(np.full((64, 96, 3), (0.78, 0.47, 0.16), np.float32), 'photo.png')"
           printf 'name = "smoke"\n\n[[step]]\neffect = "grade"\n\n[[step]]\neffect = "halftone"\n' > smoke.toml
           "$bin/bt-image" render photo.png smoke.toml -o out
           ls -l out
