@@ -65,14 +65,20 @@ impl Tone {
 
     /// The paper's luminance, for a kernel.
     #[cfg(feature = "gpu")]
-    #[expect(clippy::cast_possible_truncation, reason = "a luminance, handed to a single precision kernel")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a luminance, handed to a single precision kernel"
+    )]
     pub(crate) const fn paper_light(&self) -> f32 {
         self.paper as f32
     }
 
     /// The ink's luminance less the paper's, for a kernel.
     #[cfg(feature = "gpu")]
-    #[expect(clippy::cast_possible_truncation, reason = "a luminance, handed to a single precision kernel")]
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a luminance, handed to a single precision kernel"
+    )]
     pub(crate) const fn reach(&self) -> f32 {
         self.reach as f32
     }

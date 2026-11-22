@@ -11,14 +11,38 @@ use crate::common::pictures::varied_seeded;
 fn recipes() -> Vec<(&'static str, Recipe)> {
     let step = |name: &str| Step::new(name);
     vec![
-        ("crosshatch", Recipe::new([step("crosshatch").param("angle", 33.0).param("spacing", 2.0)])),
-        ("engraving", Recipe::new([step("engraving").param("bend", 0.0).param("angle", 71.0).param("spacing", 2.0)])),
-        ("aurora", Recipe::new([step("aurora").param("height", 3000.0).param("waviness", 400.0)])),
-        ("lens_flare", Recipe::new([step("lens_flare").param("x", 0.9).param("y", 0.8)])),
-        ("paper_texture", Recipe::new([step("paper_texture").param("scale", 3.0)])),
+        (
+            "crosshatch",
+            Recipe::new([step("crosshatch").param("angle", 33.0).param("spacing", 2.0)]),
+        ),
+        (
+            "engraving",
+            Recipe::new([step("engraving")
+                .param("bend", 0.0)
+                .param("angle", 71.0)
+                .param("spacing", 2.0)]),
+        ),
+        (
+            "aurora",
+            Recipe::new([step("aurora").param("height", 3000.0).param("waviness", 400.0)]),
+        ),
+        (
+            "lens_flare",
+            Recipe::new([step("lens_flare").param("x", 0.9).param("y", 0.8)]),
+        ),
+        (
+            "paper_texture",
+            Recipe::new([step("paper_texture").param("scale", 3.0)]),
+        ),
         ("fog", Recipe::new([step("fog").param("scale", 3.0)])),
-        ("noise_field", Recipe::new([step("noise_field").param("kind", "value").param("scale", 3.0)])),
-        ("light_leak", Recipe::new([step("light_leak").param("angle", 37.0).param("size", 80.0)])),
+        (
+            "noise_field",
+            Recipe::new([step("noise_field").param("kind", "value").param("scale", 3.0)]),
+        ),
+        (
+            "light_leak",
+            Recipe::new([step("light_leak").param("angle", 37.0).param("size", 80.0)]),
+        ),
     ]
 }
 
