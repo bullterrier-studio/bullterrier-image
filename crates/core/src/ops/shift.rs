@@ -136,6 +136,25 @@ pub(crate) struct Band {
     pub(crate) distance: i64,
 }
 
+/// How far each of the `height` rows from canvas row `first_row` on is rotated to the right by `bands` (a row in several bands moves
+/// by the sum of their distances): a number of pixels in 0..`width`.
+pub(crate) fn slides(first_row: usize, (height, width): (usize, usize), bands: &[Band]) -> Vec<usize> {
+    #[expect(clippy::cast_possible_wrap, reason = "a picture side is far below 2**63")]
+    let columns = width as i64;
+    (first_row..first_row + height)
+        .map(|row| {
+            let total: i64 = bands
+                .iter()
+                .filter(|band| (band.top..band.top + band.rows).contains(&row))
+                .map(|band| band.distance)
+                .sum();
+            #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "rem_euclid is in 0..width")]
+            let moved = total.rem_euclid(columns) as usize;
+            moved
+        })
+        .collect()
+}
+
 /// The `height` x `width` `pixels` (both at least 1), the rows from canvas row `first_row` on, with each of `bands` (rows of
 /// the canvas) slid sideways by whole pixels, what leaves one side coming back on the other, the rest of the picture as it was.
 ///
@@ -148,23 +167,12 @@ pub(crate) fn slide_bands(
     first_row: usize,
     bands: &[Band],
 ) -> Vec<[f32; 3]> {
-    let slide: Vec<i64> = (first_row..first_row + height)
-        .map(|row| {
-            bands
-                .iter()
-                .filter(|band| (band.top..band.top + band.rows).contains(&row))
-                .map(|band| band.distance)
-                .sum()
-        })
-        .collect();
-    #[expect(clippy::cast_possible_wrap, reason = "a picture side is far below 2**63")]
-    let columns = width as i64;
+    let moved = slides(first_row, (height, width), bands);
     let mut out = vec![[0.0; 3]; height * width];
     par::rows(&mut out, width, |first_row, band| {
         for (at, line) in band.chunks_exact_mut(width).enumerate() {
             let row = first_row + at;
-            #[expect(clippy::cast_possible_truncation, reason = "rem_euclid is in 0..width")]
-            let moved = slide[row].rem_euclid(columns) as usize;
+            let moved = moved[row];
             let source = &pixels[row * width..][..width];
             // the pixel at column `moved` is the first of the source row
             line[moved..].copy_from_slice(&source[..width - moved]);

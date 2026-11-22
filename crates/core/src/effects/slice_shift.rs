@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::random::Rng;
-use crate::ops::shift::{Band, slide_bands};
+use crate::ops::shift::{Band, slide_bands, slides};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
 
@@ -109,12 +109,9 @@ fn band(rng: &mut Rng, height: usize, lowest: f64, tallest: f64, amount: f64) ->
     Band { top, rows, distance }
 }
 
-/// The picture with strips and bands slid sideways.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    let (height, width) = (picture.height(), picture.width());
-    let place = inputs.place(picture);
-    // the strips and bands (at most 500 of each, the parameters' maximum) are those of the canvas, whichever rows are drawn
-    let canvas = place.canvas_height;
+/// The strips and bands of the canvas of `canvas` rows (at most 500 of each, the parameters' maximum): every band of rows meets the
+/// same ones.
+fn moves(canvas: usize, params: &Params) -> Vec<Band> {
     let mut rng = Rng::seeded(params.seed);
     let mut moves = Vec::new();
     if params.slices > 0 {
@@ -137,9 +134,33 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     for _ in 0..params.bands {
         moves.push(band(&mut rng, canvas, lowest, tallest, amount));
     }
+    moves
+}
+
+/// The picture with strips and bands slid sideways.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    let (height, width) = (picture.height(), picture.width());
+    let place = inputs.place(picture);
+    let moves = moves(place.canvas_height, params);
     Image::from_pixels(
         height,
         width,
         slide_bands(picture.pixels(), (height, width), place.first_row, &moves),
+    )
+}
+
+/// The slide on the GPU (`slice_shift.wgsl`): the bands are the CPU's own draws, worked out to one number a row (how far the row
+/// turns round to the right, a table); the pixels are copied, so the picture is the CPU's to the bit.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("slice_shift.wgsl"), |_: &Params, _: &crate::gpu::Header| Vec::new()).with_table(
+        |params: &Params, header: &crate::gpu::Header| {
+            let place = header.place();
+            let (height, width) = (header.height as usize, header.width as usize);
+            slides(place.first_row, (height, width), &moves(place.canvas_height, params))
+                .into_iter()
+                .map(|moved| crate::ops::cast::single(crate::ops::length::float(moved)))
+                .collect()
+        },
     )
 }
