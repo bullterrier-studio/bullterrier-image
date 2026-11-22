@@ -12,6 +12,7 @@ mod recipes;
 mod reduce;
 mod render;
 mod transfer;
+mod wide;
 
 use std::cell::{Cell, RefCell};
 use std::ops::Deref;

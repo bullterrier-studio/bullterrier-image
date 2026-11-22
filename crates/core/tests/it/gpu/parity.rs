@@ -20,8 +20,10 @@ const SIZES: [(usize, usize); 3] = [(1, 1), (17, 13), (64, 48)];
 
 /// The effects whose default step moves more than the picture up once and back once, as (uploads, downloads), and why: `dither`'s
 /// default is a serial method, which the CPU runs between a readback and an upload; `gradient_map` reads the picture back for
-/// its clip points (`reading_picture`).
-const DEFAULT_TRANSFERS: [(&str, (u64, u64)); 2] = [("dither", (2, 2)), ("gradient_map", (1, 2))];
+/// its clip points (`reading_picture`); `engraving`'s default bends its lines by the smoothed picture (a neighbourhood), which the
+/// kernel leaves to the CPU.
+const DEFAULT_TRANSFERS: [(&str, (u64, u64)); 3] =
+    [("dither", (2, 2)), ("engraving", (2, 2)), ("gradient_map", (1, 2))];
 
 /// The name of the picture every photo of this test is given (a 4 x 4 one: a matrix of 16 distinct greys, and a strip of one
 /// tile), and of its lookup table (3 entries a side, not the identity).

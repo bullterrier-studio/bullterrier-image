@@ -22,6 +22,12 @@ impl Lines {
         Self { sin, cos, spacing }
     }
 
+    /// The sine and cosine of the lines' direction.
+    #[cfg(feature = "gpu")]
+    pub(crate) const fn direction(&self) -> (f64, f64) {
+        (self.sin, self.cos)
+    }
+
     /// How far the canvas point (`x`, `y`) lies across the lines, in px, from the canvas's corner.
     pub(crate) fn across(&self, x: f64, y: f64) -> f64 {
         y * self.cos - x * self.sin
@@ -55,6 +61,20 @@ impl Tone {
             paper,
             reach: f64::from(luminance(color)) - paper,
         }
+    }
+
+    /// The paper's luminance, for a kernel.
+    #[cfg(feature = "gpu")]
+    #[expect(clippy::cast_possible_truncation, reason = "a luminance, handed to a single precision kernel")]
+    pub(crate) const fn paper_light(&self) -> f32 {
+        self.paper as f32
+    }
+
+    /// The ink's luminance less the paper's, for a kernel.
+    #[cfg(feature = "gpu")]
+    #[expect(clippy::cast_possible_truncation, reason = "a luminance, handed to a single precision kernel")]
+    pub(crate) const fn reach(&self) -> f32 {
+        self.reach as f32
     }
 
     /// The darkness (0..1) of a pixel of luminance `light`; 0 when ink and paper are equally bright, since no tone is then

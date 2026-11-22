@@ -110,3 +110,26 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     });
     Image::from_pixels(height, width, out)
 }
+
+/// Straight engraving lines on the GPU (`engraving.wgsl`, with `ops/hatch.wgsl`): a pixel reads only its own tone. A `bend` reads
+/// the picture smoothed by a Gaussian, a neighbourhood: the CPU runs those steps (counted); so the default, which bends, does too.
+/// Position is told in single precision, as for `crosshatch`, whose bound it shares.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(
+        concat!(include_str!("../ops/hatch.wgsl"), include_str!("engraving.wgsl")),
+        |params: &Params, _: &crate::gpu::Header| {
+            let tone = Tone::new(params.paper.0, params.color.0);
+            let (sin, cos) = Lines::new(f64::from(params.angle), f64::from(params.spacing)).direction();
+            let [paper, color] = [params.paper.0, params.color.0];
+            vec![
+                [tone.paper_light(), tone.reach(), params.spacing, 0.0],
+                [crate::ops::cast::single(sin), crate::ops::cast::single(cos), 0.0, 0.0],
+                [paper[0], paper[1], paper[2], 0.0],
+                [color[0], color[1], color[2], 0.0],
+            ]
+        },
+    )
+    .only_where(|params: &Params| params.bend <= 0.0)
+    .with_bound(4e-4)
+}
