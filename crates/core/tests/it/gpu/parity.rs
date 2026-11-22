@@ -1,7 +1,8 @@
 //! Every effect with a GPU kernel matches its CPU render within the bound the kernel states: seeded pictures (with exact
 //! 0s and 1s among their values), each parameter at its minimum, default, maximum and two values between, every choice
-//! and switch, each drivable parameter driven by a map and all of them by a field the recipe makes, at sizes that are
-//! and are not multiples of a workgroup. A new kernel inherits every case; every case must be compared at least once.
+//! and switch, each drivable parameter driven by a map and all of them by a field the recipe makes (a driven step runs on
+//! the CPU today: those cases hold the executor to that, and a later GPU drive to the bound), at sizes that are and are
+//! not multiples of a workgroup. A new kernel inherits every case; every case must be compared at least once.
 
 use bullterrier_image::params::{Kind, Scalar};
 use bullterrier_image::region::LinearGradient;

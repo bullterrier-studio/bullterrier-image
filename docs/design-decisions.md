@@ -1780,8 +1780,8 @@ measured first would break at a larger one.
 
 - **The CPU is the reference; the GPU is a call on its context, held to a bound.** Feature `gpu` (off for pure Rust callers:
   compile time; on in the wheel). One choice, the context: `photo.render(..)` is the CPU, `gpu.render(&photo, ..)` the GPU
-  (a `GpuImage`; `gpu.download` reads it back). The recipe and its parameters are the same, and nothing falls back silently (no adapter, a picture past the
-  device, an option the GPU path does not take: `Error::Gpu`, naming the cause). Byte promises (any thread count, bands,
+  (a `GpuImage`; `gpu.download` reads it back). The recipe and its parameters are the same, and nothing falls back
+  silently: an error names the cause (`Error::Gpu` for what the machine cannot, see below). Byte promises (any thread count, bands,
   windows, WebAssembly against native) stay CPU promises. *Rejected:* an `auto` backend (the result would need to say which
   ran); a GPU-only effect.
 - **`Gpu` wraps the caller's device and queue** (`Gpu::new`), or takes its own (`Gpu::request`: the high-performance
@@ -1842,7 +1842,8 @@ measured first would break at a larger one.
   `prepare`'s scaling) is worked out once in Rust and handed to both, so a bug there makes the same wrong picture on both
   and parity passes. Those rest on the CPU tests of each effect, by design. The harness (`tests/it/gpu/parity.rs`): every
   kernel at each parameter's ends and between, the extremes compounded, each drivable parameter driven by a map and all of
-  them by a field the recipe makes, each case compared at least once; every gap through one helper that fails on a NaN.
+  them by a field the recipe makes (a driven step runs on the CPU today, so these hold the executor's choice and a later
+  GPU drive to the bound), each case compared at least once; every gap through one helper that fails on a NaN.
 - **Tests run on a GPU in CI**: `poe rust-test-gpu` (the core's whole suite built with the feature, `tests/it/gpu/` among it)
   in `check`, and in CI's GPU job on Mesa's lavapipe; `BT_GPU` says what the machine has (`none`: the GPU tests return early
   and `rust-test-gpu` ends with a banner counting them, as Rust has no skip at run time; else part of the adapter's name,

@@ -17,8 +17,8 @@ class Gpu:
 
     `Gpu()` takes the device; a machine without a GPU is a GpuError naming why. `adapter` names the GPU,
     `largest_picture` is the most pixels a picture on it can have, `transfers` counts the pictures sent to it and read
-    back (`{"uploads", "downloads", "bytes"}`; an all-GPU recipe makes one of each), `reset_transfers()` sets that count
-    to zero.
+    back (`{"uploads", "downloads", "bytes"}`; an all-GPU recipe makes one of each, and a mask or a transparent frame's
+    alpha one more upload), `reset_transfers()` sets that count to zero.
     """
 
     __slots__ = ("_core",)
