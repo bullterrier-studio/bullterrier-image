@@ -119,3 +119,22 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         out
     })
 }
+
+/// The grain on the GPU (`grain.wgsl`): the CPU's seeded draws, one for each canvas place, so the same grain. Specks of more
+/// than a pixel need the clumping blur, which is a neighbourhood effect: the CPU runs them.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("grain.wgsl"), |params: &Params, _: &crate::gpu::Header| {
+        let flag = |on: bool| f32::from(u8::from(on));
+        vec![
+            [
+                params.amount,
+                params.balance,
+                flag(params.color),
+                flag(params.distribution == Distribution::Uniform),
+            ],
+            [f32::from_bits(params.seed), 0.0, 0.0, 0.0],
+        ]
+    })
+    .only_where(|params: &Params| params.size <= 1.0)
+}
