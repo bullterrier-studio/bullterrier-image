@@ -7,7 +7,7 @@ import os
 import numpy as np
 import pytest
 
-from bullterrier_image import Gpu, GpuError, Recipe, Step, fx, render, render_all
+from bullterrier_image import Gpu, GpuError, Recipe, RecipeError, Step, fx, render, render_all
 
 NO_GPU = os.environ.get("BT_GPU") == "none"
 needs_gpu = pytest.mark.skipif(NO_GPU, reason="BT_GPU=none: this machine has no GPU")
@@ -49,9 +49,10 @@ def test_the_gpu_names_its_adapter(gpu):
 
 
 @needs_gpu
-def test_a_gpu_render_refuses_a_band_as_a_gpu_error_naming_it(gpu):
-    with pytest.raises(GpuError, match="band="):
+def test_a_gpu_render_refuses_a_band_as_a_recipe_error_naming_it_never_a_gpu_error(gpu):
+    with pytest.raises(RecipeError, match="band=") as refused:
         render(photo(), Recipe([Step("grade")]), band=8, gpu=gpu)
+    assert not isinstance(refused.value, GpuError)
 
 
 def test_the_effects_say_which_run_on_the_gpu():

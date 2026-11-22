@@ -259,7 +259,7 @@ impl Options {
     /// `Ok` unless these options hold one that a GPU render does not take yet.
     ///
     /// # Errors
-    /// [`Error::Gpu`] naming the option: a band, a window or room.
+    /// [`Error::Recipe`] naming the option (a band, a window or room): the caller's choice, not the machine's limit.
     #[cfg(feature = "gpu")]
     pub(super) fn gpu_takes(&self) -> Result<(), Error> {
         let refused = if self.band.is_some() {
@@ -272,7 +272,7 @@ impl Options {
             None
         };
         match refused {
-            Some(option) => Err(Error::Gpu(format!(
+            Some(option) => Err(Error::Recipe(format!(
                 "a GPU render does not take {option} yet: render on the CPU (no GPU) for it"
             ))),
             None => Ok(()),

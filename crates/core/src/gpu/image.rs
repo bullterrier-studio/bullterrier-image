@@ -90,12 +90,12 @@ impl GpuImage {
     /// This picture, if it is one of `gpu`'s.
     ///
     /// # Errors
-    /// [`Error::Gpu`] if another context made it.
+    /// [`Error::Inputs`] if another context made it: the caller's programming error, not the machine's.
     pub(crate) fn of(&self, gpu: &Gpu) -> Result<&Self, Error> {
         if self.owner.same(gpu) {
             Ok(self)
         } else {
-            Err(Error::Gpu(format!(
+            Err(Error::Inputs(format!(
                 "this GpuImage belongs to another Gpu context (on {}): a picture stays with the context that made it",
                 self.owner.adapter()
             )))
@@ -164,7 +164,7 @@ impl Gpu {
     /// `image` read back from the device: the [`Image`] it holds, with alpha only if it has alpha. Counted as one download.
     ///
     /// # Errors
-    /// [`Error::Gpu`] if another context made `image` or the device fails (is lost) while reading it.
+    /// [`Error::Inputs`] if another context made `image`; [`Error::Gpu`] if the device fails (is lost) while reading it.
     pub async fn download(&self, image: &GpuImage) -> Result<Image, Error> {
         let image = image.of(self)?;
         let values = self.read(image.buffer(), image.height() * image.width()).await?;

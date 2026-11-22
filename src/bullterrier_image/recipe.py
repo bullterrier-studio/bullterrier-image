@@ -172,7 +172,8 @@ def render(
 
     gpu: a `Gpu` to render on; None, the default, renders on the CPU. The result is the same numpy picture, held to
     each GPU kernel's bound (a step of an effect without one runs on the CPU between a readback and an upload); the
-    CPU stays the exact reference. A GPU render takes no `band` (GpuError); `threads` then applies to its CPU work.
+    CPU stays the exact reference. A GPU render takes no `band` (RecipeError); `threads` then applies to its CPU work.
+    GpuError means this machine's GPU cannot (none, too small, lost): the same render without `gpu=` runs on the CPU.
     """
     recipe = _one_recipe(recipe)
     return bridge.render(

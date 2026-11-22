@@ -245,20 +245,60 @@ fn a_cut_out_chained_on_the_device_keeps_its_alpha_through_kernel_laid_and_cpu_s
 }
 
 #[test]
-fn a_gpu_render_refuses_the_options_it_does_not_take_naming_them() -> Outcome {
+fn a_gpu_render_refuses_the_options_it_does_not_take_as_a_recipe_error_naming_them() -> Outcome {
     let Some(gpu) = gpu() else { return Ok(()) };
     let values = seeded(8, 8, 0);
     let photo = Photo::new(Picture::new(8, 8, &values)?);
     let recipe = five_kernels();
     let rows = NonZeroUsize::new(4).ok_or("4 rows")?;
+    let held = block_on(gpu.upload(&Picture::new(8, 8, &values)?))?;
     for (option, options) in [
         ("with_band", Options::default().with_band(rows)),
         ("with_window", Options::default().with_window(0, 8, 16)),
         ("with_room", Options::default().with_room(1, 1, 1, 1)),
     ] {
+        // the caller's mistake, never "this machine cannot": `except GpuError: <the CPU>` must not hide it
         let error = rendered(&gpu, &photo, &recipe, options).err().ok_or(option)?;
-        assert_eq!(error.kind(), ErrorKind::Gpu, "{error}");
+        assert_eq!(error.kind(), ErrorKind::Recipe, "{error}");
         assert!(error.to_string().contains(option), "{error}");
+        let error = block_on(gpu.render_from(&held, &recipe, &Presets::new(), options))
+            .err()
+            .ok_or(option)?;
+        assert_eq!(error.kind(), ErrorKind::Recipe, "render_from: {error}");
+        assert!(error.to_string().contains(option), "render_from: {error}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_chain_from_a_picture_on_the_device_refuses_a_resample_or_a_map_as_a_recipe_error() -> Outcome {
+    let Some(gpu) = gpu() else { return Ok(()) };
+    let values = seeded(8, 6, 0);
+    let held = block_on(gpu.upload(&Picture::new(8, 6, &values)?))?;
+    let mut framed = five_kernels();
+    framed.frame = Frame {
+        transparent: Transparent::Circle,
+        ..Frame::default()
+    };
+    for (what, recipe, options, named) in [
+        ("another size", five_kernels(), Options::default().with_size(16), "size"),
+        ("the same size", five_kernels(), Options::default().with_size(8), ""),
+        ("a frame", framed, Options::default(), "frame"),
+        (
+            "a mask",
+            Recipe::new([Step::new("levels").mask("subject")]),
+            Options::default(),
+            "subject",
+        ),
+    ] {
+        let made = block_on(gpu.render_from(&held, &recipe, &Presets::new(), options));
+        if named.is_empty() {
+            assert!(made.is_ok(), "{what}: {made:?}");
+            continue;
+        }
+        let error = made.err().ok_or(what)?;
+        assert_eq!(error.kind(), ErrorKind::Recipe, "{what}: {error}");
+        assert!(error.to_string().contains(named), "{what}: {error}");
     }
     Ok(())
 }
@@ -288,14 +328,18 @@ fn a_picture_of_one_gpu_is_refused_by_another() -> Outcome {
     let values = seeded(3, 3, 0);
     let held = block_on(one.upload(&Picture::new(3, 3, &values)?))?;
     let error = block_on(other.download(&held)).err().ok_or("another context")?;
+    // a programming error of the caller (the kind a binding raises as its plain error), not "this machine cannot"
     assert!(
-        error.kind() == ErrorKind::Gpu && error.to_string().contains("another Gpu"),
+        error.kind() == ErrorKind::Other && error.to_string().contains("another Gpu"),
         "{error}"
     );
     let error = block_on(other.render_from(&held, &five_kernels(), &Presets::new(), Options::default()))
         .err()
         .ok_or("another context")?;
-    assert!(error.to_string().contains("another Gpu"), "{error}");
+    assert!(
+        error.kind() == ErrorKind::Other && error.to_string().contains("another Gpu"),
+        "{error}"
+    );
     Ok(())
 }
 

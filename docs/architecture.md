@@ -146,8 +146,10 @@ feature, `Native` erases it into the public `GpuKernel` that `Effect::kernel` re
 executor (`run/gpu.rs`): `begin()` on the CPU, the working picture uploaded once, runs of kernel steps (`Prepared::on_gpu`:
 a plain step of an effect with a kernel, no drive, field or partition) recorded into one encoder, each laid over its input by
 `gpu/lay.wgsl` unless plain; any other step through `Prepared::apply` between a readback and an upload. `frame.transparent`:
-`Cut` after the readback, or `gpu/alpha.wgsl` for `Gpu::render`. Refused by name (`Error::Gpu`): `with_band`, `with_window`,
-`with_room`; `trace`, `region_map` and the data calls with a GPU; `render_from` with a `frame`, another `size` or a map. Tests:
+`gpu/alpha.wgsl` after the last step. A chain keeps the picture's alpha (`store` writes the source's; a CPU step's picture
+takes the one it was given). `Error::Gpu` means "this machine cannot" (no adapter, a missing limit, too large, device lost); a
+caller's mistake is the usual kind: `with_band`, `with_window`, `with_room` and `render_from` with a `frame`, another `size`
+or a map are `Error::Recipe` naming it, a `GpuImage` of another context `Error::Inputs`. Tests:
 `tests/it/gpu/` (`poe rust-test-gpu`; `BT_GPU`, `docs/development.md`); Python: `bt.Gpu`, `render(..., gpu=)`.
 
 The runner is given each map by name, as an array (`maps={"subject": alpha}`) or a `Finder(identity, find)`

@@ -1818,11 +1818,16 @@ measured first would break at a larger one.
   of steps with kernels is recorded into one command encoder and submitted together, each laid over its input by the `lay`
   kernel (`ops/blend.rs` formula for formula: modes, opacity, mask uploaded as a map) unless plain. A step whose effect has no
   kernel, a driven step, an `each` step and one with a field or partition run exactly as on the CPU (`Prepared::apply`)
-  between a readback and an upload, each counted (`Gpu::transfers`). `frame.transparent`: on the CPU after the readback of
-  `render`, a small kernel for the resident `Gpu::render`. `Gpu::render_from` chains from a picture already there: no `frame`,
+  between a readback and an upload, each counted (`Gpu::transfers`). `frame.transparent`: a small kernel after the last
+  step. A chain keeps the picture's alpha (BTIMG-0014: it came back with three channels). `Gpu::render_from` chains from a picture already there: no `frame`,
   no other `size` (a resample kernel is BTIMG-0012), no maps. No rayon around GPU work.
-- **Refused for now, by name:** `with_band`, `with_window` and `with_room` on the GPU; `trace`, `region_map` and the data calls
-  with a GPU (they run on the CPU only).
+- **Refused for now, by name:** `with_band`, `with_window` and `with_room` on the GPU. `trace`, `region_map` and the data
+  calls run on the CPU only and take no GPU (nothing to refuse since the options hold none).
+- **`ErrorKind::Gpu` means "this machine cannot"** (BTIMG-0014): no adapter, a missing limit, a picture past the device (the
+  CPU can render it), a lost device. A caller's mistake is the kind the CPU uses for it: a refused option, or `render_from`
+  asked for a resample or a map, is `Error::Recipe` (as room with a `frame` is on the CPU); a `GpuImage` handed to another
+  context is `Error::Inputs` (a programming error, a plain `ValueError` in Python). So `except GpuError: <render on the
+  CPU>` never hides a bug.
 - **The bound:** each kernel states one (`GpuKernel::bound`, default 1e-4 on the f32 output; a looser one is written beside
   the kernel with its reason). `grade`'s balance and `curves` work in f64 on the CPU (L22); WGSL has no f64, and the default
   still holds: largest gaps measured on Metal, one parameter at a time, 3e-7 (`grade`), 1.2e-7 (`curves`), 2e-6

@@ -47,9 +47,10 @@ class ProjectError(BullterrierImageError, ValueError):
 
 
 class GpuError(BullterrierImageError, RuntimeError):
-    """The GPU backend cannot do what was asked: no GPU adapter on this machine, a limit the device lacks, a picture
-    larger than it holds, or an option a GPU render does not take yet (`band`). The message names the cause; the same
-    render without `gpu=` runs on the CPU."""
+    """This machine's GPU cannot do what was asked: no GPU adapter, a limit the device lacks, a picture larger than it
+    holds, a device lost. The message names the cause; the same render without `gpu=` runs on the CPU. Never a caller's
+    mistake (an option a GPU render does not take yet, `band`, is a RecipeError), so falling back to the CPU on it hides
+    no bug."""
 
 
 class UnknownEffectError(RecipeError, KeyError):

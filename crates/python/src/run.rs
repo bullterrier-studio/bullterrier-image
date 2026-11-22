@@ -68,7 +68,7 @@ use super::{
 ///
 /// `gpu` is a `Gpu` to render on (none: the CPU): the same picture, held to each kernel's bound instead of the CPU's
 /// bytes; a step whose effect has no kernel runs on the CPU between a readback and an upload. A GPU render takes no
-/// `band` (a `CoreError` of kind `gpu`). `threads` then applies to the CPU's part of the work.
+/// `band` (a `CoreError` of kind `recipe`). `threads` then applies to the CPU's part of the work.
 ///
 /// A failure is a `CoreError` (a `ValueError`) whose `kind` says which of the package's exceptions it stands for, or,
 /// when a Python function the run called raised (an effect, a finder), that very exception.

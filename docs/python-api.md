@@ -53,7 +53,8 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   CPU's bytes. A step whose effect has no kernel runs on the CPU between a readback and an upload: `fx.<effect>.gpu` says
   which do (`levels`, `grade`, `curves`, `channel_mixer`, `color_balance`). `gpu.transfers` counts what crossed
   (`{"uploads", "downloads", "bytes"}`, one each for an all-kernel recipe; `gpu.reset_transfers()`), `gpu.adapter` names the
-  device. A GPU render takes no `band` (`GpuError`); `threads` applies to its CPU part. Share one `Gpu` between renders.
+  device. A GPU render takes no `band` (`RecipeError`: `GpuError` means only "this machine cannot", so a fallback to the
+  CPU on it hides no mistake); `threads` applies to its CPU part. Share one `Gpu` between renders.
 - **One effect.** `fx.bloom(radius=12).apply(photo)` is `render(photo, Recipe([step]))`, and takes what `render` takes
   (`maps`, `finders`, `size`); `render(photo, step)` too. The recipe is a `Recipe` or a `Step`, `render_all` takes a list
   or tuple of `Recipe`; anything else (a list of steps, a look's name, swapped arguments) is a `RecipeError` naming the fix.

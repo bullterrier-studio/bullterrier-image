@@ -73,9 +73,10 @@ pub enum Error {
     /// not UTF-8 or malformed, or entries and a domain that make no table. The text names the file and, for a fault in
     /// one, the line.
     Lut(String),
-    /// The GPU backend cannot do what was asked: no adapter, a limit the device lacks, a picture larger than the device
-    /// holds, a picture of another GPU context, a device lost or failing, or an option the GPU path does not take. The
-    /// text names the cause.
+    /// This machine's GPU cannot do what was asked: no adapter, a limit the device lacks, a picture larger than the device
+    /// holds (the CPU can render it), a device lost or failing. The text names the cause. A caller's mistake is never this
+    /// kind, so a caller may render on the CPU on it without hiding a bug: an option a GPU render does not take is an
+    /// [`Error::Recipe`], a picture handed to another GPU context an [`Error::Inputs`].
     Gpu(String),
     /// A project (`bt-image.toml`, or one made in code) breaks a rule: a file that is not TOML, an unknown key, globs that
     /// match nothing, a value out of range. The text names the file or the setting and the value.
@@ -108,7 +109,7 @@ pub enum Error {
     },
     /// An effect was given inputs that do not fit: one it declares is missing, or a partition or map is not of the
     /// picture's size, or a map or partition has values it must not. Also an option of a call outside its range (the
-    /// quality of `write_with`).
+    /// quality of `write_with`), and a picture on the GPU handed to a context other than the one that made it.
     Inputs(String),
     /// Channel values that do not make a picture of the given size (three per pixel), or a size with no row or no column.
     Size {
@@ -161,7 +162,7 @@ pub enum ErrorKind {
     Lut,
     /// A project breaks a rule.
     Project,
-    /// The GPU backend cannot do what was asked.
+    /// This machine's GPU cannot do what was asked (never a caller's mistake).
     Gpu,
     /// Anything else: a programming error of the caller, or a failure outside the core. Bindings raise their plain
     /// error (a `ValueError` in Python).

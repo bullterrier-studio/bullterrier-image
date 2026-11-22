@@ -23,9 +23,10 @@ const LAY: (&str, &str) = ("lay", include_str!("../gpu/lay.wgsl"));
 /// The kernel that gives the finished picture its alpha (a `frame.transparent` cut).
 const ALPHA: (&str, &str) = ("alpha", include_str!("../gpu/alpha.wgsl"));
 
-/// The refusal of a recipe in a `render_from`, saying what it needs and why it cannot have it yet.
+/// The refusal of a recipe in a `render_from`, saying what it needs and why it cannot have it yet: the caller's recipe, not
+/// the machine, so [`Error::Recipe`].
 fn refuse_from(what: &str) -> Error {
-    Error::Gpu(format!(
+    Error::Recipe(format!(
         "`render_from` renders a picture already on the GPU, which has no {what}: render the photo with `render` for it"
     ))
 }
@@ -51,8 +52,8 @@ impl Gpu {
     /// executor of its own (`block_on(gpu.render(..))`, `docs/architecture.md` "GPU").
     ///
     /// # Errors
-    /// As [`Photo::render`]; [`Error::Gpu`] for a picture larger than the device holds (naming both sizes) or a device that
-    /// fails.
+    /// As [`Photo::render`]; [`Error::Recipe`] for an option a GPU render does not take (naming it); [`Error::Gpu`] when
+    /// this machine cannot: a picture larger than the device holds (naming both sizes), a device that fails or is lost.
     pub async fn render(
         &self,
         photo: &Photo<'_>,
@@ -74,8 +75,8 @@ impl Gpu {
     /// one (a `mask`, a field, a region) is refused too. Effects never see its alpha; the result keeps it.
     ///
     /// # Errors
-    /// [`Error::Gpu`] for `image` of another context, a recipe that needs a resample or a map, or `options` a GPU render
-    /// does not take; else as [`render`](Self::render).
+    /// [`Error::Inputs`] for `image` of another context; [`Error::Recipe`] for a recipe that needs a resample or a map, or
+    /// `options` a GPU render does not take; else as [`render`](Self::render).
     pub async fn render_from(
         &self,
         image: &GpuImage,
