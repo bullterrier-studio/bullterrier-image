@@ -44,9 +44,11 @@ def test_an_all_kernel_recipe_crosses_once_each_way_and_render_all_once_a_recipe
 
 
 @needs_gpu
-def test_the_gpu_names_its_adapter(gpu):
+def test_the_gpu_names_its_adapter_and_the_largest_picture_it_holds(gpu):
     assert gpu.adapter
     assert gpu.adapter in repr(gpu)
+    # any device holds WebGPU's default binding, 128 MiB: 8 Mi pixels of 16 bytes
+    assert gpu.largest_picture >= 1 << 23
 
 
 @needs_gpu

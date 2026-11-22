@@ -15,9 +15,10 @@ class Gpu:
     `render(..., gpu=gpu)`, which returns the same numpy picture as on the CPU, held to each GPU kernel's stated bound
     instead of the CPU's bytes (the CPU stays the exact reference). Share one context between renders and threads.
 
-    `Gpu()` takes the device; a machine without a GPU is a GpuError naming why. `adapter` names the GPU, `transfers`
-    counts the pictures sent to it and read back (`{"uploads", "downloads", "bytes"}`; an all-GPU recipe makes one of
-    each), `reset_transfers()` sets that count to zero.
+    `Gpu()` takes the device; a machine without a GPU is a GpuError naming why. `adapter` names the GPU,
+    `largest_picture` is the most pixels a picture on it can have, `transfers` counts the pictures sent to it and read
+    back (`{"uploads", "downloads", "bytes"}`; an all-GPU recipe makes one of each), `reset_transfers()` sets that count
+    to zero.
     """
 
     __slots__ = ("_core",)
@@ -30,6 +31,11 @@ class Gpu:
     def adapter(self) -> str:
         """The adapter the device is on, as its driver names it: name, backend, kind and driver."""
         return str(self._core.adapter)
+
+    @property
+    def largest_picture(self) -> int:
+        """The most pixels a picture on this device can have; a larger render is a GpuError (the CPU renders it)."""
+        return int(self._core.largest_picture)
 
     @property
     def transfers(self) -> dict[str, int]:

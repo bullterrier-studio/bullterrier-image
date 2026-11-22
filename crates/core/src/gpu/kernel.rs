@@ -92,8 +92,7 @@ impl<P> Clone for Kernel<P> {
 
 impl<P> Copy for Kernel<P> {}
 
-/// The bound of every kernel today: the largest difference from the CPU's f32 output, on a value of 0 to 1. A kernel that
-/// needs a looser one gets a `with_bound` and says why beside it.
+/// The bound of every kernel today: the largest difference from the CPU's f32 output, on a value of 0 to 1.
 const DEFAULT_BOUND: f32 = 1e-4; // constant: the GPU decision's bound for a per-pixel effect (docs/design-decisions.md)
 
 impl<P> Kernel<P> {
