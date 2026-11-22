@@ -115,7 +115,7 @@ impl Gpu {
     /// uploaded, so nothing is counted.
     ///
     /// # Errors
-    /// [`Error::Gpu`] for a size larger than the device holds; [`Error::Inputs`] for a buffer too small for it.
+    /// [`Error::Gpu`] for a size larger than the device holds; [`Error::Inputs`] for a buffer too small for it or lacking a usage.
     pub fn adopt(&self, buffer: wgpu::Buffer, height: usize, width: usize, alpha: bool) -> Result<GpuImage, Error> {
         self.fits(height, width)?;
         if buffer.size() < picture_bytes(height, width) {
@@ -123,6 +123,13 @@ impl Gpu {
                 "a buffer of {} bytes holds no picture of {height} x {width} pixels ({} bytes)",
                 buffer.size(),
                 picture_bytes(height, width)
+            )));
+        }
+        let wanted = wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST;
+        let missing = wanted - buffer.usage();
+        if !missing.is_empty() {
+            return Err(Error::Inputs(format!(
+                "the buffer lacks the usages {missing:?}: a picture's buffer needs STORAGE, COPY_SRC and COPY_DST"
             )));
         }
         Ok(GpuImage::from_buffer(self.clone(), height, width, alpha, buffer))

@@ -91,3 +91,38 @@ fn a_buffer_of_the_callers_device_is_a_picture_and_a_picture_is_a_buffer() -> cr
     assert!(gpu.adopt(small, 2, 3, true).is_err());
     Ok(())
 }
+
+#[test]
+fn the_contexts_device_and_queue_make_buffers_it_adopts() -> crate::common::Outcome {
+    let Some(gpu) = gpu() else { return Ok(()) };
+    let values: Vec<f32> = (0..8u8).map(|at| f32::from(at) / 8.0).collect();
+    let buffer = gpu.device().create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: 2 * 16,
+        usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    gpu.queue().write_buffer(
+        &buffer,
+        0,
+        &values.iter().flat_map(|value| value.to_le_bytes()).collect::<Vec<u8>>(),
+    );
+    let back = block_on(gpu.download(&gpu.adopt(buffer, 1, 2, true)?))?.into_values();
+    assert_eq!(first_bit_difference(&back, &values), None);
+    Ok(())
+}
+
+#[test]
+fn a_buffer_missing_a_usage_is_the_callers_error_naming_it() {
+    let Some(gpu) = gpu() else { return };
+    let buffer = gpu.device().create_buffer(&wgpu::BufferDescriptor {
+        label: None,
+        size: 16,
+        usage: wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+    let error = gpu.adopt(buffer, 1, 1, true).err();
+    assert!(matches!(error, Some(bullterrier_image::Error::Inputs(_))), "{error:?}");
+    let message = error.map(|error| error.to_string()).unwrap_or_default();
+    assert!(message.contains("STORAGE") && message.contains("COPY_SRC"), "{message}");
+}

@@ -272,6 +272,19 @@ impl Gpu {
         })
     }
 
+    /// The wgpu device the pictures live on: for a library that builds its own buffers and kernels next to the core's
+    /// (see [`GpuImage::buffer`]).
+    #[must_use]
+    pub fn device(&self) -> &wgpu::Device {
+        &self.context.device
+    }
+
+    /// The queue of [`device`](Self::device).
+    #[must_use]
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.context.queue
+    }
+
     /// The adapter the device is on, as its driver names it: name, backend, kind and driver
     /// (`"Apple M4 (Metal, IntegratedGpu, )"`, `"llvmpipe (LLVM 19.1.1, 256 bits) (Vulkan, Cpu, llvmpipe)"`).
     #[must_use]
@@ -310,14 +323,6 @@ impl Gpu {
         };
         counter.fetch_add(1, Ordering::Relaxed);
         self.context.bytes.fetch_add(bytes, Ordering::Relaxed);
-    }
-
-    pub(crate) fn device(&self) -> &wgpu::Device {
-        &self.context.device
-    }
-
-    pub(crate) fn queue(&self) -> &wgpu::Queue {
-        &self.context.queue
     }
 
     /// `Ok` if a picture of `height` x `width` fits on this device.
