@@ -83,7 +83,12 @@ impl GpuImage {
         self.alpha
     }
 
-    pub(crate) const fn buffer(&self) -> &wgpu::Buffer {
+    /// The storage buffer that holds the picture: `height` x `width` pixels, each one `vec4<f32>` (red, green, blue and alpha, straight
+    /// alpha, the levels an [`Image`] holds; alpha is 1 where the picture has none), row after row. For a library that
+    /// works on the same wgpu device (the shared vocabulary of the packages) and reads the picture without a readback.
+    /// Read it only: it is shared with whatever else holds the picture.
+    #[must_use]
+    pub const fn buffer(&self) -> &wgpu::Buffer {
         &self.buffer
     }
 
@@ -104,6 +109,25 @@ impl GpuImage {
 }
 
 impl Gpu {
+    /// The picture of `height` x `width` pixels that `buffer` holds, as a [`GpuImage`] of this context: the inverse of
+    /// [`GpuImage::buffer`]. `buffer` must be on this context's device, hold `vec4<f32>` a pixel (straight alpha; alpha is
+    /// ignored and read as 1 if `alpha` is false) and have the `STORAGE`, `COPY_SRC` and `COPY_DST` usages. Nothing is
+    /// uploaded, so nothing is counted.
+    ///
+    /// # Errors
+    /// [`Error::Gpu`] for a size larger than the device holds; [`Error::Inputs`] for a buffer too small for it.
+    pub fn adopt(&self, buffer: wgpu::Buffer, height: usize, width: usize, alpha: bool) -> Result<GpuImage, Error> {
+        self.fits(height, width)?;
+        if buffer.size() < picture_bytes(height, width) {
+            return Err(Error::Inputs(format!(
+                "a buffer of {} bytes holds no picture of {height} x {width} pixels ({} bytes)",
+                buffer.size(),
+                picture_bytes(height, width)
+            )));
+        }
+        Ok(GpuImage::from_buffer(self.clone(), height, width, alpha, buffer))
+    }
+
     /// `picture` sent to the device: a [`GpuImage`] of its size without alpha. Counted as one upload.
     ///
     /// # Errors
