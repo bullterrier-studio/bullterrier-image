@@ -6,7 +6,7 @@ use serde::Deserialize;
 use crate::Footprint;
 use crate::effect::{Category, Input, Meta};
 use crate::ops::random::Rng;
-use crate::ops::shift::{Band, slide_bands, slides};
+use crate::ops::shift::{Band, slide_bands};
 use crate::params::Params;
 use crate::{Image, Inputs, Picture};
 
@@ -157,7 +157,7 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
         |params: &Params, header: &crate::gpu::Header| {
             let place = header.place();
             let (height, width) = (header.height as usize, header.width as usize);
-            slides(place.first_row, (height, width), &moves(place.canvas_height, params))
+            crate::ops::shift::slides(place.first_row, (height, width), &moves(place.canvas_height, params))
                 .into_iter()
                 .map(|moved| crate::ops::cast::single(crate::ops::length::float(moved)))
                 .collect()

@@ -148,11 +148,7 @@ pub(crate) fn slides(first_row: usize, (height, width): (usize, usize), bands: &
                 .filter(|band| (band.top..band.top + band.rows).contains(&row))
                 .map(|band| band.distance)
                 .sum();
-            #[expect(
-                clippy::cast_possible_truncation,
-                clippy::cast_sign_loss,
-                reason = "rem_euclid is in 0..width"
-            )]
+            #[expect(clippy::cast_possible_truncation, reason = "rem_euclid is in 0..width")]
             let moved = total.rem_euclid(columns) as usize;
             moved
         })
