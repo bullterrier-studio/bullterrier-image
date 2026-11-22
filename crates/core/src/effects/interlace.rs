@@ -85,3 +85,30 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         }
     })
 }
+
+/// The slid field on the GPU (`interlace.wgsl`): the CPU's own reading, the source column's whole offset and the share of
+/// the next pixel worked out once in f64.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(
+        include_str!("interlace.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            // the column a pixel reads is its own less the offset
+            let source = -f64::from(params.offset);
+            let first = source.floor();
+            let rule = match params.edge {
+                crate::ops::edge::Edge::Reflect => 0,
+                crate::ops::edge::Edge::Nearest => 1,
+                crate::ops::edge::Edge::Mirror => 2,
+                crate::ops::edge::Edge::Wrap => 3,
+            };
+            let int = |value: i64| f32::from_bits(i32::try_from(value).unwrap_or(i32::MAX).cast_unsigned());
+            #[expect(clippy::cast_possible_truncation, reason = "an offset is at most a few thousand pixels")]
+            let whole = first as i64;
+            vec![
+                [crate::ops::cast::single(source - first), 0.0, 0.0, 0.0],
+                [int(whole), int(rule), int(i64::from(params.field == Field::Odd)), 0.0],
+            ]
+        },
+    )
+}
