@@ -129,7 +129,7 @@ impl Gpu {
         let (height, width) = (image.height(), image.width());
         self.guarded("cut the picture out", || {
             let alpha = self.send(&cut.alpha(height, width), true);
-            let dest = self.picture_buffer(pixel_bytes(height, width));
+            let dest = self.picture_buffer(height, width);
             let mut encoder = self.encoder();
             self.dispatch(
                 &mut encoder,
@@ -148,11 +148,6 @@ impl Gpu {
         })
         .await
     }
-}
-
-/// The bytes of a picture of `height` x `width` on the device.
-fn pixel_bytes(height: usize, width: usize) -> u64 {
-    (height * width) as u64 * 16 // constant: a vec4<f32> a pixel
 }
 
 /// The steps of `recipe` run on `photo` on `gpu`, and the cut still to make of the result.
@@ -279,7 +274,7 @@ fn kernel_step(
     let (height, width) = (current.height(), current.width());
     let Encoded { block, table } = step.kernel.encode(step.params)?;
     let table = table.map(|table| gpu.send(&table, false));
-    let after = gpu.picture_buffer(pixel_bytes(height, width));
+    let after = gpu.picture_buffer(height, width);
     gpu.dispatch(
         encoder,
         step.kernel.source(),
@@ -302,7 +297,7 @@ fn kernel_step(
         ));
     }
     let mask = mask.map(|mask| gpu.send(mask.values(), true));
-    let laid = gpu.picture_buffer(pixel_bytes(height, width));
+    let laid = gpu.picture_buffer(height, width);
     let mode = match step.overlay.blend_mode {
         BlendMode::Normal => 0.0,
         BlendMode::Multiply => 1.0,

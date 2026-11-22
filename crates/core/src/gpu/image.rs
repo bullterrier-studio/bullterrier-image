@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use super::{Bindings, Gpu, Header, PIXEL_BYTES, failed};
+use super::{Bindings, Gpu, Header, failed, picture_bytes};
 use crate::{Error, Image, Picture};
 
 /// The kernel that spreads an upload into one vec4 a pixel.
@@ -135,12 +135,11 @@ impl Gpu {
 
     async fn upload_values(&self, height: usize, width: usize, values: &[f32], alpha: bool) -> Result<GpuImage, Error> {
         self.fits(height, width)?;
-        let bytes = (height * width) as u64 * PIXEL_BYTES;
         let channels = if alpha { 4.0 } else { 3.0 };
         let buffer = self
             .guarded("take a picture", || {
                 let sent = self.send(values, true);
-                let buffer = self.picture_buffer(bytes);
+                let buffer = self.picture_buffer(height, width);
                 let mut encoder = self.encoder();
                 self.dispatch(
                     &mut encoder,
@@ -167,7 +166,7 @@ impl Gpu {
     /// [`Error::Inputs`] if another context made `image`; [`Error::Gpu`] if the device fails (is lost) while reading it.
     pub async fn download(&self, image: &GpuImage) -> Result<Image, Error> {
         let image = image.of(self)?;
-        let values = self.read(image.buffer(), image.height() * image.width()).await?;
+        let values = self.read(image.buffer(), image.height(), image.width()).await?;
         let quads = values.as_chunks::<4>().0;
         let pixels = quads.iter().map(|&[red, green, blue, _]| [red, green, blue]).collect();
         let made = Image::from_pixels(image.height(), image.width(), pixels);
@@ -178,9 +177,9 @@ impl Gpu {
         })
     }
 
-    /// The `pixels` vec4s of `buffer` read back, four floats each.
-    async fn read(&self, buffer: &wgpu::Buffer, pixels: usize) -> Result<Vec<f32>, Error> {
-        let size = pixels as u64 * PIXEL_BYTES;
+    /// The picture of `height` x `width` in `buffer` read back, four floats a pixel.
+    async fn read(&self, buffer: &wgpu::Buffer, height: usize, width: usize) -> Result<Vec<f32>, Error> {
+        let size = picture_bytes(height, width);
         let staging = self
             .guarded("read a picture back", || {
                 let staging = self.device().create_buffer(&wgpu::BufferDescriptor {

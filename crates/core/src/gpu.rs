@@ -92,6 +92,11 @@ impl PartialEq for Gpu {
 
 impl Eq for Gpu {}
 
+/// The bytes a picture of `height` x `width` takes on the device: the one place that knows a pixel's size there.
+pub(crate) fn picture_bytes(height: usize, width: usize) -> u64 {
+    (height * width) as u64 * PIXEL_BYTES
+}
+
 /// The failure of a wgpu call, as the core reports it.
 pub(crate) fn failed(what: &str, error: impl fmt::Display) -> Error {
     Error::Gpu(format!("the GPU failed to {what}: {error}"))
@@ -304,11 +309,11 @@ impl Gpu {
         Ok(())
     }
 
-    /// A buffer of `bytes` bytes for a picture on the device, a kernel's destination and a copy's source.
-    pub(crate) fn picture_buffer(&self, bytes: u64) -> wgpu::Buffer {
+    /// A buffer for a picture of `height` x `width` on the device, a kernel's destination and a copy's source.
+    pub(crate) fn picture_buffer(&self, height: usize, width: usize) -> wgpu::Buffer {
         self.device().create_buffer(&wgpu::BufferDescriptor {
             label: Some("bullterrier-image picture"),
-            size: bytes.max(PIXEL_BYTES),
+            size: picture_bytes(height, width).max(PIXEL_BYTES),
             usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_SRC | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         })
