@@ -96,17 +96,28 @@ fn patches(params: &Params, half_edge: f64) -> Vec<Patch> {
         .collect()
 }
 
+/// Where the leak's side lies on the canvas `place` lies on: the sine and cosine of its turn (counterclockwise), how far the side
+/// is from the centre and how far the picture reaches along it, at this angle.
+fn side(place: crate::Place, params: &Params) -> (f64, f64, f64, f64) {
+    #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
+    let (height, width) = (place.canvas_height as f64, place.canvas_width as f64);
+    // the maths below turns counterclockwise on the picture, `angle` clockwise
+    let (sin, cos) = (-f64::from(params.angle).to_radians()).sin_cos();
+    (
+        sin,
+        cos,
+        f64::midpoint(width * cos.abs(), height * sin.abs()),
+        f64::midpoint(width * sin.abs(), height * cos.abs()),
+    )
+}
+
 /// The picture with the leak screened over it.
 pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
     let place = inputs.place(picture);
     // the leak is that of the canvas (at most 16 patches, the parameter's maximum), whichever rows are drawn
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
     let (height, width) = (place.canvas_height as f64, place.canvas_width as f64);
-    // the maths below turns counterclockwise on the picture, `angle` clockwise
-    let (sin, cos) = (-f64::from(params.angle).to_radians()).sin_cos();
-    // how far the side lies from the centre and how far the picture reaches along it, at this angle
-    let half_depth = f64::midpoint(width * cos.abs(), height * sin.abs());
-    let half_edge = f64::midpoint(width * sin.abs(), height * cos.abs());
+    let (sin, cos, half_depth, half_edge) = side(place, params);
     let patches = patches(params, half_edge);
     let tint = params.color.0.map(|channel| params.amount * channel);
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
@@ -131,5 +142,38 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             .sum();
         let light = (1.0 - (-wash).exp()) as f32;
         screen(pixel, tint.map(|channel| channel * light))
+    })
+}
+
+/// The leak on the GPU (`light_leak.wgsl`): the patches are the CPU's own draws (a table), the pixel sums their Gaussians in single
+/// precision and screens the tint over itself as the CPU does.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("light_leak.wgsl"), |params: &Params, header: &crate::gpu::Header| {
+        let single = crate::ops::cast::single;
+        let place = header.place();
+        let (sin, cos, half_depth, _) = side(place, params);
+        let tint = params.color.0.map(|channel| params.amount * channel);
+        vec![
+            [tint[0], tint[1], tint[2], 0.0],
+            [single(sin), single(cos), single(half_depth), 0.0],
+            [f32::from_bits(u32::try_from(params.blobs).unwrap_or(0)), 0.0, 0.0, 0.0],
+        ]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let single = crate::ops::cast::single;
+        let (_, _, _, half_edge) = side(header.place(), params);
+        patches(params, half_edge)
+            .into_iter()
+            .flat_map(|patch| {
+                [
+                    single(patch.depth),
+                    single(patch.along),
+                    single(patch.sigma),
+                    single(patch.sigma_along),
+                    single(patch.weight),
+                ]
+            })
+            .collect()
     })
 }
