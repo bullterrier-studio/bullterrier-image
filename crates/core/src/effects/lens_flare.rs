@@ -99,10 +99,8 @@ impl Bump {
     }
 }
 
-/// The picture with the flare screened over it.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
-    // the light lies on the canvas, of which the picture holds the rows from `first_row`
-    let place = inputs.place(picture);
+/// The features of the flare on the canvas `place` lies on: the halo, the ring, then the ghosts.
+fn bumps(place: crate::Place, params: &Params) -> Vec<Bump> {
     #[expect(clippy::cast_precision_loss, reason = "a picture side is far below 2**52")]
     let (last_row, last_column) = ((place.canvas_height - 1) as f64, (place.canvas_width - 1) as f64);
     let light = (f64::from(params.y) * last_row, f64::from(params.x) * last_column);
@@ -132,6 +130,14 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         let fade = f64::from(params.ghosts - ghost + 1) / f64::from(params.ghosts);
         bumps.push(bump(centre, size, 0.0, fade));
     }
+    bumps
+}
+
+/// The picture with the flare screened over it.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>) -> Image {
+    // the light lies on the canvas, of which the picture holds the rows from `first_row`
+    let place = inputs.place(picture);
+    let bumps = bumps(place, params);
     let tint = params.color.0.map(|channel| params.amount * channel);
     #[expect(
         clippy::cast_possible_truncation,
@@ -143,5 +149,34 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
             .map(|bump| bump.at(place.first_row + row, column))
             .sum::<f64>() as f32;
         screen(pixel, tint.map(|channel| channel * flare))
+    })
+}
+
+/// The flare on the GPU (`lens_flare.wgsl`): the bumps are worked out in f64 here (a table, a few numbers each) and a pixel sums
+/// them in single precision, then screens as the CPU does.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("lens_flare.wgsl"), |params: &Params, header: &crate::gpu::Header| {
+        let tint = params.color.0.map(|channel| params.amount * channel);
+        let count = bumps(header.place(), params).len();
+        vec![
+            [tint[0], tint[1], tint[2], 0.0],
+            [f32::from_bits(u32::try_from(count).unwrap_or(0)), 0.0, 0.0, 0.0],
+        ]
+    })
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        bumps(header.place(), params)
+            .into_iter()
+            .flat_map(|bump| {
+                let single = crate::ops::cast::single;
+                [
+                    single(bump.centre.0),
+                    single(bump.centre.1),
+                    single(bump.reach),
+                    single(bump.ring),
+                    single(bump.weight),
+                ]
+            })
+            .collect()
     })
 }
