@@ -102,14 +102,21 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     use crate::ops::cast::single;
-    crate::gpu::Kernel::new(include_str!("vignette.wgsl"), |params: &Params, _: &crate::gpu::Header| {
-        let exponent = if params.roundness > 0.0 { 2.0 / f64::from(params.roundness) } else { 0.0 };
-        let reach = if exponent > 0.0 { exponent.recip() } else { 0.0 };
-        let [red, green, blue] = params.color.0;
-        vec![
-            [params.amount, params.radius, params.feather, single(exponent)],
-            [single(reach), 0.0, 0.0, 0.0],
-            [red, green, blue, 0.0],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("vignette.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            let exponent = if params.roundness > 0.0 {
+                2.0 / f64::from(params.roundness)
+            } else {
+                0.0
+            };
+            let reach = if exponent > 0.0 { exponent.recip() } else { 0.0 };
+            let [red, green, blue] = params.color.0;
+            vec![
+                [params.amount, params.radius, params.feather, single(exponent)],
+                [single(reach), 0.0, 0.0, 0.0],
+                [red, green, blue, 0.0],
+            ]
+        },
+    )
 }

@@ -159,16 +159,18 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     crate::gpu::Kernel::new(
-        concat!(
-            include_str!("../ops/noise.wgsl"),
-            include_str!("paper_texture.wgsl")
-        ),
+        concat!(include_str!("../ops/noise.wgsl"), include_str!("paper_texture.wgsl")),
         |params: &Params, _: &crate::gpu::Header| {
             let (_, weave_share, fibre_share) = mixing(params);
             let single = cast::single;
             vec![
                 [params.amount, single(weave_share), single(fibre_share), 0.0],
-                [f32::from_bits(params.seed), f32::from_bits(u32::from(params.kind != Kind::Paper)), 0.0, 0.0],
+                [
+                    f32::from_bits(params.seed),
+                    f32::from_bits(u32::from(params.kind != Kind::Paper)),
+                    0.0,
+                    0.0,
+                ],
             ]
         },
     )

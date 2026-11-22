@@ -153,14 +153,16 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// turns round to the right, a table); the pixels are copied, so the picture is the CPU's to the bit.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("slice_shift.wgsl"), |_: &Params, _: &crate::gpu::Header| Vec::new()).with_table(
-        |params: &Params, header: &crate::gpu::Header| {
-            let place = header.place();
-            let (height, width) = (header.height as usize, header.width as usize);
-            crate::ops::shift::slides(place.first_row, (height, width), &moves(place.canvas_height, params))
-                .into_iter()
-                .map(|moved| crate::ops::cast::single(crate::ops::length::float(moved)))
-                .collect()
-        },
+    crate::gpu::Kernel::new(
+        include_str!("slice_shift.wgsl"),
+        |_: &Params, _: &crate::gpu::Header| Vec::new(),
     )
+    .with_table(|params: &Params, header: &crate::gpu::Header| {
+        let place = header.place();
+        let (height, width) = (header.height as usize, header.width as usize);
+        crate::ops::shift::slides(place.first_row, (height, width), &moves(place.canvas_height, params))
+            .into_iter()
+            .map(|moved| crate::ops::cast::single(crate::ops::length::float(moved)))
+            .collect()
+    })
 }

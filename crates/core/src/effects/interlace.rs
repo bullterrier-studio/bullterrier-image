@@ -103,7 +103,10 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
                 crate::ops::edge::Edge::Wrap => 3,
             };
             let int = |value: i64| f32::from_bits(i32::try_from(value).unwrap_or(i32::MAX).cast_unsigned());
-            #[expect(clippy::cast_possible_truncation, reason = "an offset is at most a few thousand pixels")]
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "an offset is at most a few thousand pixels"
+            )]
             let whole = first as i64;
             vec![
                 [crate::ops::cast::single(source - first), 0.0, 0.0, 0.0],

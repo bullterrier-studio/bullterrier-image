@@ -123,19 +123,27 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     use crate::ops::cast::single;
     use crate::ops::length::float;
-    crate::gpu::Kernel::new(include_str!("gradient.wgsl"), |params: &Params, _: &crate::gpu::Header| {
-        let kind = match params.kind {
-            Kind::Linear => 0.0,
-            Kind::Radial => 1.0,
-            Kind::Conic => 2.0,
-        };
-        let start = f64::from(params.angle).to_radians();
-        let stops = u32::try_from(params.colors.len()).unwrap_or(u32::MAX);
-        vec![
-            [kind, single(start), float_to_f32(params.repeat), f32::from(u8::from(params.reflect))],
-            [f32::from_bits(stops), 0.0, 0.0, 0.0],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("gradient.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            let kind = match params.kind {
+                Kind::Linear => 0.0,
+                Kind::Radial => 1.0,
+                Kind::Conic => 2.0,
+            };
+            let start = f64::from(params.angle).to_radians();
+            let stops = u32::try_from(params.colors.len()).unwrap_or(u32::MAX);
+            vec![
+                [
+                    kind,
+                    single(start),
+                    float_to_f32(params.repeat),
+                    f32::from(u8::from(params.reflect)),
+                ],
+                [f32::from_bits(stops), 0.0, 0.0, 0.0],
+            ]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let place = header.place();
         let (high, wide) = (float(place.canvas_height), float(place.canvas_width));

@@ -152,10 +152,13 @@ fn lit(first: usize, count: usize, period: f64, start: f64, length: f64) -> Vec<
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     use crate::ops::cast::single;
-    crate::gpu::Kernel::new(include_str!("pixel_grid.wgsl"), |params: &Params, _: &crate::gpu::Header| {
-        let divisor = Grid::new(params).mean_gain.map_or(1.0, single);
-        vec![[params.amount, divisor, 0.0, 0.0]]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("pixel_grid.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            let divisor = Grid::new(params).mean_gain.map_or(1.0, single);
+            vec![[params.amount, divisor, 0.0, 0.0]]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let grid = Grid::new(params);
         let rows = grid.rows(header.place().first_row, header.height as usize);

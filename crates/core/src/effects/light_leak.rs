@@ -149,17 +149,20 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// precision and screens the tint over itself as the CPU does.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("light_leak.wgsl"), |params: &Params, header: &crate::gpu::Header| {
-        let single = crate::ops::cast::single;
-        let place = header.place();
-        let (sin, cos, half_depth, _) = side(place, params);
-        let tint = params.color.0.map(|channel| params.amount * channel);
-        vec![
-            [tint[0], tint[1], tint[2], 0.0],
-            [single(sin), single(cos), single(half_depth), 0.0],
-            [f32::from_bits(u32::try_from(params.blobs).unwrap_or(0)), 0.0, 0.0, 0.0],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("light_leak.wgsl"),
+        |params: &Params, header: &crate::gpu::Header| {
+            let single = crate::ops::cast::single;
+            let place = header.place();
+            let (sin, cos, half_depth, _) = side(place, params);
+            let tint = params.color.0.map(|channel| params.amount * channel);
+            vec![
+                [tint[0], tint[1], tint[2], 0.0],
+                [single(sin), single(cos), single(half_depth), 0.0],
+                [f32::from_bits(u32::try_from(params.blobs).unwrap_or(0)), 0.0, 0.0, 0.0],
+            ]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let single = crate::ops::cast::single;
         let (_, _, _, half_edge) = side(header.place(), params);

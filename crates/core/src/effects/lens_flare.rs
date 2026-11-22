@@ -156,14 +156,17 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// them in single precision, then screens as the CPU does.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("lens_flare.wgsl"), |params: &Params, header: &crate::gpu::Header| {
-        let tint = params.color.0.map(|channel| params.amount * channel);
-        let count = bumps(header.place(), params).len();
-        vec![
-            [tint[0], tint[1], tint[2], 0.0],
-            [f32::from_bits(u32::try_from(count).unwrap_or(0)), 0.0, 0.0, 0.0],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("lens_flare.wgsl"),
+        |params: &Params, header: &crate::gpu::Header| {
+            let tint = params.color.0.map(|channel| params.amount * channel);
+            let count = bumps(header.place(), params).len();
+            vec![
+                [tint[0], tint[1], tint[2], 0.0],
+                [f32::from_bits(u32::try_from(count).unwrap_or(0)), 0.0, 0.0, 0.0],
+            ]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         bumps(header.place(), params)
             .into_iter()

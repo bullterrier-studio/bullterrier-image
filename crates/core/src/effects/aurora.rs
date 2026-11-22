@@ -144,16 +144,29 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// the precision of a row number (an f32 of a few thousand: about a ten-thousandth of a level on a 4000 px picture).
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("aurora.wgsl"), |params: &Params, header: &crate::gpu::Header| {
-        let single = cast::single;
-        let rows = length::float(header.place().canvas_height);
-        let sky = params.sky.0;
-        vec![
-            [single(f64::from(params.base) * rows), params.waviness, params.height, params.falloff],
-            [sky[0], sky[1], sky[2], 0.0],
-            [f32::from_bits(u32::try_from(params.colors.len()).unwrap_or(2)), 0.0, 0.0, 0.0],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("aurora.wgsl"),
+        |params: &Params, header: &crate::gpu::Header| {
+            let single = cast::single;
+            let rows = length::float(header.place().canvas_height);
+            let sky = params.sky.0;
+            vec![
+                [
+                    single(f64::from(params.base) * rows),
+                    params.waviness,
+                    params.height,
+                    params.falloff,
+                ],
+                [sky[0], sky[1], sky[2], 0.0],
+                [
+                    f32::from_bits(u32::try_from(params.colors.len()).unwrap_or(2)),
+                    0.0,
+                    0.0,
+                    0.0,
+                ],
+            ]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let (ripple, ray) = columns(header.place().canvas_width, params);
         let mut table = ripple;

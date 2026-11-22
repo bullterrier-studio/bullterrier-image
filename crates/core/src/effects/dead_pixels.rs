@@ -99,20 +99,23 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// for every cell: 0 sound, 1 stuck, 2 dead), the kernel looks the pixel's cell up. The picture is otherwise untouched.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("dead_pixels.wgsl"), |params: &Params, header: &crate::gpu::Header| {
-        let place = header.place();
-        let [red, green, blue] = params.color.0;
-        let columns = place.canvas_width.div_ceil(params.size.cast_unsigned() as usize);
-        vec![
-            [red, green, blue, 0.0],
-            [
-                f32::from_bits(params.size.cast_unsigned()),
-                f32::from_bits(u32::try_from(columns).unwrap_or(u32::MAX)),
-                0.0,
-                0.0,
-            ],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("dead_pixels.wgsl"),
+        |params: &Params, header: &crate::gpu::Header| {
+            let place = header.place();
+            let [red, green, blue] = params.color.0;
+            let columns = place.canvas_width.div_ceil(params.size.cast_unsigned() as usize);
+            vec![
+                [red, green, blue, 0.0],
+                [
+                    f32::from_bits(params.size.cast_unsigned()),
+                    f32::from_bits(u32::try_from(columns).unwrap_or(u32::MAX)),
+                    0.0,
+                    0.0,
+                ],
+            ]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let place = header.place();
         let size = params.size.cast_unsigned() as usize;

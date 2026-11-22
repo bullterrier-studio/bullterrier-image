@@ -800,7 +800,10 @@ fn on_gpu(params: &Params) -> bool {
 /// What `dither.wgsl` is given: the CPU's own palette (found in the picture it is given back for `photo`), its order of
 /// lightness and the screen's ranks, worked out by the code `render` runs.
 #[cfg(feature = "gpu")]
-#[expect(clippy::unnecessary_wraps, reason = "the signature of a plan, which may leave a step to the CPU")]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the signature of a plan, which may leave a step to the CPU"
+)]
 fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<'_>) -> Option<crate::gpu::Encoded> {
     let word = f32::from_bits;
     let size = (header.height as usize, header.width as usize);
@@ -814,7 +817,8 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
     };
     let matched = in_space(&palette, params.space);
     let order = crate::ops::dither::lightness_order(&Choices::new(&matched, None));
-    let Some(screen) = thresholds(params.method, params, grid, given.inputs).map(|thresholds| thresholds.screen()) else {
+    let Some(screen) = thresholds(params.method, params, grid, given.inputs).map(|thresholds| thresholds.screen())
+    else {
         unreachable!("the kernel runs ordered methods only (`on_gpu`)")
     };
     let words = |values: [usize; 4]| values.map(|value| word(u32::try_from(value).unwrap_or(u32::MAX)));

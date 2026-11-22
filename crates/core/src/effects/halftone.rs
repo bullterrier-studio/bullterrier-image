@@ -662,12 +662,32 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
     let mut block = vec![
         [cell, 1.0 / cell, 1.0 / params.feather, 0.0],
         [word(separation), word(count), word(geometry), word(table.code as usize)],
-        [word(mode), word(half.len() - 1), word(rule), word(if mode == 2 { picture_at } else { offset })],
-        [word(spot_at), word(table.numbers.len()), word(table.matrix.0), word(table.matrix.1)],
+        [
+            word(mode),
+            word(half.len() - 1),
+            word(rule),
+            word(if mode == 2 { picture_at } else { offset }),
+        ],
+        [
+            word(spot_at),
+            word(table.numbers.len()),
+            word(table.matrix.0),
+            word(table.matrix.1),
+        ],
         [table.aspect, amplitude, wavelength, params.ink_floor],
-        [paper[0], paper[1], paper[2], f32::from(u8::from(luminance(paper) < params.paper_threshold))],
+        [
+            paper[0],
+            paper[1],
+            paper[2],
+            f32::from(u8::from(luminance(paper) < params.paper_threshold)),
+        ],
         ink,
-        [params.dot_gain, params.ink_noise, params.constant_value, f32::from_bits(params.seed)],
+        [
+            params.dot_gain,
+            params.ink_noise,
+            params.constant_value,
+            f32::from_bits(params.seed),
+        ],
         fitting,
     ];
     let mut screens: Vec<[f32; 4]> = turned
@@ -676,7 +696,11 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
         .collect();
     screens.resize(MOST_INKS, [0.0; 4]);
     block.extend(screens);
-    block.extend(inks.through().iter().map(|through| [through[0], through[1], through[2], 0.0]));
+    block.extend(
+        inks.through()
+            .iter()
+            .map(|through| [through[0], through[1], through[2], 0.0]),
+    );
     let encoded = crate::gpu::Encoded::new(block, Some(numbers));
     Some(if mode == 2 { encoded.counting_table() } else { encoded })
 }

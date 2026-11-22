@@ -110,10 +110,13 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// same pixels are torn.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("torn_edge.wgsl"), |params: &Params, _: &crate::gpu::Header| {
-        let [red, green, blue] = params.fill.0;
-        vec![[red, green, blue, 0.0]]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("torn_edge.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            let [red, green, blue] = params.fill.0;
+            vec![[red, green, blue, 0.0]]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let (height, width) = (header.place().canvas_height, header.place().canvas_width);
         // top and bottom a value a column, left and right a value a canvas row

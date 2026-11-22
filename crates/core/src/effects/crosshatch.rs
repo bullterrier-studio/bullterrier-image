@@ -103,27 +103,25 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// level at most), is measured on pictures 3000 px long with the closest lines (tests/it/gpu/wide.rs): 3.1e-4.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(concat!(include_str!("../ops/hatch.wgsl"), include_str!("crosshatch.wgsl")), |params: &Params, _: &crate::gpu::Header| {
-        let layers = usize::try_from(params.layers).unwrap_or(1);
-        let turn = 180.0 / float(layers);
-        let tone = Tone::new(params.paper.0, params.color.0);
-        let [paper, color] = [params.paper.0, params.color.0];
-        let mut block = vec![
-            [
-                tone.paper_light(),
-                tone.reach(),
-                params.spacing,
-                params.thickness,
-            ],
-            [f32::from_bits(u32::try_from(layers).unwrap_or(1)), 0.0, 0.0, 0.0],
-            [paper[0], paper[1], paper[2], 0.0],
-            [color[0], color[1], color[2], 0.0],
-        ];
-        block.extend((0..6).map(|k| {
-            let (sin, cos) = Lines::new(f64::from(params.angle) + turn * float(k), 1.0).direction();
-            [crate::ops::cast::single(sin), crate::ops::cast::single(cos), 0.0, 0.0]
-        }));
-        block
-    })
+    crate::gpu::Kernel::new(
+        concat!(include_str!("../ops/hatch.wgsl"), include_str!("crosshatch.wgsl")),
+        |params: &Params, _: &crate::gpu::Header| {
+            let layers = usize::try_from(params.layers).unwrap_or(1);
+            let turn = 180.0 / float(layers);
+            let tone = Tone::new(params.paper.0, params.color.0);
+            let [paper, color] = [params.paper.0, params.color.0];
+            let mut block = vec![
+                [tone.paper_light(), tone.reach(), params.spacing, params.thickness],
+                [f32::from_bits(u32::try_from(layers).unwrap_or(1)), 0.0, 0.0, 0.0],
+                [paper[0], paper[1], paper[2], 0.0],
+                [color[0], color[1], color[2], 0.0],
+            ];
+            block.extend((0..6).map(|k| {
+                let (sin, cos) = Lines::new(f64::from(params.angle) + turn * float(k), 1.0).direction();
+                [crate::ops::cast::single(sin), crate::ops::cast::single(cos), 0.0, 0.0]
+            }));
+            block
+        },
+    )
     .with_bound(4e-4)
 }

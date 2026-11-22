@@ -292,7 +292,12 @@ pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
             let count = u32::try_from(stops.len()).unwrap_or(u32::MAX);
             Some(crate::gpu::Encoded::new(
                 vec![
-                    [single(dark), single(span), f32::from(u8::from(params.space == Space::Oklab)), 0.0],
+                    [
+                        single(dark),
+                        single(span),
+                        f32::from(u8::from(params.space == Space::Oklab)),
+                        0.0,
+                    ],
                     [f32::from_bits(count), 0.0, 0.0, 0.0],
                 ],
                 Some(stops.into_iter().flatten().collect()),

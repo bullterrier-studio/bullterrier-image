@@ -80,9 +80,10 @@ const fn matrix(params: &Params) -> [[f32; 3]; 3] {
 /// The mix on the GPU (`channel_mixer.wgsl`): a row of the matrix a vec4.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("channel_mixer.wgsl"), |params: &Params, _: &crate::gpu::Header| {
-        matrix(params).map(|[a, b, c]| [a, b, c, 0.0]).to_vec()
-    })
+    crate::gpu::Kernel::new(
+        include_str!("channel_mixer.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| matrix(params).map(|[a, b, c]| [a, b, c, 0.0]).to_vec(),
+    )
 }
 
 /// The mixed picture.

@@ -159,19 +159,22 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// for a point that escapes after 2000 steps at a period of 1.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("fractal.wgsl"), |params: &Params, _: &crate::gpu::Header| {
-        let [red, green, blue] = params.interior.0;
-        vec![
-            [params.c_real, params.c_imag, params.period, 0.0],
-            [red, green, blue, 0.0],
-            [
-                f32::from_bits(params.iterations.cast_unsigned()),
-                f32::from_bits(u32::from(params.kind == Kind::Julia)),
-                f32::from_bits(u32::try_from(params.colors.len()).unwrap_or(2)),
-                0.0,
-            ],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("fractal.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            let [red, green, blue] = params.interior.0;
+            vec![
+                [params.c_real, params.c_imag, params.period, 0.0],
+                [red, green, blue, 0.0],
+                [
+                    f32::from_bits(params.iterations.cast_unsigned()),
+                    f32::from_bits(u32::from(params.kind == Kind::Julia)),
+                    f32::from_bits(u32::try_from(params.colors.len()).unwrap_or(2)),
+                    0.0,
+                ],
+            ]
+        },
+    )
     .with_table(|params: &Params, header: &crate::gpu::Header| {
         let place = header.place();
         let view = View::of(place, params);

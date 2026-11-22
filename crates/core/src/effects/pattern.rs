@@ -116,21 +116,24 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 /// The pattern on the GPU (`pattern.wgsl`): the CPU's f32 maths for each pixel.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
-    crate::gpu::Kernel::new(include_str!("pattern.wgsl"), |params: &Params, _: &crate::gpu::Header| {
-        let (sin, cos) = params.angle.to_radians().sin_cos();
-        let kind = match params.kind {
-            Kind::Stripes => 0.0,
-            Kind::Checks => 1.0,
-            Kind::Dots => 2.0,
-            Kind::Grid => 3.0,
-        };
-        let [fr, fg, fb] = params.foreground.0;
-        let [br, bg, bb] = params.background.0;
-        vec![
-            [cos, sin, params.cell, params.thickness * params.cell / 2.0],
-            [kind, params.radius * params.cell, params.feather, 0.0],
-            [fr, fg, fb, 0.0],
-            [br, bg, bb, 0.0],
-        ]
-    })
+    crate::gpu::Kernel::new(
+        include_str!("pattern.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            let (sin, cos) = params.angle.to_radians().sin_cos();
+            let kind = match params.kind {
+                Kind::Stripes => 0.0,
+                Kind::Checks => 1.0,
+                Kind::Dots => 2.0,
+                Kind::Grid => 3.0,
+            };
+            let [fr, fg, fb] = params.foreground.0;
+            let [br, bg, bb] = params.background.0;
+            vec![
+                [cos, sin, params.cell, params.thickness * params.cell / 2.0],
+                [kind, params.radius * params.cell, params.feather, 0.0],
+                [fr, fg, fb, 0.0],
+                [br, bg, bb, 0.0],
+            ]
+        },
+    )
 }
