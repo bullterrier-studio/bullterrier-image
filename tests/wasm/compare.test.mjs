@@ -22,7 +22,7 @@ for (const name of ["subject", "depth"]) {
 
 for (const [name, expected] of Object.entries(oracle.cases)) {
   const { recipe, look, size } = expected;
-  test(`${name}: the same pixels as the native render`, () => {
+  test(`${name}: the same pixels as the native render`, (t) => {
     const loaded = look ? Recipe.look(look) : Recipe.fromToml(readFileSync(new URL(recipe, here), "utf8"));
     if (expected.error) {
       assert.throws(() => loaded.render(photo, { size, maps }), { name: expected.error });
@@ -32,10 +32,19 @@ for (const [name, expected] of Object.entries(oracle.cases)) {
     assert.deepEqual([out.width, out.height], [expected.width, expected.height]);
     assert.equal(out.data.length, out.width * out.height * 4);
     if (expected.bound > 0 && sha256(out.data) !== expected.sha256) {
+      // The Fourier allowance (CLAUDE.md, WebAssembly; oracle.py FOURIER_EFFECTS): a recipe through rustfft may differ
+      // from the native render by `bound` levels of a channel, never more. The largest difference and the count of
+      // differing bytes are reported, so a CI log is the measurement.
       const native = readFileSync(new URL(`../../pkg/${name}.rgba`, here));
-      let worst = 0;
-      for (let index = 0; index < native.length; index++) worst = Math.max(worst, Math.abs(native[index] - out.data[index]));
-      assert.ok(worst <= expected.bound, `a channel differs by ${worst} levels, the bound is ${expected.bound}`);
+      let [worst, differing] = [0, 0];
+      for (let index = 0; index < native.length; index++) {
+        const gap = Math.abs(native[index] - out.data[index]);
+        worst = Math.max(worst, gap);
+        differing += gap > 0 ? 1 : 0;
+      }
+      const measured = `${differing} of ${native.length} bytes differ, by at most ${worst} levels`;
+      t.diagnostic(measured);
+      assert.ok(worst <= expected.bound, `${measured}; the bound is ${expected.bound}`);
     } else {
       assert.equal(sha256(out.data), expected.sha256);
     }
