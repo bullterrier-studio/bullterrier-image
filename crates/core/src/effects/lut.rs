@@ -46,3 +46,27 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         [0, 1, 2].map(|channel| (pixel[channel] + params.amount * (graded[channel] - pixel[channel])).clamp(0.0, 1.0))
     })
 }
+
+/// The grade on the GPU (`lut.wgsl`): the table the step names is sent as it is, and the device does the CPU's own trilinear
+/// lookup.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::planned(
+        include_str!("lut.wgsl"),
+        |params: &Params, _: &crate::gpu::Header, given: &crate::gpu::Given<'_>| {
+            let table = given.inputs.lut("file");
+            let size = table.map_or(0, crate::Lut::size);
+            let (low, high) = table.map_or(([0.0; 3], [1.0; 3]), |table| (table.domain_min(), table.domain_max()));
+            let pad = |colour: [f32; 3]| [colour[0], colour[1], colour[2], 0.0];
+            Some(crate::gpu::Encoded {
+                block: vec![
+                    [f32::from_bits(u32::try_from(size).unwrap_or(u32::MAX)), 0.0, 0.0, 0.0],
+                    pad(low),
+                    pad(high),
+                    [params.amount, 0.0, 0.0, 0.0],
+                ],
+                table: table.map(|table| table.entries().iter().flatten().copied().collect()),
+            })
+        },
+    )
+}
