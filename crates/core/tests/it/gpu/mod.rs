@@ -7,17 +7,73 @@ mod parity;
 mod render;
 mod transfer;
 
-use std::sync::LazyLock;
+use std::cell::{Cell, RefCell};
+use std::ops::Deref;
+use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 
 use bullterrier_image::{Error, Gpu, Image, Options, Photo, Presets, Recipe};
 use pollster::block_on;
 
 /// The context the tests share, or none where `BT_GPU=none` says the machine has no GPU.
-static SHARED: LazyLock<Option<Gpu>> = LazyLock::new(fresh);
+static SHARED: LazyLock<Option<Gpu>> = LazyLock::new(fresh_context);
+
+/// One GPU test at a time. The Vulkan loader (Ubuntu's `libvulkan1`, under lavapipe in CI) crashed with SIGSEGV in
+/// `vkSetDebugUtilsObjectNameEXT`, naming a buffer of one context, while another test's new context enumerated its
+/// devices (4 of 10 CI runs, 2026-11-22; wgpu names objects in debug builds): contexts of separate instances used at once
+/// from several threads. The library holds no state between contexts; this is the loader's race, kept out of the tests.
+static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+thread_local! {
+    /// How many contexts this thread's test holds, and the lock while it holds any: a test may hold two.
+    static HELD: Cell<usize> = const { Cell::new(0) };
+    static GUARD: RefCell<Option<MutexGuard<'static, ()>>> = const { RefCell::new(None) };
+}
+
+/// This thread's share of the lock: taken by the first, let go with the last.
+struct Alone;
+
+impl Alone {
+    fn take() -> Self {
+        if HELD.get() == 0 {
+            let guard = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
+            GUARD.with_borrow_mut(|held| *held = Some(guard));
+        }
+        HELD.set(HELD.get() + 1);
+        Self
+    }
+}
+
+impl Drop for Alone {
+    fn drop(&mut self) {
+        HELD.set(HELD.get() - 1);
+        if HELD.get() == 0 {
+            GUARD.with_borrow_mut(Option::take);
+        }
+    }
+}
+
+/// A context a test holds: no other GPU test runs until it is dropped (with the test's other contexts).
+pub(crate) struct Held {
+    gpu: Gpu,
+    _alone: Alone,
+}
+
+impl Deref for Held {
+    type Target = Gpu;
+    fn deref(&self) -> &Gpu {
+        &self.gpu
+    }
+}
+
+/// The context `make` gives, held, the lock taken before it is made; none (the lock let go) where it gives none.
+fn held(make: impl FnOnce() -> Option<Gpu>) -> Option<Held> {
+    let alone = Alone::take();
+    make().map(|gpu| Held { gpu, _alone: alone })
+}
 
 /// The shared context, or none (after noting the skip) where the machine has no GPU.
-pub(crate) fn gpu() -> Option<Gpu> {
-    let shared = SHARED.clone();
+pub(crate) fn gpu() -> Option<Held> {
+    let shared = held(|| SHARED.clone());
     if shared.is_none() {
         skipped();
     }
@@ -45,13 +101,18 @@ fn skipped() {
     );
 }
 
-/// A context of its own, for a test that counts transfers; none where the machine has no GPU.
+/// A context of its own, held, for a test that counts transfers; none where the machine has no GPU.
+pub(crate) fn fresh() -> Option<Held> {
+    held(fresh_context)
+}
+
+/// A new context; none where the machine has no GPU. Made only under the lock ([`held`]).
 ///
 /// # Panics
 /// If there is no adapter and `BT_GPU` does not say `none`, or the adapter is not the one `BT_GPU` names.
 #[expect(clippy::print_stderr, reason = "a skipped test says why, as BT_GPU=none asks")]
 #[expect(clippy::panic, reason = "a missing GPU fails the tests that need it, with its error")]
-pub(crate) fn fresh() -> Option<Gpu> {
+fn fresh_context() -> Option<Gpu> {
     let expected = std::env::var("BT_GPU").unwrap_or_default();
     if expected == "none" {
         eprintln!("skipped: BT_GPU=none says this machine has no GPU");
@@ -122,6 +183,6 @@ fn the_gap_of_two_pictures_is_their_largest_difference_and_a_non_finite_value_fa
 fn the_adapter_is_the_one_bt_gpu_names_and_holds_a_picture() {
     // `fresh` checks the name; a device holds at least WebGPU's default binding, 128 MiB, 8 Mi pixels
     if let Some(gpu) = gpu() {
-        assert!(gpu.largest_picture() >= 1 << 23, "{gpu:?}");
+        assert!(gpu.largest_picture() >= 1 << 23, "{:?}", *gpu);
     }
 }

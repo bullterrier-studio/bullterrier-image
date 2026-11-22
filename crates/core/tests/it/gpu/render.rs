@@ -322,9 +322,8 @@ fn a_picture_wider_than_the_device_dispatches_is_refused_naming_both_sizes() -> 
 
 #[test]
 fn a_picture_of_more_pixels_than_the_callers_device_holds_is_refused_naming_both_sizes() -> Outcome {
-    if gpu().is_none() {
-        return Ok(());
-    }
+    // held while the test makes a context of its own (`gpu::ONE_AT_A_TIME`)
+    let Some(_alone) = gpu() else { return Ok(()) };
     // a caller's device whose storage buffers hold 64 KiB: 4,096 pixels of 16 bytes
     let (device, queue) = block_on(async {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
