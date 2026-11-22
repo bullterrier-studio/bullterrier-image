@@ -131,3 +131,32 @@ jobs:
         run: uv sync --locked
       - name: Build the package, run it in Node and compare it with the Python package (poe wasm-test)
         run: uv run --locked poe wasm-test
+
+  # The GPU backend's tests (`poe rust-test-gpu`: the core's whole suite built with the feature, and `tests/it/gpu/`) on Mesa's
+  # software Vulkan driver (lavapipe): GitHub's runners have no GPU. BT_GPU names the adapter the tests must find, so a missing
+  # or different adapter fails the job instead of skipping. Once, on Linux.
+  gpu:
+    name: The GPU tests pass on a software Vulkan adapter
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Install Mesa's software Vulkan driver (lavapipe) and the Vulkan loader
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends mesa-vulkan-drivers libvulkan1
+      - name: Install the pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup toolchain install --no-self-update && cargo --version
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Fetch the locked crates (cargo fetch)
+        run: cargo fetch --locked
+      - name: Install the locked dependencies (builds the Rust extension)
+        run: uv sync --locked
+      - name: The core's Rust tests with the GPU backend on lavapipe (poe rust-test-gpu)
+        env:
+          BT_GPU: llvmpipe
+        run: uv run --locked poe rust-test-gpu

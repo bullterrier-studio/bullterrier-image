@@ -219,7 +219,7 @@ fn a_trace_shows_every_stage_at_the_working_size_and_ends_with_what_render_retur
     let photo = Photo::new(Picture::new(4, 6, &values)?).with_map("subject", Layer::new(4, 6, vec![0.5; 24])?)?;
     let recipe = Recipe::new([uses(&recorder, "subject"), uses(&recorder, "subject").mask("subject")]);
     let options = Options::default().with_size(12);
-    let stages = photo.trace(&recipe, &Presets::new(), options)?;
+    let stages = photo.trace(&recipe, &Presets::new(), options.clone())?;
     let rendered = render(&photo, &recipe, options)?;
     assert_eq!(stages.len(), 4);
     for stage in &stages {

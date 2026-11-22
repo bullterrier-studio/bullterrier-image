@@ -68,13 +68,26 @@ pub struct Params {
     pub blue_from_blue: f32,
 }
 
-/// The mixed picture.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let matrix = [
+/// The matrix of `params`: a row for each output channel.
+const fn matrix(params: &Params) -> [[f32; 3]; 3] {
+    [
         [params.red_from_red, params.red_from_green, params.red_from_blue],
         [params.green_from_red, params.green_from_green, params.green_from_blue],
         [params.blue_from_red, params.blue_from_green, params.blue_from_blue],
-    ];
+    ]
+}
+
+/// The mix on the GPU (`channel_mixer.wgsl`): a row of the matrix a vec4.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("channel_mixer.wgsl"), |params: &Params| {
+        matrix(params).map(|[a, b, c]| [a, b, c, 0.0]).to_vec()
+    })
+}
+
+/// The mixed picture.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+    let matrix = matrix(params);
     picture.map(|pixel| {
         matrix.map(|weights| {
             let sum = weights[0] * pixel[0] + weights[1] * pixel[1] + weights[2] * pixel[2];

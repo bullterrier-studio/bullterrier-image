@@ -49,12 +49,16 @@ impl Cut {
 
     /// `image`, the picture after the last step, with its alpha: its colour is untouched.
     pub(super) fn apply(&self, image: Image) -> Image {
-        let (height, width) = (image.height(), image.width());
-        let alpha = match self {
+        let alpha = self.alpha(image.height(), image.width());
+        image.with_alpha(alpha)
+    }
+
+    /// The alpha of each pixel of a picture of `height` x `width` (the working picture's size), row after row.
+    pub(super) fn alpha(&self, height: usize, width: usize) -> Vec<f32> {
+        match self {
             Self::Circle => cutout::circle(height, width),
             Self::Rounded(radius) => cutout::rounded(height, width, *radius),
             Self::Subject(subject) => subject.values().to_vec(),
-        };
-        image.with_alpha(alpha)
+        }
     }
 }

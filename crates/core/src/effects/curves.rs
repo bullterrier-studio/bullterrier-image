@@ -98,8 +98,8 @@ pub struct Params {
     pub blue_highlights: f32,
 }
 
-/// The curved picture.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+/// The master curve of `params` and the red, green and blue ones.
+fn curves(params: &Params) -> (Curve, [Curve; 3]) {
     let master = Curve::through(
         &INPUTS,
         &[
@@ -121,6 +121,35 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         curve_of([params.green_shadows, params.green_midtones, params.green_highlights]),
         curve_of([params.blue_shadows, params.blue_midtones, params.blue_highlights]),
     ];
+    (master, channels)
+}
+
+/// The curves on the GPU (`curves.wgsl`): the points' inputs in the block, the pieces of the master, red, green and blue
+/// curves as a table. The CPU evaluates the cubics in f64, WGSL in f32: the default bound holds it (1.2e-7 measured on
+/// Metal).
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    use crate::ops::cast::single;
+    crate::gpu::Kernel::new(include_str!("curves.wgsl"), |_| {
+        vec![
+            [
+                single(INPUTS[0]),
+                single(INPUTS[1]),
+                single(INPUTS[2]),
+                single(INPUTS[3]),
+            ],
+            [single(INPUTS[4]), 0.0, 0.0, 0.0],
+        ]
+    })
+    .with_table(|params: &Params| {
+        let (master, channels) = curves(params);
+        master.pieces().chain(channels.iter().flat_map(Curve::pieces)).collect()
+    })
+}
+
+/// The curved picture.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+    let (master, channels) = curves(params);
     picture.map(|pixel| {
         let toned = pixel.map(|value| master.apply(value));
         [0, 1, 2].map(|channel| channels[channel].apply(toned[channel]))

@@ -43,7 +43,7 @@ def installed_version() -> str | None:
 def generate() -> str:
     """The notices `cargo about` writes for this checkout."""
     done = subprocess.run(
-        ["cargo", "about", "generate", "--workspace", "--locked", "about.hbs"],  # noqa: S607
+        ["cargo", "about", "generate", "--workspace", "--all-features", "--locked", "about.hbs"],  # noqa: S607  (the wheel is built with every feature: `gpu`)
         cwd=ROOT,
         capture_output=True,
         encoding="utf-8",

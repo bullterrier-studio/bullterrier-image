@@ -15,6 +15,11 @@ crate-type = ["cdylib"]
 test = false
 doctest = false
 
+# The GPU backend (`Gpu`, `render(..., gpu=)`): maturin builds the wheel with it ([tool.maturin] in pyproject.toml); a
+# `--workspace` build leaves it out, so the core's CPU-only build is the one `poe rust-test` tests.
+[features]
+gpu = ["bullterrier-image/gpu"]
+
 [dependencies]
 bullterrier-image = { workspace = true, features = ["onnx"] }
 bullterrier-image-cli.workspace = true

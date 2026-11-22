@@ -805,13 +805,13 @@ fn a_piece_is_looked_at_in_its_box_grown_by_the_context_rounded_to_the_even_pixe
     let plain = Options::default();
     // two pieces of 4 x 5: the context is 2.5 pixels across, which goes to 2 (the even one, not 3), and 2 pixels down,
     // clipped at both ends of the 4 rows
-    assert_eq!(asked(&[1.0, 1.0], 0.5, plain)?, [(4, 7), (4, 7)]);
-    assert_eq!(asked(&[1.0, 1.0], 0.0, plain)?, [(4, 5), (4, 5)]);
-    assert_eq!(asked(&[1.0, 1.0], 1.0, plain)?, [(4, 10), (4, 10)]);
+    assert_eq!(asked(&[1.0, 1.0], 0.5, plain.clone())?, [(4, 7), (4, 7)]);
+    assert_eq!(asked(&[1.0, 1.0], 0.0, plain.clone())?, [(4, 5), (4, 5)]);
+    assert_eq!(asked(&[1.0, 1.0], 1.0, plain.clone())?, [(4, 10), (4, 10)]);
     // the pieces are asked about in order, whatever their size: 3 wide, then 7
-    assert_eq!(asked(&[1.0, 2.0], 0.0, plain)?, [(4, 3), (4, 7)]);
+    assert_eq!(asked(&[1.0, 2.0], 0.0, plain.clone())?, [(4, 3), (4, 7)]);
     // 0.25 of 3 is 0.75, which goes to 1; of 7 it is 1.75, which goes to 2 (clipped at the right edge)
-    assert_eq!(asked(&[1.0, 2.0], 0.25, plain)?, [(4, 4), (4, 9)]);
+    assert_eq!(asked(&[1.0, 2.0], 0.25, plain.clone())?, [(4, 4), (4, 9)]);
     // the crop is of the working picture: at a size of 20 wide it is 8 high and the pieces are 10 wide each
     assert_eq!(
         asked(&[1.0, 1.0], 0.0, Options::default().with_size(20))?,

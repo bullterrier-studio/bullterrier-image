@@ -96,6 +96,22 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     })
 }
 
+/// The pushes on the GPU (`color_balance.wgsl`): each range's colour less mid grey, the amount, the hand-overs' centre and
+/// width, and whether luma is kept.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("color_balance.wgsl"), |params: &Params| {
+        let [shadows, midtones, highlights] =
+            [params.shadows, params.midtones, params.highlights].map(|colour| colour.0.map(|value| value - NEUTRAL));
+        vec![
+            [shadows[0], shadows[1], shadows[2], params.amount],
+            [midtones[0], midtones[1], midtones[2], params.balance / 2.0],
+            [highlights[0], highlights[1], highlights[2], params.softness / 2.0],
+            [if params.preserve_luminosity { 1.0 } else { 0.0 }, 0.0, 0.0, 0.0],
+        ]
+    })
+}
+
 /// 0 below `centre` - `width` / 2, 1 above `centre` + `width` / 2, and a smoothstep in between.
 fn handover(luma: f32, centre: f32, width: f32) -> f32 {
     let x = ((luma - centre) / width + 0.5).clamp(0.0, 1.0);

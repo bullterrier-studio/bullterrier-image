@@ -226,6 +226,14 @@ pub trait Effect: Send + Sync {
         Err(no_data(self.name()))
     }
 
+    /// Its GPU kernel, if it has one: a GPU render runs a step of this effect as that kernel, and one of an effect without
+    /// on the CPU (see [`Options::with_gpu`](crate::Options::with_gpu)). None by default: only the core's own effects have
+    /// kernels.
+    #[cfg(feature = "gpu")]
+    fn kernel(&self) -> Option<&crate::GpuKernel> {
+        None
+    }
+
     /// Run it on `picture` with `params` (an object with the effect's parameters): a new image of the picture's size.
     /// `inputs` holds the inputs the effect declares and nothing else, each of the picture's size: the core makes it
     /// so (see [`Inputs`]).
@@ -312,6 +320,9 @@ pub(crate) struct Native<P> {
     check: Option<Check<P>>,
     /// What the effect makes beside its picture, if it makes any (see [`Effect::data`]).
     data: Option<DataOf<P>>,
+    /// Its GPU kernel, if it has one.
+    #[cfg(feature = "gpu")]
+    kernel: Option<crate::GpuKernel>,
 }
 
 impl<P: Declared> Native<P> {
@@ -339,12 +350,24 @@ impl<P: Declared> Native<P> {
             render,
             check: None,
             data: None,
+            #[cfg(feature = "gpu")]
+            kernel: None,
         }
     }
 
     /// The effect, making `data` beside its picture (see `data` in `src/effects/`).
     pub(crate) fn with_data(mut self, data: DataOf<P>) -> Self {
         self.data = Some(data);
+        self
+    }
+
+    /// The effect, run on the GPU by `kernel` (see `kernel` in `src/effects/`).
+    #[cfg(feature = "gpu")]
+    pub(crate) fn with_kernel(mut self, kernel: crate::gpu::Kernel<P>) -> Self
+    where
+        P: DeserializeOwned + 'static,
+    {
+        self.kernel = Some(crate::GpuKernel::of(self.name, kernel));
         self
     }
 
@@ -397,6 +420,12 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
     fn spread(&self, params: &Value) -> Result<Spread, Error> {
         let params = self.read(params)?;
         Ok(self.spread.map_or(Spread::NONE, |spread| spread(&params)))
+    }
+
+    #[cfg(feature = "gpu")]
+    fn kernel(&self) -> Option<&crate::GpuKernel> {
+        // a kernel runs no `check`: an effect that refuses runs has none
+        self.kernel.as_ref().filter(|_| self.check.is_none())
     }
 
     fn data(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Data, Error> {

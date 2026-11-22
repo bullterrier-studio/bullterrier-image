@@ -99,6 +99,7 @@ fn rows_of(rows: usize) -> Result<NonZeroUsize, Box<dyn Error>> {
 }
 
 /// The first band size in `bands` at which `recipe` banded (with `options`) is not the whole render, with how.
+#[expect(clippy::needless_pass_by_value, reason = "the callers build the options inline")]
 fn first_problem(
     values: &[f32],
     recipe: &Recipe,
@@ -106,9 +107,9 @@ fn first_problem(
     bands: &[usize],
     within: f32,
 ) -> Result<Option<String>, Box<dyn Error>> {
-    let whole = render(values, recipe, options)?;
+    let whole = render(values, recipe, options.clone())?;
     for &rows in bands {
-        let banded = render(values, recipe, options.with_band(rows_of(rows)?))?;
+        let banded = render(values, recipe, options.clone().with_band(rows_of(rows)?))?;
         if let Some(found) = difference(&whole, &banded, within) {
             return Ok(Some(format!("band {rows}: {found}")));
         }

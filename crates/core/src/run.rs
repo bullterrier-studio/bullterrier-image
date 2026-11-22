@@ -16,6 +16,8 @@ mod band;
 mod cut;
 mod each;
 mod frame;
+#[cfg(feature = "gpu")]
+mod gpu;
 mod laid;
 mod many;
 mod maps;
@@ -252,9 +254,17 @@ impl<'a> Photo<'a> {
     /// uses that the photo has neither of nor a finder for (or whose finder fails or answers one of another size), and
     /// [`Error::Foreign`] if an effect that runs elsewhere fails or returns a picture of another size, and [`Error::Lut`]
     /// for a lookup table a step names that is neither given to the photo nor a readable `.cube` file.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "options are a value built at the call, `Options::default().with_size(..)`; a GPU in them made them no longer `Copy`"
+    )]
     pub fn render(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Image, Error> {
         par::install(options.threads(), || {
-            let mut run = self.start(recipe, presets, options)?;
+            #[cfg(feature = "gpu")]
+            if let Some(gpu) = options.gpu() {
+                return pollster::block_on(gpu::render(gpu, self, recipe, presets, &options));
+            }
+            let mut run = self.start(recipe, presets, &options)?;
             match options.band() {
                 Some(rows) => run.advance_banded(rows.get())?,
                 None => while run.advance()?.is_some() {},
@@ -271,8 +281,14 @@ impl<'a> Photo<'a> {
     /// # Errors
     /// As [`render`](Self::render) for the recipe, the photo and its maps; [`Error::Recipe`] naming the last step's effect
     /// if it makes no data, is not plain, or is an `each` step, or `options` ask for room (`Options::with_room`).
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "options are a value built at the call, `Options::default().with_size(..)`; a GPU in them made them no longer `Copy`"
+    )]
     pub(crate) fn data(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Data, Error> {
-        par::install(options.threads(), || self.start(recipe, presets, options)?.data())?
+        #[cfg(feature = "gpu")]
+        options.cpu_only("ink_planes`, `palette_map` and `characters")?;
+        par::install(options.threads(), || self.start(recipe, presets, &options)?.data())?
     }
 
     /// The ink coverage planes of the last step of `recipe`, one [`Layer`] per ink, 0 to 1: how
@@ -339,16 +355,22 @@ impl<'a> Photo<'a> {
     /// Whatever [`Recipe::checked`] refuses the recipe for, [`Error::Recipe`] if `name` is no selection (it is a
     /// partition, or no region), naming the selections there are and the closest, and [`Error::MapNotFound`] for a map
     /// the region is made from that the photo has neither of nor a finder for.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "options are a value built at the call, `Options::default().with_size(..)`; a GPU in them made them no longer `Copy`"
+    )]
     pub fn region_map(&self, recipe: &Recipe, presets: &Presets, options: Options, name: &str) -> Result<Layer, Error> {
+        #[cfg(feature = "gpu")]
+        options.cpu_only("region_map")?;
         par::install(options.threads(), || {
-            let mut run = self.begin(recipe, presets, options, Some(name))?;
+            let mut run = self.begin(recipe, presets, &options, Some(name))?;
             let picture = run.working.picture();
             Ok(Layer::clone(run.regions.selection(name, &picture)?.as_ref()))
         })?
     }
 
     /// `recipe` checked and every step of it prepared, with all the maps they use found: ready to run.
-    fn start(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Run<'a>, Error> {
+    fn start(&self, recipe: &Recipe, presets: &Presets, options: &Options) -> Result<Run<'a>, Error> {
         self.begin(recipe, presets, options, None)
     }
 
@@ -358,7 +380,7 @@ impl<'a> Photo<'a> {
         &self,
         recipe: &Recipe,
         presets: &Presets,
-        options: Options,
+        options: &Options,
         only: Option<&str>,
     ) -> Result<Run<'a>, Error> {
         let uses = recipe.check_rules(presets)?;

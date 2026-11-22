@@ -88,6 +88,22 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
     }
 }
 
+/// The grade on the GPU (`grade.wgsl`): the gains and the exposure's factor worked out here, as `render` does. The CPU
+/// works the sRGB transfer of the colour balance in f64 (see `ops/colorspace.rs`) and WGSL has no f64: the default bound
+/// holds it (3e-7 measured on Metal).
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("grade.wgsl"), |params: &Params| {
+        let (gains, balanced) =
+            colour_balance(params.temperature, params.tint).map_or(([1.0; 3], 0.0), |gains| (gains, 1.0));
+        vec![
+            [gains[0], gains[1], gains[2], balanced],
+            [params.exposure.exp2(), params.pivot, params.contrast, params.saturation],
+            [params.vibrance, 0.0, 0.0, 0.0],
+        ]
+    })
+}
+
 /// The von Kries gains of red, green and blue in linear light, divided by the largest so nothing brightens; none
 /// when temperature and tint leave the balance alone.
 fn colour_balance(temperature: f32, tint: f32) -> Option<[f32; 3]> {

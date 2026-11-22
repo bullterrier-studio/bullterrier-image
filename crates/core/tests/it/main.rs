@@ -66,6 +66,8 @@ mod fog;
 mod footprint;
 mod fractal;
 mod gaussian_blur;
+#[cfg(feature = "gpu")]
+mod gpu;
 mod grade;
 mod gradient;
 mod gradient_map;

@@ -50,14 +50,25 @@ pub struct Params {
     pub output_white: f32,
 }
 
-/// The remapped picture.
-pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
-    let remap = Remap::new(
+/// The remap of `params`.
+fn remap(params: &Params) -> Remap {
+    Remap::new(
         params.black,
         params.white,
         params.gamma,
         params.output_black,
         params.output_white,
-    );
+    )
+}
+
+/// The remapped picture.
+pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_>) -> Image {
+    let remap = remap(params);
     picture.map(|pixel| pixel.map(|value| remap.apply(value)))
+}
+
+/// The remap on the GPU: the same numbers, worked out once here (`levels.wgsl`).
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("levels.wgsl"), |params: &Params| remap(params).block())
 }

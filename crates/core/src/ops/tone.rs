@@ -34,6 +34,15 @@ impl Remap {
         }
     }
 
+    /// The remap as a GPU kernel's block, `levels.wgsl`'s: (black, span, exponent, output black), (reach, 0, 0, 0).
+    #[cfg(feature = "gpu")]
+    pub(crate) fn block(&self) -> Vec<[f32; 4]> {
+        vec![
+            [self.black, self.span, self.exponent, self.output_black],
+            [self.reach, 0.0, 0.0, 0.0],
+        ]
+    }
+
     /// `value` remapped.
     pub(crate) fn apply(&self, value: f32) -> f32 {
         let normalised = ((value - self.black) / self.span).clamp(0.0, 1.0);
@@ -90,6 +99,13 @@ impl Curve {
             inputs: inputs.to_vec(),
             pieces,
         }
+    }
+
+    /// The curve's pieces as a GPU kernel reads them (`curves.wgsl`): for each stretch between two points its four
+    /// coefficients, highest power first, narrowed to f32.
+    #[cfg(feature = "gpu")]
+    pub(crate) fn pieces(&self) -> impl Iterator<Item = f32> + '_ {
+        self.pieces.iter().flatten().map(|&coefficient| single(coefficient))
     }
 
     /// The curve's output at `value`.

@@ -559,7 +559,7 @@ fn a_look_is_run_at_the_working_pictures_size_ratio_and_its_pixel_values_scaled_
         6,
         480,
         &recipe_of(1, each_of(vec![Some(paint.step())], 0.0)),
-        doubled,
+        doubled.clone(),
     )?;
     assert_eq!(*paint.ratios.lock().unwrap_or_else(PoisonError::into_inner), vec![2.0]);
     // `pixel_grid`'s cell is in px: the look makes the picture the same step makes on its own at that size
@@ -574,7 +574,7 @@ fn a_look_is_run_at_the_working_pictures_size_ratio_and_its_pixel_values_scaled_
         6,
         480,
         &recipe_of(1, each_of(vec![Some(grid())], 0.0)),
-        doubled,
+        doubled.clone(),
     )?;
     let alone = render(&values, 6, 480, &Recipe::new([grid()]), doubled)?;
     assert_close(&by_each, &alone, 1e-6, "a px look inside an each step and on its own");

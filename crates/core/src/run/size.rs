@@ -19,8 +19,10 @@ pub(super) fn ratio_of(longest_side: f64) -> f64 {
     longest_side / DESIGN_SIZE
 }
 
-/// What a render is asked for besides the recipe.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// What a render is asked for besides the recipe: its size, threads, bands, canvas, window, room and (with the feature
+/// `gpu`) the backend. Two options are equal when every choice is; a [`Gpu`](crate::Gpu) is the same one only if it is a
+/// clone of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Options {
     size: Option<u32>,
@@ -30,6 +32,9 @@ pub struct Options {
     window: Option<Window>,
     /// The room around the box of the picture, as top, right, bottom and left.
     room: [u32; 4],
+    /// The GPU the render runs on; none: the CPU.
+    #[cfg(feature = "gpu")]
+    gpu: Option<crate::Gpu>,
 }
 
 /// The rows of a canvas that the picture handed to a render is (see [`Options::with_window`]).
@@ -62,6 +67,17 @@ pub(super) struct Part {
 }
 
 impl Origin {
+    /// A picture of `height` x `width` that is its own canvas, with no room.
+    #[cfg(feature = "gpu")]
+    pub(super) const fn whole(height: usize, width: usize) -> Self {
+        Self {
+            canvas_height: height,
+            canvas_width: width,
+            first_row: 0,
+            room: [0; 4],
+        }
+    }
+
     /// Whether the picture has room around its box.
     pub(super) fn has_room(self) -> bool {
         self.room != [0; 4]
@@ -103,6 +119,8 @@ impl Default for Options {
             canvas: None,
             window: None,
             room: [0; 4],
+            #[cfg(feature = "gpu")]
+            gpu: None,
         }
     }
 }
@@ -244,18 +262,81 @@ impl Options {
         self
     }
 
+    /// These options with the render on `gpu` (feature `gpu`): the recipe is the same, and so is the [`Image`] a
+    /// [`render`](crate::Photo::render) returns (one readback at the end), held to the bound each kernel states, not to the
+    /// CPU's bytes (the CPU is the reference). The photo is framed, resized and its maps made on the CPU as before; then it is
+    /// sent to the device once and each step runs there as its effect's kernel, laid over its input there too (blend mode,
+    /// opacity, mask). A step whose effect has no kernel (see [`Effect::kernel`](crate::Effect::kernel)), a driven step, an
+    /// `each` step and one that reads a field or a partition run on the CPU: the picture is read back, the step runs as it
+    /// would without the GPU, and the result is sent again (each counted in [`Gpu::transfers`](crate::Gpu::transfers)).
+    /// Nothing falls back silently: a picture larger than the device holds is an error naming both sizes.
+    ///
+    /// [`with_threads`](Self::with_threads) applies to the CPU's part of the work only. A GPU render refuses
+    /// [`with_band`](Self::with_band), [`with_window`](Self::with_window) and [`with_room`](Self::with_room) (an error
+    /// naming the option, never ignored), and so do [`trace`](crate::Photo::trace), [`region_map`](crate::Photo::region_map)
+    /// and the data calls ([`ink_planes`](crate::Photo::ink_planes)), which run on the CPU only.
+    #[cfg(feature = "gpu")]
+    #[must_use]
+    pub fn with_gpu(mut self, gpu: &crate::Gpu) -> Self {
+        self.gpu = Some(gpu.clone());
+        self
+    }
+
+    /// The GPU the render runs on, if any.
+    #[cfg(feature = "gpu")]
+    pub(super) const fn gpu(&self) -> Option<&crate::Gpu> {
+        self.gpu.as_ref()
+    }
+
+    /// `Ok` unless these options name a GPU, which `call` (a render that runs on the CPU only) does not take.
+    ///
+    /// # Errors
+    /// [`Error::Gpu`] naming `call`.
+    #[cfg(feature = "gpu")]
+    pub(super) fn cpu_only(&self, call: &str) -> Result<(), Error> {
+        if self.gpu.is_some() {
+            return Err(Error::Gpu(format!(
+                "`{call}` runs on the CPU only: call it with options that have no `with_gpu`"
+            )));
+        }
+        Ok(())
+    }
+
+    /// `Ok` unless these options hold one that a GPU render does not take yet.
+    ///
+    /// # Errors
+    /// [`Error::Gpu`] naming the option: a band, a window or room.
+    #[cfg(feature = "gpu")]
+    pub(super) fn gpu_takes(&self) -> Result<(), Error> {
+        let refused = if self.band.is_some() {
+            Some("with_band")
+        } else if self.window.is_some() {
+            Some("with_window")
+        } else if self.room != [0; 4] {
+            Some("with_room")
+        } else {
+            None
+        };
+        match refused {
+            Some(option) => Err(Error::Gpu(format!(
+                "a GPU render does not take `{option}` yet: render on the CPU (no `with_gpu`) for it"
+            ))),
+            None => Ok(()),
+        }
+    }
+
     /// The rows a band is, if the render is banded.
-    pub(super) const fn band(self) -> Option<NonZeroUsize> {
+    pub(super) const fn band(&self) -> Option<NonZeroUsize> {
         self.band
     }
 
     /// The number of threads asked for.
-    pub(super) const fn threads(self) -> usize {
+    pub(super) const fn threads(&self) -> usize {
         self.threads
     }
 
     /// The size asked for, if any.
-    pub(super) const fn size(self) -> Option<u32> {
+    pub(super) const fn size(&self) -> Option<u32> {
         self.size
     }
 }
@@ -321,34 +402,13 @@ impl<'a> Working<'a> {
         self.made.as_ref().map_or(self.given, Image::as_picture)
     }
 
-    /// Working pixels per design pixel, the one decision of how a length in a recipe follows the size of the picture: the
-    /// longest side over [`DESIGN_SIZE`], of the canvas `options` name, else of the box of the window's canvas, else of the
-    /// box of the picture (the picture less its room).
+    /// Working pixels per design pixel (see [`ratio_for`]) of the working picture.
     ///
     /// # Errors
-    /// [`Error::Recipe`] for a canvas with a side of 0.
-    pub(super) fn ratio(&self, options: Options) -> Result<f64, Error> {
+    /// As [`ratio_for`].
+    pub(super) fn ratio(&self, options: &Options) -> Result<f64, Error> {
         let picture = self.picture();
-        let [top, right, bottom, left] = options.room;
-        let boxed = |width: u32, height: u32| (width.saturating_sub(left + right), height.saturating_sub(top + bottom));
-        let canvas = match (options.canvas, options.window) {
-            (Some(canvas), _) => Some(canvas),
-            (None, Some(window)) => Some(boxed(window.width, window.height)),
-            (None, None) => None,
-        };
-        let Some((canvas_width, canvas_height)) = canvas else {
-            let side = picture
-                .height()
-                .saturating_sub((top + bottom) as usize)
-                .max(picture.width().saturating_sub((left + right) as usize));
-            return Ok(ratio_of(length::float(side)));
-        };
-        if canvas_width == 0 || canvas_height == 0 {
-            return Err(Error::Recipe(format!(
-                "`canvas` {canvas_width} x {canvas_height} must have both sides at least 1"
-            )));
-        }
-        Ok(ratio_of(f64::from(canvas_width.max(canvas_height))))
+        ratio_for(picture.height(), picture.width(), options)
     }
 
     /// Where the working picture lies on its canvas: on itself, unless `options` give a window, and what part of it is the
@@ -357,7 +417,7 @@ impl<'a> Working<'a> {
     /// # Errors
     /// [`Error::Recipe`] for a window the picture is not the rows of (see [`Options::with_window`]), and for room that leaves no
     /// box or a recipe that changes the picture (see [`Options::with_room`]).
-    pub(super) fn origin(&self, options: Options) -> Result<Origin, Error> {
+    pub(super) fn origin(&self, options: &Options) -> Result<Origin, Error> {
         let picture = self.picture();
         let (height, width) = (picture.height(), picture.width());
         let room = options.room.map(|side| side as usize);
@@ -426,4 +486,32 @@ impl<'a> Working<'a> {
             resize.apply(current.values().as_chunks::<1>().0).into_flattened(),
         )?))
     }
+}
+
+/// Working pixels per design pixel of a working picture of `height` x `width`, the one decision of how a length in a recipe
+/// follows the size of the picture: the longest side over [`DESIGN_SIZE`], of the canvas `options` name, else of the box
+/// of the window's canvas, else of the box of the picture (the picture less its room).
+///
+/// # Errors
+/// [`Error::Recipe`] for a canvas with a side of 0.
+pub(super) fn ratio_for(height: usize, width: usize, options: &Options) -> Result<f64, Error> {
+    let [top, right, bottom, left] = options.room;
+    let boxed = |across: u32, down: u32| (across.saturating_sub(left + right), down.saturating_sub(top + bottom));
+    let canvas = match (options.canvas, options.window) {
+        (Some(canvas), _) => Some(canvas),
+        (None, Some(window)) => Some(boxed(window.width, window.height)),
+        (None, None) => None,
+    };
+    let Some((canvas_width, canvas_height)) = canvas else {
+        let side = height
+            .saturating_sub((top + bottom) as usize)
+            .max(width.saturating_sub((left + right) as usize));
+        return Ok(ratio_of(length::float(side)));
+    };
+    if canvas_width == 0 || canvas_height == 0 {
+        return Err(Error::Recipe(format!(
+            "`canvas` {canvas_width} x {canvas_height} must have both sides at least 1"
+        )));
+    }
+    Ok(ratio_of(f64::from(canvas_width.max(canvas_height))))
 }

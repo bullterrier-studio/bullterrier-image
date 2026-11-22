@@ -15,16 +15,20 @@ publish = true  # one of the two crates published to crates.io (the others are i
 [features]
 # Running models through ONNX Runtime (`finding::onnx`): the library is loaded at run time, none is bundled. The published wheel enables it.
 onnx = ["dep:ort", "dep:ureq", "dep:flate2", "dep:tar", "dep:zip"]
+# The GPU backend (`gpu`, `Options::with_gpu`): pictures and kernels on a wgpu device. Off by default (compile time); the wheel enables it.
+gpu = ["dep:wgpu", "dep:pollster", "dep:futures-channel"]
 
 [dependencies]
 bullterrier-image-derive.workspace = true
 delaunator.workspace = true
 flate2 = { workspace = true, optional = true }
+futures-channel = { workspace = true, optional = true }
 glob.workspace = true
 image.workspace = true
 libm.workspace = true
 moxcms.workspace = true
 ort = { workspace = true, optional = true }
+pollster = { workspace = true, optional = true }
 read-fonts.workspace = true
 rayon.workspace = true
 roxmltree.workspace = true
@@ -38,6 +42,7 @@ svgtypes.workspace = true
 tar = { workspace = true, optional = true }
 tiff.workspace = true
 toml.workspace = true
+wgpu = { workspace = true, optional = true }
 zip = { workspace = true, optional = true }
 zune-core.workspace = true
 zune-jpeg.workspace = true

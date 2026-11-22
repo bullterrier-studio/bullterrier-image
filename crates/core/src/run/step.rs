@@ -127,6 +127,23 @@ impl Prepared {
         }
     }
 
+    /// This entry as a GPU kernel's run, or none if it runs on the CPU: an `each` step, a driven step, one that reads a
+    /// field or a partition, and one whose effect has no kernel. The whole picture is the part it runs on (a GPU render
+    /// has no room or window).
+    #[cfg(feature = "gpu")]
+    pub(super) fn on_gpu(&self) -> Option<GpuStep<'_>> {
+        let Self::Step(step) = self else { return None };
+        let Runs::One { scaled } = &step.runs else { return None };
+        if !step.fields.is_empty() || step.partition.is_some() {
+            return None;
+        }
+        step.effect.kernel().map(|kernel| GpuStep {
+            kernel,
+            params: scaled,
+            overlay: &step.overlay,
+        })
+    }
+
     /// The rows of margin this entry needs above and below the rows it makes, or none if it reads the whole
     /// picture: an `each` step, a driven step and an effect that says [`Whole`](crate::Footprint::Whole).
     ///
@@ -138,6 +155,14 @@ impl Prepared {
             Self::Each(_) => Ok(None),
         }
     }
+}
+
+/// A step a GPU render runs as a kernel: the kernel, its complete parameters and how the result is laid over the input.
+#[cfg(feature = "gpu")]
+pub(super) struct GpuStep<'a> {
+    pub(super) kernel: &'a crate::GpuKernel,
+    pub(super) params: &'a Value,
+    pub(super) overlay: &'a Overlay,
 }
 
 /// The complete parameters a step's effect is run with.
@@ -152,10 +177,10 @@ enum Runs {
 /// How the result of a step is laid over its input: by a blend mode, mixed in by an opacity and, where there is a `mask`,
 /// only as far as the mask says.
 pub(super) struct Overlay {
-    opacity: f64,
-    blend_mode: BlendMode,
+    pub(super) opacity: f64,
+    pub(super) blend_mode: BlendMode,
     /// The name of the region that limits it.
-    mask: Option<String>,
+    pub(super) mask: Option<String>,
 }
 
 impl Overlay {

@@ -61,6 +61,7 @@ fn rows() -> Vec<(Error, ErrorKind)> {
             Error::Project("bt-image.toml: unknown keys ['colour']".to_owned()),
             ErrorKind::Project,
         ),
+        (Error::Gpu("no GPU adapter was found".to_owned()), ErrorKind::Gpu),
         (Error::Duplicate("grade".to_owned()), ErrorKind::Other),
         (Error::Inputs("no partition".to_owned()), ErrorKind::Other),
         (Error::foreign("fx", "broke"), ErrorKind::Other),

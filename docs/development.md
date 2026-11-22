@@ -48,6 +48,10 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
   or a tree a gate at least as high already passed on (the record carries the tier: `full` covers `check`, never the
   reverse); other branches are checked by CI when the pull request opens. CI runs the proofs once, on one Linux
   cell of `test.yml`.
+- GPU tests (`uv run poe rust-test-gpu`, in `check`; the Python ones in `poe test`) need a GPU adapter and fail without one.
+  `BT_GPU` says what the machine has: unset, any adapter; `none`, there is none, and each GPU test says it was skipped and
+  passes; any other value, part of the adapter's name the tests must find (CI's GPU job sets `llvmpipe`, Mesa's software
+  Vulkan, and `test.yml` sets `none`). Only the tests read it.
 - Apple Vision test skipped off macOS. Portable subject backend and depth model tested with tiny stand-in models built in the
   tests: suite never downloads a real model; tests of real models run only when already in cache and assert coarse
   properties (a model update may change every pixel).
