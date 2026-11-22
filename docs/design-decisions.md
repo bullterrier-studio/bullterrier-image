@@ -1813,7 +1813,10 @@ measured first would break at a larger one.
   `unsafe impl`, which `#![forbid(unsafe_code)]` refuses, and vec4s need no padding rule in either language. Every number
   worked out once per render (spans, exponents, the gains, PCHIP coefficients) is worked out in Rust, so the kernel does only
   per-pixel maths. `Effect::kernel()` (None by default) gives it as an opaque `GpuKernel`; a Python or foreign effect has
-  none, so the trait changes nothing for them. A kernel's effect has no `check` (a kernel would skip it).
+  none, so the trait changes nothing for them. A kernel's effect has no `check`: `build.rs` fails on an effect file that
+  declares both (BTIMG-0014; before, the kernel was dropped without a word). *Rejected:* running `check` in `prepare` on
+  both backends: a `check` reads the step's `Inputs` (pictures, maps), which only the CPU run builds, so the rule would
+  live in two places; one rule at the source keeps it in one.
 - **One executor.** `begin()` stays on the CPU (frame, resize, maps, prepared steps); the working picture is sent once; a run
   of steps with kernels is recorded into one command encoder and submitted together, each laid over its input by the `lay`
   kernel (`ops/blend.rs` formula for formula: modes, opacity, mask uploaded as a map) unless plain. A step whose effect has no
@@ -1835,9 +1838,15 @@ measured first would break at a larger one.
   (a review's random combinations, up to 1.8e-5). WGSL's `pow` is undefined at 0, so `levels` guards it (the parity pictures hold exact 0s and 1s). Recipe
   budget (interim): at most 1/255 a channel after 8-bit rounding on 99.9% of values, 2/255 on all, tested on the five-kernel
   chain and demo 31's recipe (two of its steps on the CPU).
+- **What parity cannot see:** set-up code both paths share (`Remap::new`, the curve pieces, `colour_balance`'s gains,
+  `prepare`'s scaling) is worked out once in Rust and handed to both, so a bug there makes the same wrong picture on both
+  and parity passes. Those rest on the CPU tests of each effect, by design. The harness (`tests/it/gpu/parity.rs`): every
+  kernel at each parameter's ends and between, the extremes compounded, each drivable parameter driven by a map and all of
+  them by a field the recipe makes, each case compared at least once; every gap through one helper that fails on a NaN.
 - **Tests run on a GPU in CI**: `poe rust-test-gpu` (the core's whole suite built with the feature, `tests/it/gpu/` among it)
-  in `check`, and in CI's GPU job on Mesa's lavapipe; `BT_GPU` says what the machine has (`none`: the GPU tests skip and say
-  so; else part of the adapter's name, which the tests check). `test.yml`'s runners have no GPU and set `none`.
+  in `check`, and in CI's GPU job on Mesa's lavapipe; `BT_GPU` says what the machine has (`none`: the GPU tests return early
+  and `rust-test-gpu` ends with a banner counting them, as Rust has no skip at run time; else part of the adapter's name,
+  which the tests check). `test.yml`'s runners have no GPU and set `none`.
 - **Numbers** (`poe bench-gpu`, release, M4, 1920 x 1080, load 6 to 8, minimum of 9 runs, ms; "on the device": a picture
   already there, the steps and a readback, less a readback alone, 6.6 ms):
 

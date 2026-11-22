@@ -308,7 +308,16 @@ fn table(files: &[(String, PathBuf)]) -> Result<String, Box<dyn std::error::Erro
             String::new()
         };
         // a kernel (`fn kernel() -> Kernel<Params>`) is compiled with the GPU backend only
-        let kernel = if fs::read_to_string(path)?.contains("\npub(crate) fn kernel(") {
+        let has_kernel = fs::read_to_string(path)?.contains("\npub(crate) fn kernel(");
+        if has_kernel && !check.is_empty() {
+            return Err(format!(
+                "{}: an effect with a GPU `kernel` declares no `check`: a GPU render runs the kernel and never the check, \
+                 so the run it refuses would pass on the GPU (docs/design-decisions.md, \"GPU backend\")",
+                path.display()
+            )
+            .into());
+        }
+        let kernel = if has_kernel {
             format!(" #[cfg(feature = \"gpu\")] let effect = effect.with_kernel({name}::kernel());")
         } else {
             String::new()

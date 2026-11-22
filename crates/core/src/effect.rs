@@ -424,8 +424,8 @@ impl<P: DeserializeOwned + Declared> Effect for Native<P> {
 
     #[cfg(feature = "gpu")]
     fn kernel(&self) -> Option<&crate::GpuKernel> {
-        // a kernel runs no `check`: an effect that refuses runs has none
-        self.kernel.as_ref().filter(|_| self.check.is_none())
+        // an effect file with both a kernel and a `check` fails the build (build.rs)
+        self.kernel.as_ref()
     }
 
     fn data(&self, picture: &Picture<'_>, params: &Value, inputs: &Inputs<'_>) -> Result<Data, Error> {
