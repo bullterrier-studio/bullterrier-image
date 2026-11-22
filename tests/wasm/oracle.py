@@ -28,10 +28,11 @@ SIDE = 480  # the photo's longest side: small, so the Node test runs in seconds
 NEEDS_FILES = {"blend": "ImageReadError", "color_transfer": "ImageReadError", "lut": "LutError"}
 # Effects that filter through the Fourier transform. rustfft runs a different SIMD routine on each architecture (NEON,
 # AVX with fused multiply-add, WebAssembly SIMD), each rounding the f32 sums its own way, so a render that goes through
-# one can differ from the native one by one level of one channel (measured on arm64: bloom, engraving, focus_blur,
-# lens_blur and starburst, 1 to 4 bytes of 288000; on x86-64 Linux also ambient_occlusion, gaussian_blur and sharpen,
-# whose example recipes blur past the reach the transform takes over at); only the scalar routine matches all of them,
-# and costs these effects 1.4 to 1.6 times as long natively. Every other effect renders to the same bytes.
+# one can differ from the native one by one level of one channel (measured, of 288000 bytes: on arm64 bloom,
+# engraving, focus_blur, lens_blur and starburst, 1 to 4; on x86-64 Linux engraving, focus_blur, lens_blur and
+# starburst, 1 to 5, and ambient_occlusion 2, gaussian_blur 2 and sharpen 3, whose example recipes blur past the reach
+# the transform takes over at); only the scalar routine matches all of them, and costs these effects 1.4 to 1.6 times
+# as long natively. Every other effect renders to the same bytes.
 FOURIER_EFFECTS = (
     "ambient_occlusion",
     "bloom",
