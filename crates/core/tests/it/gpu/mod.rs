@@ -1,6 +1,7 @@
 //! The GPU backend (feature `gpu`), at small sizes. `BT_GPU` says what GPU the machine has: unset, the tests need one
-//! and fail without it; `none`, each GPU test says it was skipped and why, and passes; any other value is part of the
-//! adapter's name the tests must find (CI sets `llvmpipe`, Mesa's software Vulkan).
+//! and fail without it; `none`, each GPU test returns early and passes (Rust has no skip at run time), writing its name
+//! to the file `BT_GPU_SKIPS` names, which `poe rust-test-gpu` counts aloud (`tools/gpu_skips.py`); any other value is
+//! part of the adapter's name the tests must find (CI sets `llvmpipe`, Mesa's software Vulkan).
 
 mod parity;
 mod render;
@@ -14,9 +15,34 @@ use pollster::block_on;
 /// The context the tests share, or none where `BT_GPU=none` says the machine has no GPU.
 static SHARED: LazyLock<Option<Gpu>> = LazyLock::new(fresh);
 
-/// The shared context, or none (after saying so) where the machine has no GPU.
+/// The shared context, or none (after noting the skip) where the machine has no GPU.
 pub(crate) fn gpu() -> Option<Gpu> {
-    SHARED.clone()
+    let shared = SHARED.clone();
+    if shared.is_none() {
+        skipped();
+    }
+    shared
+}
+
+/// Notes that the running test skips for want of a GPU: its name (libtest names its thread so), one line in the file
+/// `BT_GPU_SKIPS` names, if it names one.
+///
+/// # Panics
+/// If that file cannot be written: a skip nobody counts is what this guards against.
+fn skipped() {
+    let Ok(path) = std::env::var("BT_GPU_SKIPS") else {
+        return;
+    };
+    let test = std::thread::current().name().unwrap_or("a GPU test").to_owned();
+    let written = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&path)
+        .and_then(|mut file| std::io::Write::write_all(&mut file, format!("{test}\n").as_bytes()));
+    assert!(
+        written.is_ok(),
+        "{test}: the skip could not be written to {path}: {written:?}"
+    );
 }
 
 /// A context of its own, for a test that counts transfers; none where the machine has no GPU.
@@ -29,6 +55,7 @@ pub(crate) fn fresh() -> Option<Gpu> {
     let expected = std::env::var("BT_GPU").unwrap_or_default();
     if expected == "none" {
         eprintln!("skipped: BT_GPU=none says this machine has no GPU");
+        skipped();
         return None;
     }
     let gpu =

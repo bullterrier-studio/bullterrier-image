@@ -150,7 +150,7 @@ stubtest = { cmd = "python -m mypy.stubtest --mypy-config-file pyproject.toml bu
 rust-test = { cmd = "python tools/run_capped.py -- cargo test --workspace --locked --quiet --no-fail-fast", help = "Run the Rust tests under the memory cap, every binary even after one fails" }
 # The core's tests again with the GPU backend (`tests/it/gpu/` and the whole suite beside it): `rust-test` builds it without. Needs a GPU
 # adapter, unless BT_GPU=none says there is none (docs/development.md); CI runs it on Mesa's software Vulkan (project.yml).
-rust-test-gpu = { cmd = "python tools/run_capped.py -- cargo test -p bullterrier-image --features gpu,onnx --locked --quiet --no-fail-fast", help = "Run the core's Rust tests with the GPU backend, under the memory cap (needs a GPU, or BT_GPU=none)" }
+rust-test-gpu = { cmd = "python tools/gpu_skips.py -- python tools/run_capped.py -- cargo test -p bullterrier-image --features gpu,onnx --locked --quiet --no-fail-fast", help = "Run the core's Rust tests with the GPU backend, under the memory cap (needs a GPU, or BT_GPU=none), and say how many GPU tests skipped" }
 # The Rust tests `#[ignore = "full: ..."]` (tests/tools/test_rust_full_tier.py): every size or band of a matrix `check` runs one row of,
 # and the real models (BT_IMAGE_ONNX_LIB, and the models in the cache folder or BT_IMAGE_ALLOW_DOWNLOAD=1); one test at a time, because
 # two real models in two tests would pass the memory cap together
