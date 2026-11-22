@@ -2,8 +2,12 @@
 //!
 //! A render keeps only the newest picture: the most memory it holds at once does not grow with the number of steps.
 //!
-//! This is the only test binary with a counting allocator, so every byte the process allocates is measured; the
-//! measurements run one at a time, each building its own photo under the lock, so nothing else allocates while one runs.
+//! This is the only test binary with a counting allocator, so every byte the process allocates is measured. Each test
+//! holds the lock from its first line to its last ([`alone`]), so no other test allocates or frees while one measures:
+//! with the lock around the measurements only, what a test built outside one (a region, an SVG's text) could be freed
+//! during another's, and the blur's lower bound failed on CI runners 5 and 30 KB short, never on an idle machine.
+//! shortcut: that shortfall was never reproduced here, so this removes one source, not a proven one; if it recurs, the
+//! next suspect is the render pools' threads (kept for the process), whose frees no lock covers.
 //! `trace`, which keeps a picture per step by design, is the measurement that can fail: it shows the counter sees a
 //! picture that is kept.
 
@@ -12,7 +16,7 @@ mod common;
 
 use std::fmt::Write as _;
 use std::num::NonZeroUsize;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use bullterrier_image::frame::Flip;
 use bullterrier_image::region::{Band, Curve, Cuts, Edge, EdgeStyle, Grid, Line, Path, Region, Shards, Shares, Svg};
@@ -28,6 +32,11 @@ static HEAP: PeakAlloc = PeakAlloc;
 
 static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
+/// The lock every test takes first and holds to its end (see the module's doc).
+fn alone() -> MutexGuard<'static, ()> {
+    ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 const HEIGHT: usize = 400;
 const WIDTH: usize = 600;
 /// The bytes of one picture of the test photo's size: 2.88 million, far above anything else a run allocates.
@@ -36,7 +45,6 @@ const IMAGE: usize = HEIGHT * WIDTH * 3 * size_of::<f32>();
 /// The most bytes, beyond the photo's own, that `run` holds at once while it works on a chain of `steps` steps that each
 /// make a new picture.
 fn peak_of<R>(steps: u32, run: impl FnOnce(&Photo<'_>, &Recipe) -> Result<R, Error>) -> Result<usize, Error> {
-    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
     let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
     let recipe = Recipe::new((1..=steps).map(|step| Step::new("grade").param("exposure", f64::from(step) / 100.0)));
     let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?);
@@ -68,6 +76,7 @@ fn trace_peak(steps: u32) -> Result<usize, Error> {
 
 #[test]
 fn a_render_holds_a_few_pictures_however_many_steps_it_has() -> Result<(), Error> {
+    let _alone = alone();
     // the picture a step reads and the one it makes, and some room for the rest
     let (short, long) = (render_peak(2)?, render_peak(12)?);
     assert!(
@@ -81,7 +90,6 @@ fn a_render_holds_a_few_pictures_however_many_steps_it_has() -> Result<(), Error
 
 /// The most bytes, beyond the photo's own, that a render of the one step `step` on `threads` threads holds at once.
 fn step_peak(step: Step, threads: usize) -> Result<usize, Error> {
-    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
     let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
     let recipe = Recipe::new([step]);
     let photo = Photo::new(Picture::new(HEIGHT, WIDTH, &values)?);
@@ -101,6 +109,7 @@ fn blur_peak(radius: f64, threads: usize) -> Result<usize, Error> {
 
 #[test]
 fn a_blur_holds_its_picture_and_a_channels_working_space_on_any_threads() -> Result<(), Error> {
+    let _alone = alone();
     // The blurred picture, and the channel being blurred three times over (as a plane, turned on its side, and
     // turned back): 1 + 3 x 1/3 = 2 pictures, which the Fourier transform's few lines of working space (about
     // 2 x 1024 x 8 bytes a thread) does not add to. Radius 2 is sigma 2.5 px here, summed; radius 20 is sigma 25, so
@@ -114,7 +123,8 @@ fn a_blur_holds_its_picture_and_a_channels_working_space_on_any_threads() -> Res
         );
         assert!(
             peak >= 2 * IMAGE,
-            "the blur held {peak} bytes: less than the picture and the channel's planes"
+            "radius {radius} on {threads} threads held {peak} bytes: less than the picture and the channel's planes, {}",
+            2 * IMAGE
         );
     }
     Ok(())
@@ -131,6 +141,7 @@ fn transform_length(samples: usize) -> usize {
 
 #[test]
 fn a_disc_blur_by_the_2d_transform_holds_three_spectra_and_a_few_planes_on_any_threads() -> Result<(), Error> {
+    let _alone = alone();
     // A disc of design radius 16 is 20 px on this 600-wide photo (a design px is 600 / 480 = 1.25 px) and reaches 20 px each
     // side (a pixel within half a pixel of the rim still weighs): 1257 weights, far past the 128 that are summed tap by tap.
     // The planes are extended by the reach, to 440 x 640, and filtered at the lengths the transform runs at, 512 x 768. The
@@ -161,6 +172,7 @@ fn a_disc_blur_by_the_2d_transform_holds_three_spectra_and_a_few_planes_on_any_t
 
 #[test]
 fn a_guided_filter_holds_five_maps_of_f64_and_a_map_of_f32_on_any_threads() -> Result<(), Error> {
+    let _alone = alone();
     // The filter keeps the means of the guide, the source, their product and the guide's square, and while it makes the
     // last it turns the map it is averaging: five maps of f64 (8 B a pixel) beside the log-luminance map of f32 that is
     // its guide and its source (4 B a pixel). The edge-aware tone map is the step that runs it on a picture.
@@ -183,6 +195,7 @@ fn a_guided_filter_holds_five_maps_of_f64_and_a_map_of_f32_on_any_threads() -> R
 
 #[test]
 fn a_render_on_ten_threads_holds_no_more_pictures_than_one_on_a_single_thread() -> Result<(), Error> {
+    let _alone = alone();
     // the pool's own memory and a band's working space are far below a picture; a render that gave each thread a copy would not be
     let ten = threaded_render_peak(12, 10)?;
     assert!(
@@ -195,6 +208,7 @@ fn a_render_on_ten_threads_holds_no_more_pictures_than_one_on_a_single_thread() 
 
 #[test]
 fn a_trace_holds_a_picture_for_every_step_which_is_what_the_measurement_must_see() -> Result<(), Error> {
+    let _alone = alone();
     // the known-bad pair of the test above: a run that keeps every picture
     let (short, long) = (trace_peak(2)?, trace_peak(12)?);
     assert!(
@@ -215,7 +229,6 @@ const BIG_IMAGE: usize = BIG_HEIGHT * BIG_WIDTH * 3 * size_of::<f32>();
 /// The most bytes, beyond the photo's own, that a render of steps that each read a pixel or a few rows around it holds at
 /// once on the big photo with `options`. The recipe needs no maps.
 fn pixel_steps_peak(options: Options) -> Result<usize, Error> {
-    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
     let values = vec![0.5_f32; BIG_HEIGHT * BIG_WIDTH * 3];
     let recipe = Recipe::new([
         Step::new("grade").param("exposure", 0.1),
@@ -237,6 +250,7 @@ const BAND: NonZeroUsize = NonZeroUsize::MIN.saturating_add(63);
 
 #[test]
 fn a_banded_render_holds_the_image_it_makes_and_a_little_more() -> Result<(), Error> {
+    let _alone = alone();
     let peak = pixel_steps_peak(Options::default().with_band(BAND))?;
     assert!(
         peak <= BIG_IMAGE + BIG_IMAGE / 4,
@@ -248,6 +262,7 @@ fn a_banded_render_holds_the_image_it_makes_and_a_little_more() -> Result<(), Er
 
 #[test]
 fn a_whole_picture_render_of_the_same_steps_holds_more_which_is_what_the_measurement_must_see() -> Result<(), Error> {
+    let _alone = alone();
     // the known-bad of the test above: the same steps with no band
     let peak = pixel_steps_peak(Options::default())?;
     assert!(
@@ -260,6 +275,7 @@ fn a_whole_picture_render_of_the_same_steps_holds_more_which_is_what_the_measure
 
 #[test]
 fn a_size_no_picture_can_have_is_refused_before_the_framed_photo_is_made() -> Result<(), Error> {
+    let _alone = alone();
     // a flip makes a second picture of the photo's size, and a longest side of 100,000 asks for 100,000 x 66,667 pixels,
     // over the limit: the refusal comes first, so no picture is made (the photo's own is not counted)
     let peak = peak_of(1, |photo, recipe| {
@@ -281,7 +297,6 @@ fn a_size_no_picture_can_have_is_refused_before_the_framed_photo_is_made() -> Re
 /// The most bytes, beyond the photo's own and its depth map, that `run` holds at once while it works on 8 masked steps,
 /// each masked by a region of its own: a band of the depth.
 fn masked_peak(run: impl FnOnce(&Photo<'_>, &Recipe) -> Result<(), Error>) -> Result<usize, Error> {
-    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
     let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
     let depth = Layer::new(HEIGHT, WIDTH, vec![0.5_f32; HEIGHT * WIDTH])?;
     let mut recipe =
@@ -303,6 +318,7 @@ fn masked_peak(run: impl FnOnce(&Photo<'_>, &Recipe) -> Result<(), Error>) -> Re
 
 #[test]
 fn a_render_holds_the_regions_the_steps_ahead_need_and_not_those_it_has_made() -> Result<(), Error> {
+    let _alone = alone();
     // a picture the step reads, the one it makes and the one it is laid into, and the band of the step (a third of a
     // picture): 3.33 pictures. The band of the step before, kept, would make 3.67 and all 7 before it 5.7
     let peak = masked_peak(|photo, recipe| photo.render(recipe, &Presets::new(), Options::default()).map(drop))?;
@@ -316,6 +332,7 @@ fn a_render_holds_the_regions_the_steps_ahead_need_and_not_those_it_has_made() -
 
 #[test]
 fn a_trace_of_masked_steps_holds_every_picture_which_is_what_the_measurement_must_see() -> Result<(), Error> {
+    let _alone = alone();
     // the known-bad of the test above: a run that keeps every picture and every region
     let peak = masked_peak(|photo, recipe| photo.trace(recipe, &Presets::new(), Options::default()).map(drop))?;
     assert!(
@@ -329,7 +346,6 @@ fn a_trace_of_masked_steps_holds_every_picture_which_is_what_the_measurement_mus
 /// The most bytes, beyond the photo's own, that `run` holds at once while it works on a `grade` step followed by an each
 /// step of three looks over a grid of 12 columns, blended over 24 design pixels.
 fn each_peak(run: impl FnOnce(&Photo<'_>, &Recipe) -> Result<(), Error>) -> Result<usize, Error> {
-    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
     let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
     let look = |exposure: f64| Some(Step::new("grade").param("exposure", exposure).opacity(1.0));
     let mut each = Each::new("cells", [look(0.2), look(0.4), look(0.6)]);
@@ -354,6 +370,7 @@ fn each_peak(run: impl FnOnce(&Photo<'_>, &Recipe) -> Result<(), Error>) -> Resu
 
 #[test]
 fn an_each_step_holds_its_input_the_blend_so_far_one_look_and_one_weight_map_at_a_time() -> Result<(), Error> {
+    let _alone = alone();
     // the first step's picture, the blend so far, the look being run and its weights and the piece numbers (a third of a
     // picture each): 3.76 pictures. The results and weights of all three looks kept would be 7
     let peak = each_peak(|photo, recipe| photo.render(recipe, &Presets::new(), Options::default()).map(drop))?;
@@ -368,6 +385,7 @@ fn an_each_step_holds_its_input_the_blend_so_far_one_look_and_one_weight_map_at_
 #[test]
 fn a_trace_of_an_each_step_keeps_the_picture_of_every_step_which_is_what_the_measurement_must_see() -> Result<(), Error>
 {
+    let _alone = alone();
     // the known-bad of the test above: a run that keeps the picture of each step as well
     let peak = each_peak(|photo, recipe| photo.trace(recipe, &Presets::new(), Options::default()).map(drop))?;
     assert!(
@@ -382,7 +400,6 @@ fn a_trace_of_an_each_step_keeps_the_picture_of_every_step_which_is_what_the_mea
 /// it, for a selection) holds at once.
 fn laid_peak(region: impl Into<Region>) -> Result<usize, Error> {
     let region = region.into();
-    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner);
     let values = vec![0.5_f32; HEIGHT * WIDTH * 3];
     let step = if matches!(region, Region::Path(_)) {
         Entry::from(Step::new("grade").param("exposure", 0.5).mask("r"))
@@ -399,6 +416,7 @@ fn laid_peak(region: impl Into<Region>) -> Result<usize, Error> {
 
 #[test]
 fn a_region_laid_over_a_frame_holds_a_few_pictures_however_much_its_numbers_ask_for() -> Result<(), Error> {
+    let _alone = alone();
     let torn = Edge {
         style: EdgeStyle::Torn,
         amount: 48.0,
@@ -520,7 +538,7 @@ const fn colour(pixels: usize) -> usize {
 
 #[test]
 fn applying_a_profile_does_not_double_the_memory_a_read_holds() -> Result<(), Error> {
-    let _alone = ONE_AT_A_TIME.lock().unwrap_or_else(PoisonError::into_inner); // the files below are big too
+    let _alone = alone();
     let to_error = |error: &dyn std::fmt::Display| Error::ImageRead(error.to_string());
     // a PNG of flat colour is a few kilobytes whatever its size; the profile goes in after its header chunk
     let side = 2000;
