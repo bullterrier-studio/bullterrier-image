@@ -1862,6 +1862,37 @@ measured first would break at a larger one.
     `tiles`; `gradient_map` for a picture whose brightness span is under 2e-3; `halftone`'s `rings`, `spiral` and `rays` screens
     (polar maths) and `specks` (draws on the bits of 64-bit floats). `halftone`'s blur is summed on the device for a reach
     under 16 px and made by the CPU, read back and sent as a counted table, for a longer one.
+  - *The other per-pixel effects (K2): what runs where.* One rule decided each: a kernel is a pixel's own maths on tables the CPU's own
+    code made (a table is a few numbers a column, a row, a mark or a lattice octave, never a picture, except where said), so the CPU stays the
+    one definition of every draw, shuffle and weight. Bounds are the default 1e-4 unless written; "measured" is the largest gap of the
+    parity cases on Metal.
+
+    | effect | where | how, or why not | bound (measured) |
+    |---|---|---|---|
+    | `torn_edge` | kernel | four sides' distances from the CPU's noise (a table of a line each), the CPU's comparisons in f32 | 1e-4 (0) |
+    | `dead_pixels` | kernel | the CPU's shuffle gives each cell of the canvas a number (sound, stuck, dead): a table a cell | 1e-4 (0) |
+    | `slice_shift` | kernel | the CPU's bands worked out to one rotation a row; the pixels are copied | 1e-4 (0) |
+    | `crosshatch` | kernel | the CPU's loop over families, directions from f64; position across the lines in f32 | 4e-4 (7e-6; 3.1e-4 on a 3000 px picture with lines 2 px apart) |
+    | `engraving` | kernel for `bend <= 0` | the same lines; a `bend` reads the Gaussian-smoothed picture (a neighbourhood), so the default runs on the CPU | 4e-4 (2.8e-6) |
+    | `lens_flare` | kernel | the bumps (centre, reach, ring, weight) from f64, summed per pixel | 1e-4 (2e-6) |
+    | `light_leak` | kernel | the CPU's patches from its seeded generator (a table), the Gaussians summed per pixel | 1e-4 (2.4e-7) |
+    | `aurora` | kernel | the ripple and the rays are one line of noise along the picture, made by the CPU (a table a column); the curtain per pixel | 1e-4 (1.9e-6) |
+    | `fractal` | kernel | the CPU's orbit step for step in f32 (each product through `times`, so Metal's fused multiply-add does not change an orbit), from the CPU's own start points (a table a column and a canvas row); only the smooth count's logarithms are f32 | 1e-4 (4.9e-6) |
+    | `ntsc` | kernel | the colour axes summed along the row with the CPU's weights whatever the reach (its Fourier path agrees to millionths) | 1e-4 (2.4e-7) |
+    | `paper_texture` | kernel | the value noise of `ops/noise.rs` ported (`ops/noise.wgsl`: the same hash, Catmull-Rom, deviation from the weights alone), the weave two lines of cosines from the CPU | 1e-4 (3.1e-6) |
+    | `fog` | kernel for clouds read in place | the same noise, `ops/gauss.wgsl`'s `ndtr` (a 1.2e-7 fit; WGSL has no erfc); with `rise` or `turbulence` the clouds are read between pixels and ranked over the picture: CPU | 1e-4 (2.2e-6) |
+    | `noise_field` | kernel for `value` without `warp` | the same noise and `ndtr`, then the colour ramp; the other kinds are standardised over the picture they make and a warp reads between pixels: CPU (so the default, `perlin`, is) | 1e-4 (7.5e-7) |
+    | `blend` | CPU | placing the second picture is a resample (`ops/place.rs`: Lanczos, a neighbourhood, BTIMG-0012); the blend after it is the `lay` kernel, but the placed picture would go up as a table as big as the round trip it saves | |
+    | `dust_scratches`, `particles`, `flow_lines` | CPU | each draws thousands of marks into a plane of ink where the strongest wins: a loop over the marks, not the pixels (a pixel looking at every mark is marks x pixels). They want a second kernel shape, a thread a mark with an atomic maximum on the plane, which `Kernel` does not have; a candidate, not a cheap port | |
+    | `vhs` | CPU | five stages in turn (bands, wobble, dropout streaks stamped on the rows, a smear of the colour, clumped tape noise), the later ones neighbourhoods of the earlier ones' result | |
+
+    Red evidence: 40 mutants of the thirteen kernels' WGSL (a dropped term, a swapped axis, a wrong table offset, a changed clamp), all killed by the
+    parity and long-picture tests; among them `fractal`'s `times` replaced by a plain product, which Metal fuses and which changes escape counts.
+
+    *Whole-picture standardisation* (`noise_field`'s other kinds, `fog` read between pixels) was not ported by either route (`Gpu::reduce` or a
+    counted readback): the noise they standardise is the CPU's to make first, so a reduction would follow a CPU-made picture, and the picture
+    already read back is the fastest way to run the whole step on the CPU. The in-place cases need no statistic: the noise has deviation 1 at
+    every pixel by construction.
   - *Equal to the CPU where it is a decision, not a drift.* An edge a pixel falls on (the cell of a screen, the nearest palette
     colour) is the CPU's only if the rounding is: the device fuses `a * b + c` into one rounding, so `px * cos - py * sin` is not 0
     on the diagonal of a 45 degree screen where the CPU's is, and the pixel lands in the next cell (a whole dot's tone off,
