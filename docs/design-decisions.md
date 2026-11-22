@@ -1857,7 +1857,7 @@ measured first would break at a larger one.
     noise value a kernel draws is the CPU's.
   - *A table the CPU derives in f64* (`gradient`'s offsets, a separable kernel's weights, a palette in Oklab) is made on the
     CPU and sent as `data`; WGSL has no f64 and `powf` differs per platform (lessons L22).
-  - *What stays on the CPU, counted* (BTIMG-0010 so far): `dither`'s error-diffusion methods, `riemersma` and `dot_diffusion` (a
+  - *What stays on the CPU, counted* (BTIMG-0010): `dither`'s error-diffusion methods, `riemersma` and `dot_diffusion` (a
     pixel's result depends on the ones before it), a `block` (a pair of colours chosen for each block), 'spot' separation and
     `tiles`; `gradient_map` for a picture whose brightness span is under 2e-3; `halftone`'s `rings`, `spiral` and `rays` screens
     (polar maths) and `specks` (draws on the bits of 64-bit floats). `halftone`'s blur is summed on the device for a reach
@@ -1946,20 +1946,65 @@ measured first would break at a larger one.
   in `check`, and in CI's GPU job on Mesa's lavapipe; `BT_GPU` says what the machine has (`none`: the GPU tests return early
   and `rust-test-gpu` ends with a banner counting them, as Rust has no skip at run time; else part of the adapter's name,
   which the tests check). `test.yml`'s runners have no GPU and set `none`.
-- **Numbers** (`poe bench-gpu`, release, M4, 1920 x 1080, load 6 to 8, minimum of 9 runs, ms; "on the device": a picture
-  already there, the steps and a readback, less a readback alone, 6.6 ms):
+- **Numbers** (`poe bench-gpu`, release, M4 under a load of 6 to 10 (another agent was building), 1920 x 1080, minimum of 9
+  runs, ms; every effect with a kernel, set to run whole on the device, then the dither tool's recipes at their own settings;
+  "on the device": a picture already there, the steps and a readback, less a readback alone, 7.5 ms, so a figure under about 10
+  is the readback's noise, not work):
 
-  | recipe | CPU 1 thread | CPU all cores | GPU end to end | GPU on the device |
+  | row | CPU 1 thread | CPU all cores | GPU end to end | GPU on the device |
   |---|---|---|---|---|
-  | levels | 20.2 | 4.1 | 14.6 | 1.1 |
-  | grade | 133.8 | 25.7 | 14.3 | 1.1 |
-  | curves | 38.2 | 6.9 | 16.4 | 3.3 |
-  | channel_mixer | 1.3 | 0.7 | 14.5 | 1.1 |
-  | color_balance | 3.6 | 0.9 | 14.3 | 1.4 |
-  | chain of five | 194.3 | 39.7 | 21.0 | 8.7 |
+| aurora | 23.4 | 7.2 | 17.1 | 9.4 |
+| channel_mixer | 2.1 | 2.0 | 27.5 | 10.6 |
+| color_balance | 6.4 | 3.3 | 23.5 | 9.9 |
+| crosshatch | 117.5 | 17.5 | 21.2 | 9.2 |
+| curves | 113.6 | 15.9 | 23.3 | 12.4 |
+| dead_pixels | 48.9 | 9.2 | 21.4 | 9.7 |
+| dither | 418.7 | 167.7 | 32.6 | 20.1 |
+| engraving | 17.3 | 10.8 | 23.2 | 11.0 |
+| fog | 98.6 | 42.0 | 36.0 | 20.6 |
+| fractal | 164.3 | 21.2 | 22.1 | 10.4 |
+| grade | 34.2 | 7.6 | 21.2 | 9.6 |
+| gradient | 19.0 | 9.2 | 21.0 | 7.6 |
+| gradient_map (readback inside) | 24.5 | 18.5 | 49.0 | 30.3 |
+| grain | 85.7 | 14.0 | 19.8 | 7.3 |
+| halftone | 28.8 | 6.3 | 25.2 | 6.4 |
+| interlace | 24.3 | 8.5 | 20.3 | 7.7 |
+| lens_flare | 24.1 | 4.8 | 19.4 | 7.3 |
+| levels | 9.9 | 2.7 | 19.9 | 5.6 |
+| light_leak | 45.7 | 8.5 | 17.3 | 5.5 |
+| lut | 2.7 | 1.0 | 19.5 | 4.1 |
+| noise_field | 32.0 | 32.1 | 28.9 | 13.3 |
+| ntsc | 18.6 | 5.8 | 33.1 | 14.7 |
+| paper_texture | 17.4 | 18.7 | 29.2 | 14.4 |
+| pattern | 30.3 | 6.7 | 18.4 | 5.7 |
+| pixel_grid | 28.3 | 5.6 | 18.3 | 5.1 |
+| scanlines | 2.0 | 1.6 | 23.9 | 6.0 |
+| selective_color | 34.7 | 7.5 | 16.8 | 4.7 |
+| slice_shift | 1.0 | 1.1 | 20.8 | 5.4 |
+| torn_edge | 5.1 | 2.5 | 20.9 | 5.3 |
+| vignette | 55.3 | 11.2 | 17.9 | 9.4 |
+| demo 31 (readback inside) | 197.5 | 63.6 | 262.2 | 196.2 |
+| 1-bit Bayer | 27.7 | 10.2 | 33.3 | 15.8 |
+| Game Boy | 24.0 | 10.7 | 32.7 | 17.4 |
+| CMYK halftone (readback inside) | 2971.7 | 496.8 | 2338.5 | 1946.4 |
+| CMYK halftone, no blur | 2423.5 | 424.5 | 1558.2 | 1552.3 |
 
-  End to end is the transfers (f32 both ways: 25 MB up, 33 MB back, and the conversion on the CPU); the work stays on the
-  device across a chain, which is where the GPU pays: the five-kernel chain is 8.7 ms there against 40 ms on every core.
-  A cheap per-pixel effect (`channel_mixer`) is faster on the CPU end to end: the backend is a choice of the caller.
+  End to end is the transfers (f32 both ways: 25 MB up, 33 MB back, and the conversion on the CPU: about 17 to 25 ms before any
+  work); the work stays on the device across a chain, which is where the GPU pays. Read the table so:
+  - *The GPU wins end to end* where the CPU's work is heavy (`dither` 168 ms on every core against 33, `fractal`, `curves`,
+    `crosshatch`, `fog`, `grain` at one pixel, `selective_color`, the 1-bit Bayer and Game Boy recipes ahead on the device).
+    *The CPU wins* for a cheap effect (`channel_mixer`, `lut`, `scanlines`, `slice_shift`, `torn_edge`: 1 to 5 ms on every core,
+    against the transfers): the backend is the caller's choice, and a chain pays the transfers once.
+  - *Settings the rows use so the step stays on the device:* `dither` with a named palette (the default `photo` finds it by the
+    CPU's k-means over a readback), `grain` size under 1 design px (a clump is a CPU blur; px are scaled by 4 at this size), `halftone` with
+    no blur (its default `sigma` 0.5 is a Fourier blur made by the CPU and read back, so every halftone at 1080p with the
+    default blur has a counted readback), `engraving` with no `bend`, `noise_field` as `value`. `gradient_map` reads the picture back
+    for its quantiles (`readback inside`). With those settings the recipes of demo 31 (the grain at its default size and the
+    halftone's blur run on the CPU at this size, so 262 ms against 64 ms on every core) and the CMYK halftone are not
+    whole on the device at 1080p: the whole-device check of `tests/it/gpu/recipes.rs` runs at 240 px.
+  - ***Halftone with `separation="cmyk"` is slow on the device***: 1558 ms end to end without the blur (2339 ms with the CPU's),
+    against 425 ms (497 ms) on every core of the CPU. The kernel has no per-cell pass (the model has none): every pixel works out its
+    cell's four inks again (64 coordinate-descent sweeps), where the CPU does it once a cell. Not
+    optimised here (a per-cell pass, or an unmixing table made by the CPU, would be the fix; see the ticket's leftovers).
 
 - **Chaining with another library (2026-11-22):** the packages share wgpu's device, so the picture's storage is a documented public contract, not an internal: `GpuImage::buffer` (read only) and `Gpu::adopt(buffer, height, width, alpha)` (nothing is uploaded, nothing counted; a too-small buffer is `Error::Inputs`). The layout (`vec4<f32>` a pixel, straight alpha) may still change to half floats by a change of this pair's docs and a minor version.

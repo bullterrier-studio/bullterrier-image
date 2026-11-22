@@ -52,9 +52,13 @@ its `Unreleased` becomes the release date.
   `Gpu::render` and `render_from` (pictures kept on the device, alpha kept), `Gpu::download`, `Gpu::transfers`; every GPU
   call is `async` (block with `pollster::block_on`); `Options` holds no GPU. `ErrorKind::Gpu` means only that this
   machine's GPU cannot; an option a GPU render does not take is a `Recipe` error. Python: `Gpu()`,
-  `render(..., gpu=)`, `GpuError`, `fx.<effect>.gpu`, `Gpu.largest_picture`. Kernels: `levels`, `grade`, `curves`, `channel_mixer`,
-  `color_balance` and a step's blend mode, opacity and mask, each within 1e-4 of the CPU; other steps run on the CPU inside
-  a GPU render.
+  `render(..., gpu=)`, `GpuError`, `fx.<effect>.gpu`, `Gpu.largest_picture`. Kernels (each within its stated bound of the CPU, 1e-4
+  unless said): 30 effects (`fx.<effect>.gpu` says which) and a step's blend mode, opacity and mask; a step or a setting
+  with no kernel runs on the CPU inside a GPU render, counted (`Gpu.transfers`). The dither tool's looks run whole on the
+  device: `dither`'s ordered and noise methods with any palette, `halftone`'s grid and wave screens in every separation;
+  its serial methods, `rings`, `spiral`, `rays` and `specks` stay on the CPU. `Gpu::reduce` and `Gpu::histogram` (Rust):
+  sum, extremes and counts of a channel with a fixed reduction tree. `poe bench-gpu` times every kernel effect and the
+  dither tool's recipes at 1920 x 1080.
 
 - `Recipe::close_band_margin`: the rows of margin a window needs when its rows need only look the same as the whole render's
   (within 32 of 65,535 on a value of 0 to 1), which also clears steps that sum a blur by a Fourier transform or round a
