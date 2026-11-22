@@ -30,16 +30,17 @@ jobs:
         run: cargo fetch --locked
       - name: Install the locked dependencies (builds the Rust extension)
         run: uv sync --locked
-      # the real-model tests (finding_onnx.rs) need the ONNX Runtime library, which `bt-image install onnx --runtime-only` keeps in the cache
-      # folder (kept between runs with the models: the key is the files that hold their checksums, so a changed pin fetches again)
+      # the real-model tests (finding_onnx.rs) need the ONNX Runtime library and the models in the cache folder, which `bt-image install
+      # onnx` keeps (kept between runs: the key is the files that hold their checksums, so a changed pin fetches again)
       - name: Keep the models between runs
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/bt-image
           key: models-${{ hashFiles('crates/core/src/finding.rs', 'crates/core/src/finding/runtime.rs') }}
-      - name: Install the ONNX Runtime library
-        run: uv run --locked bt-image install onnx --runtime-only --yes
-      # a cold cache downloads each model once (about 280 MB), and the checksum in the catalogue guards what arrives
+      # every model before the tests: one of them reads a model file another would download (a cold cache, about 1.2 GB, comes
+      # once; the checksum in the catalogue guards what arrives)
+      - name: Install the ONNX Runtime library and every model
+        run: uv run --locked bt-image install onnx --depth --prompted --yes
       - name: The whole matrices and the real models (poe rust-test-full)
         env:
           BT_IMAGE_ALLOW_DOWNLOAD: "1"
