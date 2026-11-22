@@ -185,3 +185,37 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         [0, 1, 2].map(|channel| pixel[channel] + opacity * (color[channel] - pixel[channel]))
     })
 }
+
+/// Clouds read in place on the GPU (`fog.wgsl`, with `ops/noise.wgsl` and `ops/gauss.wgsl`): the noise of a pixel at its own place, its
+/// rank on the normal curve and the mix, in single precision. Clouds drawn out by `rise` or pushed by `turbulence` are read between
+/// pixels (a sampler, a neighbourhood) and ranked over the whole picture: the CPU runs those.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(
+        concat!(
+            include_str!("../ops/noise.wgsl"),
+            include_str!("../ops/gauss.wgsl"),
+            include_str!("fog.wgsl")
+        ),
+        |params: &Params, _: &crate::gpu::Header| {
+            let [red, green, blue] = params.color.0;
+            vec![
+                [params.amount, params.gradient, params.coverage, params.feather],
+                [red, green, blue, params.floor],
+                [f32::from_bits(params.seed), 0.0, 0.0, 0.0],
+            ]
+        },
+    )
+    .with_table(|params: &Params, _: &crate::gpu::Header| {
+        Fractal {
+            spacing: f64::from(params.scale),
+            octaves: params.octaves.cast_unsigned(),
+            persistence: f64::from(params.persistence),
+            lacunarity: f64::from(params.lacunarity),
+            seed: params.seed,
+            origin: 0.0, // constant: a lattice point on the first pixel
+        }
+        .octave_table()
+    })
+    .only_where(reads_in_place)
+}
