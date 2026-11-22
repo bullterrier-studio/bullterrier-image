@@ -31,7 +31,11 @@ fn timed(mut work: impl FnMut() -> Result<(), Error>) -> Result<f64, Error> {
 fn step_for(name: &str) -> Step {
     let step = Step::new(name);
     match name {
-        "dither" => step.param("method", "bayer"),
+        // the default palette, `photo`, is found by the CPU's k-means from a readback
+        "dither" => step.param("method", "bayer").param("palette", "gameboy"),
+        // above 1 px (4 px at this size) the clumps are a blur, a CPU run; the default's blur is a CPU run from a readback too
+        "grain" => step.param("size", 0.25),
+        "halftone" => step.param("sigma", 0.0),
         "engraving" => step.param("bend", 0),
         "noise_field" => step.param("kind", "value"),
         _ => step,
@@ -81,6 +85,18 @@ fn recipes() -> Vec<(&'static str, Recipe)> {
                     .param("dot_gain", 0.1),
             ]),
         ),
+        (
+            "recipe: CMYK halftone, no blur",
+            Recipe::new([
+                Step::new("grade").param("contrast", 1.1),
+                Step::new("halftone")
+                    .param("cell", 12)
+                    .param("separation", "cmyk")
+                    .param("paper", "#fffbe8")
+                    .param("dot_gain", 0.1)
+                    .param("sigma", 0.0),
+            ]),
+        ),
     ]
 }
 
@@ -93,6 +109,9 @@ fn rows() -> Result<Vec<(String, Recipe)>, Error> {
         }
     }
     rows.extend(recipes().into_iter().map(|(name, recipe)| (name.to_owned(), recipe)));
+    // `cargo run ... --example bench_gpu -- halftone grain`: only the rows whose name has one of the words
+    let only: Vec<String> = std::env::args().skip(1).collect();
+    rows.retain(|(name, _)| only.is_empty() || only.iter().any(|word| name.contains(word.as_str())));
     Ok(rows)
 }
 
@@ -133,12 +152,12 @@ fn main() -> Result<(), Error> {
                 gpu.download(&made).await.map(drop)
             })
         })? - readback;
-        // a step the kernel declines runs on the CPU inside the GPU render: more than one upload and one readback
+        // a step a kernel declines, or one that reads the picture back, shows in the transfers of a render left on the device
         gpu.reset_transfers();
         block_on(gpu.render(&photo, &recipe, &presets, Options::default()))?;
         let moved = gpu.transfers();
         let note = if moved.uploads > 1 || moved.downloads > 0 {
-            " (CPU inside)"
+            " (CPU or readback inside)"
         } else {
             ""
         };
