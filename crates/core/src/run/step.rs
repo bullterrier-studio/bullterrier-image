@@ -137,11 +137,14 @@ impl Prepared {
         if !step.fields.is_empty() || step.partition.is_some() {
             return None;
         }
-        step.effect.kernel().filter(|kernel| kernel.runs(scaled)).map(|kernel| GpuStep {
-            kernel,
-            params: scaled,
-            overlay: &step.overlay,
-        })
+        step.effect
+            .kernel()
+            .filter(|kernel| kernel.runs(scaled))
+            .map(|kernel| GpuStep {
+                kernel,
+                params: scaled,
+                overlay: &step.overlay,
+            })
     }
 
     /// The rows of margin this entry needs above and below the rows it makes, or none if it reads the whole
