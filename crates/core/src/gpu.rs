@@ -456,3 +456,27 @@ impl Gpu {
         self == other
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The refusal of a machine with no adapter, where it is raised: no public route reaches an instance with no backend,
+    //! and a machine with a GPU has an adapter.
+
+    use super::adapter_of;
+    use crate::ErrorKind;
+
+    #[test]
+    fn an_instance_with_no_adapter_is_refused_naming_why() {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::empty(),
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
+        });
+        let refused = pollster::block_on(adapter_of(&instance)).err();
+        assert!(
+            refused
+                .as_ref()
+                .is_some_and(|error| error.kind() == ErrorKind::Gpu && error.to_string().contains("no GPU adapter")),
+            "{refused:?}"
+        );
+    }
+}

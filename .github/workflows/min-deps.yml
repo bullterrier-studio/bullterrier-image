@@ -39,5 +39,8 @@ jobs:
       # metadata too, which building the extension does not download. The gates and tests below run cargo offline.
       - name: Fetch the locked crates (cargo fetch)
         run: cargo fetch --locked
+      # the runner has no GPU: BT_GPU=none says so, and the GPU tests say they were skipped (docs/development.md)
       - name: Tests on the lowest allowed dependencies (pytest; skips and the 10 slowest tests are listed)
+        env:
+          BT_GPU: none
         run: uv run --locked poe check-min-deps -ra --durations=10
