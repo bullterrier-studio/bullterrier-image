@@ -1778,9 +1778,9 @@ measured first would break at a larger one.
 
 ## GPU backend (BTIMG-0009, 2026-11-22)
 
-- **The CPU is the reference; the GPU is an option of a render, held to a bound.** Feature `gpu` (off for pure Rust callers:
-  compile time; on in the wheel). One choice: `Options::with_gpu(&gpu)`; `Photo::render` returns the same `Image` type on
-  both backends, the recipe and its parameters are the same, and nothing falls back silently (no adapter, a picture past the
+- **The CPU is the reference; the GPU is a call on its context, held to a bound.** Feature `gpu` (off for pure Rust callers:
+  compile time; on in the wheel). One choice, the context: `photo.render(..)` is the CPU, `gpu.render(&photo, ..)` the GPU
+  (a `GpuImage`; `gpu.download` reads it back). The recipe and its parameters are the same, and nothing falls back silently (no adapter, a picture past the
   device, an option the GPU path does not take: `Error::Gpu`, naming the cause). Byte promises (any thread count, bands,
   windows, WebAssembly against native) stay CPU promises. *Rejected:* an `auto` backend (the result would need to say which
   ran); a GPU-only effect.
@@ -1788,9 +1788,19 @@ measured first would break at a larger one.
   adapter, asking for its own storage-buffer limits so a picture is as large as the device holds, not WebGPU's 128 MiB). It
   holds the pipelines (compiled by kernel name the first time), the adapter's name, the largest picture and a transfer
   count. It sets no handler on a caller's device: wgpu calls run inside error scopes, so a validation or memory error is an
-  `Error::Gpu`, not wgpu's panic. `Clone` shares it; two are equal only as clones (so `Options` compare a GPU by identity).
-- **`Options` lost `Copy`** to hold a `Gpu`: a backend is an option like the size and the threads. Public calls still take
-  `Options` by value (built at the call, `Options::default().with_size(..)`); a caller rendering twice clones.
+  `Error::Gpu`, not wgpu's panic. `Clone` shares it; two are equal only as clones.
+- **The context renders; `Options` stay plain data** (BTIMG-0014, after an audit). BTIMG-0009 shipped `Options::with_gpu`
+  beside `Gpu::render`, so a call could name two contexts (an error that existed only because the choice was in two places)
+  and `Photo::render` had a GPU branch that blocked. Now the context is the only way to the GPU and `Options` are `Copy + Eq`
+  again. A runtime toggle is the caller's two-line `match`. Python keeps `render(..., gpu=)`: the bindings call the context
+  and read back.
+- **Async only, no blocking twins** (BTIMG-0014): `request`, `upload`, `upload_image`, `render`, `render_from`, `download`
+  are `async`; the `*_blocking` methods (8 methods for 4 operations) are gone, and so is `pollster` from the core (it blocked
+  inside the async `render` through `upload`). Native callers block at their edge (`pollster::block_on`, one line); the
+  bindings do. *The rule that proved too strict:* "nothing under a GPU call blocks" holds but for the native readback, which
+  still waits with `device.poll`: native wgpu (30) runs `map_async`'s callback only from a poll "elsewhere in the runtime",
+  and the non-blocking alternative, polling with `PollType::Poll` and waking itself, spins a core for the length of the GPU
+  work. On the web the wait is a no-op and the readback is awaited.
 - **`GpuImage`: the picture on the device is image's**, straight alpha, the levels `Image` holds, stored as one `vec4<f32>` a
   pixel in a storage buffer (private, so half floats can come later). No texture and no hardware filtering: kernels read
   pixels with the CPU's maths. An upload sends 3 floats a pixel and a kernel spreads them into vec4 (a fifth fewer bytes,

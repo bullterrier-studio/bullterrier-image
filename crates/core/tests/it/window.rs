@@ -83,17 +83,17 @@ fn first_problem(
     recipe: &Recipe,
     margin: usize,
     within: f32,
-    options: &Options,
+    options: Options,
 ) -> Result<Option<String>, Box<dyn Error>> {
     let Canvas { height, width, bands } = canvas;
     let whole = photo(canvas, values, 0..height)?
-        .render(recipe, &Presets::new(), options.clone())?
+        .render(recipe, &Presets::new(), options)?
         .into_values();
     for &rows in bands {
         for top in (0..height).step_by(rows) {
             let (bottom, from) = ((top + rows).min(height), top.saturating_sub(margin));
             let to = (bottom + margin).min(height);
-            let band = windowed(canvas, values, recipe, from..to, options.clone())?.into_values();
+            let band = windowed(canvas, values, recipe, from..to, options)?.into_values();
             let (made, want) = (
                 &band[(top - from) * width * 3..(bottom - from) * width * 3],
                 &whole[top * width * 3..bottom * width * 3],
@@ -150,7 +150,7 @@ fn every_cleared_effect_over(
                 continue;
             };
             cleared += 1;
-            if let Some(found) = first_problem(canvas, &values, &recipe, margin, 0.0, &Options::default())? {
+            if let Some(found) = first_problem(canvas, &values, &recipe, margin, 0.0, Options::default())? {
                 problems.push(format!("{name} {}: {found}", Value::Object(setting)));
             }
         }
@@ -188,7 +188,7 @@ fn a_chain_of_steps_needs_the_margins_added_and_gives_the_rows_of_the_whole_rend
         "the margins add: {margin}"
     );
     assert_eq!(
-        first_problem(SMALL, &values, &recipe, margin, 0.0, &Options::default())?,
+        first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
         None
     );
     Ok(())
@@ -203,7 +203,7 @@ fn a_window_and_the_runners_own_bands_compose() -> Outcome {
         .ok_or("these steps are banded")?;
     let rows = std::num::NonZeroUsize::new(7).ok_or("rows")?;
     let options = Options::default().with_band(rows);
-    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, &options)?, None);
+    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, options)?, None);
     Ok(())
 }
 
@@ -214,7 +214,7 @@ fn a_canvas_fixes_the_scale_of_a_window_and_the_window_the_place() -> Outcome {
     let recipe = Recipe::new([Step::new("gaussian_blur").param("radius", 3.0), Step::new("vignette")]);
     let margin = recipe.band_margin(&Presets::new(), 600)?.ok_or("banded")?;
     let scaled = Options::default().with_canvas(300, 600);
-    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, &scaled)?, None);
+    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, scaled)?, None);
     // the canvas is used: the bands without it are not that whole render
     let whole = photo(SMALL, &values, 0..SMALL.height)?
         .render(&recipe, &Presets::new(), scaled)?
@@ -481,7 +481,7 @@ fn a_halftone_of_every_shape_gives_the_rows_of_the_whole_render_from_a_window() 
             .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
             .ok_or("halftone is banded")?;
         assert_eq!(
-            first_problem(SMALL, &values, &recipe, margin, 0.0, &Options::default())?,
+            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
             None,
             "{shape}"
         );
@@ -508,7 +508,7 @@ fn a_halftone_with_print_realism_gives_the_rows_of_the_whole_render_from_a_windo
                 .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
                 .ok_or("halftone is banded")?;
             assert_eq!(
-                first_problem(SMALL, &values, &recipe, margin, 0.0, &Options::default())?,
+                first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
                 None,
                 "gain {gain} noise {noise} specks {specks} {separation}"
             );
@@ -526,7 +526,7 @@ fn a_halftone_of_a_fractional_cell_gives_the_rows_of_the_whole_render_from_a_win
             .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
             .ok_or("halftone is banded")?;
         assert_eq!(
-            first_problem(SMALL, &values, &recipe, margin, 0.0, &Options::default())?,
+            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
             None,
             "cell {cell} sigma {sigma}"
         );
@@ -560,7 +560,7 @@ fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a
             .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
             .ok_or("this halftone is banded")?;
         assert_eq!(
-            first_problem(SMALL, &values, &recipe, margin, 0.0, &Options::default())?,
+            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
             None,
             "{screen} {wavelength}"
         );
@@ -571,7 +571,7 @@ fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a
     // ... and the rays themselves, which a flat picture shows, are the same from a band that holds no more than its rows
     let flat = vec![0.4; SMALL.height * SMALL.width * 3];
     assert_eq!(
-        first_problem(SMALL, &flat, &recipe, 0, 0.0, &Options::default())?,
+        first_problem(SMALL, &flat, &recipe, 0, 0.0, Options::default())?,
         None,
         "rays"
     );
@@ -682,7 +682,7 @@ fn a_close_margin_gives_the_rows_of_the_whole_render_within_a_tolerance_where_th
                 close_only += 1;
                 // a window and its margin that hold the whole canvas prove nothing
                 windowed_short += usize::from(margin * 2 < canvas.height);
-                if let Some(found) = first_problem(canvas, &values, &recipe, margin, CLOSE, &Options::default())? {
+                if let Some(found) = first_problem(canvas, &values, &recipe, margin, CLOSE, Options::default())? {
                     problems.push(format!("{name} {}: {found}", Value::Object(setting)));
                 }
             }

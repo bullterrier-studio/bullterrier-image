@@ -536,10 +536,10 @@ fn a_region_map_is_made_for_the_working_picture_framed_and_sized_as_a_render_has
         let recipe = framed(frame, recipe_size);
         let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
         rig.recorder.clear();
-        render(&photo, &recipe, options.clone())?;
+        render(&photo, &recipe, options)?;
         let (gradient, given) = (rig.seen().remove(0), rig.seen().remove(1));
         for (name, seen) in [("g", gradient), ("star", given)] {
-            let map = photo.region_map(&recipe, &Presets::new(), options.clone(), name)?;
+            let map = photo.region_map(&recipe, &Presets::new(), options, name)?;
             assert_eq!(map.values(), seen, "{what}: {name}");
             assert_eq!(map.height() * map.width(), map.values().len(), "{what}: {name}");
         }

@@ -18,13 +18,15 @@ doctest = false
 # The GPU backend (`Gpu`, `render(..., gpu=)`): maturin builds the wheel with it ([tool.maturin] in pyproject.toml); a
 # `--workspace` build leaves it out, so the core's CPU-only build is the one `poe rust-test` tests.
 [features]
-gpu = ["bullterrier-image/gpu"]
+gpu = ["bullterrier-image/gpu", "dep:pollster"]
 
 [dependencies]
 bullterrier-image = { workspace = true, features = ["onnx"] }
 bullterrier-image-cli.workspace = true
 bullterrier-image-finders.workspace = true
 numpy.workspace = true
+# the bindings block on the core's async GPU calls, at their edge (feature `gpu`)
+pollster = { workspace = true, optional = true }
 pyo3.workspace = true
 serde_json.workspace = true
 

@@ -170,10 +170,10 @@ fn asking_for_the_wrong_kind_or_a_step_that_makes_none_is_refused_naming_the_eff
     let on = photo(&values)?;
     let (presets, options) = (Presets::new(), Options::default());
     let ascii = recipe(Step::of(white_on_black(10)));
-    let said = message(on.ink_planes(&ascii, &presets, options.clone()));
+    let said = message(on.ink_planes(&ascii, &presets, options));
     assert!(said.contains("ascii") && said.contains("ink planes"), "{said}");
     let grade = recipe(Step::new("grade"));
-    let said = message(on.characters(&grade, &presets, options.clone()));
+    let said = message(on.characters(&grade, &presets, options));
     assert!(said.contains("grade") && said.contains("no data"), "{said}");
     let said = message(on.palette_map(&recipe(Step::of(Halftone::default())), &presets, options));
     assert!(said.contains("halftone") && said.contains("palette map"), "{said}");

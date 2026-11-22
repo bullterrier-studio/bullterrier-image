@@ -212,7 +212,7 @@ fn the_background_cut_is_the_subject_as_the_steps_work_on_it() -> Result<(), Err
     // at another size it is the subject resampled with the picture: what a trace shows as the subject
     let resized = Options::default().with_size(12);
     let recipe = recipe_of(cut(Transparent::Background, 0.2));
-    let stages = photo.trace(&recipe, &Presets::new(), resized.clone())?;
+    let stages = photo.trace(&recipe, &Presets::new(), resized)?;
     let shown = stages.iter().find_map(|stage| match stage {
         Stage::Subject(layer) => Some(layer.values().to_vec()),
         _ => None,

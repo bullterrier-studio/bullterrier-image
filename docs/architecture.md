@@ -118,17 +118,22 @@ that wants it continuous orders the halos last. Regions (`mask`, fields, partiti
 window's canvas; with `with_band` the runner's bands compose. Refused (`Error::Recipe`, naming `room`): a room that leaves no box, and a `frame` or `size`. `tests/it/room.rs`
 renders every effect on a grown picture (its edge repeated) against the box alone: bit for bit for a boxed step, and inside its margin and spread for the others. Not in Python.
 
-**GPU** (feature `gpu`; `crates/core/src/gpu.rs`, `gpu/`, `run/gpu.rs`; why: design-decisions, "GPU backend"). One backend
-choice, the render options; the CPU is the reference and byte promises are CPU promises.
+**GPU** (feature `gpu`; `crates/core/src/gpu.rs`, `gpu/`, `run/gpu.rs`; why: design-decisions, "GPU backend"). The CPU
+renders are the plain calls (`photo.render`); a GPU render is a call on the context, the one place that chooses it. Every GPU
+call is `async`, with no blocking twin; `Options` are plain data (`Copy`). The CPU is the reference and byte promises are CPU
+promises.
 
 ```text
-let gpu = Gpu::request_blocking()?;                       // or Gpu::new(device, queue): the caller's wgpu device
-let options = Options::default().with_size(1080).with_gpu(&gpu);
-let image: Image = photo.render(&recipe, &presets, options.clone())?;             // on the GPU, one readback
-let resident: GpuImage = gpu.render_blocking(&photo, &recipe, &presets, options)?; // stays on the device
-let next = gpu.render_from_blocking(&resident, &recipe2, &presets, Options::default())?;
-let back: Image = gpu.download_blocking(&next)?;          // async: `download`, `render`, `render_from`, `request`
+let gpu = Gpu::request().await?;                          // or Gpu::new(device, queue): the caller's wgpu device
+let options = Options::default().with_size(1080);
+let held: GpuImage = gpu.render(&photo, &recipe, &presets, options).await?;      // stays on the device
+let next: GpuImage = gpu.render_from(&held, &recipe2, &presets, Options::default()).await?; // no transfer
+let image: Image = gpu.download(&next).await?;            // one readback
 ```
+
+Native code with no async runtime blocks at its edge: `pollster::block_on(gpu.render(..))` (the Python bindings, the GPU
+tests and `bench_gpu` do). Nothing under the calls blocks but the native readback's wait for the device (`device.poll`):
+native wgpu runs a map's callback only from a poll, and a non-blocking poll would spin a core.
 
 `Gpu` (Clone, shared; equal only as clones): the device and queue, pipelines by kernel name, the largest picture, a transfer
 count; wgpu calls run in error scopes (`Gpu::guarded`), so a failure is `Error::Gpu`. `GpuImage`: one `vec4<f32>` a pixel in a

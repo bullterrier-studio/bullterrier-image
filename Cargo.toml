@@ -39,7 +39,7 @@ objc2-vision = { version = "0.3", features = ["VNRequest", "VNRequestHandler", "
 # ONNX Runtime, loaded at run time from a library the user has or fetches (`finding/onnx.rs`, feature `onnx`): pinned exactly, a release candidate whose API has moved between candidates
 ort = { version = "=2.0.0-rc.15", default-features = false, features = ["load-dynamic", "std"] }
 peak_alloc = "0.3"
-pollster = "0.4"  # the blocking wrapper of the GPU calls on native (`gpu/`, feature `gpu`): a GPU readback is async
+pollster = "0.4"  # blocking on the core's async GPU calls at the native edge: the Python bindings (`crates/python/src/gpu.rs`, `run.rs`), the core's GPU tests and `bench_gpu`
 proc-macro2 = "1"
 proptest = "1.12"
 # the bundled font's outlines and metrics (`ops/glyphs.rs`), as bullterrier-vector reads fonts: pinned exactly because a release may move an outline, no default features and `libm` so that the maths is the same on every platform

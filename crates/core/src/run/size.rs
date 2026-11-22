@@ -19,10 +19,9 @@ pub(super) fn ratio_of(longest_side: f64) -> f64 {
     longest_side / DESIGN_SIZE
 }
 
-/// What a render is asked for besides the recipe: its size, threads, bands, canvas, window, room and (with the feature
-/// `gpu`) the backend. Two options are equal when every choice is; a [`Gpu`](crate::Gpu) is the same one only if it is a
-/// clone of it.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// What a render is asked for besides the recipe: its size, threads, bands, canvas, window and room. Plain data: a render on
+/// the GPU is a call on its context ([`Gpu::render`](crate::Gpu::render)), never an option.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Options {
     size: Option<u32>,
@@ -32,9 +31,6 @@ pub struct Options {
     window: Option<Window>,
     /// The room around the box of the picture, as top, right, bottom and left.
     room: [u32; 4],
-    /// The GPU the render runs on; none: the CPU.
-    #[cfg(feature = "gpu")]
-    gpu: Option<crate::Gpu>,
 }
 
 /// The rows of a canvas that the picture handed to a render is (see [`Options::with_window`]).
@@ -119,8 +115,6 @@ impl Default for Options {
             canvas: None,
             window: None,
             room: [0; 4],
-            #[cfg(feature = "gpu")]
-            gpu: None,
         }
     }
 }
@@ -260,46 +254,6 @@ impl Options {
     pub const fn with_room(mut self, top: u32, right: u32, bottom: u32, left: u32) -> Self {
         self.room = [top, right, bottom, left];
         self
-    }
-
-    /// These options with the render on `gpu` (feature `gpu`): the recipe is the same, and so is the [`Image`] a
-    /// [`render`](crate::Photo::render) returns (one readback at the end), held to the bound each kernel states, not to the
-    /// CPU's bytes (the CPU is the reference). The photo is framed, resized and its maps made on the CPU as before; then it is
-    /// sent to the device once and each step runs there as its effect's kernel, laid over its input there too (blend mode,
-    /// opacity, mask). A step whose effect has no kernel (see [`Effect::kernel`](crate::Effect::kernel)), a driven step, an
-    /// `each` step and one that reads a field or a partition run on the CPU: the picture is read back, the step runs as it
-    /// would without the GPU, and the result is sent again (each counted in [`Gpu::transfers`](crate::Gpu::transfers)).
-    /// Nothing falls back silently: a picture larger than the device holds is an error naming both sizes.
-    ///
-    /// [`with_threads`](Self::with_threads) applies to the CPU's part of the work only. A GPU render refuses
-    /// [`with_band`](Self::with_band), [`with_window`](Self::with_window) and [`with_room`](Self::with_room) (an error
-    /// naming the option, never ignored), and so do [`trace`](crate::Photo::trace), [`region_map`](crate::Photo::region_map)
-    /// and the data calls ([`ink_planes`](crate::Photo::ink_planes)), which run on the CPU only.
-    #[cfg(feature = "gpu")]
-    #[must_use]
-    pub fn with_gpu(mut self, gpu: &crate::Gpu) -> Self {
-        self.gpu = Some(gpu.clone());
-        self
-    }
-
-    /// The GPU the render runs on, if any.
-    #[cfg(feature = "gpu")]
-    pub(super) const fn gpu(&self) -> Option<&crate::Gpu> {
-        self.gpu.as_ref()
-    }
-
-    /// `Ok` unless these options name a GPU, which `call` (a render that runs on the CPU only) does not take.
-    ///
-    /// # Errors
-    /// [`Error::Gpu`] naming `call`.
-    #[cfg(feature = "gpu")]
-    pub(super) fn cpu_only(&self, call: &str) -> Result<(), Error> {
-        if self.gpu.is_some() {
-            return Err(Error::Gpu(format!(
-                "`{call}` runs on the CPU only: call it with options that have no `with_gpu`"
-            )));
-        }
-        Ok(())
     }
 
     /// `Ok` unless these options hold one that a GPU render does not take yet.

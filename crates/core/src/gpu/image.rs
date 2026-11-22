@@ -103,17 +103,18 @@ impl Gpu {
     ///
     /// # Errors
     /// [`Error::Gpu`] for a picture larger than the device holds (naming both sizes) or a device that fails.
-    pub fn upload(&self, picture: &Picture<'_>) -> Result<GpuImage, Error> {
+    pub async fn upload(&self, picture: &Picture<'_>) -> Result<GpuImage, Error> {
         self.upload_values(picture.height(), picture.width(), picture.values(), false)
+            .await
     }
 
     /// `image` sent to the device: a [`GpuImage`] of its size, with its alpha if it has one. Counted as one upload.
     ///
     /// # Errors
     /// As [`upload`](Self::upload).
-    pub fn upload_image(&self, image: &Image) -> Result<GpuImage, Error> {
+    pub async fn upload_image(&self, image: &Image) -> Result<GpuImage, Error> {
         match image.alpha() {
-            None => self.upload(&image.as_picture()),
+            None => self.upload(&image.as_picture()).await,
             Some(alpha) => {
                 let values: Vec<f32> = image
                     .as_picture()
@@ -122,34 +123,36 @@ impl Gpu {
                     .zip(alpha)
                     .flat_map(|(&[red, green, blue], &alpha)| [red, green, blue, alpha])
                     .collect();
-                self.upload_values(image.height(), image.width(), &values, true)
+                self.upload_values(image.height(), image.width(), &values, true).await
             }
         }
     }
 
-    fn upload_values(&self, height: usize, width: usize, values: &[f32], alpha: bool) -> Result<GpuImage, Error> {
+    async fn upload_values(&self, height: usize, width: usize, values: &[f32], alpha: bool) -> Result<GpuImage, Error> {
         self.fits(height, width)?;
         let bytes = (height * width) as u64 * PIXEL_BYTES;
         let channels = if alpha { 4.0 } else { 3.0 };
-        let buffer = pollster::block_on(self.guarded("take a picture", || {
-            let sent = self.send(values, true);
-            let buffer = self.picture_buffer(bytes);
-            let mut encoder = self.encoder();
-            self.dispatch(
-                &mut encoder,
-                UNPACK,
-                Header::plain(height, width),
-                &[[channels, 0.0, 0.0, 0.0]],
-                &Bindings {
-                    source: None,
-                    dest: &buffer,
-                    data: Some(&sent),
-                    other: None,
-                },
-            );
-            self.queue().submit([encoder.finish()]);
-            buffer
-        }))?;
+        let buffer = self
+            .guarded("take a picture", || {
+                let sent = self.send(values, true);
+                let buffer = self.picture_buffer(bytes);
+                let mut encoder = self.encoder();
+                self.dispatch(
+                    &mut encoder,
+                    UNPACK,
+                    Header::plain(height, width),
+                    &[[channels, 0.0, 0.0, 0.0]],
+                    &Bindings {
+                        source: None,
+                        dest: &buffer,
+                        data: Some(&sent),
+                        other: None,
+                    },
+                );
+                self.queue().submit([encoder.finish()]);
+                buffer
+            })
+            .await?;
         Ok(GpuImage::from_buffer(self.clone(), height, width, alpha, buffer))
     }
 
@@ -168,15 +171,6 @@ impl Gpu {
         } else {
             made
         })
-    }
-
-    /// [`download`](Self::download), blocking until the picture is back.
-    ///
-    /// # Errors
-    /// As [`download`](Self::download).
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn download_blocking(&self, image: &GpuImage) -> Result<Image, Error> {
-        pollster::block_on(self.download(image))
     }
 
     /// The `pixels` vec4s of `buffer` read back, four floats each.

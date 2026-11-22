@@ -15,8 +15,8 @@ publish = true  # one of the two crates published to crates.io (the others are i
 [features]
 # Running models through ONNX Runtime (`finding::onnx`): the library is loaded at run time, none is bundled. The published wheel enables it.
 onnx = ["dep:ort", "dep:ureq", "dep:flate2", "dep:tar", "dep:zip"]
-# The GPU backend (`gpu`, `Options::with_gpu`): pictures and kernels on a wgpu device. Off by default (compile time); the wheel enables it.
-gpu = ["dep:wgpu", "dep:pollster", "dep:futures-channel"]
+# The GPU backend (`gpu`, `Gpu::render`): pictures and kernels on a wgpu device. Off by default (compile time); the wheel enables it.
+gpu = ["dep:wgpu", "dep:futures-channel"]
 
 [dependencies]
 bullterrier-image-derive.workspace = true
@@ -28,7 +28,6 @@ image.workspace = true
 libm.workspace = true
 moxcms.workspace = true
 ort = { workspace = true, optional = true }
-pollster = { workspace = true, optional = true }
 read-fonts.workspace = true
 rayon.workspace = true
 roxmltree.workspace = true
@@ -53,6 +52,8 @@ rustfft = { workspace = true, features = ["wasm_simd"] }
 
 [dev-dependencies]
 peak_alloc.workspace = true
+# the GPU tests and `bench_gpu` block on the core's async GPU calls, as a native caller does
+pollster.workspace = true
 proptest.workspace = true
 
 # `uv run poe bench-gpu`: the GPU backend's timings at 1080p

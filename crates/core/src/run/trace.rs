@@ -63,13 +63,7 @@ impl Photo<'_> {
     ///
     /// # Errors
     /// As [`render`](Self::render).
-    #[expect(
-        clippy::needless_pass_by_value,
-        reason = "options are a value built at the call, `Options::default().with_size(..)`; a GPU in them made them no longer `Copy`"
-    )]
     pub fn trace(&self, recipe: &Recipe, presets: &Presets, options: Options) -> Result<Vec<Stage>, Error> {
-        #[cfg(feature = "gpu")]
-        options.cpu_only("trace")?;
         par::install(options.threads(), || {
             let mut run = self.start(recipe, presets, &options)?;
             let picture = run.working.picture();

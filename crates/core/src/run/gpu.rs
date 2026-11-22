@@ -15,7 +15,7 @@ use super::{Photo, Run};
 use crate::gpu::{Bindings, Encoded, Header};
 use crate::ops::cast::single;
 use crate::ops::par;
-use crate::{BlendMode, Error, Frame, Gpu, GpuImage, Image, Layer, Picture, Presets, Recipe};
+use crate::{BlendMode, Error, Frame, Gpu, GpuImage, Layer, Picture, Presets, Recipe};
 
 /// The kernel that lays a step's result over its input (`ops/blend.rs` `lay`).
 const LAY: (&str, &str) = ("lay", include_str!("../gpu/lay.wgsl"));
@@ -31,13 +31,28 @@ fn refuse_from(what: &str) -> Error {
 }
 
 impl Gpu {
-    /// The picture `recipe` makes of `photo`, kept on this device: [`Photo::render`] on this GPU without the readback, for
-    /// a caller whose next work is on the device too. `options` are as for a render (their GPU, if they name one, is this
-    /// one). A `frame.transparent` cut is made on the device, so the picture has alpha.
+    /// The picture `recipe` makes of `photo`, rendered on this device and kept there: the same recipe as
+    /// [`Photo::render`] (the CPU's call), held to the bound each kernel states, not to the CPU's bytes (the CPU is the
+    /// reference). Read it back with [`download`](Self::download), or start the next recipe from it with
+    /// [`render_from`](Self::render_from).
+    ///
+    /// The photo is framed, resized and its maps made on the CPU, as a render on the CPU does; then it is sent to the
+    /// device once and each step runs there as its effect's kernel, laid over its input there too (blend mode, opacity,
+    /// mask). A step whose effect has no kernel (see [`Effect::kernel`](crate::Effect::kernel)), a driven step, an `each`
+    /// step and one that reads a field or a partition run on the CPU: the picture is read back, the step runs as it would
+    /// without the GPU, and the result is sent again (each counted in [`transfers`](Self::transfers)). A
+    /// `frame.transparent` cut is made on the device, so the picture has alpha. Nothing falls back silently.
+    ///
+    /// `options` are as for a render on the CPU: [`with_threads`](crate::Options::with_threads) applies to the CPU's part
+    /// of the work; [`with_band`](crate::Options::with_band), [`with_window`](crate::Options::with_window) and
+    /// [`with_room`](crate::Options::with_room) are refused (an error naming the option, never ignored).
+    ///
+    /// Every GPU call is `async`, with no blocking twin: native code with no async runtime blocks on it with a one-line
+    /// executor of its own (`block_on(gpu.render(..))`, `docs/architecture.md` "GPU").
     ///
     /// # Errors
-    /// As [`Photo::render`] with [`Options::with_gpu`](crate::Options::with_gpu), and [`Error::Gpu`] if `options` name
-    /// another GPU.
+    /// As [`Photo::render`]; [`Error::Gpu`] for a picture larger than the device holds (naming both sizes) or a device that
+    /// fails.
     pub async fn render(
         &self,
         photo: &Photo<'_>,
@@ -45,7 +60,6 @@ impl Gpu {
         presets: &Presets,
         options: crate::Options,
     ) -> Result<GpuImage, Error> {
-        self.own(&options)?;
         let (image, cut) = photo_on(self, photo, recipe, presets, &options).await?;
         match cut {
             None => Ok(image),
@@ -53,30 +67,15 @@ impl Gpu {
         }
     }
 
-    /// [`render`](Self::render), blocking until the picture is made.
-    ///
-    /// # Errors
-    /// As [`render`](Self::render).
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn render_blocking(
-        &self,
-        photo: &Photo<'_>,
-        recipe: &Recipe,
-        presets: &Presets,
-        options: crate::Options,
-    ) -> Result<GpuImage, Error> {
-        pollster::block_on(self.render(photo, recipe, presets, options))
-    }
-
     /// The picture `recipe` makes of `image`, a picture already on this device (a [`render`](Self::render)'s result, the
     /// next look of a chain): nothing is sent or read back but for a step that runs on the CPU. `image` is the working
     /// picture as it is, so its size is the render's: a `size` (of the options or the recipe) other than its longest side,
     /// and a `frame` other than the default, need a resample and are refused for now. It has no maps, so a recipe that uses
-    /// one (a `mask`, a field, a region) is refused too. Its alpha is not read: effects never see it.
+    /// one (a `mask`, a field, a region) is refused too. Effects never see its alpha; the result keeps it.
     ///
     /// # Errors
-    /// [`Error::Gpu`] for `image` of another context, a recipe that needs a resample or a map, or `options` naming another
-    /// GPU or one a GPU render does not take; else as [`render`](Self::render).
+    /// [`Error::Gpu`] for `image` of another context, a recipe that needs a resample or a map, or `options` a GPU render
+    /// does not take; else as [`render`](Self::render).
     pub async fn render_from(
         &self,
         image: &GpuImage,
@@ -85,7 +84,6 @@ impl Gpu {
         options: crate::Options,
     ) -> Result<GpuImage, Error> {
         let image = image.of(self)?;
-        self.own(&options)?;
         options.gpu_takes()?;
         let uses = recipe.check_rules(presets)?;
         if let Some(reached) = uses.reach(&recipe.regions).first() {
@@ -125,33 +123,6 @@ impl Gpu {
         .await
     }
 
-    /// [`render_from`](Self::render_from), blocking until the picture is made.
-    ///
-    /// # Errors
-    /// As [`render_from`](Self::render_from).
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn render_from_blocking(
-        &self,
-        image: &GpuImage,
-        recipe: &Recipe,
-        presets: &Presets,
-        options: crate::Options,
-    ) -> Result<GpuImage, Error> {
-        pollster::block_on(self.render_from(image, recipe, presets, options))
-    }
-
-    /// `Ok` unless `options` name a GPU other than this one.
-    fn own(&self, options: &crate::Options) -> Result<(), Error> {
-        match options.gpu() {
-            Some(other) if other != self => Err(Error::Gpu(format!(
-                "the options name another Gpu ({}) than the one rendering ({})",
-                other.adapter(),
-                self.adapter()
-            ))),
-            _ => Ok(()),
-        }
-    }
-
     /// `image` given the alpha of `cut`, on the device.
     async fn cut(&self, image: &GpuImage, cut: &Cut) -> Result<GpuImage, Error> {
         let (height, width) = (image.height(), image.width());
@@ -183,25 +154,6 @@ fn pixel_bytes(height: usize, width: usize) -> u64 {
     (height * width) as u64 * 16 // constant: a vec4<f32> a pixel
 }
 
-/// [`Photo::render`] on `gpu`: the picture read back and cut out on the CPU.
-///
-/// # Errors
-/// As [`Photo::render`].
-pub(super) async fn render(
-    gpu: &Gpu,
-    photo: &Photo<'_>,
-    recipe: &Recipe,
-    presets: &Presets,
-    options: &crate::Options,
-) -> Result<Image, Error> {
-    let (image, cut) = photo_on(gpu, photo, recipe, presets, options).await?;
-    let image = gpu.download(&image).await?;
-    Ok(match cut {
-        Some(cut) => cut.apply(image),
-        None => image,
-    })
-}
-
 /// The steps of `recipe` run on `photo` on `gpu`, and the cut still to make of the result.
 async fn photo_on(
     gpu: &Gpu,
@@ -222,7 +174,7 @@ async fn photo_on(
     } = par::install(options.threads(), || photo.start(recipe, presets, options))??;
     let picture = working.picture();
     gpu.fits(picture.height(), picture.width())?;
-    let start = gpu.upload(&picture)?;
+    let start = gpu.upload(&picture).await?;
     let threads = options.threads();
     let image = steps_on(
         gpu,
@@ -299,7 +251,7 @@ async fn steps_on(
             let after = par::install(threads, || {
                 steps[index].apply(&picture, ratio, regions, &working.unwrap_or(picture), (0, origin))
             })??;
-            current = gpu.upload_image(&after)?;
+            current = gpu.upload_image(&after).await?;
             regions.release(index);
             index += 1;
         }

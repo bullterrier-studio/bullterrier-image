@@ -8,7 +8,9 @@ use bullterrier_image::frame::Transparent;
 use bullterrier_image::{BlendMode, Error, ErrorKind, Frame, Image, Options, Photo, Picture, Presets, Recipe, Step};
 
 use super::parity::seeded;
-use super::{fresh, gpu};
+use pollster::block_on;
+
+use super::{fresh, gpu, rendered};
 use crate::common::Outcome;
 use crate::common::compare::first_bit_difference;
 
@@ -73,10 +75,8 @@ fn a_chain_of_kernels_and_demo_31s_recipe_stay_within_the_recipe_budget_on_a_pho
     ]);
     for (what, recipe) in [("five kernels", five_kernels()), ("demo 31", demo_31)] {
         let options = Options::default().with_size(240);
-        let cpu = photo.render(&recipe, &Presets::new(), options.clone())?.into_values();
-        let on_gpu = photo
-            .render(&recipe, &Presets::new(), options.with_gpu(&gpu))?
-            .into_values();
+        let cpu = photo.render(&recipe, &Presets::new(), options)?.into_values();
+        let on_gpu = rendered(&gpu, &photo, &recipe, options)?.into_values();
         // the interim budget: at most 1/255 a channel on 99.9% of the values, 2/255 on all
         let (share, largest) = levels_apart(&cpu, &on_gpu);
         assert!(
@@ -92,11 +92,8 @@ fn the_same_gpu_and_input_give_the_same_bytes_twice() -> Outcome {
     let Some(gpu) = gpu() else { return Ok(()) };
     let values = seeded(37, 29, 3);
     let photo = Photo::new(Picture::new(37, 29, &values)?);
-    let options = Options::default().with_gpu(&gpu);
-    let first = photo
-        .render(&five_kernels(), &Presets::new(), options.clone())?
-        .into_values();
-    let second = photo.render(&five_kernels(), &Presets::new(), options)?.into_values();
+    let first = rendered(&gpu, &photo, &five_kernels(), Options::default())?.into_values();
+    let second = rendered(&gpu, &photo, &five_kernels(), Options::default())?.into_values();
     assert_eq!(first_bit_difference(&first, &second), None);
     Ok(())
 }
@@ -106,14 +103,13 @@ fn a_recipe_of_kernels_crosses_once_each_way_and_a_cpu_step_adds_one_of_each() -
     let Some(gpu) = fresh() else { return Ok(()) };
     let values = seeded(20, 30, 1);
     let photo = Photo::new(Picture::new(20, 30, &values)?);
-    let options = Options::default().with_gpu(&gpu);
-    photo.render(&five_kernels(), &Presets::new(), options.clone())?;
+    rendered(&gpu, &photo, &five_kernels(), Options::default())?;
     let all_kernels = gpu.transfers();
     assert_eq!((all_kernels.uploads, all_kernels.downloads), (1, 1));
     gpu.reset_transfers();
     let mut steps = five_kernels().steps;
     steps.insert(2, Recipe::new([Step::new("vignette")]).steps.remove(0));
-    photo.render(&Recipe::new(steps), &Presets::new(), options)?;
+    rendered(&gpu, &photo, &Recipe::new(steps), Options::default())?;
     let one_cpu_step = gpu.transfers();
     assert_eq!((one_cpu_step.uploads, one_cpu_step.downloads), (2, 2));
     // a picture of 20 x 30 is 600 pixels: sent as 3 floats a pixel and read back as 4
@@ -152,9 +148,7 @@ fn a_step_laid_over_its_input_by_opacity_mask_and_each_blend_mode_matches_the_cp
         let cpu = photo
             .render(&recipe, &Presets::new(), Options::default())?
             .into_values();
-        let on_gpu = photo
-            .render(&recipe, &Presets::new(), Options::default().with_gpu(&gpu))?
-            .into_values();
+        let on_gpu = rendered(&gpu, &photo, &recipe, Options::default())?.into_values();
         let gap = cpu
             .iter()
             .zip(&on_gpu)
@@ -172,11 +166,11 @@ fn a_picture_rendered_on_the_device_stays_there_for_the_next_recipe() -> Outcome
     let photo = Photo::new(Picture::new(24, 18, &values)?);
     let first = Recipe::new(five_kernels().steps[..2].to_vec());
     let second = Recipe::new(five_kernels().steps[2..].to_vec());
-    let resident = gpu.render_blocking(&photo, &first, &Presets::new(), Options::default())?;
-    let next = gpu.render_from_blocking(&resident, &second, &Presets::new(), Options::default())?;
+    let resident = block_on(gpu.render(&photo, &first, &Presets::new(), Options::default()))?;
+    let next = block_on(gpu.render_from(&resident, &second, &Presets::new(), Options::default()))?;
     let before_readback = gpu.transfers();
     assert_eq!((before_readback.uploads, before_readback.downloads), (1, 0));
-    let chained = gpu.download_blocking(&next)?.into_values();
+    let chained = block_on(gpu.download(&next))?.into_values();
     let whole = photo
         .render(&five_kernels(), &Presets::new(), Options::default())?
         .into_values();
@@ -200,9 +194,9 @@ fn a_cut_out_made_on_the_device_has_the_cpus_alpha() -> Outcome {
         ..Frame::default()
     };
     let cpu = photo.render(&recipe, &Presets::new(), Options::default())?;
-    let resident = gpu.render_blocking(&photo, &recipe, &Presets::new(), Options::default())?;
+    let resident = block_on(gpu.render(&photo, &recipe, &Presets::new(), Options::default()))?;
     assert_eq!(resident.channels(), 4);
-    let (on_gpu, cpu) = (gpu.download_blocking(&resident)?.into_values(), cpu.into_values());
+    let (on_gpu, cpu) = (block_on(gpu.download(&resident))?.into_values(), cpu.into_values());
     let alpha = |values: &[f32]| values.chunks(4).map(|pixel| pixel[3]).collect::<Vec<f32>>();
     assert_eq!(alpha(&on_gpu), alpha(&cpu));
     let gap = cpu
@@ -220,22 +214,16 @@ fn a_gpu_render_refuses_the_options_it_does_not_take_naming_them() -> Outcome {
     let values = seeded(8, 8, 0);
     let photo = Photo::new(Picture::new(8, 8, &values)?);
     let recipe = five_kernels();
-    let on_gpu = Options::default().with_gpu(&gpu);
     let rows = NonZeroUsize::new(4).ok_or("4 rows")?;
     for (option, options) in [
-        ("with_band", on_gpu.clone().with_band(rows)),
-        ("with_window", on_gpu.clone().with_window(0, 8, 16)),
-        ("with_room", on_gpu.clone().with_room(1, 1, 1, 1)),
+        ("with_band", Options::default().with_band(rows)),
+        ("with_window", Options::default().with_window(0, 8, 16)),
+        ("with_room", Options::default().with_room(1, 1, 1, 1)),
     ] {
-        let error = photo.render(&recipe, &Presets::new(), options).err().ok_or(option)?;
+        let error = rendered(&gpu, &photo, &recipe, options).err().ok_or(option)?;
         assert_eq!(error.kind(), ErrorKind::Gpu, "{error}");
         assert!(error.to_string().contains(option), "{error}");
     }
-    let error = photo.trace(&recipe, &Presets::new(), on_gpu).err().ok_or("trace")?;
-    assert!(
-        error.kind() == ErrorKind::Gpu && error.to_string().contains("trace"),
-        "{error}"
-    );
     Ok(())
 }
 
@@ -245,7 +233,9 @@ fn a_picture_wider_than_the_device_dispatches_is_refused_naming_both_sizes() -> 
     // a workgroup is 16 wide and a dispatch at most 65,535 of them across: the widest picture is 1,048,560
     let width = 1_048_561;
     let values = vec![0.5; width * 3];
-    let error = gpu.upload(&Picture::new(1, width, &values)?).err().ok_or("too wide")?;
+    let error = block_on(gpu.upload(&Picture::new(1, width, &values)?))
+        .err()
+        .ok_or("too wide")?;
     assert_eq!(error.kind(), ErrorKind::Gpu);
     assert!(
         error.to_string().contains("1 x 1048561") && error.to_string().contains("a side"),
@@ -260,14 +250,13 @@ fn a_picture_of_one_gpu_is_refused_by_another() -> Outcome {
         return Ok(());
     };
     let values = seeded(3, 3, 0);
-    let held = one.upload(&Picture::new(3, 3, &values)?)?;
-    let error = other.download_blocking(&held).err().ok_or("another context")?;
+    let held = block_on(one.upload(&Picture::new(3, 3, &values)?))?;
+    let error = block_on(other.download(&held)).err().ok_or("another context")?;
     assert!(
         error.kind() == ErrorKind::Gpu && error.to_string().contains("another Gpu"),
         "{error}"
     );
-    let error = other
-        .render_from_blocking(&held, &five_kernels(), &Presets::new(), Options::default())
+    let error = block_on(other.render_from(&held, &five_kernels(), &Presets::new(), Options::default()))
         .err()
         .ok_or("another context")?;
     assert!(error.to_string().contains("another Gpu"), "{error}");
@@ -322,10 +311,10 @@ fn the_cpu_steps_of_a_render_kept_on_the_device_use_the_threads_asked_for() -> O
         bullterrier_image::register(painter.clone())?;
         let recipe = Recipe::new([Step::new(painter.name.as_str()).opacity(1.0), Step::new("levels")]);
         if from_resident {
-            let start = gpu.upload(&Picture::new(1000, 40, &values)?)?;
-            gpu.render_from_blocking(&start, &recipe, &Presets::new(), options.clone())?;
+            let start = block_on(gpu.upload(&Picture::new(1000, 40, &values)?))?;
+            block_on(gpu.render_from(&start, &recipe, &Presets::new(), options))?;
         } else {
-            gpu.render_blocking(&photo, &recipe, &Presets::new(), options.clone())?;
+            block_on(gpu.render(&photo, &recipe, &Presets::new(), options))?;
         }
         bullterrier_image::unregister(&painter.name);
         let rows_on = painter

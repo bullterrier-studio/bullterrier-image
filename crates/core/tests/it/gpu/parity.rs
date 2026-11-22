@@ -6,7 +6,7 @@ use bullterrier_image::params::{Kind, Scalar};
 use bullterrier_image::{Options, Photo, Picture, Presets, Recipe, Step, effect, effects};
 use serde_json::Value;
 
-use super::gpu;
+use super::{gpu, rendered};
 use crate::common::pictures::varied_seeded;
 
 const SIZES: [(usize, usize); 3] = [(1, 1), (17, 13), (64, 48)];
@@ -122,7 +122,7 @@ fn every_kernel_matches_its_cpu_render_within_its_bound_across_its_parameters() 
                 let Ok(cpu) = photo.render(&recipe, &presets, Options::default()) else {
                     continue;
                 };
-                let on_gpu = photo.render(&recipe, &presets, Options::default().with_gpu(&gpu))?;
+                let on_gpu = rendered(&gpu, &photo, &recipe, Options::default())?;
                 let (cpu, on_gpu) = (cpu.into_values(), on_gpu.into_values());
                 let (gap, at) = largest_gap(&cpu, &on_gpu);
                 assert!(

@@ -8,7 +8,8 @@ mod transfer;
 
 use std::sync::LazyLock;
 
-use bullterrier_image::Gpu;
+use bullterrier_image::{Error, Gpu, Image, Options, Photo, Presets, Recipe};
+use pollster::block_on;
 
 /// The context the tests share, or none where `BT_GPU=none` says the machine has no GPU.
 static SHARED: LazyLock<Option<Gpu>> = LazyLock::new(fresh);
@@ -31,13 +32,21 @@ pub(crate) fn fresh() -> Option<Gpu> {
         return None;
     }
     let gpu =
-        Gpu::request_blocking().unwrap_or_else(|error| panic!("{error} (set BT_GPU=none on a machine without a GPU)"));
+        block_on(Gpu::request()).unwrap_or_else(|error| panic!("{error} (set BT_GPU=none on a machine without a GPU)"));
     assert!(
         gpu.adapter().to_lowercase().contains(&expected.to_lowercase()),
         "the adapter is {}, not the {expected:?} BT_GPU names",
         gpu.adapter()
     );
     Some(gpu)
+}
+
+/// `recipe` rendered on `photo` on `gpu` and read back, blocking: what a native caller writes.
+pub(crate) fn rendered(gpu: &Gpu, photo: &Photo<'_>, recipe: &Recipe, options: Options) -> Result<Image, Error> {
+    block_on(async {
+        let held = gpu.render(photo, recipe, &Presets::new(), options).await?;
+        gpu.download(&held).await
+    })
 }
 
 #[test]

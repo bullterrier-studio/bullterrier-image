@@ -19,7 +19,7 @@ impl PyGpu {
     #[new]
     fn new(py: Python<'_>) -> PyResult<Self> {
         let gpu = py
-            .detach(bullterrier_image::Gpu::request_blocking)
+            .detach(|| pollster::block_on(bullterrier_image::Gpu::request()))
             .map_err(core_error)?;
         Ok(Self { gpu })
     }

@@ -227,7 +227,7 @@ pub trait Effect: Send + Sync {
     }
 
     /// Its GPU kernel, if it has one: a GPU render runs a step of this effect as that kernel, and one of an effect without
-    /// on the CPU (see [`Options::with_gpu`](crate::Options::with_gpu)). None by default: only the core's own effects have
+    /// on the CPU (see [`Gpu::render`](crate::Gpu::render)). None by default: only the core's own effects have
     /// kernels.
     #[cfg(feature = "gpu")]
     fn kernel(&self) -> Option<&crate::GpuKernel> {

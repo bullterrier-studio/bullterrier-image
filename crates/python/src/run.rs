@@ -96,10 +96,12 @@ pub(crate) fn render<'py>(
     let picture = picture_of(&readonly)?;
     let photo = photo_with(Photo::new(picture), maps, finders, luts, pictures)?;
     let (recipe, presets) = (recipe_of(recipe)?, presets_of(presets)?);
-    let options = on_gpu(options_of(size, threads, band)?, gpu)?;
-    let image = py
-        .detach(|| photo.render(&recipe, &presets, options))
-        .map_err(core_error)?;
+    let options = options_of(size, threads, band)?;
+    let image = match gpu {
+        None => py.detach(|| photo.render(&recipe, &presets, options)),
+        Some(gpu) => on_gpu(py, gpu, &photo, &recipe, &presets, options)?,
+    }
+    .map_err(core_error)?;
     image_array(py, image)
 }
 
@@ -415,20 +417,34 @@ pub(super) fn options_of(
     Ok(options)
 }
 
-/// `options` with the render on `gpu`, a `Gpu`, if one is given.
+/// `recipe` rendered on `photo` on `gpu`, a `Gpu`, and read back: the core's two async calls, blocked on here, at the
+/// bindings' edge, without the GIL.
 ///
 /// # Errors
-/// A `TypeError` if `gpu` is no `Gpu`; a `ValueError` for a build without the GPU backend.
-fn on_gpu(options: Options, gpu: Option<&Bound<'_, PyAny>>) -> PyResult<Options> {
-    let Some(gpu) = gpu else { return Ok(options) };
+/// A `TypeError` if `gpu` is no `Gpu`; a `ValueError` for a build without the GPU backend. The render's own error is the
+/// inner result.
+fn on_gpu(
+    py: Python<'_>,
+    gpu: &Bound<'_, PyAny>,
+    photo: &Photo<'_>,
+    recipe: &Recipe,
+    presets: &Presets,
+    options: Options,
+) -> PyResult<Result<Image, Error>> {
     #[cfg(feature = "gpu")]
     {
         let gpu = gpu.cast::<super::gpu::PyGpu>()?;
-        Ok(options.with_gpu(&gpu.get().gpu))
+        let gpu = &gpu.get().gpu;
+        Ok(py.detach(|| {
+            pollster::block_on(async {
+                let held = gpu.render(photo, recipe, presets, options).await?;
+                gpu.download(&held).await
+            })
+        }))
     }
     #[cfg(not(feature = "gpu"))]
     {
-        let _ = (options, gpu);
+        let _ = (py, gpu, photo, recipe, presets, options);
         Err(value_error(
             "this build of the extension has no GPU backend (feature `gpu`)",
         ))

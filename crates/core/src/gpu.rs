@@ -1,9 +1,9 @@
 //! The GPU backend (feature `gpu`): [`Gpu`], the core's context on a wgpu device, and [`GpuImage`], a picture held on it.
 //!
 //! The CPU is the reference: a render on the GPU is the same recipe held to a bound, not to the byte (see
-//! `docs/design-decisions.md`, "GPU backend"). A render asks for the GPU in one place, its options
-//! ([`Options::with_gpu`](crate::Options::with_gpu)); effects never touch a device, they declare a [`Kernel`] that the one
-//! executor runs. A picture lives on the device as `vec4<f32>` per pixel in a storage buffer (straight alpha, the levels an
+//! `docs/design-decisions.md`, "GPU backend"). A render on the GPU is a call on the context ([`Gpu::render`]), the one
+//! place that chooses it; every GPU call is `async`, with no blocking twin. Effects never touch a device, they declare a
+//! [`Kernel`] that the one executor runs. A picture lives on the device as `vec4<f32>` per pixel in a storage buffer (straight alpha, the levels an
 //! [`Image`](crate::Image) holds) and is read with the CPU's own maths, never through hardware filtering.
 
 use std::collections::HashMap;
@@ -36,9 +36,8 @@ const STORAGE_BINDINGS: u32 = 4; // constant: the binding layout of prelude.wgsl
 /// of the pictures that crossed between the CPU and the device. Cloning it is cheap and shares all of that; it can be
 /// shared between threads. Two contexts are equal only if one is a clone of the other.
 ///
-/// Render on it by naming it in a render's options ([`Options::with_gpu`](crate::Options::with_gpu)), or keep the result
-/// on the device with [`render`](Self::render). The core never makes a device of its own except in
-/// [`request`](Self::request).
+/// Render on it with [`render`](Self::render), which keeps the picture on the device, and read it back with
+/// [`download`](Self::download). The core never makes a device of its own except in [`request`](Self::request).
 #[derive(Clone)]
 pub struct Gpu {
     context: Arc<Context>,
@@ -108,7 +107,7 @@ async fn adapter_of(instance: &wgpu::Instance) -> Result<wgpu::Adapter, Error> {
         .await
         .map_err(|error| {
             Error::Gpu(format!(
-                "no GPU adapter was found ({error}): this machine has no GPU the core can use (Metal, Vulkan or Direct3D 12); render on the CPU (no `with_gpu`)"
+                "no GPU adapter was found ({error}): this machine has no GPU the core can use (Metal, Vulkan or Direct3D 12); render on the CPU"
             ))
         })
 }
@@ -137,15 +136,6 @@ impl Gpu {
             .await
             .map_err(|error| failed("give a device", error))?;
         Self::new(device, queue)
-    }
-
-    /// [`request`](Self::request), blocking until the device is there.
-    ///
-    /// # Errors
-    /// As [`request`](Self::request).
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn request_blocking() -> Result<Self, Error> {
-        pollster::block_on(Self::request())
     }
 
     /// A context on the caller's `device` and `queue`: the core compiles its kernels on that device and keeps its pictures
@@ -462,6 +452,9 @@ mod tests {
     //! The refusal of a machine with no adapter, where it is raised: no public route reaches an instance with no backend,
     //! and a machine with a GPU has an adapter.
 
+    use std::pin::pin;
+    use std::task::{Context, Poll, Waker};
+
     use super::adapter_of;
     use crate::ErrorKind;
 
@@ -471,7 +464,12 @@ mod tests {
             backends: wgpu::Backends::empty(),
             ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
-        let refused = pollster::block_on(adapter_of(&instance)).err();
+        // with no backend there is nothing to wait for: the answer is there at the first poll
+        let polled = pin!(adapter_of(&instance)).poll(&mut Context::from_waker(Waker::noop()));
+        let Poll::Ready(refused) = polled else {
+            unreachable!("an instance with no backend answers at once")
+        };
+        let refused = refused.err();
         assert!(
             refused
                 .as_ref()

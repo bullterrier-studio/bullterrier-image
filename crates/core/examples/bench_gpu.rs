@@ -6,6 +6,7 @@
 use std::time::Instant;
 
 use bullterrier_image::{Error, Gpu, Options, Photo, Picture, Presets, Recipe, Step};
+use pollster::block_on;
 
 const HEIGHT: usize = 1080; // constant: the benchmark's picture, 1080p
 const WIDTH: usize = 1920; // constant: the benchmark's picture, 1080p
@@ -59,11 +60,11 @@ fn main() -> Result<(), Error> {
         .collect();
     let picture = Picture::new(HEIGHT, WIDTH, &values)?;
     let photo = Photo::new(picture);
-    let gpu = Gpu::request_blocking()?;
+    let gpu = block_on(Gpu::request())?;
     let presets = Presets::new();
-    let resident = gpu.upload(&picture)?;
+    let resident = block_on(gpu.upload(&picture))?;
     // a readback alone, to take out of the device-only figure (the readback is how a native caller waits for the GPU)
-    let readback = timed(|| gpu.download_blocking(&resident).map(drop))?;
+    let readback = timed(|| block_on(gpu.download(&resident)).map(drop))?;
     println!("{WIDTH} x {HEIGHT}, {}; minimum of {RUNS} runs, ms\n", gpu.adapter());
     println!("| recipe | CPU 1 thread | CPU all cores | GPU end to end | GPU on the device |");
     println!("|---|---|---|---|---|");
@@ -75,13 +76,18 @@ fn main() -> Result<(), Error> {
                 .map(drop)
         })?;
         let end_to_end = timed(|| {
-            photo
-                .render(&recipe, &presets, Options::default().with_gpu(&gpu))
-                .map(drop)
+            block_on(async {
+                let made = gpu.render(&photo, &recipe, &presets, Options::default()).await?;
+                gpu.download(&made).await.map(drop)
+            })
         })?;
         let device = timed(|| {
-            let made = gpu.render_from_blocking(&resident, &recipe, &presets, Options::default())?;
-            gpu.download_blocking(&made).map(drop)
+            block_on(async {
+                let made = gpu
+                    .render_from(&resident, &recipe, &presets, Options::default())
+                    .await?;
+                gpu.download(&made).await.map(drop)
+            })
         })? - readback;
         println!(
             "| {name} | {one:.1} | {all:.1} | {end_to_end:.1} | {:.1} |",

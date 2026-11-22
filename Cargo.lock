@@ -211,6 +211,7 @@ dependencies = [
  "bullterrier-image-cli",
  "bullterrier-image-finders",
  "numpy",
+ "pollster",
  "pyo3",
  "serde_json",
 ]
