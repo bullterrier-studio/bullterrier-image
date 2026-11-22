@@ -102,3 +102,12 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
     let gain = gains(inputs.place(picture).first_row, picture.height(), params);
     picture.map_at(|row, _, pixel| pixel.map(|value| value * gain[row]))
 }
+
+/// The scanlines on the GPU (`scanlines.wgsl`): the CPU's own gain of each row, sent as a table.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(include_str!("scanlines.wgsl"), |_, _| Vec::new())
+        .with_table(|params: &Params, header: &crate::gpu::Header| {
+            gains(header.place().first_row, header.height as usize, params)
+        })
+}
