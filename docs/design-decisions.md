@@ -1930,10 +1930,12 @@ measured first would break at a larger one.
   kernel at each parameter's ends and between, the extremes compounded, each drivable parameter driven by a map and all of
   them by a field the recipe makes (a driven step runs on the CPU today, so these hold the executor's choice and a later
   GPU drive to the bound), each case compared at least once; every gap through one helper that fails on a NaN.
-- **Supported platforms, and who falls back (BTIMG-0015).** macOS (Metal) and the browser (WebGPU) only: on lavapipe the test
-  process crashed in the Vulkan loader about 4 runs in 10, and simplicity wins over covering Linux and Windows. `Gpu::request`
-  and `Gpu::new` ask one check in `gpu.rs` first, before any adapter or device work, and any other system is `Error::Gpu`
-  (`GpuError`) naming it. The one exception is CI's: `BT_GPU=llvmpipe` allows Linux, so the lavapipe job runs every GPU test.
+- **Supported platforms, and who falls back (BTIMG-0015).** macOS (Metal) and the browser (WebGPU) are supported (tested, bounds
+  measured). Elsewhere it is experimental: on lavapipe the test process crashed in the Vulkan loader about 4 runs in 10, so
+  Linux and Windows get a context only when the environment sets `BT_GPU_EXPERIMENTAL=1` (exactly `1`; any other value, or
+  none, is off), at the caller's own risk. `Gpu::request` and `Gpu::new` ask one check in `gpu.rs` first, before any adapter
+  or device work, and without the switch any other system is `Error::Gpu` (`GpuError`) naming it and the switch. CI's lavapipe
+  job sets the same switch, so there is no test-only path.
   The library has no automatic mode; the fallback belongs to the app:
 
   ```python
@@ -1945,7 +1947,7 @@ measured first would break at a larger one.
   image = bt.render(photo, recipe, gpu=gpu)  # gpu=None is the CPU
   ```
 - **Tests run on a GPU in CI**: `poe rust-test-gpu` (the core's whole suite built with the feature, `tests/it/gpu/` among it)
-  in `check`, and in CI's GPU job on Mesa's lavapipe; `BT_GPU` says what the machine has (`none`: the GPU tests return early
+  in `check`, and in CI's GPU job on Mesa's lavapipe (which sets `BT_GPU_EXPERIMENTAL=1`); `BT_GPU` says what the machine has (`none`: the GPU tests return early
   and `rust-test-gpu` ends with a banner counting them, as Rust has no skip at run time; else part of the adapter's name,
   which the tests check). `test.yml`'s runners have no GPU and set `none`.
 - **Numbers** (`poe bench-gpu`, release, M4 under a load of 6 to 10 (another agent was building), 1920 x 1080, minimum of 9

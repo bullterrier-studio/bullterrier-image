@@ -51,8 +51,8 @@ defaults, example recipe, shared parameter names (`amount`, not `strength`).
 - GPU tests (`uv run poe rust-test-gpu`, in `check`; the Python ones in `poe test`) need a GPU adapter and fail without one.
   `BT_GPU` says what the machine has: unset, any adapter; `none`, there is none, and each GPU test returns early and passes
   (Rust has no skip at run time), so `rust-test-gpu` ends with a banner counting the GPU tests that skipped
-  (`tools/gpu_skips.py`; pytest counts its own skips); any other value, part of the adapter's name the tests must find (CI's GPU job sets `llvmpipe`, which is also the one value that lets the GPU backend run on Linux; Mesa's software
-  Vulkan, and `test.yml` sets `none`). Only the tests read it.
+  (`tools/gpu_skips.py`; pytest counts its own skips); any other value, part of the adapter's name the tests must find (CI's GPU job sets `llvmpipe`, Mesa's software
+  Vulkan, and `BT_GPU_EXPERIMENTAL=1`, the switch that lets the experimental GPU backend run on Linux; and `test.yml` sets `none`). Only the tests read `BT_GPU`; the library itself reads `BT_GPU_EXPERIMENTAL`.
 - Apple Vision test skipped off macOS. Portable subject backend and depth model tested with tiny stand-in models built in the
   tests: suite never downloads a real model; tests of real models run only when already in cache and assert coarse
   properties (a model update may change every pixel).

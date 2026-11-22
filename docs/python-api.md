@@ -48,7 +48,7 @@ everything else by keyword (`fx.bloom(12)` is a TypeError naming `radius=12`).
   bytes at any number. To render many photos at once keep 1 and use your own threads: the GIL is released while the core
   works. `step.apply` and `fx.<effect>` use 1. `bt-image` (`render`, `sheet`, `sweep`, `steps`, `run`) and the gallery render one picture at a
   time, so they use every core.
-- **GPU.** `gpu = bt.Gpu()` takes this machine's GPU (macOS and the browser only: any other system is a `GpuError` naming it, as is a Mac with no adapter; the app falls back to the CPU, see design-decisions "GPU backend"); `render(photo,
+- **GPU.** `gpu = bt.Gpu()` takes this machine's GPU (supported on macOS and the browser; any other system is a `GpuError` naming it and the switch, unless `BT_GPU_EXPERIMENTAL=1` is set in the environment, which tries the GPU there at your own risk (experimental: bounds are measured on Metal only); a Mac with no adapter is one too; the app falls back to the CPU, see design-decisions "GPU backend"); `render(photo,
   recipe, gpu=gpu)` (also `render_all`) returns the same float32 array, held to each kernel's bound (1e-4) instead of the
   CPU's bytes. A step whose effect has no kernel runs on the CPU between a readback and an upload: `fx.<effect>.gpu` says
   which do (`levels`, `grade`, `curves`, `channel_mixer`, `color_balance`). `gpu.transfers` counts what crossed

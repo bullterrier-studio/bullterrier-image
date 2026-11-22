@@ -127,16 +127,16 @@ async fn adapter_of(instance: &wgpu::Instance) -> Result<wgpu::Adapter, Error> {
         })
 }
 
-/// Whether the GPU backend supports operating system `os` (`std::env::consts::OS`): macOS (Metal). The browser
-/// (WebGPU) is supported too, but has no OS name: [`require_supported_platform`] skips this check there. `test_bed` is
-/// the one exception, for CI only: Linux on Mesa's software Vulkan (`BT_GPU=llvmpipe`) is the only free GPU runner,
-/// so the GPU tests run there.
-fn supported(os: &str, test_bed: bool) -> Result<(), Error> {
-    if os == "macos" || (os == "linux" && test_bed) {
+/// Whether a GPU context may be made on operating system `os` (`std::env::consts::OS`): macOS (Metal) is supported, and
+/// so is the browser (WebGPU), which has no OS name: [`require_supported_platform`] skips this check there. Any other
+/// system is experimental and `opted_in` (the environment's `BT_GPU_EXPERIMENTAL=1`, nothing else) allows it: the
+/// library promises no more than the CPU's result there, and its bounds are measured on Metal only.
+fn supported(os: &str, opted_in: bool) -> Result<(), Error> {
+    if os == "macos" || opted_in {
         return Ok(());
     }
     Err(Error::Gpu(format!(
-        "the GPU backend supports macOS and the browser; this is {os}: render on the CPU"
+        "the GPU backend supports macOS and the browser; this is {os}: render on the CPU, or set BT_GPU_EXPERIMENTAL=1 to try the GPU at your own risk"
     )))
 }
 
@@ -147,7 +147,7 @@ fn require_supported_platform() -> Result<(), Error> {
     }
     supported(
         std::env::consts::OS,
-        std::env::var("BT_GPU").is_ok_and(|gpu| gpu == "llvmpipe"),
+        std::env::var("BT_GPU_EXPERIMENTAL").is_ok_and(|switch| switch == "1"),
     )
 }
 
@@ -156,7 +156,7 @@ impl Gpu {
     /// storage buffer (so the largest picture is what the adapter holds, not WebGPU's default of 128 MiB).
     ///
     /// # Errors
-    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), if there is no adapter,
+    /// [`Error::Gpu`] on a platform other than macOS and the browser without `BT_GPU_EXPERIMENTAL=1` (the message names both), if there is no adapter,
     /// or it gives no device.
     pub async fn request() -> Result<Self, Error> {
         require_supported_platform()?;
@@ -184,7 +184,7 @@ impl Gpu {
     /// it.
     ///
     /// # Errors
-    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), or naming the limit, if
+    /// [`Error::Gpu`] on a platform other than macOS and the browser without `BT_GPU_EXPERIMENTAL=1` (the message names both), or naming the limit, if
     /// the device allows fewer storage buffers a shader stage, bindings a group or invocations a workgroup than the
     /// core's kernels use.
     pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Result<Self, Error> {
@@ -555,8 +555,8 @@ mod tests {
     use super::{adapter_of, supported};
     use crate::{Error, ErrorKind};
 
-    fn refusal(os: &str, test_bed: bool) -> Option<String> {
-        match supported(os, test_bed) {
+    fn refusal(os: &str, opted_in: bool) -> Option<String> {
+        match supported(os, opted_in) {
             Ok(()) => None,
             Err(Error::Gpu(message)) => Some(message),
             Err(other) => unreachable!("a platform is refused as Error::Gpu, not {other:?}"),
@@ -564,22 +564,28 @@ mod tests {
     }
 
     #[test]
-    fn macos_is_supported_and_other_systems_are_refused_naming_themselves() {
+    fn macos_is_supported_with_or_without_the_switch() {
         assert_eq!(refusal("macos", false), None);
+        assert_eq!(refusal("macos", true), None);
+    }
+
+    #[test]
+    fn other_systems_are_refused_without_the_switch_naming_themselves_and_it() {
         for os in ["linux", "windows", "freebsd"] {
             let Some(message) = refusal(os, false) else {
                 unreachable!("{os} is refused")
             };
             assert!(message.contains(&format!("this is {os}")), "{message}");
             assert!(message.contains("macOS and the browser"), "{message}");
+            assert!(message.contains("BT_GPU_EXPERIMENTAL=1"), "{message}");
         }
     }
 
     #[test]
-    fn the_test_bed_allows_linux_only() {
-        assert_eq!(refusal("linux", true), None);
-        assert!(refusal("windows", true).is_some());
-        assert!(refusal("freebsd", true).is_some());
+    fn the_switch_allows_other_systems() {
+        for os in ["linux", "windows", "freebsd"] {
+            assert_eq!(refusal(os, true), None, "{os}");
+        }
     }
 
     #[test]

@@ -1,7 +1,8 @@
 //! The GPU backend (feature `gpu`), at small sizes. `BT_GPU` says what GPU the machine has: unset, the tests need one
 //! and fail without it; `none`, each GPU test returns early and passes (Rust has no skip at run time), writing its name
 //! to the file `BT_GPU_SKIPS` names, which `poe rust-test-gpu` counts aloud (`tools/gpu_skips.py`); any other value is
-//! part of the adapter's name the tests must find (CI sets `llvmpipe`, Mesa's software Vulkan).
+//! part of the adapter's name the tests must find (CI sets `llvmpipe`, Mesa's software Vulkan, with `BT_GPU_EXPERIMENTAL=1`, which
+//! lets the backend run on Linux).
 
 mod dither;
 mod gradient_map;

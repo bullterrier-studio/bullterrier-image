@@ -16,12 +16,13 @@ needs_gpu = pytest.mark.skipif(NO_GPU, reason="BT_GPU=none: this machine has no 
 
 
 @pytest.mark.skipif(
-    sys.platform == "darwin" or os.environ.get("BT_GPU") == "llvmpipe",
-    reason="the GPU backend runs on macOS, and on CI's one test bed (BT_GPU=llvmpipe)",
+    sys.platform == "darwin" or os.environ.get("BT_GPU_EXPERIMENTAL") == "1",
+    reason="the GPU backend runs on macOS, and elsewhere only with BT_GPU_EXPERIMENTAL=1",
 )
 def test_a_gpu_is_refused_by_name_on_a_platform_the_backend_does_not_support():
     # not behind BT_GPU=none: the refusal needs no GPU, only the wheel built with the backend
-    with pytest.raises(GpuError, match=r"supports macOS and the browser; this is (linux|windows)"):
+    refusal = r"supports macOS and the browser; this is (linux|windows).*BT_GPU_EXPERIMENTAL=1"
+    with pytest.raises(GpuError, match=refusal):
         Gpu()
 
 

@@ -42,9 +42,12 @@ its `Unreleased` becomes the release date.
 
 ### Added
 
-- **The GPU backend runs on macOS and in the browser only.** `Gpu::request` and `Gpu::new` (Python `Gpu()`) on any other system
-  fail at once with `Error::Gpu` (`GpuError`) naming it ("the GPU backend supports macOS and the browser; this is linux"); an
-  app that wants the GPU where it exists catches it and renders on the CPU. CI's software-Vulkan job (`BT_GPU=llvmpipe`) is the one exception.
+- **The GPU backend is supported on macOS and in the browser; elsewhere it is an experimental opt-in.** `Gpu::request` and
+  `Gpu::new` (Python `Gpu()`) on any other system fail at once with `Error::Gpu` (`GpuError`) naming it and the switch ("the GPU
+  backend supports macOS and the browser; this is linux: render on the CPU, or set BT_GPU_EXPERIMENTAL=1 to try the GPU at your
+  own risk"); an app that wants the GPU where it exists catches it and renders on the CPU. Setting `BT_GPU_EXPERIMENTAL=1` (exactly
+  `1`) in the environment allows a context on Linux, Windows and the rest at the caller's own risk: bounds are measured on Metal
+  only. CI's software-Vulkan job sets it too.
 - `GpuImage::buffer` and `Gpu::adopt` (feature `gpu`): another library on the same wgpu device reads a picture's storage
   buffer (`vec4<f32>` a pixel, straight alpha) and hands one back as a `GpuImage`, so a chain between libraries needs no
   readback.

@@ -162,6 +162,7 @@ jobs:
       - name: The core's Rust tests with the GPU backend on lavapipe (poe rust-test-gpu)
         env:
           BT_GPU: llvmpipe
+          BT_GPU_EXPERIMENTAL: "1" # lets the backend run on Linux (experimental opt-in)
         run: |
           ulimit -c unlimited
           sudo sysctl -w kernel.core_pattern="$RUNNER_TEMP/core.%p"
@@ -178,4 +179,5 @@ jobs:
       - name: The Python package's GPU tests on lavapipe (pytest tests/core/test_gpu.py)
         env:
           BT_GPU: llvmpipe
+          BT_GPU_EXPERIMENTAL: "1" # lets the backend run on Linux (experimental opt-in)
         run: uv run --locked pytest -q -n 0 -ra tests/core/test_gpu.py
