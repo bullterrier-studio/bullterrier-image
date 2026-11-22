@@ -52,6 +52,19 @@ One idea, one name: both effects call separate inks `separation="spot"` (`dither
 A ruling in lines per inch is a size question: `cell` px = the print's DPI over the ruling, scaled to the recipe's size.
 Documented with the DPI write option, no parameter.
 
+## GPU
+
+Where a GPU render (`Gpu`, `render(..., gpu=)`) runs each look on the device; the rest runs on the CPU inside it, counted. Bounds and
+reasons: design-decisions, "GPU backend".
+
+| Look | GPU | CPU |
+|---|---|---|
+| `dither` method | `bayer2`, `bayer4`, `bayer`, `clustered`, `clustered45`, `blue_noise`, `white_noise`, `gameboy_camera`, `matrix`, with any palette (`photo` included) | the error-diffusion methods, `riemersma`, `dot_diffusion`, `tiles` (a pixel depends on earlier ones) |
+| `dither` mode | `phase`, `pattern`, `cell` | `block` attribute cells, `separation="spot"` |
+| `halftone` screen | `grid`, `wave` | `rings`, `spiral`, `rays` |
+| `halftone` separation | `none`, `cmyk`, `rgb`, `spot`; shapes, misregistration, fractional `cell`, dot gain, ink noise | |
+| `halftone` paper | | `specks` |
+
 ## New effects
 
 | Effect | What it does |

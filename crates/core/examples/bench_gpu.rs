@@ -1,11 +1,11 @@
-//! The GPU backend's timings at 1920 x 1080 (`uv run poe bench-gpu`, a release build): each kernel and the chain of all
-//! five on the CPU (one thread, every core) and on the GPU (end to end: upload, steps, readback; and on the device alone:
+//! The GPU backend's timings at 1920 x 1080 (`uv run poe bench-gpu`, a release build): every effect with a kernel and the dither tool's four
+//! recipes on the CPU (one thread, every core) and on the GPU (end to end: upload, steps, readback; and on the device alone:
 //! a picture already there, the steps only). A Markdown table on stdout, the minimum of several runs after a warm-up.
 //! `docs/design-decisions.md` ("GPU backend") records a run.
 
 use std::time::Instant;
 
-use bullterrier_image::{Error, Gpu, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::{Error, Gpu, Options, Photo, Picture, Presets, Recipe, Step, effect, effects};
 use pollster::block_on;
 
 const HEIGHT: usize = 1080; // constant: the benchmark's picture, 1080p
@@ -26,30 +26,74 @@ fn timed(mut work: impl FnMut() -> Result<(), Error>) -> Result<f64, Error> {
     Ok(best)
 }
 
+/// The step a kernel is timed with: the effect's defaults, except where the defaults are a setting its kernel declines
+/// (the run would be the CPU's, which `main` also checks by counting the transfers).
+fn step_for(name: &str) -> Step {
+    let step = Step::new(name);
+    match name {
+        "dither" => step.param("method", "bayer"),
+        "engraving" => step.param("bend", 0),
+        "noise_field" => step.param("kind", "value"),
+        _ => step,
+    }
+}
+
+/// The recipes of `tests/it/gpu/recipes.rs` (demo 31's, the dither tool's three), which the benchmark times whole.
 fn recipes() -> Vec<(&'static str, Recipe)> {
-    let steps = [
-        Step::new("levels")
-            .param("black", 0.05)
-            .param("white", 0.92)
-            .param("gamma", 1.3),
-        Step::new("grade")
-            .param("temperature", 0.4)
-            .param("contrast", 1.3)
-            .param("saturation", 1.2)
-            .param("vibrance", 0.3),
-        Step::new("curves").param("shadows", 0.2).param("highlights", 0.82),
-        Step::new("channel_mixer")
-            .param("red_from_green", 0.2)
-            .param("blue_from_blue", 0.9),
-        Step::new("color_balance").param("amount", 0.4),
-    ];
-    let mut all: Vec<(&str, Recipe)> = ["levels", "grade", "curves", "channel_mixer", "color_balance"]
-        .into_iter()
-        .zip(steps.iter().cloned())
-        .map(|(name, step)| (name, Recipe::new([step])))
-        .collect();
-    all.push(("chain of five", Recipe::new(steps)));
-    all
+    vec![
+        (
+            "recipe: demo 31",
+            Recipe::new([
+                Step::new("grade").param("contrast", 1.3),
+                Step::new("halftone").param("cell", 3).param("angle", 30),
+                Step::new("grain").param("amount", 0.05).param("seed", 1),
+            ]),
+        ),
+        (
+            "recipe: 1-bit Bayer",
+            Recipe::new([
+                Step::new("grade").param("contrast", 1.2),
+                Step::new("dither")
+                    .param("method", "bayer")
+                    .param("palette", "custom")
+                    .param("custom", ["#000000", "#ffffff"])
+                    .param("cell", 2),
+            ]),
+        ),
+        (
+            "recipe: Game Boy",
+            Recipe::new([
+                Step::new("grade").param("saturation", 0.6),
+                Step::new("dither")
+                    .param("method", "bayer4")
+                    .param("palette", "gameboy")
+                    .param("cell", 3),
+            ]),
+        ),
+        (
+            "recipe: CMYK halftone",
+            Recipe::new([
+                Step::new("grade").param("contrast", 1.1),
+                Step::new("halftone")
+                    .param("cell", 12)
+                    .param("separation", "cmyk")
+                    .param("paper", "#fffbe8")
+                    .param("dot_gain", 0.1),
+            ]),
+        ),
+    ]
+}
+
+/// Every effect that has a kernel, then the recipes: what the table times.
+fn rows() -> Result<Vec<(String, Recipe)>, Error> {
+    let mut rows = Vec::new();
+    for name in effects() {
+        if effect(&name)?.kernel().is_some() {
+            rows.push((name.clone(), Recipe::new([step_for(&name)])));
+        }
+    }
+    rows.extend(recipes().into_iter().map(|(name, recipe)| (name.to_owned(), recipe)));
+    Ok(rows)
 }
 
 #[expect(clippy::print_stdout, reason = "the benchmark's table is its output")]
@@ -68,7 +112,7 @@ fn main() -> Result<(), Error> {
     println!("{WIDTH} x {HEIGHT}, {}; minimum of {RUNS} runs, ms\n", gpu.adapter());
     println!("| recipe | CPU 1 thread | CPU all cores | GPU end to end | GPU on the device |");
     println!("|---|---|---|---|---|");
-    for (name, recipe) in recipes() {
+    for (name, recipe) in rows()? {
         let one = timed(|| photo.render(&recipe, &presets, Options::default()).map(drop))?;
         let all = timed(|| {
             photo
@@ -89,8 +133,17 @@ fn main() -> Result<(), Error> {
                 gpu.download(&made).await.map(drop)
             })
         })? - readback;
+        // a step the kernel declines runs on the CPU inside the GPU render: more than one upload and one readback
+        gpu.reset_transfers();
+        block_on(gpu.render(&photo, &recipe, &presets, Options::default()))?;
+        let moved = gpu.transfers();
+        let note = if moved.uploads > 1 || moved.downloads > 0 {
+            " (CPU inside)"
+        } else {
+            ""
+        };
         println!(
-            "| {name} | {one:.1} | {all:.1} | {end_to_end:.1} | {:.1} |",
+            "| {name}{note} | {one:.1} | {all:.1} | {end_to_end:.1} | {:.1} |",
             device.max(0.0)
         );
     }

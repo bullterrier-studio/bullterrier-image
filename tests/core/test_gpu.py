@@ -69,10 +69,48 @@ def test_a_gpu_render_refuses_a_band_as_a_recipe_error_naming_it_never_a_gpu_err
     assert not isinstance(refused.value, GpuError)
 
 
+# Written out, not read from the core: the table of "what runs where" in docs/design-decisions.md ("GPU backend").
+# A kernel added or dropped changes this list on purpose.
+KERNELS = frozenset(
+    [
+        "aurora",
+        "channel_mixer",
+        "color_balance",
+        "crosshatch",
+        "curves",
+        "dead_pixels",
+        "dither",
+        "engraving",
+        "fog",
+        "fractal",
+        "grade",
+        "gradient",
+        "gradient_map",
+        "grain",
+        "halftone",
+        "interlace",
+        "lens_flare",
+        "levels",
+        "light_leak",
+        "lut",
+        "noise_field",
+        "ntsc",
+        "paper_texture",
+        "pattern",
+        "pixel_grid",
+        "scanlines",
+        "selective_color",
+        "slice_shift",
+        "torn_edge",
+        "vignette",
+    ]
+)
+
+
 def test_every_effect_says_it_runs_on_the_gpu_exactly_when_the_core_has_a_kernel_for_it():
     on_gpu = {name for name in fx.__all__ if getattr(fx, name).gpu}
     with_kernels = {name for name in fx.__all__ if native.effect(name)["gpu"]}
     assert on_gpu == with_kernels
-    # some effects have a kernel and most do not: neither side of the comparison is trivially everything or nothing
-    assert "grade" in on_gpu
-    assert "vignette" not in on_gpu
+    # known-good rows report true, known-bad ones (an effect with no kernel) false, from a list the core does not write
+    assert on_gpu == KERNELS
+    assert not on_gpu & {"blend", "vhs", "bloom"}

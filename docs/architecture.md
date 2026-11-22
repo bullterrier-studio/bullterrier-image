@@ -141,7 +141,7 @@ storage buffer, straight alpha, owned by its `Gpu` (another's is refused). Uploa
 `unpack` kernel; readback: a copy and a map. A kernel: `gpu/prelude.wgsl` (bindings: 0 uniform `Header` then the effect's
 `Block` of vec4s, 1 `source`, 2 `dest`, 3 `data` floats, 4 `other` picture; `inside`, `pixel_index`, `store`, `luminance`,
 the sRGB transfer) plus its own `main`, `@workgroup_size(16, 16)`. An effect file declares `fn kernel() -> Kernel<Params>`
-(WGSL, the block from `Params`, an optional table, default bound 1e-4) beside `<effect>.wgsl`; `build.rs` adds it under the
+(WGSL, the block from `Params` and the picture's `Header`, an optional table, default bound 1e-4, `with_bound` for a looser one) beside `<effect>.wgsl`; `Kernel::only_where` declines a setting (that step runs on the CPU, counted) and `Kernel::planned` also gets the step's `Inputs` and, if asked, the picture read back, for what only the CPU's own code can make (a palette from the photo, a table, quantiles), and may decline too; the effect's `check` runs on the GPU as on the CPU; `Gpu::reduce` and `Gpu::histogram` (fixed tree) give a caller a picture's sum, extremes or counts; `build.rs` adds it under the
 feature, `Native` erases it into the public `GpuKernel` that `Effect::kernel` returns (None for every other effect). The
 executor (`run/gpu.rs`): `begin()` on the CPU, the working picture uploaded once, runs of kernel steps (`Prepared::on_gpu`:
 a plain step of an effect with a kernel, no drive, field or partition) recorded into one encoder, each laid over its input by
