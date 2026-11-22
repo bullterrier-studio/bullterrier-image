@@ -117,13 +117,39 @@ async fn adapter_of(instance: &wgpu::Instance) -> Result<wgpu::Adapter, Error> {
         })
 }
 
+/// Whether the GPU backend supports operating system `os` (`std::env::consts::OS`): macOS (Metal). The browser (WebGPU) is
+/// supported too, but has no OS name: [`require_supported_platform`] skips this check there. `test_bed` is the one
+/// exception, for CI only: Linux on Mesa's software Vulkan (`BT_GPU=llvmpipe`) is the only free GPU runner, so the GPU
+/// tests run there.
+fn supported(os: &str, test_bed: bool) -> Result<(), Error> {
+    if os == "macos" || (os == "linux" && test_bed) {
+        return Ok(());
+    }
+    Err(Error::Gpu(format!(
+        "the GPU backend supports macOS and the browser; this is {os}: render on the CPU"
+    )))
+}
+
+/// The one platform rule, asked first by every way to make a context, before any adapter or device work.
+fn require_supported_platform() -> Result<(), Error> {
+    if cfg!(target_arch = "wasm32") {
+        return Ok(());
+    }
+    supported(
+        std::env::consts::OS,
+        std::env::var("BT_GPU").is_ok_and(|gpu| gpu == "llvmpipe"),
+    )
+}
+
 impl Gpu {
     /// A context on a device of its own: the machine's high-performance adapter, with its own limits on the size of a
     /// storage buffer (so the largest picture is what the adapter holds, not WebGPU's default of 128 MiB).
     ///
     /// # Errors
-    /// [`Error::Gpu`] if there is no adapter (no GPU, or none with Metal, Vulkan or Direct3D 12), or it gives no device.
+    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), if there is no adapter, or it
+    /// gives no device.
     pub async fn request() -> Result<Self, Error> {
+        require_supported_platform()?;
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
         let adapter = adapter_of(&instance).await?;
         let wanted = adapter.limits();
@@ -148,9 +174,10 @@ impl Gpu {
     /// it.
     ///
     /// # Errors
-    /// [`Error::Gpu`] naming the limit, if the device allows fewer storage buffers a shader stage, bindings a group or
+    /// [`Error::Gpu`] on a platform other than macOS and the browser (the message names it), or naming the limit, if the device allows fewer storage buffers a shader stage, bindings a group or
     /// invocations a workgroup than the core's kernels use.
     pub fn new(device: wgpu::Device, queue: wgpu::Queue) -> Result<Self, Error> {
+        require_supported_platform()?;
         let limits = device.limits();
         let invocations = GROUP * GROUP;
         for (name, has, needs) in [
@@ -460,8 +487,33 @@ mod tests {
     use std::pin::pin;
     use std::task::{Context, Poll, Waker};
 
-    use super::adapter_of;
-    use crate::ErrorKind;
+    use super::{adapter_of, supported};
+    use crate::{Error, ErrorKind};
+
+    fn refusal(os: &str, test_bed: bool) -> Option<String> {
+        match supported(os, test_bed) {
+            Ok(()) => None,
+            Err(Error::Gpu(message)) => Some(message),
+            Err(other) => panic!("a platform is refused as Error::Gpu, not {other:?}"),
+        }
+    }
+
+    #[test]
+    fn macos_is_supported_and_other_systems_are_refused_naming_themselves() {
+        assert_eq!(refusal("macos", false), None);
+        for os in ["linux", "windows", "freebsd"] {
+            let message = refusal(os, false).unwrap_or_else(|| panic!("{os} is refused"));
+            assert!(message.contains(&format!("this is {os}")), "{message}");
+            assert!(message.contains("macOS and the browser"), "{message}");
+        }
+    }
+
+    #[test]
+    fn the_test_bed_allows_linux_only() {
+        assert_eq!(refusal("linux", true), None);
+        assert!(refusal("windows", true).is_some());
+        assert!(refusal("freebsd", true).is_some());
+    }
 
     #[test]
     fn an_instance_with_no_adapter_is_refused_naming_why() {

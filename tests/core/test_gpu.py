@@ -3,6 +3,7 @@ is the core's own test). `BT_GPU=none` says the machine has no GPU: the tests th
 it a missing GPU fails them (docs/development.md)."""
 
 import os
+import sys
 
 import numpy as np
 import pytest
@@ -12,6 +13,16 @@ from bullterrier_image.core import native
 
 NO_GPU = os.environ.get("BT_GPU") == "none"
 needs_gpu = pytest.mark.skipif(NO_GPU, reason="BT_GPU=none: this machine has no GPU")
+
+
+@pytest.mark.skipif(
+    sys.platform == "darwin" or os.environ.get("BT_GPU") == "llvmpipe",
+    reason="the GPU backend runs on macOS, and on CI's one test bed (BT_GPU=llvmpipe)",
+)
+def test_a_gpu_is_refused_by_name_on_a_platform_the_backend_does_not_support():
+    # not behind BT_GPU=none: the refusal needs no GPU, only the wheel built with the backend
+    with pytest.raises(GpuError, match=r"supports macOS and the browser; this is (linux|windows)"):
+        Gpu()
 
 
 @pytest.fixture(scope="module")
