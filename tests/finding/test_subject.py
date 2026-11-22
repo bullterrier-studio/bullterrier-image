@@ -210,10 +210,11 @@ def test_on_macos_the_default_is_apple_vision(echo_red, monkeypatch):
 
 @pytest.mark.skipif(sys.platform == "darwin", reason="macOS defaults to Apple Vision, which needs no model file")
 def test_a_default_that_cannot_run_names_the_model_it_needs(monkeypatch):
+    # unchosen, the portable model is what runs, and its refusal names the file it needs and the variable naming it
     monkeypatch.delenv("BT_IMAGE_SEGMENTER")
     with pytest.raises(BackendUnavailableError, match="no-such-model") as caught:  # the suite's BT_IMAGE_SUBJECT_MODEL
         subject_matte(ramp())
-    assert "default" in str(caught.value)
+    assert "BT_IMAGE_SUBJECT_MODEL" in str(caught.value)
 
 
 def test_a_missing_local_model_file_is_named_with_the_variable_that_points_at_it(tmp_path, monkeypatch):
