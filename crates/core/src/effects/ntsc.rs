@@ -90,3 +90,45 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
         yiq_to_rgb([luma + crawl, i, q]).map(|level| level.clamp(0.0, 1.0))
     })
 }
+
+/// The smear and the dot crawl on the GPU (`ntsc.wgsl`): the colour axes are summed along the row tap by tap with the CPU's own
+/// weights (a table), whatever the reach (the CPU's Fourier transform for a long one agrees to a few millionths); the YIQ
+/// matrices are read off the CPU's own conversions.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    use crate::ops::edge::Extension;
+    crate::gpu::Kernel::new(include_str!("ntsc.wgsl"), |params: &Params, _: &crate::gpu::Header| {
+        let half = crate::ops::blur::weights(f64::from(params.sigma), f64::from(params.truncate));
+        let rule: u32 = match params.edge.extension() {
+            Extension::Reflect => 0,
+            Extension::Nearest => 1,
+            Extension::Mirror => 2,
+            Extension::Wrap | Extension::Constant(_) => 3,
+        };
+        let turn = std::f64::consts::TAU * f64::from(params.phase);
+        let column = |matrix: fn([f32; 3]) -> [f32; 3], axis: usize| {
+            let mut unit = [0.0_f32; 3];
+            unit[axis] = 1.0;
+            let [one, two, three] = matrix(unit);
+            [one, two, three, 0.0]
+        };
+        let mut block = vec![
+            [params.crawl, cast::single(turn.cos()), cast::single(turn.sin()), 0.0],
+            [
+                f32::from_bits(u32::try_from(half.len() - 1).unwrap_or(0)),
+                f32::from_bits(rule),
+                0.0,
+                0.0,
+            ],
+        ];
+        block.extend((0..3).map(|axis| column(rgb_to_yiq, axis)));
+        block.extend((0..3).map(|axis| column(yiq_to_rgb, axis)));
+        block
+    })
+    .with_table(|params: &Params, _: &crate::gpu::Header| {
+        crate::ops::blur::weights(f64::from(params.sigma), f64::from(params.truncate))
+            .into_iter()
+            .map(cast::single)
+            .collect()
+    })
+}
