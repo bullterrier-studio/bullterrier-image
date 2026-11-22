@@ -87,3 +87,17 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, _inputs: &Inputs<'_
         ])
     })
 }
+
+/// The shift of one range of hues on the GPU (`selective_color.wgsl`), the CPU's own f32 maths.
+#[cfg(feature = "gpu")]
+pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
+    crate::gpu::Kernel::new(
+        include_str!("selective_color.wgsl"),
+        |params: &Params, _: &crate::gpu::Header| {
+            vec![
+                [params.hue, params.width, params.feather, params.hue_shift],
+                [params.saturation, params.lightness, 0.0, 0.0],
+            ]
+        },
+    )
+}
