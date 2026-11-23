@@ -51,7 +51,8 @@ def test_an_all_kernel_recipe_crosses_once_each_way_and_render_all_once_a_recipe
     assert (gpu.transfers["uploads"], gpu.transfers["downloads"]) == (1, 1)
     gpu.reset_transfers()
     render_all(photo(), [Recipe([fx.levels(gamma=1.5)]), Recipe([fx.curves(midtones=0.6)])], gpu=gpu)
-    assert gpu.transfers == {"uploads": 2, "downloads": 2, "bytes": 2 * 30 * 40 * (12 + 16)}
+    # the curves' table (4 curves of 4 stretches of 4 coefficients: 256 bytes) is counted beside the pictures
+    assert gpu.transfers == {"uploads": 2, "tables": 1, "downloads": 2, "bytes": 2 * 30 * 40 * (12 + 16) + 256}
 
 
 @needs_gpu
