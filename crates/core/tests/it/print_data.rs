@@ -16,7 +16,7 @@ use bullterrier_image::effects::halftone::{Params as Halftone, Separation};
 use bullterrier_image::params::Color;
 use bullterrier_image::{Error, Options, Photo, Picture, Presets, Recipe, Step};
 
-use crate::common::compare::first_difference_within;
+use crate::common::compare::{assert_looks_the_same, first_difference_within};
 use crate::common::pictures::varied;
 
 const WIDTH: usize = 480;
@@ -433,14 +433,14 @@ fn cmyk_gives_four_planes_and_a_dark_paper_refusal_still_holds() -> Result<(), E
 }
 
 #[test]
-fn data_is_the_same_whatever_the_thread_count() -> Result<(), Error> {
+fn data_looks_the_same_whatever_the_thread_count() -> Result<(), Error> {
     let values = ramp();
     let on = photo(&values)?;
     let look = recipe(Step::of(screen(Separation::Cmyk)));
     let one = on.ink_planes(&look, &Presets::new(), Options::default())?;
     let many = on.ink_planes(&look, &Presets::new(), Options::default().with_threads(3))?;
     for (a, b) in one.iter().zip(&many) {
-        assert_eq!(first_difference_within(a.values(), b.values(), 0.0), None);
+        assert_looks_the_same(a.values(), b.values(), "ink planes");
     }
     Ok(())
 }

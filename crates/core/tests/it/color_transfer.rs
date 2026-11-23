@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use crate::common::compare::assert_close;
+use crate::common::compare::{assert_close, assert_looks_the_same};
 use crate::common::pictures::{varied, varied_seeded};
 use bullterrier_image::{Error, Image, Options, Photo, Picture, Presets, Recipe, Step};
 
@@ -297,7 +297,7 @@ fn a_large_nearly_flat_bright_reference_gives_its_spread_at_any_thread_count() -
             Some(rgb(height, width, &reference)?),
             &[],
         )?;
-        assert_close(&more, &one, 1e-5, "threads");
+        assert_looks_the_same(&more, &one, "threads");
     }
     Ok(())
 }

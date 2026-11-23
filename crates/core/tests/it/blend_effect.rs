@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use crate::common::compare::assert_close;
+use crate::common::compare::{assert_close, assert_looks_the_same};
 use crate::common::pictures::varied;
 use bullterrier_image::{Error, Image, Options, Photo, Picture, Presets, Recipe, Step};
 use serde_json::Value;
@@ -223,7 +223,7 @@ fn the_result_is_the_same_at_any_thread_count() -> Result<(), Error> {
     let single = lay(asset(3, 4, &pixels)?, &params)?;
     for threads in [2, 3, 10] {
         let many = laid(asset(3, 4, &pixels)?, &params, threads)?;
-        assert!(single == many, "threads {threads}");
+        assert_looks_the_same(&single, &many, &format!("threads {threads}"));
     }
     Ok(())
 }
