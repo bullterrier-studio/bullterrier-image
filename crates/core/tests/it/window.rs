@@ -3,7 +3,8 @@
 //!
 //! Every effect the query clears, with its defaults and each parameter alone at its limits, is rendered whole, then as
 //! windows of the picture rows from the band's first row less the margin to its last plus the margin, and the rows of the
-//! band compared with the whole, byte for byte: a recipe with a blur summed by a Fourier transform is not cleared.
+//! band compared with the whole (looking the same, `common::compare`): a recipe with a blur summed by a Fourier transform is not
+//! cleared, since the transform's sum follows the window's length.
 
 use std::error::Error;
 use std::sync::Arc;
@@ -12,7 +13,7 @@ use bullterrier_image::region::Bands;
 use bullterrier_image::{Each, Entry, Frame, Image, Input, Options, Photo, Picture, Presets, Recipe, Step, effect};
 use serde_json::Value;
 
-use crate::common::compare::{first_bit_difference, first_difference_within};
+use crate::common::compare::{difference_in_looks, looks_the_same};
 use crate::common::pictures::{asset, varied};
 use crate::common::sweep::{Setting, awkward, fine, variants};
 use crate::common::{Outcome, core_effects};
@@ -76,19 +77,19 @@ fn windowed(
     Ok(photo(canvas, values, rows)?.render(recipe, &Presets::new(), options)?)
 }
 
-/// The first band of `rows` rows whose window render is not the whole render's rows, with how, or none.
+/// How the window renders of `recipe`, over all the bands, do not look the same as the whole render's rows, or none.
 fn first_problem(
     canvas: Canvas,
     values: &[f32],
     recipe: &Recipe,
     margin: usize,
-    within: f32,
     options: Options,
 ) -> Result<Option<String>, Box<dyn Error>> {
     let Canvas { height, width, bands } = canvas;
     let whole = photo(canvas, values, 0..height)?
         .render(recipe, &Presets::new(), options)?
         .into_values();
+    let (mut got, mut wanted) = (Vec::new(), Vec::new());
     for &rows in bands {
         for top in (0..height).step_by(rows) {
             let (bottom, from) = ((top + rows).min(height), top.saturating_sub(margin));
@@ -98,14 +99,11 @@ fn first_problem(
                 &band[(top - from) * width * 3..(bottom - from) * width * 3],
                 &whole[top * width * 3..bottom * width * 3],
             );
-            if let Some(at) = first_difference_within(made, want, within) {
-                return Ok(Some(format!(
-                    "band of {rows} rows from row {top} (window {from}..{to}): value {at} differs"
-                )));
-            }
+            got.extend_from_slice(made);
+            wanted.extend_from_slice(want);
         }
     }
-    Ok(None)
+    Ok(difference_in_looks(&got, &wanted))
 }
 
 #[test]
@@ -150,7 +148,7 @@ fn every_cleared_effect_over(
                 continue;
             };
             cleared += 1;
-            if let Some(found) = first_problem(canvas, &values, &recipe, margin, 0.0, Options::default())? {
+            if let Some(found) = first_problem(canvas, &values, &recipe, margin, Options::default())? {
                 problems.push(format!("{name} {}: {found}", Value::Object(setting)));
             }
         }
@@ -188,7 +186,7 @@ fn a_chain_of_steps_needs_the_margins_added_and_gives_the_rows_of_the_whole_rend
         "the margins add: {margin}"
     );
     assert_eq!(
-        first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+        first_problem(SMALL, &values, &recipe, margin, Options::default())?,
         None
     );
     Ok(())
@@ -203,7 +201,7 @@ fn a_window_and_the_runners_own_bands_compose() -> Outcome {
         .ok_or("these steps are banded")?;
     let rows = std::num::NonZeroUsize::new(7).ok_or("rows")?;
     let options = Options::default().with_band(rows);
-    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, options)?, None);
+    assert_eq!(first_problem(SMALL, &values, &recipe, margin, options)?, None);
     Ok(())
 }
 
@@ -214,7 +212,7 @@ fn a_canvas_fixes_the_scale_of_a_window_and_the_window_the_place() -> Outcome {
     let recipe = Recipe::new([Step::new("gaussian_blur").param("radius", 3.0), Step::new("vignette")]);
     let margin = recipe.band_margin(&Presets::new(), 600)?.ok_or("banded")?;
     let scaled = Options::default().with_canvas(300, 600);
-    assert_eq!(first_problem(SMALL, &values, &recipe, margin, 0.0, scaled)?, None);
+    assert_eq!(first_problem(SMALL, &values, &recipe, margin, scaled)?, None);
     // the canvas is used: the bands without it are not that whole render
     let whole = photo(SMALL, &values, 0..SMALL.height)?
         .render(&recipe, &Presets::new(), scaled)?
@@ -224,7 +222,7 @@ fn a_canvas_fixes_the_scale_of_a_window_and_the_window_the_place() -> Outcome {
     let want = &whole[rows.start * SMALL.width * 3..rows.end * SMALL.width * 3];
     assert_eq!(band.len(), want.len());
     assert!(
-        first_bit_difference(&band, want).is_some(),
+        !looks_the_same(&band, want),
         "a window alone follows its own canvas, not the scale asked for"
     );
     Ok(())
@@ -317,8 +315,8 @@ fn a_window_that_is_not_rows_of_the_canvas_is_refused_naming_the_window() -> Out
 /// switch to the Fourier transform at a height that is cheap to render.
 const THIN: usize = 64;
 
-/// The first problem in the render of `recipe` on a thin canvas of `height` rows: a band whose rows differ from the whole
-/// render's, byte for byte, or an answer of the query other than `cleared`.
+/// The first problem in the render of `recipe` on a thin canvas of `height` rows: bands whose rows do not look the same as the
+/// whole render's, or an answer of the query other than `cleared`.
 fn thin_problem(recipe: &Recipe, height: usize, cleared: bool) -> Result<Option<String>, Box<dyn Error>> {
     let values = varied(height, THIN);
     let (width, canvas) = (u32::try_from(THIN)?, u32::try_from(height)?);
@@ -335,22 +333,25 @@ fn thin_problem(recipe: &Recipe, height: usize, cleared: bool) -> Result<Option<
     let margin = recipe.band_margin(&Presets::new(), canvas)?;
     if let Some(margin) = margin {
         let whole = render(0..height, false)?;
+        let (mut got, mut wanted) = (Vec::new(), Vec::new());
         for rows in [height / 3 + 1, 13] {
             for top in (0..height).step_by(rows) {
                 let (bottom, from) = ((top + rows).min(height), top.saturating_sub(margin));
                 let band = render(from..(bottom + margin).min(height), true)?;
                 let made = &band[(top - from) * THIN * 3..(bottom - from) * THIN * 3];
-                if let Some(at) = first_bit_difference(made, &whole[top * THIN * 3..bottom * THIN * 3]) {
-                    return Ok(Some(format!("band of {rows} rows from row {top}: value {at} differs")));
-                }
+                got.extend_from_slice(made);
+                wanted.extend_from_slice(&whole[top * THIN * 3..bottom * THIN * 3]);
             }
+        }
+        if let Some(why) = difference_in_looks(&got, &wanted) {
+            return Ok(Some(why));
         }
     }
     Ok((margin.is_some() != cleared).then(|| format!("cleared is {}, want {cleared}", margin.is_some())))
 }
 
 #[test]
-fn a_recipe_the_query_clears_is_the_whole_render_byte_for_byte_on_both_sides_of_the_fourier_switch() {
+fn a_recipe_the_query_clears_looks_like_the_whole_render_on_both_sides_of_the_fourier_switch() {
     let one = |name: &str, key: &str, value: f64| Recipe::new([Step::new(name).param(key, value)]);
     // a blur reaching under 16 working px is summed tap by tap; from 16, or a kernel of more than 128 taps, by a transform
     // whose rounding depends on the rows it is given
@@ -481,7 +482,7 @@ fn a_halftone_of_every_shape_gives_the_rows_of_the_whole_render_from_a_window() 
             .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
             .ok_or("halftone is banded")?;
         assert_eq!(
-            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+            first_problem(SMALL, &values, &recipe, margin, Options::default())?,
             None,
             "{shape}"
         );
@@ -508,7 +509,7 @@ fn a_halftone_with_print_realism_gives_the_rows_of_the_whole_render_from_a_windo
                 .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
                 .ok_or("halftone is banded")?;
             assert_eq!(
-                first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+                first_problem(SMALL, &values, &recipe, margin, Options::default())?,
                 None,
                 "gain {gain} noise {noise} specks {specks} {separation}"
             );
@@ -526,7 +527,7 @@ fn a_halftone_of_a_fractional_cell_gives_the_rows_of_the_whole_render_from_a_win
             .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
             .ok_or("halftone is banded")?;
         assert_eq!(
-            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+            first_problem(SMALL, &values, &recipe, margin, Options::default())?,
             None,
             "cell {cell} sigma {sigma}"
         );
@@ -560,7 +561,7 @@ fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a
             .band_margin(&Presets::new(), u32::try_from(SMALL.height)?)?
             .ok_or("this halftone is banded")?;
         assert_eq!(
-            first_problem(SMALL, &values, &recipe, margin, 0.0, Options::default())?,
+            first_problem(SMALL, &values, &recipe, margin, Options::default())?,
             None,
             "{screen} {wavelength}"
         );
@@ -571,7 +572,7 @@ fn a_halftone_of_every_screen_geometry_gives_the_rows_of_the_whole_render_from_a
     // ... and the rays themselves, which a flat picture shows, are the same from a band that holds no more than its rows
     let flat = vec![0.4; SMALL.height * SMALL.width * 3];
     assert_eq!(
-        first_problem(SMALL, &flat, &recipe, 0, 0.0, Options::default())?,
+        first_problem(SMALL, &flat, &recipe, 0, Options::default())?,
         None,
         "rays"
     );
@@ -629,13 +630,8 @@ fn a_halftone_of_every_screen_geometry_reads_no_further_than_its_margin_says() -
     Ok(())
 }
 
-/// How far a window of a step that sums a blur by a Fourier transform, or rounds a position by its row, may be from the whole
-/// render: 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit level). Measured at most 14 of 65,535 (`liquid_metal` on a noise
-/// picture of 4.5 megapixels) and 1.3 on a photo of 0.5 megapixel.
-const CLOSE: f32 = 32.0 / 65_535.0;
-
-/// A recipe `close_band_margin` clears and `band_margin` does not gives the rows of the whole render to within [`CLOSE`]; one both
-/// clear has the same margin (and a window of it is exact: the tests above).
+/// A recipe `close_band_margin` clears and `band_margin` does not gives rows that look the same as the whole render's; one both
+/// clear has the same margin (the tests above).
 #[test]
 fn a_close_margin_gives_the_rows_of_the_whole_render_within_a_tolerance_where_the_exact_margin_is_none() -> Outcome {
     let (mut close_only, mut both, mut windowed_short, mut problems) = (0, 0, 0, Vec::new());
@@ -682,7 +678,7 @@ fn a_close_margin_gives_the_rows_of_the_whole_render_within_a_tolerance_where_th
                 close_only += 1;
                 // a window and its margin that hold the whole canvas prove nothing
                 windowed_short += usize::from(margin * 2 < canvas.height);
-                if let Some(found) = first_problem(canvas, &values, &recipe, margin, CLOSE, Options::default())? {
+                if let Some(found) = first_problem(canvas, &values, &recipe, margin, Options::default())? {
                     problems.push(format!("{name} {}: {found}", Value::Object(setting)));
                 }
             }
