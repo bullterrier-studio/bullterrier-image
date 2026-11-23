@@ -1,5 +1,5 @@
-// The CPU's seeded random numbers (`ops/random.rs`: SplitMix64 and its `mix`, `unit`), bit for bit, on the 32-bit words WGSL
-// has. A 64-bit word is a vec2<u32>: x the low half, y the high half. A kernel that draws a number for a pixel calls
+// The CPU's seeded random numbers (`ops/random.rs`: SplitMix64 and its `mix`, `unit`), giving the same numbers, on the 32-bit words
+// WGSL has. A 64-bit word is a vec2<u32>: x the low half, y the high half. A kernel that draws a number for a pixel calls
 // `mix3` with the CPU's own seed and words, then `unit53` or `standard_normal`. Nothing here keeps state.
 
 fn u64_add(a: vec2<u32>, b: vec2<u32>) -> vec2<u32> {

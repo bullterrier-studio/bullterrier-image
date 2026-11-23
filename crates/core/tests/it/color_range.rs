@@ -105,7 +105,7 @@ fn a_grey_ramp_against_white_follows_the_lightness_and_never_rises_as_the_grey_d
 
 #[test]
 fn a_tolerance_of_0_with_no_feather_chooses_only_the_exact_colour() -> Outcome {
-    // exactly representable channels, so the pixel is the target to the bit
+    // exactly representable channels, so the pixel is the target
     let target = [0.5, 0.25, 0.75];
     let one_step = 1.0 / 256.0;
     let pixels = [

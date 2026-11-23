@@ -75,8 +75,7 @@ impl Recipe {
     ///
     /// Hand a render the rows of the picture from the band's first row less this margin to its last row plus it (fewer
     /// where the picture ends), with [`Options::with_window`] saying where they lie on the canvas, and the rows of the
-    /// band in what it returns are the rows of the whole picture's render, byte for byte (unlike [`Options::with_band`],
-    /// which is within float rounding, 1e-4, where a step blurs by a Fourier transform). The margins of the steps add, as
+    /// band in what it returns look like the rows of the whole picture's render. The margins of the steps add, as
     /// each reads what the one before made.
     ///
     /// The answer is none for a recipe with a `frame` or a `size` (they change the rows), and with a step that reads the
@@ -95,10 +94,10 @@ impl Recipe {
 
     /// [`band_margin`](Self::band_margin) for a window that need only look the same: the rows of the band in what a window
     /// returns are the rows of the whole picture's render to within 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit
-    /// level), not byte for byte. It also clears a step that sums a blur by a Fourier transform
+    /// level). It also clears a step that sums a blur by a Fourier transform
     /// ([`Footprint::Fourier`](crate::Footprint::Fourier)) or rounds a position by its row
     /// ([`Footprint::Rounded`](crate::Footprint::Rounded)), which have no exact margin; where [`band_margin`](Self::band_margin)
-    /// has one, this is the same number and the window is exact. The answer is none for the same recipes otherwise.
+    /// has one, this is the same number. The answer is none for the same recipes otherwise.
     ///
     /// The bound is for each such step: measured at most 14 of 65,535 (`liquid_metal` on a noise picture of 4.5 megapixels),
     /// 1.3 on a photo of 0.5 megapixel, and far less for a blur or a halftone. A step after it that raises contrast

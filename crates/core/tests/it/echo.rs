@@ -68,7 +68,7 @@ fn nothing_to_lay_over_leaves_the_picture_exactly_as_it_is() -> Result<(), Error
             &picture
         ),
         None,
-        "no copies is bit for bit"
+        "no copies leaves the picture unchanged"
     );
     Ok(())
 }

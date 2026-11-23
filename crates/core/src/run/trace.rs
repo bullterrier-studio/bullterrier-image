@@ -49,7 +49,7 @@ impl Photo<'_> {
     /// recipe that the steps use (or that a region they use is made from) in the order the recipe declares them, the
     /// picture after each step and, if the recipe's frame cuts the picture out, the cut-out picture, in that order. It
     /// runs exactly the code [`render`](Self::render) does, so the last stage is what
-    /// `render` returns, byte for byte, and it fails where `render` would. Where `render` keeps only the newest
+    /// `render` returns, and it fails where `render` would. Where `render` keeps only the newest
     /// picture, a trace keeps one picture per step, as many as the recipe has steps.
     ///
     /// ```text

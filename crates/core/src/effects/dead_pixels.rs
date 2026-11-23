@@ -28,7 +28,7 @@ pub(crate) fn footprint(_params: &Params) -> Footprint {
 ///
 /// The picture is divided into cells of `size` px (the last row and column of cells may be cut off by the picture's edge).
 /// `seed` shuffles the cells and the first `count` are the faulty ones, so a larger count keeps every pixel a smaller one
-/// had; the first `round(count x stuck)` of those are stuck (`count` is capped at the number of cells). Everything else is the picture, bit for bit.
+/// had; the first `round(count x stuck)` of those are stuck (`count` is capped at the number of cells). Everything else is the picture, unchanged.
 #[derive(Debug, Clone, PartialEq, Deserialize, Params)]
 #[serde(deny_unknown_fields)]
 pub struct Params {

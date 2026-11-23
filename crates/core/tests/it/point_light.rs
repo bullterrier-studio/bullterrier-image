@@ -401,7 +401,7 @@ fn a_px_value_is_design_px_so_the_look_matches_at_two_frame_sizes() -> Result<()
 }
 
 /// The lookup table is for the lighting passes only: `grade`, which also converts to and from linear light, keeps the
-/// exact conversions, bit for bit (values pinned from the exact code before the table came in).
+/// conversions pinned to the values the code gave before the table came in.
 #[test]
 fn grade_keeps_the_exact_conversions() -> Result<(), Error> {
     let levels = [0.0, 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0];

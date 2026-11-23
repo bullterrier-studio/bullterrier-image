@@ -104,7 +104,7 @@ fn escape_count(mut z: (f32, f32), c: (f32, f32), iterations: i32) -> Option<f64
 }
 
 /// Where the plane's points lie on the canvas: the point of a column and of a canvas row, as the single precision numbers the orbit
-/// starts from (the CPU's, to the bit: the orbit is chaotic, so a point a rounding off may escape at another step).
+/// starts from (the CPU's: the orbit is chaotic, so a point a rounding off may escape at another step).
 struct View {
     centre: (f64, f64),
     half: (f64, f64),

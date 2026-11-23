@@ -135,8 +135,8 @@ impl Options {
 
     /// These options with `threads`, how many threads the render may use: 1 (the default) runs everything on the calling
     /// thread and starts none, 0 uses one for each core of the machine, and no more than 256 are allowed (the render is
-    /// refused, naming the number, before anything runs). The picture a render returns does not depend on it: the
-    /// same bytes at any number of threads. The threads are those of a pool of that size shared by every render at that count in the
+    /// refused, naming the number, before anything runs). The picture a render returns does not depend on it: a
+    /// picture that looks the same at any number of threads. The threads are those of a pool of that size shared by every render at that count in the
     /// process (started the first time and kept), so renders running at once on several threads of the caller share n
     /// threads and do not each start n. Only work that is the same for every row of the picture, such as laying a
     /// step over its input, framing and resizing the photo, and an effect that works pixel by pixel, is shared out.
@@ -155,7 +155,7 @@ impl Options {
     }
 
     /// These options with `rows`, how many rows of the working picture a render makes at a time: the same picture as the
-    /// whole-picture render (equal within float rounding, 1e-4; most effects byte for byte; at any number of threads), made in bands so that the memory a run of steps
+    /// whole-picture render (it looks the same), made in bands so that the memory a run of steps
     /// needs beyond the picture it makes is about a band's, not several pictures'. Without it the render works on the
     /// whole picture.
     ///
@@ -211,7 +211,7 @@ impl Options {
 
     /// These options with `window`: the picture the render is handed is the `rows` rows of a canvas `canvas_width` x
     /// `canvas_height` from canvas row `first_row`, in px of that picture. It makes a render of a band of a larger
-    /// canvas the same pixels as the same rows of the render of the whole: an effect's place (a vignette's distance
+    /// canvas look like the same rows of the render of the whole: an effect's place (a vignette's distance
     /// from the middle, noise numbered by position, a gradient, a screen's lattice) is its place on the canvas, and the
     /// design scale follows the window's canvas unless [`with_canvas`](Self::with_canvas) is given: then that canvas fixes
     /// the scale and the window only the place.

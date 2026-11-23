@@ -150,7 +150,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
 }
 
 /// The slide on the GPU (`slice_shift.wgsl`): the bands are the CPU's own draws, worked out to one number a row (how far the row
-/// turns round to the right, a table); the pixels are copied, so the picture is the CPU's to the bit.
+/// turns round to the right, a table); the pixels are copied, so the picture is the CPU's.
 #[cfg(feature = "gpu")]
 pub(crate) fn kernel() -> crate::gpu::Kernel<Params> {
     crate::gpu::Kernel::new(

@@ -153,7 +153,7 @@ pub(crate) fn render(picture: &Picture<'_>, params: &Params, inputs: &Inputs<'_>
                 target_mean[channel] + gain[channel] * (lab[channel] - own_mean[channel])
             }
         });
-        // mixed as sRGB levels, so that amount 0 returns the pixel bit for bit
+        // mixed as sRGB levels, so that amount 0 returns the pixel unchanged
         let moved = oklab_to_rgb(moved).map(|level| level.clamp(0.0, 1.0));
         std::array::from_fn(|channel| pixel[channel] + params.amount * (moved[channel] - pixel[channel]))
     })

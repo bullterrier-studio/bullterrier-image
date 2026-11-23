@@ -59,7 +59,7 @@ use super::{
 ///
 /// `threads` is how many threads the render may use for the rows of its work (laying a step over its input, framing and
 /// resizing, an effect that works pixel by pixel): 1 (the default) starts none, 0 is one for each core, and the picture
-/// is the same bytes at any number. A number above 256 is a `CoreError` of kind `recipe`. The render itself stays on the
+/// looks the same at any number. A number above 256 is a `CoreError` of kind `recipe`. The render itself stays on the
 /// calling thread, so a Python effect it runs keeps its context.
 ///
 /// `band` is how many rows of the working picture the render makes at a time (a positive whole number; none: the whole

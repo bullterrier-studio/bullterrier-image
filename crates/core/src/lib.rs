@@ -23,7 +23,7 @@
 //!
 //! A render runs on the calling thread unless it is given more: [`Options::with_threads`] shares the rows of the work that
 //! is the same for every row (laying a step over its input, framing and resizing the photo, an effect that works pixel by
-//! pixel) between that many threads, and the picture is the same bytes at any number. To render many pictures, share the
+//! pixel) between that many threads, and the picture looks the same at any number. To render many pictures, share the
 //! [`Photo`]s, [`Recipe`] and [`Presets`] between your own threads, one render each (they are `Send` and `Sync`), and
 //! leave the default of one thread for each render; for one picture, ask for every core:
 //!

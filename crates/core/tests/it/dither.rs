@@ -81,7 +81,7 @@ fn a_fixed_palette_paints_with_its_published_colours_only() -> Result<(), Error>
     Ok(())
 }
 
-/// Seven named palettes typed again from their published colours: the oracle that the data holds them bit for bit. (Gameboy,
+/// Seven named palettes typed again from their published colours: the oracle that the data holds them exactly. (Gameboy,
 /// CGA, EGA and PICO-8 were in the code before the data; ZX Spectrum, MSX and C64 came with it.)
 const FORMERLY_CODED: [(Palette, &[&str]); 7] = [
     (Palette::Gameboy, &["#0f380f", "#306230", "#8bac0f", "#9bbc0f"]),

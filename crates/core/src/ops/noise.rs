@@ -128,7 +128,7 @@ pub(crate) fn bend(height: usize, width: usize, tear: &Tear) -> [Vec<f32>; 2] {
 /// values. A single field costs half of [`fractal`].
 ///
 /// The value at a place depends on
-/// the place and the seed only, so rows cut from the canvas are the same rows of the whole field, to the bit.
+/// the place and the seed only, so rows cut from the canvas are the same rows of the whole field.
 ///
 /// Every value is divided by its own standard deviation, which is known without looking at any other pixel. A lattice value
 /// is drawn evenly from -1 to 1, so it has mean 0 and variance 1/3 (the variance of a uniform on an interval of width 2
@@ -195,8 +195,7 @@ pub(crate) fn clumps_by_fourier(size: f64, truncate: f64) -> bool {
 /// of its column times that of its row ([`axis_variance`], which counts what `edge` does at the canvas's border, where one
 /// draw is read several times), and each value is divided by its root. A value depends only on the canvas draws within the
 /// kernel's reach, which are made for the rows beyond the band too (through `edge` past the canvas), so rows cut from the
-/// canvas are the same rows of the whole field, to the bit while the kernel is summed tap by tap, and within float rounding
-/// when the blur is a Fourier transform.
+/// canvas are the same rows of the whole field (within float rounding when the blur is a Fourier transform).
 pub(crate) fn clumped(
     (height, width): (usize, usize),
     (first_row, rows): (usize, usize),

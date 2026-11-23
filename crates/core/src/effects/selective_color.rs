@@ -33,7 +33,7 @@ const HALF_TURN: f32 = 180.0; // constant: degrees in half a turn of the colour 
 /// A range of hues (a centre, a width and a feather) and the changes made to the colours inside it. Works in HSV on the
 /// gamma-encoded values. A pixel's weight is its place in the range (1 within `width` of the `hue` centre, falling
 /// linearly to 0 over `feather` degrees; the wheel wraps round) times its HSV saturation, so a grey, which has no hue,
-/// is never selected and a pale colour is changed less than a vivid one. Pixels of weight 0 come back bit for bit. A
+/// is never selected and a pale colour is changed less than a vivid one. Pixels of weight 0 come back unchanged. A
 /// selected pixel moves by weight times each change: `hue_shift` degrees, saturation times `saturation` and value
 /// toward black or full by `lightness`. Saturation and value stay inside 0..1 by construction, so the result needs no
 /// clipping.

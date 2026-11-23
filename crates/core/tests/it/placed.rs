@@ -1,6 +1,6 @@
 //! Effects that depend on where a pixel lies on the canvas (a row's parity, the middle of the picture, a stripe's phase):
 //! rows cut from the canvas, with the margin the effect's footprint asks for and told their place, render the same rows
-//! as the whole picture, to the bit. The same rows not told their place do not: the known-bad row that shows the check
+//! look the same as the whole picture. The same rows not told their place do not: the known-bad row that shows the check
 //! can fail. The whole render is the oracle.
 
 use std::error::Error;

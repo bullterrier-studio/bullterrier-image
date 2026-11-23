@@ -20,7 +20,7 @@ use serde_json::{Map, Value, json};
 type Outcome = Result<(), Box<dyn Error>>;
 
 /// A change below this is rounding noise: a pattern turned a whole turn differs by about 2e-6, `grade.pivot` at a
-/// `contrast` of 1 is not bit-exact.
+/// `contrast` of 1 differs in the last bits.
 const TOLERANCE: f32 = 1e-4;
 const SIDE: u8 = 12;
 /// The side of the picture for `disperse`, whose pieces are cells of several px and whose bottom border takes a figure at

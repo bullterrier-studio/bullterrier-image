@@ -1,8 +1,7 @@
 //! The WebAssembly package of bullterrier-image, for the browser and Node: a recipe rendered on a photo, with the core's
 //! own checks and errors. The core runs unchanged (one thread, no `onnx` feature), so a render is the native render of the
-//! same size, byte for byte, except for the effects that filter through the Fourier transform (`bloom`, `engraving`,
-//! `focus_blur`, `lens_blur`, `starburst`): rustfft rounds differently in each architecture's SIMD routine, so a channel
-//! may differ by one level of 255 (measured on 5 of the 84 example recipes, 1 to 4 bytes of 360000); this file only converts between JavaScript's values and the core's, and gives each core
+//! same size and looks the same (the tests allow a share of samples a level or two apart: rustfft rounds differently in
+//! each architecture's SIMD routine); this file only converts between JavaScript's values and the core's, and gives each core
 //! error its JavaScript `Error`. A subject cut-out is not found here: the page hands it in with each render (`maps`).
 
 use bullterrier_image as image;

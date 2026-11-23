@@ -88,7 +88,7 @@ impl Footprint {
         }
     }
 
-    /// [`margin`](Self::margin) for a window that must give the rows of the whole render bit for bit: none for
+    /// [`margin`](Self::margin) for a window whose rows must not depend at all on how the picture is cut: none for
     /// [`Fourier`](Self::Fourier) and [`Rounded`](Self::Rounded) as well as [`Whole`](Self::Whole).
     #[must_use]
     pub fn exact_margin(self) -> Option<usize> {

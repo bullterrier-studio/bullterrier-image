@@ -87,8 +87,7 @@ enum Format {
 /// Python package refuses such an array before it gets here).
 ///
 /// The file embeds a small sRGB profile, so every viewer shows the colours the effects made, and carries no other
-/// metadata: nothing from the photo it came from, no EXIF and no GPS position. The same image gives the same bytes
-/// every time. PNG is lossless, written at the best compression with adaptive filtering; WebP is lossless; JPEG keeps full-resolution colour
+/// metadata: nothing from the photo it came from, no EXIF and no GPS position. PNG is lossless, written at the best compression with adaptive filtering; WebP is lossless; JPEG keeps full-resolution colour
 /// (4:4:4, no chroma subsampling).
 ///
 /// # Errors

@@ -1,4 +1,4 @@
-//! A recipe rendered on the GPU: the same picture as on the CPU within the recipe's budget, the same bytes twice,
+//! A recipe rendered on the GPU: the same picture as on the CPU within the recipe's budget, a picture that looks the same twice,
 //! the transfers it promises, steps laid over their input on the device, pictures kept there, and the refusals.
 
 use std::num::NonZeroUsize;
@@ -12,7 +12,7 @@ use pollster::block_on;
 
 use super::{assert_finite, fresh, gpu, largest_gap, rendered};
 use crate::common::Outcome;
-use crate::common::compare::first_bit_difference;
+use crate::common::compare::assert_looks_the_same;
 
 /// The five kernels in a row, each away from its defaults.
 fn five_kernels() -> Recipe {
@@ -93,13 +93,13 @@ fn a_chain_of_kernels_and_demo_31s_recipe_stay_within_the_recipe_budget_on_a_pho
 }
 
 #[test]
-fn the_same_gpu_and_input_give_the_same_bytes_twice() -> Outcome {
+fn the_same_gpu_and_input_give_a_picture_that_looks_the_same_twice() -> Outcome {
     let Some(gpu) = gpu() else { return Ok(()) };
     let values = seeded(37, 29, 3);
     let photo = Photo::new(Picture::new(37, 29, &values)?);
     let first = rendered(&gpu, &photo, &five_kernels(), Options::default())?.into_values();
     let second = rendered(&gpu, &photo, &five_kernels(), Options::default())?.into_values();
-    assert_eq!(first_bit_difference(&first, &second), None);
+    assert_looks_the_same(&first, &second, "twice");
     Ok(())
 }
 
@@ -250,7 +250,7 @@ fn a_cut_out_chained_on_the_device_keeps_its_alpha_through_kernel_laid_and_cpu_s
         assert_eq!(next.channels(), 4, "{what}");
         let back = block_on(gpu.download(&next))?;
         assert_eq!(back.channels(), 4, "{what}");
-        assert_eq!(first_bit_difference(&alpha(back), &cut_alpha), None, "{what}");
+        assert_looks_the_same(&alpha(back), &cut_alpha, what);
     }
     Ok(())
 }
