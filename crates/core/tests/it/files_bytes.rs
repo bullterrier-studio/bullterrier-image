@@ -107,3 +107,24 @@ fn a_path_error_still_names_the_path() {
     let error = read(Path::new("missing-picture.png")).err();
     assert!(error.is_some_and(|error| error.to_string().contains("missing-picture.png")));
 }
+
+#[test]
+fn a_file_longer_than_any_picture_can_be_is_refused_by_its_size_without_being_read() -> Outcome {
+    // 2 * 89,478,485 pixels * 8 bytes: the most a decoder may allocate, so no picture the core reads is longer
+    const LONGEST: u64 = 2 * 89_478_485 * 8;
+    let folder = Scratch::new()?;
+    let path = folder.write("huge.png", Png::new(1, 1, 8, 2, &[&[1, 2, 3]]).bytes())?;
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&path)?
+        .set_len(LONGEST + 1)?; // sparse: no disk
+    for (reading, error) in [("read", read(&path).err()), ("read_map", read_map(&path).err())] {
+        assert_eq!(error.as_ref().map(Error::kind), Some(ErrorKind::ImageRead), "{reading}");
+        let message = error.map(|error| error.to_string()).unwrap_or_default();
+        assert!(
+            message.contains("huge.png") && message.contains(&(LONGEST + 1).to_string()),
+            "{reading}: {message}"
+        );
+    }
+    Ok(())
+}

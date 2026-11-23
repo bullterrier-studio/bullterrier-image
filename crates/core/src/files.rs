@@ -81,12 +81,13 @@ struct Decoded {
 ///
 /// # Errors
 /// [`Error::ImageRead`], naming the path and the reason, if the file is missing, a folder, not an image, damaged or
-/// truncated, in a layout the core does not read (a palette TIFF, a floating-point TIFF holding NaN), or has more
+/// truncated, in a layout the core does not read (a palette TIFF, a floating-point TIFF holding NaN), is longer
+/// than 1,431,655,760 bytes (no picture the core reads is), which is checked before the file is read, or has more
 /// pixels than 178,956,970 (twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485), which is checked from the header before
 /// anything is decoded.
 pub fn read(path: &Path) -> Result<Image, Error> {
     let name = path.display();
-    let bytes = std::fs::read(path).map_err(|error| unreadable(&name, &error))?;
+    let bytes = file_bytes(path)?;
     picture(&bytes, &name)
 }
 
@@ -133,7 +134,7 @@ fn picture(bytes: &[u8], name: &dyn Display) -> Result<Image, Error> {
 /// [`Error::ImageRead`] as for [`read`]; for those two TIFFs the message names the mode.
 pub fn read_map(path: &Path) -> Result<Layer, Error> {
     let name = path.display();
-    let bytes = std::fs::read(path).map_err(|error| unreadable(&name, &error))?;
+    let bytes = file_bytes(path)?;
     map(&bytes, &name)
 }
 
@@ -180,6 +181,19 @@ fn map(bytes: &[u8], name: &dyn Display) -> Result<Layer, Error> {
             .collect(),
     };
     Layer::new(height, width, values)
+}
+
+/// The bytes of the file at `path`, unless it is longer than any picture the core reads can be ([`MAX_ALLOC`]): it is
+/// refused by its length, before it is read.
+fn file_bytes(path: &Path) -> Result<Vec<u8>, Error> {
+    let refuse = |reason: &dyn Display| unreadable(&path.display(), reason);
+    let length = std::fs::metadata(path).map_err(|error| refuse(&error))?.len();
+    if length > MAX_ALLOC {
+        return Err(refuse(&format!(
+            "it is {length} bytes, more than the {MAX_ALLOC} a picture the core reads can be"
+        )));
+    }
+    std::fs::read(path).map_err(|error| refuse(&error))
 }
 
 /// What the error messages call bytes that came with no path.
