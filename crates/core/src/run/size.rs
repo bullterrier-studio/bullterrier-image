@@ -154,8 +154,8 @@ impl Options {
         self
     }
 
-    /// These options with `rows`, how many rows of the working picture a render makes at a time: the same picture as the
-    /// whole-picture render (it looks the same), made in bands so that the memory a run of steps
+    /// These options with `rows`, how many rows of the working picture a render makes at a time: a picture that looks the same
+    /// as the whole-picture render, made in bands so that the memory a run of steps
     /// needs beyond the picture it makes is about a band's, not several pictures'. Without it the render works on the
     /// whole picture.
     ///

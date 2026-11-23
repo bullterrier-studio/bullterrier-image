@@ -13,7 +13,7 @@ from . import native
 class Gpu:
     """A GPU context on this machine's high-performance GPU (Metal, Vulkan or Direct3D 12): render on it with
     `render(..., gpu=gpu)`, which returns the same numpy picture as on the CPU, held to each GPU kernel's stated bound
-    instead of the CPU's bytes (the CPU stays the exact reference). Share one context between renders and threads.
+    instead of the CPU's picture (the CPU stays the reference). Share one context between renders and threads.
 
     `Gpu()` takes the device; a machine without a GPU is a GpuError naming why. `adapter` names the GPU,
     `largest_picture` is the most pixels a picture on it can have, `transfers` counts the pictures sent to it and read

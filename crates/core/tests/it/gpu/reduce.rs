@@ -1,5 +1,5 @@
 //! The reductions of a picture on the device against the CPU's own sums, extremes and bins, at sizes that are and are not
-//! multiples of a workgroup (256 x 64 pixels): the answer is the CPU's, and a second run gives the same bits.
+//! multiples of a workgroup (256 x 64 pixels): the answer is the CPU's within the stated bound.
 
 use bullterrier_image::{MOST_BINS, Picture, Plane, Reduction};
 use pollster::block_on;
