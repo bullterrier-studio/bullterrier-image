@@ -1862,6 +1862,8 @@ measured first would break at a larger one.
     `tiles`; `gradient_map` for a picture whose brightness span is under 2e-3; `halftone`'s `rings`, `spiral` and `rays` screens
     (polar maths) and `specks` (draws on the bits of 64-bit floats). `halftone`'s blur is summed on the device for a reach
     under 16 px and made by the CPU, read back and sent as a counted table, for a longer one.
+  - *Every table is counted.* `Gpu::send_table` is the one way a kernel's table goes up: it counts it in `Transfers::tables` and
+    `bytes` (a 256-entry LUT is 201 MB), and refuses one over the device's storage-binding limit as `Error::Gpu` naming its size.
   - *The other per-pixel effects (K2): what runs where.* One rule decided each: a kernel is a pixel's own maths on tables the CPU's own
     code made (a table is a few numbers a column, a row, a mark or a lattice octave, never a picture, except where said), so the CPU stays the
     one definition of every draw, shuffle and weight. Bounds are the default 1e-4 unless written; "measured" is the largest gap of the
@@ -1873,7 +1875,7 @@ measured first would break at a larger one.
     | `dead_pixels` | kernel | the CPU's shuffle gives each cell of the canvas a number (sound, stuck, dead): a table a cell | 1e-4 (0) |
     | `slice_shift` | kernel | the CPU's bands worked out to one rotation a row; the pixels are copied | 1e-4 (0) |
     | `crosshatch` | kernel | the CPU's loop over families, directions from f64; position across the lines in f32 | 4e-4 (7e-6; 3.1e-4 on a 3000 px picture with lines 2 px apart) |
-    | `engraving` | kernel for `bend <= 0` | the same lines; a `bend` reads the Gaussian-smoothed picture (a neighbourhood), so the default runs on the CPU | 4e-4 (2.8e-6) |
+    | `engraving` | kernel for `bend <= 0` | the same lines; a `bend` reads the Gaussian-smoothed picture (a neighbourhood), so the default runs on the CPU | 4e-4 (2.8e-6; 3.7e-4 on a 3000 x 8 picture, whose long side puts the lines far from the origin) |
     | `lens_flare` | kernel | the bumps (centre, reach, ring, weight) from f64, summed per pixel | 1e-4 (2e-6) |
     | `light_leak` | kernel | the CPU's patches from its seeded generator (a table), the Gaussians summed per pixel | 1e-4 (2.4e-7) |
     | `aurora` | kernel | the ripple and the rays are one line of noise along the picture, made by the CPU (a table a column); the curtain per pixel | 1e-4 (1.9e-6) |
@@ -2005,6 +2007,6 @@ measured first would break at a larger one.
   - ***Halftone with `separation="cmyk"` is slow on the device***: 1558 ms end to end without the blur (2339 ms with the CPU's),
     against 425 ms (497 ms) on every core of the CPU. The kernel has no per-cell pass (the model has none): every pixel works out its
     cell's four inks again (64 coordinate-descent sweeps), where the CPU does it once a cell. Not
-    optimised here (a per-cell pass, or an unmixing table made by the CPU, would be the fix; see the ticket's leftovers).
+    optimised here (a per-cell pass, or an unmixing table made by the CPU, would be the fix).
 
 - **Chaining with another library (2026-11-22):** the packages share wgpu's device, so the picture's storage is a documented public contract, not an internal: `GpuImage::buffer` (read only) and `Gpu::adopt(buffer, height, width, alpha)` (nothing is uploaded, nothing counted; a too-small buffer is `Error::Inputs`). The layout (`vec4<f32>` a pixel, straight alpha) may still change to half floats by a change of this pair's docs and a minor version.
