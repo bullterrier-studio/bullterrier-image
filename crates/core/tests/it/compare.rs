@@ -1,7 +1,10 @@
 //! The comparators the other tests judge with (`common::compare`), each shown a pair they must call equal and one they
 //! must tell apart.
 
-use crate::common::compare::{assert_close, first_bit_difference, first_difference, first_difference_within};
+use crate::common::compare::{
+    assert_close, assert_looks_the_same, first_bit_difference, first_difference, first_difference_within,
+    looks_the_same,
+};
 
 #[test]
 fn values_further_apart_than_the_tolerance_are_told_apart_at_the_first_such_index() {
@@ -49,4 +52,40 @@ fn assert_close_names_the_first_value_beyond_the_tolerance() {
 #[should_panic(expected = "shorter")]
 fn assert_close_refuses_lists_of_different_lengths() {
     assert_close(&[0.5], &[0.5, 0.5], 1.0, "shorter");
+}
+
+/// 1000 samples at 0.5 and a copy of them, `moved` levels of 255 off at the given indices.
+fn thousand_with(moved: &[(usize, i32)]) -> (Vec<f32>, Vec<f32>) {
+    let base = vec![0.5_f32; 1000];
+    let mut other = base.clone();
+    for &(at, levels) in moved {
+        other[at] += levels as f32 / 255.0;
+    }
+    (base, other)
+}
+
+#[test]
+fn looks_the_same_refuses_a_sample_three_levels_off() {
+    let (base, other) = thousand_with(&[(7, 3)]);
+    assert!(!looks_the_same(&base, &other));
+}
+
+#[test]
+fn looks_the_same_accepts_samples_one_level_off_and_one_in_a_thousand_two_off() {
+    let (base, other) = thousand_with(&[(1, 1), (2, -1), (3, 1), (500, 1), (999, -1)]);
+    assert_looks_the_same(&base, &other, "one level");
+    let (base, other) = thousand_with(&[(5, 2)]);
+    assert_looks_the_same(&base, &other, "one in a thousand two levels off");
+}
+
+#[test]
+fn looks_the_same_refuses_a_share_of_samples_two_levels_off_beyond_a_thousandth() {
+    let (base, other) = thousand_with(&[(5, 2), (6, 2)]);
+    assert!(!looks_the_same(&base, &other));
+}
+
+#[test]
+fn looks_the_same_refuses_lengths_that_differ_and_values_that_are_not_numbers() {
+    assert!(!looks_the_same(&[0.5, 0.5], &[0.5]));
+    assert!(!looks_the_same(&[0.5, f32::NAN], &[0.5, f32::NAN]));
 }
