@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 
+import { differenceInLooks } from "./looks_the_same.mjs";
+
 const { Photo, Recipe, effects, looks, parameters } = createRequire(import.meta.url)("../../pkg/bullterrier_image_wasm.js");
 
 const grey = (width, height) => new Photo(new Uint8Array(width * height * 4).fill(128), width, height);
@@ -21,7 +23,7 @@ test("a recipe written as JSON renders as the same recipe written as TOML", () =
   const fromToml = Recipe.fromToml(halftone);
   const fromJson = Recipe.fromJson(fromToml.toJson());
   const photo = grey(40, 30);
-  assert.deepEqual(fromJson.render(photo).data.slice(0, 64), fromToml.render(photo).data.slice(0, 64));
+  assert.equal(differenceInLooks(fromJson.render(photo).data, fromToml.render(photo).data), null);
   assert.equal(fromJson.toJson(), fromToml.toJson());
 });
 

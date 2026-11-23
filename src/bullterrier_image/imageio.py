@@ -99,8 +99,8 @@ def save(image: np.ndarray, path: str | Path, quality: int = 95, *, dpi: float |
     (BackendUnavailableError). It belongs to the file, never to a recipe. The file embeds a small sRGB profile (under a
     kilobyte), so every viewer shows
     the colours the effects made, and carries no other metadata: nothing from the photo it came from, so no EXIF and
-    no GPS position;
-    the same picture gives the same bytes every time. BackendUnavailableError, naming the extension, for any other
+    no GPS position.
+    BackendUnavailableError, naming the extension, for any other
     extension (TIFF, GIF, BMP are read, not written). ImageWriteError, naming the path, when the file cannot be created
     (no such folder, no permission) or the picture is too large for the format; no file is left behind.
     """

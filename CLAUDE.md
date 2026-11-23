@@ -62,12 +62,12 @@ _native    home of the Rust extension `_native._core`, beside errors          (i
 - Rust effects never refer to each other.
 - The ratio of design px (480 on the longest side) is derived from that working picture, never passed in.
 - Every user number that drives allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of `Region::check` with neither a row nor a reason.
-- Python is a facade over the core and runs no recipe itself. The WebAssembly package (`crates/wasm`) is another, as thin: it names no effect, and its renders equal the native ones byte for byte at the same size, except the effects through the Fourier transform, which may differ by one level of a channel (rustfft's SIMD routines round differently on each architecture; `poe wasm-test`, in `check`, runs every example recipe; needs `node`).
+- Python is a facade over the core and runs no recipe itself. The WebAssembly package (`crates/wasm`) is another, as thin: it names no effect, and its renders look the same as the native ones at the same size (`poe wasm-test`, in `check`, runs every example recipe and compares them through `tests/wasm/looks_the_same.mjs`; needs `node`).
 - The render stays on the calling thread, only row bands run on the pool, and rayon's global pool is never used.
 - Outside a pool a kernel runs inline, and `Effect::apply` takes no thread parameter.
-- Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count).
-- Never add real complexity for the last bit: if a kernel's rounding differs between runs with no visible effect, compare within a small tolerance.
-- **GPU** (feature `gpu`, `docs/architecture.md` "GPU"): byte promises (threads, bands, windows, WebAssembly) are CPU promises. A
+- Rule: the output looks the same at any thread count.
+- **One tolerance for "looks the same"** (thread counts, bands, windows, cached runs, WebAssembly, platforms): in levels of 8-bit output after rounding, at most 1 on 99.9% of samples and at most 2 on all. The numbers live beside one compare helper per language: `crates/core/tests/it/common/compare.rs` (Rust, the source), `tests/conftest.py` (Python), `tests/wasm/looks_the_same.mjs` (WebAssembly). No test or doc promises equal bytes between routes, and a one-bit difference is never a defect by itself; never add complexity for the last bit. What stays exact: an effect does what its parameters say, the same seed gives the same look, goldens against stored files, and a step that must not change a pixel changes none.
+- **GPU** (feature `gpu`, `docs/architecture.md` "GPU"): the CPU is the reference and a GPU render is held to a bound against it, never to bytes. A
   new effect is written for the CPU first; a GPU kernel (`fn kernel() -> Kernel<Params>` and `<effect>.wgsl`) may follow, with its
   bound beside it (default 1e-4; a looser one says why) and held to it by `tests/it/gpu/parity.rs`. Effects never touch a device.
 

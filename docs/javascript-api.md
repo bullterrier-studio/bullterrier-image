@@ -1,8 +1,7 @@
 # JavaScript API
 
 The core built for WebAssembly (`crates/wasm`), for a browser page or Node: a recipe rendered on a photo, with the pixels the
-native build gives at the same size (byte for byte, except the effects that filter through the Fourier transform, which may
-differ by one level of a channel: see [design decisions](design-decisions.md), "A WebAssembly package", which also has the
+native build gives at the same size (they look the same, within the repository's one tolerance: see [design decisions](design-decisions.md), "A WebAssembly package", which also has the
 speed). The names are Python's (`Recipe`, effects, errors, `parameters()`, `withValues()`).
 
 ## Build

@@ -127,7 +127,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
 - **Nothing hidden.** Every value that shapes a result, including options of the libraries an effect calls, is a named,
   documented field with a unit and an honest range; only mathematical and standard constants are exempt, each cited.
   *Reason:* a look must be reproducible and tunable from the recipe alone. *Consequence:* a test scans effect packages
-  and `ops` for unexplained numbers; exposing a tunable never changes default output (proved byte-identical).
+  and `ops` for unexplained numbers; exposing a tunable never changes default output.
 - **Basic and advanced parameters.** A field is advanced (`param(..., advanced=True)`) when the user would change it to
   tune the technique rather than to choose the look (`edge`, `truncate`, `interpolation`, a secondary shaping control);
   aim at six or fewer basic fields per effect. *Reason:* "nothing hidden" exposes every tunable, and one flat list of
@@ -215,7 +215,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   depth gives a lens, a linear gradient gives a tilt-shift band, `light` or a given map gives any other. The colour a miniature
   adds is not blur: it is a `grade` driven by the band that stays sharp (`examples/effects/focus_blur.toml`). *Reason:*
   `depth_of_field` and `tilt_shift` were the same blur with two ways to find a distance; a saturation in the blur effect
-  would be a parameter the depth look never wants. *Consequence:* the blur is byte-identical to both old effects; the
+  would be a parameter the depth look never wants. *Consequence:* the blur is the same as both old effects; the
   saturation is not, because `grade` takes its grey from the blurred picture where `tilt_shift` took it from the sharp one
   (up to 0.23 at the old example's settings).
 
@@ -575,9 +575,9 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
 - **Same inputs and seed give the same output on the same machine, library versions and models; across platforms equal
   within float tolerance.** Stochastic code takes `seed: int` and uses `numpy.random.default_rng(seed)`, never global
   random state.
-  *Reason:* BLAS, SIMD and library builds round differently, so "any machine" cannot be promised byte for byte; caching,
-  debugging and reviews need repeatable output on one setup. *Consequence:* byte-identical comparison is the proof for
-  refactors; tests assert properties with tolerances, not exact pixels.
+  *Reason:* BLAS, SIMD and library builds round differently, so "any machine" cannot be promised to the bit; caching,
+  debugging and reviews need output that looks the same on one setup. *Consequence:* tests compare pictures within the one
+  tolerance of "No byte promises" below, and assert properties, not exact pixels.
 - **External models are replaceable assets, not frozen.** A new subject or depth model changes outputs, and that is
   accepted; determinism holds for a given model. Updating one changes its URL, SHA-256 and size in its one module
   (`finding/_isnet.py`, `finding/_depth_anything.py`) and the real-model test skips until the cached file matches the
@@ -702,11 +702,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   the canvas's width, rows beyond the canvas, and a `frame` or `size` (they change the rows); named `window`. *The query:* `band_margin`
   returns the margin because a caller needs the number; it is none where a band of the canvas is not the canvas: `Whole` steps, `each`,
   driven steps, and steps that read a map or pieces (a band's `subject`, a feathered or blurred region, is the band's, not the canvas's).
-  It promises the rows of the whole render byte for byte (decided 2026-11-15, lesson L21: scene's bands promise the bit and a banded grain on
-  a long side of 3,800 px differed in the last float step): a step that sums a blur by the Fourier transform (a reach of 16 working px or more,
+  It clears only what does not depend on the rows it is given (decided 2026-11-15; since 2026-11-23 the rows look like the whole render's, not equal to the bit): a step that sums a blur by the Fourier transform (a reach of 16 working px or more,
   or a kernel of more than 128 taps) is `Footprint::Fourier`, which `margin` reads as a radius (so `with_band` and the room are as before) and
   `exact_margin` answers none for. The effect says it with `Footprint::transformed(blur::is_fourier(..))`, by the predicate the blur itself
-  uses; the sweep of `tests/it/window.rs` holds every effect it clears to the byte, so an effect that forgets fails there. The answer is
+  uses; the sweep of `tests/it/window.rs` holds every effect it clears to looking the same, so an effect that forgets fails there. The answer is
   conservative where the width is not in the parameters (`anamorphic_streaks`: a row as wide as the picture).
   A distance worked out by a trig function (`rgb_split`, `drop_shadow`) is rounded by the row it is subtracted from, so `ops::shift::shifted`
   takes the canvas row of the picture's first row and reads from the position of the canvas row (found by `tests/it/window.rs` on a tall canvas, at
@@ -750,8 +749,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   | whole | 3.00x | baseline |
 
   The extra ~58 MB over the output at 64 rows is per-band windows and blur planes; the split is unmeasured. A `Whole` step
-  gets no memory benefit; Fourier blurs cost more as bands shrink. A banded render equals the whole one within float
-  rounding (1e-4; most effects byte for byte): the Fourier sum depends on the window's length. *Reason:* whole stays the default because banded at 64
+  gets no memory benefit; Fourier blurs cost more as bands shrink. A banded render looks the same as the whole one: the Fourier sum depends on the window's length. *Reason:* whole stays the default because banded at 64
   rows is +62% / +87% slower and only matches at 1024 rows.
 - **Settled: noise is scaled by its known deviation, not the picture's (banded render, B2).** A fractal field
   (`noise::field_rows`) is divided at each pixel by its own deviation, derived from the lattice (a value is uniform on -1..1,
@@ -773,7 +771,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
 ## Performance
 
 - **Cost grows with the picture, not with the parameters, and memory stays a few pictures deep.** A 12 MP photo is
-  the working case, so every Gaussian goes through `ops/blur.gaussian_blur`: scipy's direct filter, byte for byte,
+  the working case, so every Gaussian goes through `ops/blur.gaussian_blur`: scipy's direct filter
   below a kernel radius of 32 px, and from there an FFT convolution over the same edge extension, within 1e-5 of
   scipy (float32 rounding), whatever the sigma. Code that builds per-pixel geometry works a band of rows at a time.
   *Reason:* a radius at the top of its documented range must still render in seconds, and a direct convolution costs
@@ -846,13 +844,13 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   single-thread branch of `par::rows` they were pointers read from a closure, LLVM could not rule out an overlap and the
   loop stayed scalar. A branch on a parameter inside a per-pixel closure does the same, so `grade` decides its colour
   balance once per picture. `Sampler::at` reads its taps directly when all lie inside the picture (the same sum in the same
-  order, so the pixels are identical to the bit; the edge rules apply only to the rest), and WASM builds use `rustfft`'s
+  order, so the pixels do not change; the edge rules apply only to the rest), and WASM builds use `rustfft`'s
   `wasm_simd` (and `+simd128`, which a browser build sets itself with `RUSTFLAGS="-C target-feature=+simd128"`: no such build lives
   in this repo yet, and without it the fix gains nothing there). Measured on an
   M4, 1 MP, one thread, median of 15, each effect in its own process, load 5 to 10 (so about 20 %): `grade` 6.7 to 1.9 ms,
   `channel_mixer` 1.7 to 0.65, `color_balance` 4.1 to 1.8, `radial_blur` 107 to 69, `light_rays` 96 to 59, `flow_warp` 81 to
-  56; the median of the 91 effects is unchanged (1.03x). *Consequence:* the output of all 91 effects is bit-identical to
-  before, and `crates/core/tests/vectorised.rs` fails when `grade` takes 1.6 times as long as the same arithmetic written
+  56; the median of the 91 effects is unchanged (1.03x). *Consequence:* the output of all 91 effects is unchanged
+  from before, and `crates/core/tests/vectorised.rs` fails when `grade` takes 1.6 times as long as the same arithmetic written
   outside the library (3.4 before, 1.0 to 1.15 after). It needs an optimised build (`cargo test --release -p
   bullterrier-image --test vectorised`); the test profile (opt-level 1) vectorises nothing, so no gate runs it.
 
@@ -861,16 +859,16 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   `onnx` feature; its JavaScript API is in [javascript-api.md](javascript-api.md). The bindings only convert: a `Photo`
   (8-bit RGBA in, the alpha is not read) and a `Recipe` (TOML or JSON, the forms a recipe already has) go to the core's
   `Photo::render` with the shipped presets, and the pixels come back as 8-bit RGBA rounded as the files the core writes are.
-  A render of the same photo, recipe and `size` is **byte-identical to the native one, except for the effects that filter
-  through the Fourier transform** (`bloom`, `engraving`, `focus_blur`, `lens_blur`, `starburst`), where a channel may differ by
-  one level of 255 (measured: 1 to 4 bytes of 360000 in each of the five examples at size 300, never more than one level).
+  A render of the same photo, recipe and `size` is **the native one to within the one tolerance of "No byte promises" below** (the effects that filter through the Fourier
+  transform, `bloom`, `engraving`, `focus_blur`, `lens_blur`, `starburst` and some blurs, may differ by a level or two of 255 on a
+  few samples).
   *Cause:* rustfft picks a SIMD routine per architecture (NEON, AVX with fused multiply-add, WebAssembly SIMD), and each rounds
-  its f32 sums its own way; with the scalar planner on both targets the five were identical too. *Rejected:* the scalar planner
-  for every target: the same bytes, but 1.4 to 1.6 times the native time of those five (release build, 1200 px, Apple M4:
+  its f32 sums its own way; with the scalar planner on both targets the five matched too. *Rejected:* the scalar planner
+  for every target: it removes a difference nobody sees, at 1.4 to 1.6 times the native time of those five (release build, 1200 px, Apple M4:
   bloom 162 to 265 ms, engraving 20 to 27, focus_blur 170 to 265, lens_blur 61 to 85, starburst 155 to 233), against a 5% limit.
   `poe wasm-test` (in `check`) renders the shipped look `crt`, five recipes of its own and every `examples/effects` recipe in
-  Node (with a `subject` and a `depth` map handed in) and compares SHA-256 of the bytes with what the Python package writes for
-  them (the five Fourier effects, and the recipes that use them, within one level); the three examples that read a file
+  Node (with a `subject` and a `depth` map handed in) and compares the pixels with what the Python package writes for
+  them (`tests/wasm/looks_the_same.mjs`); the three examples that read a file
   (`blend`, `color_transfer`, `lut`) must fail as named. Errors are `Error`s named as Python's exceptions (`RecipeError`, `UnknownEffectError`,
   `SubjectNotFoundError`), with the core's message. *Rejected:* a second recipe format for JavaScript (a recipe is the
   recipe document); the subject finder in the browser (`ort` loads its library with `dlopen`: the cut-out is made elsewhere
@@ -999,7 +997,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   - *`Photo` borrows the picture* (zero copy from numpy), and `light` is made from the working picture (framed and sized, before
     any step; the pictures as given are only what a finder is asked about), not from a step's output. `background` is 1 - `subject`.
   - *`render` and `trace` are one engine* (`Run::advance` replaces the newest image), so the last stage of a trace is
-    `render`'s result byte for byte and `render` keeps only the newest image, by construction. `Stage` is a flat
+    `render`'s result and `render` keeps only the newest image, by construction. `Stage` is a flat
     `#[non_exhaustive]` enum (`Input`, `Subject`, `Depth`, `Step { number, image }`, from R4b `CutOut`, from R4c `Selection` and `Partition`
     for each region the steps use); labels are the facade's, since they come from Python's `describe()`.
   - *Errors keep their class.* `Error::kind()` (`ErrorKind`) is the one mapping onto the package's exceptions. The extension,
@@ -1134,7 +1132,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   `assert_eq!`s a large buffer.
 
 - **Threads are a run option, default 1, and never change the result.** `Options::with_threads` (Python `threads=`),
-  not an effect parameter: a thread count is no property of a look, and a look must give the same bytes on any machine.
+  not an effect parameter: a thread count is no property of a look, and a look must look the same on any machine.
   *Default 1:* the usual use of several cores is rendering many pictures at once (a video renders frames side by side),
   where each render taking every core only competes; one picture asks for 0 (every core). `Photo`, `Recipe`, `Presets`,
   `Options` and `Image` are `Send + Sync`, so frame-level parallelism needs no API. *An installed pool, not a parameter on
@@ -1306,7 +1304,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   0.2 grey, because the mean of Oklab values is not the mean of sRGB values. Measured on 240 x 240 flats, within 1/16 per channel
   for every method (the bound of Knoll's 16 candidates). One ink's pictures change only where a method read the plane: `ostromoukhov`
   takes its level from the print's luma, and the black ink's tiny floor ratio shifts ties of the ordered and noise methods;
-  `floyd_steinberg`, `atkinson`, `dot_diffusion`, `riemersma` and every method on a coloured ink are byte-equal on a test picture.
+  `floyd_steinberg`, `atkinson`, `dot_diffusion`, `riemersma` and every method on a coloured ink come out unchanged on a test picture.
   *Amended 2026-11-16:* the ordered and noise methods no longer dither the mix: dithering it mixed in sixteenths (two inks at 0.5
   printed green 0.410 against 0.439) and put a darker ink (black) first in the candidate order where the old layers put the paper
   first, flipping single black-ink pictures. Each overprint now has its independent-overlap share of the pixel (for amounts a_k, a
@@ -1736,7 +1734,7 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   persists: nothing jumps sideways). A count that is not a multiple of the power of two (62 / 4 = 15.5) leaves one narrower
   last ray, stretched to a full cell, so its tone is exact. *Reason:* half a cell is the narrowest the screen resolves at a
   fine cell (the feather alone is a pixel); the brief's other reading (halve below one cell) leaves rays 1 to 2 cells wide.
-  *Consequence:* the picture beyond the radius where a ray is one cell wide is byte-equal (hash of the pixels 10 cells and
+  *Consequence:* the picture beyond the radius where a ray is one cell wide is unchanged (hash of the pixels 10 cells and
   more from the centre: equal); the tone holds within 0.004 in every ring from 2 cells out (a line from 1 cell); a dot's rings
   under 2 cells (a few curved cells) are off by up to 0.03, as before. `rays` stays `Whole`.
 - **`halftone` print realism is one shared implementation (halftone batch, 2026-11-16).** `dot_gain` is the gain at 50 % tone,
@@ -1749,7 +1747,7 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   `check`; `halftone`, `dither`, `ascii` have one). *Reason:* the last step is what the recipe's picture is, so the data and the
   picture cannot disagree, and scaling, presets, size, maps and assets keep one owner, the runner. The effects draw once for
   both (`halftone` through a `Kept` pixel type, `dither` through `Inked`/`Chosen`, `ascii` through `grid`), so the picture is
-  bit-identical (hash of 23 renders across methods, separations and sizes equal before and after). *Rejected:* a run option
+  unchanged (hash of 23 renders across methods, separations and sizes equal before and after). *Rejected:* a run option
   on `Options` (`render` would return a sum type, or need a side channel, and could not say which step); public per-effect
   functions on typed `Params` (a second scaling path, no recipe context); one function with a kind argument (callers match
   on an enum). *Limits:* the last step must be plain (opacity 1, normal blend, no mask or drive), else `Error::Recipe` naming
@@ -1762,12 +1760,12 @@ The template's decisions (platforms, the core's test binary, the memory cap, the
   range for both formats), finite, else `Error::Inputs` naming `dpi` and the value, nothing written; PNG gets a `pHYs` chunk
   (pixels per metre, `round(dpi / 0.0254)`: 300 dpi reads back as 299.9994) right after `IHDR`, JPEG a JFIF density in whole dots
   per inch. A WebP holds no resolution and refuses `dpi` (`BackendUnavailable`) instead of dropping it. Files without `dpi`
-  are byte-identical to before. *Reason:* DPI says how a file prints, not how a picture looks, so it is never in a recipe.
+  are written as before. *Reason:* DPI says how a file prints, not how a picture looks, so it is never in a recipe.
 
 ## A window that need only look the same: `Recipe::close_band_margin` (2026-11-21)
 
 **`band_margin` stays exact; `close_band_margin` is the same query with each step's ordinary `Footprint::margin` where
-`exact_margin` has none (Fourier and Rounded).** A caller that needs the whole render's rows byte for byte asks the first; one
+`exact_margin` has none (Fourier and Rounded).** A caller that needs rows that do not depend on the cut at all asks the first; one
 that needs them to look the same (a layer drawn for the rows a mask leaves, an editor's preview of a part) asks the second. Where the
 exact one answers, the two agree. *Bound:* 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit level) for each such step, tested over
 every cleared effect at its defaults and limits on canvases of 131, 481 and 30,001 rows (`tests/it/window.rs`: a margin of 0 fails
@@ -1853,7 +1851,7 @@ measured first would break at a larger one.
     kernel's encode step runs it on the step's `Inputs` before it builds anything, as `apply` does. So a refused run is
     refused identically on both, from one function, and the build rule that kept `check` and `kernel` apart is gone.
     *Rejected:* an exception ("dither declares a kernel and a check") and copying the check's tests into the kernel.
-  - *Seeded randomness* is the CPU's generator ported (`gpu/random.wgsl`, bit for bit on 32-bit words); a threshold or a
+  - *Seeded randomness* is the CPU's generator ported (`gpu/random.wgsl`, the same numbers on 32-bit words); a threshold or a
     noise value a kernel draws is the CPU's.
   - *A table the CPU derives in f64* (`gradient`'s offsets, a separable kernel's weights, a palette in Oklab) is made on the
     CPU and sent as `data`; WGSL has no f64 and `powf` differs per platform (lessons L22).
@@ -2012,3 +2010,17 @@ measured first would break at a larger one.
     optimised here (a per-cell pass, or an unmixing table made by the CPU, would be the fix).
 
 - **Chaining with another library (2026-11-22):** the packages share wgpu's device, so the picture's storage is a documented public contract, not an internal: `GpuImage::buffer` (read only) and `Gpu::adopt(buffer, height, width, alpha)` (nothing is uploaded, nothing counted; a too-small buffer is `Error::Inputs`). The layout (`vec4<f32>` a pixel, straight alpha) may still change to half floats by a change of this pair's docs and a minor version.
+
+## No byte promises (2026-11-23)
+
+Nothing promises equal bytes between two ways of making one picture: thread counts, bands against the whole, a window against
+the whole, a cached run against a cold one, WebAssembly against native, GPU against CPU, one platform against another. Each
+is "looks the same", checked by one tolerance in levels of 8-bit output after rounding: at most 1 on 99.9% of samples and at
+most 2 on all (float outputs are rounded first). *Reason:* the promises cost real work (a separate list of Fourier blurs in the
+band tests, an `exact_margin` and a `close_band_margin`, a Fourier allowance in the WebAssembly oracle, a scalar planner
+considered at 1.4 to 1.6 times the time) for a difference nobody can see, and a one-bit difference is never a defect by itself.
+*Consequence:* the numbers live beside one compare helper per language (`crates/core/tests/it/common/compare.rs`,
+`tests/conftest.py`, `tests/wasm/looks_the_same.mjs`), each tested on its own. *Kept:* an effect does what its parameters say; the
+same seed gives the same look; goldens against stored files; a step that must not change a pixel changes none; the CPU is the
+reference a GPU path is compared to within its own bound. *Left for later:* the API names `exact_margin` and
+`Recipe::band_margin` against `close_band_margin` still carry the old split; collapsing them is a banding change.

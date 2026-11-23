@@ -92,8 +92,7 @@ The first release, 0.1.0.
 - **Command line**: `render`, `sheet`, `cutout`, `animate`, `run`, `steps` (the picture after every step), `init`
   and `effects` (every parameter, documented).
 - **Image files**: any format and mode Pillow reads, EXIF rotation and ICC profiles applied, converted to sRGB;
-  saved stills embed an sRGB profile, carry no EXIF or GPS data from the input, and are byte-identical for the same
-  picture.
+  saved stills embed an sRGB profile, carry no EXIF or GPS data from the input.
 - **Plugins**: third-party packages add effects through the `photo_fx.effects` entry point, written against
   `photo_fx.plugin`.
 - **Errors**: every mistake a caller, recipe or photo can make raises a `PhotoFxError` subclass; the command line
@@ -123,8 +122,7 @@ The first release, 0.1.0.
 - **Command line**: `render`, `sheet`, `cutout`, `animate`, `run`, `steps` (the picture after every step), `init`
   and `effects` (every parameter, documented).
 - **Image files**: any format and mode Pillow reads, EXIF rotation and ICC profiles applied, converted to sRGB;
-  saved stills embed an sRGB profile, carry no EXIF or GPS data from the input, and are byte-identical for the same
-  picture.
+  saved stills embed an sRGB profile, carry no EXIF or GPS data from the input.
 - **Plugins**: third-party packages add effects through the `photo_fx.effects` entry point, written against
   `photo_fx.plugin`.
 - **Errors**: every mistake a caller, recipe or photo can make raises a `PhotoFxError` subclass; the command line

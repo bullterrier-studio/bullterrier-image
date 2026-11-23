@@ -167,7 +167,7 @@ api-doc = { cmd = "python tools/check_api_doc.py", help = "Check the API referen
 # them again, so a project replaces each with a sequence of its tasks without a conflict at the next update
 # The WebAssembly package (crates/wasm): a release build (simd128 for this build step only, never a config file or a native
 # build: the pixel loops are written to vectorise), the glue (`wasm-bindgen`, pinned in Cargo.toml) into the ignored pkg/,
-# then Node runs tests/wasm against what the Python package renders (tests/wasm/oracle.py): the same size, the same bytes.
+# then Node runs tests/wasm against what the Python package renders (tests/wasm/oracle.py): the same size, pixels that look the same.
 # About 25 s after a change to the core, so it runs in `check`; it needs `node` (22 or later) on the PATH.
 wasm-test = { sequence = [
     { cmd = "cargo build -p bullterrier-image-wasm --target wasm32-unknown-unknown --release --locked --quiet", env = { RUSTFLAGS = "-C target-feature=+simd128" } },

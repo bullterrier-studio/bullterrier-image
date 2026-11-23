@@ -158,21 +158,20 @@ def render(
 
     threads: how many threads the render may use for the rows of its work (laying a step over its input, framing and
     resizing the photo, an effect that works pixel by pixel), a whole number from 0 to 256 (RecipeError for anything
-    else). 1, the default, starts none; 0 is one for each core. The result is the same
-    bytes at any number, so ask for more when you render one picture and keep 1 when you render many at once from your
+    else). 1, the default, starts none; 0 is one for each core. The result looks the same
+    at any number, so ask for more when you render one picture and keep 1 when you render many at once from your
     own threads (each render using every core would only compete with the others). The GIL is released while the
     core works, so renders from several Python threads run side by side.
 
     band: how many rows of the working picture are made at a time, a whole number of 1 or more (RecipeError for anything
-    else); None, the default, makes the whole picture at once. The result equals the whole render within float rounding
-    (1e-4; most effects byte for byte), and a run of steps that each read only a bounded neighbourhood of a pixel (a
-    blur, a grade, a vignette) needs memory for a band, not for several pictures. A step that may read any pixel runs on
-    the whole picture. `trace` keeps every step's
+    else); None, the default, makes the whole picture at once. The result looks the same as the whole render, and a run
+    of steps that each read only a bounded neighbourhood of a pixel (a blur, a grade, a vignette) needs memory for a
+    band, not for several pictures. A step that may read any pixel runs on the whole picture. `trace` keeps every step's
     picture and takes no band.
 
     gpu: a `Gpu` to render on; None, the default, renders on the CPU. The result is the same numpy picture, held to
     each GPU kernel's bound (a step of an effect without one runs on the CPU between a readback and an upload); the
-    CPU stays the exact reference. A GPU render takes no `band` (RecipeError); `threads` then applies to its CPU work.
+    CPU stays the reference. A GPU render takes no `band` (RecipeError); `threads` then applies to its CPU work.
     GpuError means this machine's GPU cannot (a platform other than macOS, none, too small, lost): the same render
     without `gpu=` runs on the CPU.
     """

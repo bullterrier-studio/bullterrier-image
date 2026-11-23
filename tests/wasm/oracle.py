@@ -1,17 +1,16 @@
 """The native answers the WebAssembly package is compared with: for each case of cases.json and each example recipe
-of an effect, the SHA-256 and the size of the pixels the Python package renders (or the error the package must raise:
-the recipes that read a file), written with the photo (RGBA bytes) and the `subject` and `depth` maps every render is
+of an effect, the size and the pixels the Python package renders (or the error the package must raise: the recipes that
+read a file), written with the photo (RGBA bytes) and the `subject` and `depth` maps every render is
 handed.
 
     python tests/wasm/oracle.py pkg
 
 Writes OUT/oracle.json (each case as it was given, with its answer), OUT/photo.rgba, OUT/subject.f32, OUT/depth.f32
-and the pixels OUT/<case>.rgba of each case that may differ by a level (`level_bound`).
+and the pixels OUT/<case>.rgba of each case, which the Node test compares as looking the same (looks_the_same.mjs).
 The pixels are those of the 8-bit PNG the package writes for the render, so the native rounding to 8 bits is the
 oracle's too.
 """
 
-import hashlib
 import json
 import sys
 from pathlib import Path
@@ -26,23 +25,6 @@ PHOTO = HERE.parent.parent / "examples" / "photos" / "bullterrier.jpeg"
 SIDE = 480  # the photo's longest side: small, so the Node test runs in seconds
 # the example recipes that read a file: a browser has no file system, so the package must refuse them as named
 NEEDS_FILES = {"blend": "ImageReadError", "color_transfer": "ImageReadError", "lut": "LutError"}
-# Effects that filter through the Fourier transform. rustfft runs a different SIMD routine on each architecture (NEON,
-# AVX with fused multiply-add, WebAssembly SIMD), each rounding the f32 sums its own way, so a render that goes through
-# one can differ from the native one by one level of one channel (measured, of 288000 bytes: on arm64 bloom,
-# engraving, focus_blur, lens_blur and starburst, 1 to 4; on x86-64 Linux engraving, focus_blur, lens_blur and
-# starburst, 1 to 5, and ambient_occlusion 2, gaussian_blur 2 and sharpen 3, whose example recipes blur past the reach
-# the transform takes over at); only the scalar routine matches all of them, and costs these effects 1.4 to 1.6 times
-# as long natively. Every other effect renders to the same bytes.
-FOURIER_EFFECTS = (
-    "ambient_occlusion",
-    "bloom",
-    "engraving",
-    "focus_blur",
-    "gaussian_blur",
-    "lens_blur",
-    "sharpen",
-    "starburst",
-)
 EXAMPLE_SIZE = 300  # every example recipe renders at this size: small, and large enough to show a difference
 
 
@@ -66,15 +48,6 @@ def all_cases() -> list[dict]:
             {"name": f"example-{path.stem}", "recipe": f"../../examples/effects/{path.name}", "size": EXAMPLE_SIZE}
         )
     return cases
-
-
-def level_bound(case: dict) -> int:
-    """How many levels of 255 a channel of the package's render may differ from the native one: 1 for a recipe that
-    uses a Fourier effect (`FOURIER_EFFECTS`), else 0 (the same bytes)."""
-    if "recipe" not in case:
-        return 0
-    text = (HERE / case["recipe"]).read_text(encoding="utf-8")
-    return int(any(f'effect = "{name}"' in text for name in FOURIER_EFFECTS))
 
 
 def native_pixels(photo: np.ndarray, case: dict, maps: dict[str, np.ndarray], scratch: Path) -> tuple[int, int, bytes]:
@@ -108,15 +81,8 @@ def main(out: Path) -> None:
             answer = {"error": NEEDS_FILES[stem]}
         else:
             out_width, out_height, pixels = native_pixels(rgb, case, maps, out / "native.png")
-            bound = level_bound(case)
-            answer = {
-                "width": out_width,
-                "height": out_height,
-                "sha256": hashlib.sha256(pixels).hexdigest(),
-                "bound": bound,
-            }
-            if bound:  # the Node test compares these pixel by pixel
-                (out / f"{case['name']}.rgba").write_bytes(pixels)
+            answer = {"width": out_width, "height": out_height}
+            (out / f"{case['name']}.rgba").write_bytes(pixels)
         answers["cases"][case["name"]] = {**case, **answer}
     (out / "native.png").unlink()
     (out / "oracle.json").write_text(json.dumps(answers, indent=2) + "\n", encoding="utf-8")

@@ -69,10 +69,9 @@ the Python `Lut` wraps the core's table (`_core.Lut`). `_core.effects()` lists t
 process, so renders running at once on several threads of the caller use n threads in all); the render stays on the calling thread, only row bands run on the
 pool, and rayon's global pool is never used. A kernel fills its output with `par::rows(out, row_len, |first_row, band| ..)`
 (`Picture::map` and `map_at` do, so a per-pixel effect is threaded as written); outside a pool it runs inline, and
-`Effect::apply` takes no thread parameter. Rule: the output looks the same at any thread count and is identical where that comes naturally (a band reads only
-input rows and carries nothing from one row to the next; a reduction chunks by the data, never by the thread count). Never add
-real complexity for the last bit: if a kernel's rounding differs between runs with no visible effect, compare within a small
-tolerance. Tests: render at threads 1, 2, 3, 10 and compare (`crates/core/tests/it/threads.rs`). Python: `render`/`trace`/`render_all`
+`Effect::apply` takes no thread parameter. Rule: the output looks the same at any thread count, within the one tolerance of this repository
+(levels of 8-bit output after rounding: at most 1 on 99.9% of samples, at most 2 on all; `crates/core/tests/it/common/compare.rs`).
+Never add complexity for the last bit. Tests: render at threads 1, 2, 3, 10 and compare (`crates/core/tests/it/threads.rs`). Python: `render`/`trace`/`render_all`
 take `threads=`; `Step.apply` and `fx` use 1.
 **Canvas:** `Options::with_canvas(width, height)` names the full canvas the returned picture is placed on, in the pixels of that picture
 (after `size`). The design scale (`px` per design px: effect parameters, the `each` feather, a region's edge) is then the canvas's
@@ -87,8 +86,8 @@ rows beyond the canvas, a side of 0, and a `frame` or `size` (they change the ro
 caller's query: the rows to hand each side of a band (the steps' margins add), none for a recipe a window cannot make: a `frame` or `size`, a step that
 reads the whole picture, an `each` or driven step, one with a `mask`, `partition` or field parameter (the maps of a band are not the canvas's), or one
 that sums a blur by the Fourier transform (`Footprint::Fourier`, from a reach of 16 working px, or a kernel of more than 128 taps: its sum depends on the
-rows it is given), or reads rows at a distance of less than 2^-26 px (`Footprint::Rounded`: `echo`'s `dy`; the position rounds by the row). What it clears is exact: the rows of a window are the whole render's, byte for byte. (`Options::with_band` stays within 1e-4.) `Recipe::close_band_margin(presets, longest_side)` is the same query for a window that need only look the same: it also clears `Footprint::Fourier` and `Footprint::Rounded` steps, whose rows are the whole render's to within 32 of 65,535 on a value of 0 to 1 (0.13 of an 8-bit level; each such step, a later step that raises contrast multiplies it); where `band_margin` has an answer, the two agree and the window is exact.
-`tests/it/window.rs` renders every effect it clears as windows of band plus margin against the whole render, byte for byte, and a table of recipes on
+rows it is given), or reads rows at a distance of less than 2^-26 px (`Footprint::Rounded`: `echo`'s `dy`; the position rounds by the row). What it clears does not depend on how the rows are cut at all (no sum or rounding that follows the window), so the rows of a window look like the whole render's. `Recipe::close_band_margin(presets, longest_side)` is the same query for a window that need only look the same: it also clears `Footprint::Fourier` and `Footprint::Rounded` steps, whose rows look like the whole render's (a later step that raises contrast multiplies the small difference of each such step); where `band_margin` has an answer, the two agree.
+`tests/it/window.rs` renders every effect it clears as windows of band plus margin against the whole render, as looking the same, and a table of recipes on
 both sides of the Fourier switch. Not in Python.
 
 **Spread:** `Effect::spread(params) -> Spread` says how far an effect paints beyond the edge of the box of its content (none by default; `Spread::NONE` for an effect that
@@ -116,12 +115,12 @@ strips and noise counted from the picture's left edge). Every other step runs on
 beside the box's edge. **The limit:** a boxed step does not reach what an earlier step painted into the room (a vignette after a bloom leaves the halo undarkened); a look
 that wants it continuous orders the halos last. Regions (`mask`, fields, partitions) are made for the grown picture and cut to the box. With `with_window` the room is in the
 window's canvas; with `with_band` the runner's bands compose. Refused (`Error::Recipe`, naming `room`): a room that leaves no box, and a `frame` or `size`. `tests/it/room.rs`
-renders every effect on a grown picture (its edge repeated) against the box alone: bit for bit for a boxed step, and inside its margin and spread for the others. Not in Python.
+renders every effect on a grown picture (its edge repeated) against the box alone: looking the same for a boxed step, and inside its margin and spread for the others. Not in Python.
 
 **GPU** (feature `gpu`; `crates/core/src/gpu.rs`, `gpu/`, `run/gpu.rs`; why: design-decisions, "GPU backend"). Supported on macOS (Metal) and the browser (WebGPU); any other system is experimental: `gpu.rs`'s one platform check refuses it before any device work unless the environment sets `BT_GPU_EXPERIMENTAL=1`. The CPU
 renders are the plain calls (`photo.render`); a GPU render is a call on the context, the one place that chooses it. Every GPU
-call is `async`, with no blocking twin; `Options` are plain data (`Copy`). The CPU is the reference and byte promises are CPU
-promises.
+call is `async`, with no blocking twin; `Options` are plain data (`Copy`). The CPU is the reference, and a GPU render is held to a
+bound against it, never to bytes.
 
 ```text
 let gpu = Gpu::request().await?;                          // or Gpu::new(device, queue): the caller's wgpu device
