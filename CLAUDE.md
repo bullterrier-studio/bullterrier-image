@@ -133,7 +133,7 @@ its parameters.
   parameters and everything else by keyword. What only the library uses is a function of its module, not an attribute
   of a public class.
 - Output files carry no EXIF or GPS data from the input.
-- A new CI check goes into `ci-ok`'s `needs` and into `build`'s; image's own jobs are in `.github/workflows/project.yml`.
+- A new CI check goes into `ci-ok`'s `needs` (ci.yml); `build` is in platforms.yml, outside the gate. image's own jobs are in `.github/workflows/project.yml`.
 
 ## The effect contract
 
