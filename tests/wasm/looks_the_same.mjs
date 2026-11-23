@@ -5,15 +5,16 @@
 export const SHARE_BEYOND_ONE_LEVEL = 0.001;
 export const MOST_LEVELS = 2;
 
-/** Why `actual` does not look like `expected` (two byte arrays), or null if it does. */
+/** Why `actual` does not look like `expected` (two RGBA byte arrays), or null if it does. The share counts colour
+ * samples only, as the Rust and Python helpers do; an alpha byte is still held to MOST_LEVELS. */
 export function differenceInLooks(actual, expected) {
   if (actual.length !== expected.length) return `${actual.length} samples against ${expected.length}`;
   let beyondOne = 0;
   for (let index = 0; index < actual.length; index++) {
     const gap = Math.abs(actual[index] - expected[index]);
     if (gap > MOST_LEVELS) return `sample ${index} is ${gap} levels apart`;
-    if (gap > 1) beyondOne++;
+    if (gap > 1 && index % 4 !== 3) beyondOne++;
   }
-  const allowed = Math.floor(SHARE_BEYOND_ONE_LEVEL * actual.length);
+  const allowed = Math.floor((SHARE_BEYOND_ONE_LEVEL * actual.length * 3) / 4);
   return beyondOne > allowed ? `${beyondOne} samples are 2 levels apart; ${allowed} allowed` : null;
 }

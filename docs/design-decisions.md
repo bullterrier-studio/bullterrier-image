@@ -759,7 +759,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   deviation is a promise of how the noise is made. *Consequence:* a picture's own deviation is only about the asked one (at
   480 px, 30 seeds: `paper_texture`, `grain` and `vhs` noise 0.98-1.03; `noise_field` value level 0.229-0.319 against
   0.289 for a uniform; `fog` at the default coverage 0.93 covers 0.80-1.00 of the picture); the tests read mean and
-  deviation over seeds. Blurs of 16 px a side or more are Fourier transforms, equal to the whole within 1e-5, not to the bit.
+  deviation over seeds. Blurs of 16 px a side or more are Fourier transforms: a band looks the same as the whole (the one tolerance).
   `noise::field` (standardised over the picture) is gone: every fractal field, `displace`, `flow_warp`, `melt`, `aurora`,
   `torn_edge` and the torn regions included, is `field_rows`, so the one noise decision lives in the noise op. `displace`'s
   `amount` is the deviation of each move, no longer the longest (that needs the whole picture; default 12 to 4); at 480 px
