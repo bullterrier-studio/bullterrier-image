@@ -55,11 +55,11 @@ fn assert_close_refuses_lists_of_different_lengths() {
 }
 
 /// 1000 samples at 0.5 and a copy of them, `moved` levels of 255 off at the given indices.
-fn thousand_with(moved: &[(usize, i32)]) -> (Vec<f32>, Vec<f32>) {
+fn thousand_with(moved: &[(usize, i16)]) -> (Vec<f32>, Vec<f32>) {
     let base = vec![0.5_f32; 1000];
     let mut other = base.clone();
     for &(at, levels) in moved {
-        other[at] += levels as f32 / 255.0;
+        other[at] += f32::from(levels) / 255.0;
     }
     (base, other)
 }

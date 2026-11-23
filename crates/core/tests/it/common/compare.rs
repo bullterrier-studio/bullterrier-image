@@ -97,7 +97,6 @@ pub(crate) fn looks_the_same(actual: &[f32], expected: &[f32]) -> bool {
 
 /// Fails unless `actual` looks like `expected`, saying how it does not and `context`.
 pub(crate) fn assert_looks_the_same(actual: &[f32], expected: &[f32], context: &str) {
-    if let Some(why) = difference_in_looks(actual, expected) {
-        panic!("{context}: {why}");
-    }
+    let why = difference_in_looks(actual, expected);
+    assert!(why.is_none(), "{context}: {}", why.unwrap_or_default());
 }
