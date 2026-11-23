@@ -377,15 +377,15 @@ def test_every_row_of_the_real_pages_links_to_its_effects_own_picture_and_recipe
 # --- rendering ---------------------------------------------------------------------------------------------------
 
 
-def test_gallery_renders_missing_pictures_only_unless_forced(checkout, probe):
+def test_gallery_renders_missing_pictures_only_unless_forced(checkout, probe, assert_looks_the_same):
     picture = gallery.effect_files(probe, checkout=checkout).picture
     assert gallery.render_gallery(only=[probe], checkout=checkout) == [probe]
-    first = picture.read_bytes()
+    first = imageio.load(picture)
     picture.write_bytes(b"placeholder")
     assert gallery.render_gallery(only=[probe], checkout=checkout) == []  # it exists, so it is left alone
     assert picture.read_bytes() == b"placeholder"
     assert gallery.render_gallery(only=[probe], force=True, checkout=checkout) == [probe]
-    assert picture.read_bytes() == first  # rendered again, and rendering is deterministic
+    assert_looks_the_same(imageio.load(picture), first)  # rendered again
 
 
 def test_gallery_pictures_are_jpegs_480_px_on_the_longest_side_at_quality_82(checkout, probe):

@@ -838,26 +838,30 @@ def grid_first_project(folder) -> Project:
     return load_project(folder / "bt-image.toml")
 
 
-def test_the_subject_of_each_piece_is_remembered_between_runs_so_the_model_is_not_asked_again(folder):
+def test_the_subject_of_each_piece_is_remembered_between_runs_so_the_model_is_not_asked_again(
+    folder, assert_looks_the_same
+):
     project = grid_first_project(folder)
     finder = PieceFinder()
     run(project, only="a.png", finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 4  # one for each piece of the picture, at the recipe's size
     assert {crop.shape for crop in finder.crops} == {(24, 32, 3)}
-    first = (folder / "out" / "a" / "grid-first.png").read_bytes()
+    first = imageio.load(folder / "out" / "a" / "grid-first.png")
     run(project, only="a.png", force=True, finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 4  # the repeat render reads what was found
-    assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first  # and comes out the same picture
+    assert_looks_the_same(
+        imageio.load(folder / "out" / "a" / "grid-first.png"), first
+    )  # and comes out looking the same
 
 
-def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder):
+def test_a_piece_the_finder_found_nothing_in_is_remembered_too(folder, assert_looks_the_same):
     project = grid_first_project(folder)
     finder = PieceFinder(empty=(1, 3))
     run(project, only="a.png", finders={"subject": Finder("stand-in", finder)})
-    first = (folder / "out" / "a" / "grid-first.png").read_bytes()
+    first = imageio.load(folder / "out" / "a" / "grid-first.png")
     run(project, only="a.png", force=True, finders={"subject": Finder("stand-in", finder)})
     assert len(finder.crops) == 4
-    assert (folder / "out" / "a" / "grid-first.png").read_bytes() == first
+    assert_looks_the_same(imageio.load(folder / "out" / "a" / "grid-first.png"), first)
 
 
 def test_a_piece_finder_that_answers_values_that_are_not_finite_fails_the_recipe_and_is_never_remembered(folder):

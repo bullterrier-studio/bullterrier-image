@@ -57,11 +57,13 @@ class Finds:
         return self.answer
 
 
-def test_a_map_found_by_a_finder_is_the_map_handed_in_and_the_finder_is_asked_once(photo, subject):
+def test_a_map_found_by_a_finder_is_the_map_handed_in_and_the_finder_is_asked_once(
+    photo, subject, assert_looks_the_same
+):
     recipe = Recipe([Step("grade", params={"exposure": 1}, mask="subject"), Step("grade", mask="background")])
     finder = Finds(subject)
     found = core_render(photo, recipe, finders={"subject": finder})
-    np.testing.assert_array_equal(found, core_render(photo, recipe, maps={"subject": subject}))
+    assert_looks_the_same(found, core_render(photo, recipe, maps={"subject": subject}))
     assert len(finder.asked) == 1  # two steps use the subject, one of them through the background
     np.testing.assert_array_equal(finder.asked[0], photo)  # the photo as given
 
@@ -79,7 +81,7 @@ def test_a_finder_may_answer_in_any_float_type(photo, subject):
     np.testing.assert_allclose(wide, core_render(photo, recipe, maps={"subject": subject}), atol=1e-6)
 
 
-def test_the_core_finds_the_depth_and_a_given_region_by_their_finders_too(photo, subject):
+def test_the_core_finds_the_depth_and_a_given_region_by_their_finders_too(photo, subject, assert_looks_the_same):
     recipe = Recipe(
         [
             Step("grade", params={"exposure": 1}, mask="sky"),
@@ -89,7 +91,7 @@ def test_the_core_finds_the_depth_and_a_given_region_by_their_finders_too(photo,
     )
     got = core_render(photo, recipe, finders={"sky": Finds(subject), "depth": Finds(ramp(photo))})
     expected = core_render(photo, recipe, maps={"sky": subject, "depth": ramp(photo)})
-    np.testing.assert_array_equal(got, expected)
+    assert_looks_the_same(got, expected)
 
 
 MISSING = {

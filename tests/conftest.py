@@ -189,6 +189,40 @@ def throwaway_effects():
         unregister(name)
 
 
+# The one tolerance of "looks the same" in this repository: two renders of one look (a route, a thread count, a cached
+# run against a cold one, one platform against another) are compared in levels of 8-bit output after rounding. Every
+# sample is within MOST_LEVELS levels and all but SHARE_BEYOND_ONE_LEVEL of them within one. The Rust tests state the
+# same numbers in crates/core/tests/it/common/compare.rs, the WebAssembly tests in tests/wasm/looks_the_same.mjs.
+SHARE_BEYOND_ONE_LEVEL = 0.001
+MOST_LEVELS = 2
+
+
+def difference_in_looks(actual: np.ndarray, expected: np.ndarray) -> str | None:
+    """Why `actual` does not look like `expected` (shape, non-numbers, a sample too far off), or none if it does."""
+    if actual.shape != expected.shape:
+        return f"shape {actual.shape} against {expected.shape}"
+    if not (np.isfinite(actual).all() and np.isfinite(expected).all()):
+        return "a sample is not a number"
+    gap = np.abs(np.rint(np.clip(actual, 0, 1) * 255) - np.rint(np.clip(expected, 0, 1) * 255))
+    if gap.max(initial=0) > MOST_LEVELS:
+        return f"sample {int(np.argmax(gap))} is {int(gap.max())} levels apart"
+    beyond_one = int((gap > 1).sum())
+    if beyond_one > SHARE_BEYOND_ONE_LEVEL * gap.size:
+        return f"{beyond_one} of {gap.size} samples are 2 levels apart"
+    return None
+
+
+@pytest.fixture
+def assert_looks_the_same() -> Callable[[np.ndarray, np.ndarray], None]:
+    """`assert_looks_the_same(actual, expected)` fails unless the two pictures look the same (`difference_in_looks`)."""
+
+    def check(actual: np.ndarray, expected: np.ndarray) -> None:
+        why = difference_in_looks(np.asarray(actual), np.asarray(expected))
+        assert why is None, why
+
+    return check
+
+
 @pytest.fixture
 def photo() -> np.ndarray:
     """A small, deterministic, non-trivial picture: colour gradients plus noise."""

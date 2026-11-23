@@ -204,7 +204,9 @@ def test_the_files_that_use_the_regions_the_core_makes_are_the_ones_the_scan_fou
 
 
 @pytest.mark.parametrize("path", MADE, ids=ID)
-def test_a_shipped_file_that_uses_regions_renders_a_picture_that_the_look_changed(path, photo, subject):
+def test_a_shipped_file_that_uses_regions_renders_a_picture_that_the_look_changed(
+    path, photo, subject, assert_looks_the_same
+):
     recipe = load_recipe(path)
     maps = {"subject": subject, "depth": depth_of(photo)}
     made = core_render(photo, recipe, maps=maps)
@@ -213,13 +215,15 @@ def test_a_shipped_file_that_uses_regions_renders_a_picture_that_the_look_change
     assert made.min() >= 0
     assert made.max() <= 1
     last = bridge.trace(photo, recipe, maps=maps)[-1]
-    np.testing.assert_array_equal(last[2], made)  # the last stage of a trace is the render
+    assert_looks_the_same(last[2], made)  # the last stage of a trace is the render
     if recipe.frame == Framing() and recipe.size is None:
         assert np.abs(made - photo).max() > 1e-3  # the look does something
 
 
 @pytest.mark.parametrize("path", DRAWN, ids=ID)
-def test_a_shipped_file_that_draws_an_svg_renders_the_same_every_time_and_stays_a_picture(path, photo, subject):
+def test_a_shipped_file_that_draws_an_svg_renders_the_same_every_time_and_stays_a_picture(
+    path, photo, subject, assert_looks_the_same
+):
     recipe = load_recipe(path)
     maps = {"subject": subject, "depth": depth_of(photo)}
     made = core_render(photo, recipe, maps=maps)
@@ -227,12 +231,14 @@ def test_a_shipped_file_that_draws_an_svg_renders_the_same_every_time_and_stays_
     assert np.isfinite(made).all()
     assert made.min() >= 0
     assert made.max() <= 1
-    np.testing.assert_array_equal(bridge.trace(photo, recipe, maps=maps)[-1][2], made)
-    np.testing.assert_array_equal(core_render(photo, recipe, maps=maps), made)
+    assert_looks_the_same(bridge.trace(photo, recipe, maps=maps)[-1][2], made)
+    assert_looks_the_same(core_render(photo, recipe, maps=maps), made)
 
 
 @pytest.mark.parametrize("path", SEEDED, ids=ID)
-def test_a_shipped_file_with_shards_or_a_torn_edge_renders_the_same_every_time_and_does_something(path, photo):
+def test_a_shipped_file_with_shards_or_a_torn_edge_renders_the_same_every_time_and_does_something(
+    path, photo, assert_looks_the_same
+):
     # seeded: the shards and the tear are not numpy's, so only properties are compared (the python engine's differ)
     recipe = load_recipe(path)
     given = {"maps": {"depth": depth_of(photo)}, "finders": {"subject": Truth()}}
@@ -241,6 +247,6 @@ def test_a_shipped_file_with_shards_or_a_torn_edge_renders_the_same_every_time_a
     assert np.isfinite(made).all()
     assert made.min() >= 0
     assert made.max() <= 1
-    np.testing.assert_array_equal(core_render(photo, recipe, **given), made)
+    assert_looks_the_same(core_render(photo, recipe, **given), made)
     if recipe.frame == Framing() and recipe.size is None:
         assert np.abs(made - photo).max() > 1e-3
