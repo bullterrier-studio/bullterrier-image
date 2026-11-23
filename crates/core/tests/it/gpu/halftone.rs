@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use bullterrier_image::{Image, Options, Photo, Picture, Presets, Recipe, Step};
+use bullterrier_image::{Image, Options, Photo, Picture, Presets, Recipe, Step, Transfers};
 use serde_json::{Value, json};
 
 use super::{fresh, largest_gap, rendered};
@@ -21,13 +21,16 @@ fn halftone(settings: &[(&str, Value)]) -> Recipe {
 
 /// The CPU's gap from the GPU's picture of `recipe`, and what the GPU moved (uploads, downloads).
 fn both(recipe: &Recipe) -> Result<(f32, (u64, u64)), Box<dyn std::error::Error>> {
-    both_with_tables(recipe).map(|(gap, moved, _)| (gap, moved))
+    moved_by(recipe).map(|(gap, moved)| (gap, (moved.uploads, moved.downloads)))
 }
 
-/// As [`both`], and the tables the GPU was sent.
-fn both_with_tables(recipe: &Recipe) -> Result<(f32, (u64, u64), u64), Box<dyn std::error::Error>> {
+/// As [`both`], and everything the GPU was sent.
+fn moved_by(recipe: &Recipe) -> Result<(f32, Transfers), Box<dyn std::error::Error>> {
     let Some(gpu) = fresh() else {
-        return Ok((0.0, (1, 1), 1));
+        // no GPU: as before, one each way
+        let mut skipped = Transfers::default();
+        (skipped.uploads, skipped.tables, skipped.downloads) = (1, 1, 1);
+        return Ok((0.0, skipped));
     };
     // a picture with some structure (a ramp across, noise) so cells of every tone appear
     let noise = varied_seeded(SIZE.0, SIZE.1, 5);
@@ -44,11 +47,7 @@ fn both_with_tables(recipe: &Recipe) -> Result<(f32, (u64, u64), u64), Box<dyn s
     let cpu = photo.render(recipe, &Presets::new(), Options::default())?.into_values();
     let on_gpu = rendered(&gpu, &photo, recipe, Options::default())?.into_values();
     let moved = gpu.transfers();
-    Ok((
-        largest_gap(&cpu, &on_gpu).0,
-        (moved.uploads, moved.downloads),
-        moved.tables,
-    ))
+    Ok((largest_gap(&cpu, &on_gpu).0, moved))
 }
 
 /// Says a gap when `BT_GPU_GAPS` is set (the bounds measured, for the docs).
@@ -205,10 +204,9 @@ fn the_separations_shapes_and_screens_run_on_the_device_within_the_bound() -> cr
 #[test]
 fn a_blur_too_long_to_sum_is_the_cpus_from_a_counted_readback_and_upload() -> crate::common::Outcome {
     // the defaults at the design's size: a cell of 14 and a blur of 7 px, which the CPU makes with the Fourier transform
-    let (gap, moved, tables) = both_with_tables(&halftone(&[]))?;
+    let (gap, moved) = moved_by(&halftone(&[]))?;
     // up, down for the blur; the blurred picture goes up as the kernel's table; the result down
-    assert_eq!(moved, (1, 2));
-    assert_eq!(tables, 1);
+    assert_eq!((moved.uploads, moved.tables, moved.downloads), (1, 1, 2));
     assert!(gap <= bound(), "gap {gap:e}");
     Ok(())
 }

@@ -37,7 +37,9 @@ fn a_table_sent_to_the_device_is_counted_with_its_bytes() -> crate::common::Outc
     let Some(gpu) = fresh() else { return Ok(()) };
     // 40 entries a side: 64,000 colours of 3 floats
     let size = 40_usize;
-    let entries = (0..size.pow(3)).map(|at| [(at % 7) as f32 / 7.0; 3]).collect();
+    let entries = (0..size.pow(3))
+        .map(|at| [f32::from(u8::try_from(at % 7).unwrap_or(0)) / 7.0; 3])
+        .collect();
     let lut = Lut::new(size, [0.0; 3], [1.0; 3], entries)?;
     let values = varied_seeded(23, 19, 4);
     let photo = Photo::new(Picture::new(23, 19, &values)?).with_lut("grade", Arc::new(lut));
