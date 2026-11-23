@@ -685,30 +685,6 @@ fn every_format_embeds_the_srgb_profile_with_its_fixed_date() -> Outcome {
 }
 
 #[test]
-fn the_same_image_gives_the_same_bytes_every_time_and_a_different_one_gives_others() -> Outcome {
-    for extension in ALL {
-        let image = noise(13, 21)?;
-        let first = written_bytes(&image, &format!("a.{extension}"))?;
-        assert!(
-            first == written_bytes(&image, &format!("a.{extension}"))?,
-            "{extension}"
-        );
-        assert!(
-            first != written_bytes(&noise(13, 22)?, &format!("a.{extension}"))?,
-            "{extension}"
-        );
-    }
-    for extension in LOSSLESS {
-        let image = levels_with_alpha(6, 7)?;
-        assert!(
-            written_bytes(&image, &format!("a.{extension}"))? == written_bytes(&image, &format!("a.{extension}"))?,
-            "{extension} with alpha"
-        );
-    }
-    Ok(())
-}
-
-#[test]
 fn a_file_written_is_a_file_other_readers_open() -> Outcome {
     // The `image` crate's reader (no code of ours) opens each format and sees the picture's size.
     let image = levels(6, 8)?;

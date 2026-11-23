@@ -124,7 +124,7 @@ const FORMERLY_CODED: [(Palette, &[&str]); 7] = [
 ];
 
 #[test]
-fn a_named_palette_gives_the_same_picture_bit_for_bit_as_its_colours_given_as_custom() -> Result<(), Error> {
+fn a_named_palette_gives_the_same_picture_as_its_colours_given_as_custom() -> Result<(), Error> {
     let picture = (24, 24, varied(24, 24));
     for (palette, colours) in FORMERLY_CODED {
         let custom = colours

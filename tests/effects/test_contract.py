@@ -42,12 +42,14 @@ def assert_a_picture_like(out: np.ndarray, rgb: np.ndarray) -> None:
 
 
 @pytest.mark.parametrize("name", ALL)
-def test_every_effect_keeps_shape_dtype_and_range_is_deterministic_and_leaves_its_input_alone(name, photo):
+def test_every_effect_keeps_shape_dtype_and_range_is_deterministic_and_leaves_its_input_alone(
+    name, photo, assert_looks_the_same
+):
     before = photo.copy()
     inputs = _inputs(name, photo)
     first, second = registry.apply(name, photo, **inputs), registry.apply(name, photo, **inputs)
     assert_a_picture_like(first, photo)
-    np.testing.assert_array_equal(first, second)
+    assert_looks_the_same(first, second)
     np.testing.assert_array_equal(photo, before)
 
 

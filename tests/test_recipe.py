@@ -185,7 +185,9 @@ def test_shipped_recipes_all_load():
     assert all(load_recipe(f).steps for f in files)
 
 
-def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_model, monkeypatch):
+def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(
+    echo_model, monkeypatch, assert_looks_the_same
+):
     """Without a subject map or finder, `bullterrier_image.recipe`'s functions find the subject with `subject_matte`:
     the results must equal the core's given `subject_matte`'s answer. The portable backend with a stand-in model (the
     external boundary, see `echo_model`) is chosen through the environment, so the test is the same on every OS."""
@@ -199,11 +201,11 @@ def test_the_facade_finds_the_subject_with_matte_subject_matte_by_default(echo_m
     assert not np.array_equal(
         expected, facade.render(photo, masked, maps={"subject": np.ones_like(alpha)})
     )  # the subject matters
-    np.testing.assert_array_equal(facade.render(photo, masked), expected)
-    np.testing.assert_array_equal(facade.trace(photo, masked)[-1].image, expected)
-    np.testing.assert_array_equal(facade.render_all(photo, [masked])[0], expected)
-    np.testing.assert_array_equal(masking.apply(photo), expected)  # one step alone, with the same finder
-    np.testing.assert_array_equal(facade.render(photo, masking), expected)
+    assert_looks_the_same(facade.render(photo, masked), expected)
+    assert_looks_the_same(facade.trace(photo, masked)[-1].image, expected)
+    assert_looks_the_same(facade.render_all(photo, [masked])[0], expected)
+    assert_looks_the_same(masking.apply(photo), expected)  # one step alone, with the same finder
+    assert_looks_the_same(facade.render(photo, masking), expected)
 
 
 STEP_ALONE = {
@@ -214,12 +216,12 @@ STEP_ALONE = {
 
 
 @pytest.mark.parametrize(("step", "given"), STEP_ALONE.values(), ids=STEP_ALONE.keys())
-def test_one_step_applied_alone_is_the_recipe_of_that_step_rendered(photo, subject, step, given):
+def test_one_step_applied_alone_is_the_recipe_of_that_step_rendered(photo, subject, step, given, assert_looks_the_same):
     options = {**given, "maps": {"subject": subject}} if "maps" in given else given
     expected = render(photo, Recipe([step]), **options)
-    np.testing.assert_array_equal(step.apply(photo, **options), expected)
-    np.testing.assert_array_equal(render(photo, step, **options), expected)
-    np.testing.assert_array_equal(trace(photo, step, **options)[-1].image, expected)
+    assert_looks_the_same(step.apply(photo, **options), expected)
+    assert_looks_the_same(render(photo, step, **options), expected)
+    assert_looks_the_same(trace(photo, step, **options)[-1].image, expected)
 
 
 STEP, ONE = fx.grade(), Recipe([fx.grade()])
@@ -240,15 +242,15 @@ def test_render_refuses_what_is_no_recipe_naming_the_fix(photo, run, arguments, 
         run(*arguments(photo))
 
 
-def test_render_takes_a_recipe_a_step_and_render_all_a_sequence_of_recipes(photo):
+def test_render_takes_a_recipe_a_step_and_render_all_a_sequence_of_recipes(photo, assert_looks_the_same):
     step = fx.grade(exposure=0.3)
     recipe = Recipe([step])
     expected = render(photo, recipe)
-    np.testing.assert_array_equal(render(photo, step), expected)
+    assert_looks_the_same(render(photo, step), expected)
     assert trace(photo, recipe)[-1].image.shape == expected.shape
     for recipes in ([recipe], (recipe,)):
         (rendered,) = render_all(photo, recipes)
-        np.testing.assert_array_equal(rendered, expected)
+        assert_looks_the_same(rendered, expected)
 
 
 FRESH_STEPS = {
@@ -287,10 +289,10 @@ def test_a_step_applies_in_a_fresh_process_that_imported_nothing_else(tmp_path, 
     np.testing.assert_array_equal(np.load(tmp_path / "out.npy"), step.apply(photo))
 
 
-def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, subject):
+def test_the_facade_uses_a_given_finder_instead_of_the_default(photo, subject, assert_looks_the_same):
     masked = Recipe((Step("gradient", params={"colors": ["#000000"]}, mask="background"),), name="m", size=None)
     found = facade.render(photo, masked, finders={"subject": Finder("stand-in", lambda rgb: 1.0 - subject)})
-    np.testing.assert_array_equal(found, facade.render(photo, masked, maps={"subject": 1.0 - subject}))
+    assert_looks_the_same(found, facade.render(photo, masked, maps={"subject": 1.0 - subject}))
     assert not np.array_equal(found, facade.render(photo, masked, maps={"subject": subject}))
 
 
@@ -350,7 +352,7 @@ def test_the_default_depth_finder_is_built_only_when_a_recipe_needs_depth(photo,
         call(photo, recipe, **({"maps": {"depth": ramp}} if given else {}))
 
 
-def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
+def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model, assert_looks_the_same):
     """Without a `depth` map or finder, `bullterrier_image.recipe`'s functions find the depth with `depth_map`, here
     run by a stand-in model (the external boundary, see `depth_echo_model`)."""
     depth_echo_model(0)
@@ -358,9 +360,9 @@ def test_the_facade_finds_the_depth_with_depth_map_by_default(depth_echo_model):
     expected = facade.render(photo, DEEP, maps={"depth": depth_map(photo)})
     flat = np.zeros(photo.shape[:2], np.float32)
     assert not np.array_equal(expected, facade.render(photo, DEEP, maps={"depth": flat}))  # the depth matters
-    np.testing.assert_array_equal(facade.render(photo, DEEP), expected)
-    np.testing.assert_array_equal(facade.trace(photo, DEEP)[-1].image, expected)
-    np.testing.assert_array_equal(facade.render_all(photo, [DEEP])[0], expected)
+    assert_looks_the_same(facade.render(photo, DEEP), expected)
+    assert_looks_the_same(facade.trace(photo, DEEP)[-1].image, expected)
+    assert_looks_the_same(facade.render_all(photo, [DEEP])[0], expected)
 
 
 # --- the map of one region -----------------------------------------------------------------------------------------

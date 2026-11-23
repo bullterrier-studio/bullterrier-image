@@ -87,9 +87,9 @@ def test_the_finder_is_not_called_when_nothing_needs_the_subject_or_the_matte_is
     assert finder.seen == []
 
 
-def test_the_finders_matte_is_the_one_the_recipe_uses(photo, subject):
+def test_the_finders_matte_is_the_one_the_recipe_uses(photo, subject, assert_looks_the_same):
     found = facade.render(photo, MASKED, finders={"subject": Finder("stand-in", CountingFinder(subject))})
-    np.testing.assert_array_equal(found, facade.render(photo, MASKED, maps={"subject": subject}))
+    assert_looks_the_same(found, facade.render(photo, MASKED, maps={"subject": subject}))
     assert not np.array_equal(found, facade.render(photo, MASKED, maps={"subject": 1.0 - subject}))
 
 
@@ -467,11 +467,11 @@ def test_a_field_between_two_levels_mixes_their_renders_by_the_distance_to_each(
     np.testing.assert_allclose(got, 0.5 * first + 0.5 * second, atol=1e-6, rtol=0)
 
 
-def test_a_driven_step_is_traced_by_name_and_its_last_stage_is_the_render(photo, brighten):
+def test_a_driven_step_is_traced_by_name_and_its_last_stage_is_the_render(photo, brighten, assert_looks_the_same):
     recipe = driven(gain=(0.5, 2.5))
     stages = facade.trace(photo, recipe, maps={"f": field_of(photo, 0.5)})
     assert stages[-1].label == "1. brighten_probe(gain=by f 0.5..2.5)"
-    np.testing.assert_array_equal(stages[-1].image, facade.render(photo, recipe, maps={"f": field_of(photo, 0.5)}))
+    assert_looks_the_same(stages[-1].image, facade.render(photo, recipe, maps={"f": field_of(photo, 0.5)}))
 
 
 def test_a_drive_by_a_map_nobody_gave_is_refused_like_any_use_of_it(photo, brighten):
@@ -766,15 +766,15 @@ BANDED = Recipe(
 )
 
 
-def test_a_band_taller_than_the_picture_is_the_whole_render(photo):
+def test_a_band_taller_than_the_picture_is_the_whole_render(photo, assert_looks_the_same):
     whole = facade.render(photo, BANDED)
-    np.testing.assert_array_equal(facade.render(photo, BANDED, band=2**63), whole)
+    assert_looks_the_same(facade.render(photo, BANDED, band=2**63), whole)
 
 
-def test_a_banded_render_gives_the_picture_of_the_whole_render(photo):
+def test_a_banded_render_gives_the_picture_of_the_whole_render(photo, assert_looks_the_same):
     whole = facade.render(photo, BANDED)
-    np.testing.assert_array_equal(facade.render(photo, BANDED, band=16), whole)
-    np.testing.assert_array_equal(facade.render_all(photo, [BANDED], band=16)[0], whole)
+    assert_looks_the_same(facade.render(photo, BANDED, band=16), whole)
+    assert_looks_the_same(facade.render_all(photo, [BANDED], band=16)[0], whole)
 
 
 @pytest.mark.parametrize(

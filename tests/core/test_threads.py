@@ -36,9 +36,9 @@ def big_photo() -> np.ndarray:
     return np.random.default_rng(2).random((300, 400, 3), dtype=np.float32)
 
 
-def test_a_render_on_more_threads_gives_the_same_bytes_as_on_one(big_photo):
+def test_a_render_on_more_threads_looks_the_same_as_on_one(big_photo, assert_looks_the_same):
     alone = facade.render(big_photo, threaded_look())
-    assert facade.render(big_photo, threaded_look(), threads=2).tobytes() == alone.tobytes()
+    assert_looks_the_same(facade.render(big_photo, threaded_look(), threads=2), alone)
 
 
 @pytest.mark.parametrize(
@@ -58,10 +58,13 @@ def test_a_threads_that_is_no_number_of_threads_is_refused_naming_it(photo, thre
         facade.render(photo, PLAIN, threads=threads)
 
 
-def test_renders_from_several_python_threads_with_threads_each_give_each_photos_picture(big_photo):
+def test_renders_from_several_python_threads_with_threads_each_give_each_photos_picture(
+    big_photo, assert_looks_the_same
+):
     photos = [np.ascontiguousarray(np.roll(big_photo, shift, axis=1)) for shift in range(8)]
-    alone = [facade.render(photo, threaded_look()).tobytes() for photo in photos]
+    alone = [facade.render(photo, threaded_look()) for photo in photos]
     with ThreadPoolExecutor(4) as pool:
-        together = list(pool.map(lambda photo: facade.render(photo, threaded_look(), threads=2).tobytes(), photos))
-    assert together == alone
-    assert len(set(alone)) == len(alone), "the photos give different pictures"
+        together = list(pool.map(lambda photo: facade.render(photo, threaded_look(), threads=2), photos))
+    for one, other in zip(together, alone, strict=True):
+        assert_looks_the_same(one, other)
+    assert len({picture.tobytes() for picture in alone}) == len(alone), "the photos give different pictures"

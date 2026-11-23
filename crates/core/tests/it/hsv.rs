@@ -76,7 +76,7 @@ fn a_turn_forwards_and_the_same_turn_backwards_give_the_same_colour() -> Result<
 }
 
 #[test]
-fn the_pixels_outside_the_range_and_the_greys_come_back_bit_for_bit() -> Result<(), Error> {
+fn the_pixels_outside_the_range_and_the_greys_come_back_unchanged() -> Result<(), Error> {
     // red (hue 0) is the centre; green (120) and blue (240) are far outside width 40 and feather 20
     let pixels = [
         [0.3, 0.3, 0.3],
