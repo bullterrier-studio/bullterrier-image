@@ -10,6 +10,10 @@ its `Unreleased` becomes the release date.
 
 ## [Unreleased]
 
+### Added
+
+- `read_bytes` and `read_map_bytes` read a picture or a map from bytes (a file a web page hands over), by the same rules as `read` and `read_map`.
+
 ### Changed
 
 - `bt-image install onnx` (and a download the library allows) takes ONNX Runtime 1.23.2 from Microsoft's wheel on PyPI:

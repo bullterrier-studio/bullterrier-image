@@ -39,7 +39,7 @@ the result is laid over its input by `ops/blend` (blend mode, opacity, mask), an
 (`ops/levels`). After the last step `frame.transparent` gives the `Image` an alpha (`channels()` 3|4; `into_values` is
 `channels()` per pixel, straight alpha; `ops/cutout`); effects read a `Picture` and never see it. `Layer` (an h x w map, finite,
 0..1) and `Labels` (piece numbers) are the maps. **Files** (`crates/core/src/files.rs`, `files/`): `read` (RGB or RGBA with straight alpha, upright, first frame, an embedded
-profile converted to sRGB), `read_map`, `write` and `write_with` (png, jpg, webp; only the sRGB profile
+profile converted to sRGB), `read_map` (and `read_bytes`, `read_map_bytes`: the same from bytes, errors name "the given bytes"), `write` and `write_with` (png, jpg, webp; only the sRGB profile
 embedded, and a `dpi` if asked: `pHYs`, JFIF density); a fixed pixel limit and a decoder memory cap; `ErrorKind::ImageRead`, `ImageWrite` and `BackendUnavailable`.
 `imageio.py` calls them through `core/native.py` and keeps what is Python's (composite over white, array checks). `Error::kind()` names the package exception of an error (`ErrorKind`, one mapping
 for every binding). **Regions:** `Recipe.regions` is an ordered `Regions` of the 15 typed kinds in `bullterrier_image::region`

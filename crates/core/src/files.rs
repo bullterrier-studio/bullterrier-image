@@ -1,8 +1,7 @@
 //! Reading and writing image files.
 
 use std::fmt::Display;
-use std::fs::File;
-use std::io::BufReader;
+use std::io::Cursor;
 use std::path::Path;
 
 use image::metadata::Orientation;
@@ -86,13 +85,29 @@ struct Decoded {
 /// pixels than 178,956,970 (twice Pillow's `MAX_IMAGE_PIXELS` of 89,478,485), which is checked from the header before
 /// anything is decoded.
 pub fn read(path: &Path) -> Result<Image, Error> {
+    let name = path.display();
+    let bytes = std::fs::read(path).map_err(|error| unreadable(&name, &error))?;
+    picture(&bytes, &name)
+}
+
+/// Read the image held in `bytes`, as [`read`] reads a file: the same formats (found by content), orientation, profile,
+/// limits and levels, the format being the only thing a file name would have added. For a caller with no file system,
+/// such as a web page handed a file.
+///
+/// # Errors
+/// [`Error::ImageRead`] as for [`read`], naming "the given bytes" in place of a path.
+pub fn read_bytes(bytes: &[u8]) -> Result<Image, Error> {
+    picture(bytes, &GIVEN)
+}
+
+fn picture(bytes: &[u8], name: &dyn Display) -> Result<Image, Error> {
     let Decoded {
         height,
         width,
         colour,
         alpha,
         ..
-    } = decode(path, true)?;
+    } = decode(bytes, name, true)?;
     let image = Image::from_pixels(height, width, colour);
     Ok(match alpha {
         Some(alpha) => image.with_alpha(alpha),
@@ -117,6 +132,20 @@ pub fn read(path: &Path) -> Result<Image, Error> {
 /// # Errors
 /// [`Error::ImageRead`] as for [`read`]; for those two TIFFs the message names the mode.
 pub fn read_map(path: &Path) -> Result<Layer, Error> {
+    let name = path.display();
+    let bytes = std::fs::read(path).map_err(|error| unreadable(&name, &error))?;
+    map(&bytes, &name)
+}
+
+/// Read the image held in `bytes` as a map, as [`read_map`] reads a file.
+///
+/// # Errors
+/// [`Error::ImageRead`] as for [`read_map`], naming "the given bytes" in place of a path.
+pub fn read_map_bytes(bytes: &[u8]) -> Result<Layer, Error> {
+    map(bytes, &GIVEN)
+}
+
+fn map(bytes: &[u8], name: &dyn Display) -> Result<Layer, Error> {
     let Decoded {
         height,
         width,
@@ -124,17 +153,17 @@ pub fn read_map(path: &Path) -> Result<Layer, Error> {
         alpha,
         grey,
         wide,
-    } = decode(path, false)?;
+    } = decode(bytes, name, false)?;
     match wide {
         Some(Wide::Float) => {
             return Err(unreadable(
-                path,
+                name,
                 &"its mode 'F' (float levels) has no white: save the map as 8- or 16-bit greyscale",
             ));
         }
         Some(Wide::Integer { lowest, highest }) if lowest < 0 || highest > 65535 => {
             return Err(unreadable(
-                path,
+                name,
                 &format!(
                     "its mode 'I' holds levels {lowest}..{highest}, outside 16 bits (0..65535): save the map as 8- or 16-bit greyscale"
                 ),
@@ -153,9 +182,12 @@ pub fn read_map(path: &Path) -> Result<Layer, Error> {
     Layer::new(height, width, values)
 }
 
-/// The refusal of the file at `path` for `reason`.
-fn unreadable(path: &Path, reason: &dyn Display) -> Error {
-    Error::ImageRead(format!("cannot read {} as an image: {reason}", path.display()))
+/// What the error messages call bytes that came with no path.
+const GIVEN: &str = "the given bytes";
+
+/// The refusal of the file called `name` for `reason`.
+fn unreadable(name: &dyn Display, reason: &dyn Display) -> Error {
+    Error::ImageRead(format!("cannot read {name} as an image: {reason}"))
 }
 
 /// Refuses a size of more than [`MAX_PIXELS`] pixels, from the header alone.
@@ -168,12 +200,12 @@ fn within_limit(width: u32, height: u32) -> Result<(), String> {
     Ok(())
 }
 
-/// The first frame of the file at `path`, upright; its embedded profile is applied if `colour_managed` (a picture's
+/// The first frame of the file `bytes`, called `name` in errors, upright; its embedded profile is applied if `colour_managed` (a picture's
 /// colours) and left alone otherwise (a map's levels are data).
-fn decode(path: &Path, colour_managed: bool) -> Result<Decoded, Error> {
-    let refuse = |reason: &dyn Display| unreadable(path, reason);
-    let mut reader = ImageReader::open(path)
-        .and_then(ImageReader::with_guessed_format)
+fn decode(bytes: &[u8], name: &dyn Display, colour_managed: bool) -> Result<Decoded, Error> {
+    let refuse = |reason: &dyn Display| unreadable(name, reason);
+    let mut reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
         .map_err(|error| refuse(&error))?;
     // The decoders' own limits stay off but one: the memory a decoder may ask for, since a file can claim a size in its
     // header and then decode to another (a GIF frame larger than its screen, a profile that inflates to gigabytes).
@@ -182,15 +214,11 @@ fn decode(path: &Path, colour_managed: bool) -> Result<Decoded, Error> {
     reader.limits(limits);
     let format = reader.format();
     // The JPEG decoder fills in what a file cut short misses, so such a file is refused here.
-    if format == Some(ImageFormat::Jpeg)
-        && !std::fs::read(path)
-            .map_err(|error| refuse(&error))
-            .map(|bytes| raw::jpeg_is_complete(&bytes))?
-    {
+    if format == Some(ImageFormat::Jpeg) && !raw::jpeg_is_complete(bytes) {
         return Err(refuse(&"the file ends before the picture does: it is cut short"));
     }
     let mut embedded = None;
-    let (mut picture, orientation, wide) = if let Some((picture, orientation, wide)) = wide_tiff(path, format)? {
+    let (mut picture, orientation, wide) = if let Some((picture, orientation, wide)) = wide_tiff(bytes, name, format)? {
         (picture, orientation, Some(wide))
     } else {
         let mut decoder = reader.into_decoder().map_err(|error| refuse(&error))?;
@@ -200,17 +228,17 @@ fn decode(path: &Path, colour_managed: bool) -> Result<Decoded, Error> {
         embedded = if !colour_managed {
             None
         } else if format == Some(ImageFormat::Tiff) {
-            raw::tiff_profile(path)
+            raw::tiff_profile(bytes)
         } else {
             decoder.icc_profile().ok().flatten()
         };
         let orientation = decoder.orientation().map_err(|error| refuse(&error))?;
         // The image crate mixes the inks of a CMYK file to RGB, so its profile is applied to the inks or to nothing.
         if embedded.is_some()
-            && raw::is_cmyk(path, format, decoder.original_color_type())
+            && raw::is_cmyk(bytes, format, decoder.original_color_type())
             && let Some(profile) = embedded.take().and_then(|bytes| Profile::new(&bytes, Model::Cmyk))
             && let Some(decoded) =
-                raw::cmyk_decoded(path, format, orientation, &profile).map_err(|reason| refuse(&reason))?
+                raw::cmyk_decoded(bytes, format, orientation, &profile).map_err(|reason| refuse(&reason))?
         {
             return Ok(decoded);
         }
@@ -263,13 +291,16 @@ fn decode(path: &Path, colour_managed: bool) -> Result<Decoded, Error> {
 
 /// A TIFF of one 32-bit sample per pixel (integers or floats), which the `image` crate does not decode: its levels
 /// as a three-channel float image of equal channels, its orientation and what it held. None for any other file.
-fn wide_tiff(path: &Path, format: Option<ImageFormat>) -> Result<Option<(DynamicImage, Orientation, Wide)>, Error> {
+fn wide_tiff(
+    bytes: &[u8],
+    name: &dyn Display,
+    format: Option<ImageFormat>,
+) -> Result<Option<(DynamicImage, Orientation, Wide)>, Error> {
     if format != Some(ImageFormat::Tiff) {
         return Ok(None);
     }
-    let refuse = |reason: &dyn Display| unreadable(path, reason);
-    let file = File::open(path).map_err(|error| refuse(&error))?;
-    let mut decoder = Decoder::new(BufReader::new(file))
+    let refuse = |reason: &dyn Display| unreadable(name, reason);
+    let mut decoder = Decoder::new(Cursor::new(bytes))
         .map_err(|error| refuse(&error))?
         .with_limits(Limits::unlimited()); // the pixel limit below is the core's
     if decoder.colortype().map_err(|error| refuse(&error))? != ColorType::Gray(32) {

@@ -48,6 +48,7 @@ mod edges;
 mod effect;
 mod engraving;
 mod error;
+mod files_bytes;
 mod files_icc;
 mod files_read;
 mod files_write;

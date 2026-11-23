@@ -2,9 +2,7 @@
 //! more bytes than the profile has entries of a few dozen bytes each) and the inks of a CMYK file (it mixes them to
 //! RGB as if no profile were there).
 
-use std::fs::File;
-use std::io::BufReader;
-use std::path::Path;
+use std::io::Cursor;
 
 use image::metadata::Orientation;
 use image::{DynamicImage, ExtendedColorType, ImageBuffer, ImageFormat};
@@ -19,25 +17,24 @@ use zune_jpeg::JpegDecoder;
 use super::icc::Profile;
 use super::{Decoded, MAX_ALLOC, within_limit};
 
-/// The profile embedded in the TIFF at `path`, if it has a readable one.
-pub(super) fn tiff_profile(path: &Path) -> Option<Vec<u8>> {
-    let file = File::open(path).ok()?;
-    Decoder::new(BufReader::new(file))
+/// The profile embedded in the TIFF `bytes`, if it has a readable one.
+pub(super) fn tiff_profile(bytes: &[u8]) -> Option<Vec<u8>> {
+    Decoder::new(Cursor::new(bytes))
         .ok()?
         .get_tag_u8_vec(Tag::IccProfile)
         .ok()
 }
 
-/// Whether the file at `path`, of `format` and (as the decoder says) `original` colour type, has CMYK samples. The
+/// Whether the file `bytes`, of `format` and (as the decoder says) `original` colour type, has CMYK samples. The
 /// `image` crate says so for a TIFF but not for a JPEG, which is asked of its header.
-pub(super) fn is_cmyk(path: &Path, format: Option<ImageFormat>, original: ExtendedColorType) -> bool {
+pub(super) fn is_cmyk(bytes: &[u8], format: Option<ImageFormat>, original: ExtendedColorType) -> bool {
     match format {
         Some(ImageFormat::Tiff) => matches!(original, ExtendedColorType::Cmyk8 | ExtendedColorType::Cmyk16),
-        Some(ImageFormat::Jpeg) => std::fs::read(path).is_ok_and(|bytes| {
-            let mut decoder = jpeg_decoder(&bytes);
+        Some(ImageFormat::Jpeg) => {
+            let mut decoder = jpeg_decoder(bytes);
             decoder.decode_headers().is_ok()
                 && matches!(decoder.input_colorspace(), Some(ColorSpace::CMYK | ColorSpace::YCCK))
-        }),
+        }
         _ => false,
     }
 }
@@ -69,17 +66,17 @@ pub(super) fn jpeg_is_complete(bytes: &[u8]) -> bool {
     false
 }
 
-/// The CMYK file at `path` (a TIFF of 8-bit inks, or a JPEG of any CMYK kind), upright, in sRGB: its inks as stored,
+/// The CMYK file `bytes` (a TIFF of 8-bit inks, or a JPEG of any CMYK kind), upright, in sRGB: its inks as stored,
 /// converted by `profile`. None for any other file.
 pub(super) fn cmyk_decoded(
-    path: &Path,
+    bytes: &[u8],
     format: Option<ImageFormat>,
     orientation: Orientation,
     profile: &Profile,
 ) -> Result<Option<Decoded>, String> {
     let inks = match format {
-        Some(ImageFormat::Tiff) => tiff_inks(path)?,
-        Some(ImageFormat::Jpeg) => jpeg_inks(path)?,
+        Some(ImageFormat::Tiff) => tiff_inks(bytes)?,
+        Some(ImageFormat::Jpeg) => jpeg_inks(bytes)?,
         _ => None,
     };
     let Some((width, height, inks)) = inks else {
@@ -104,14 +101,13 @@ pub(super) fn cmyk_decoded(
     }))
 }
 
-/// Width, height and the inks (1 = full ink, four per pixel) of the CMYK TIFF at `path`, if that is what it is.
-fn tiff_inks(path: &Path) -> Result<Option<(u32, u32, Vec<u8>)>, String> {
-    let file = File::open(path).map_err(|error| error.to_string())?;
+/// Width, height and the inks (1 = full ink, four per pixel) of the CMYK TIFF `bytes`, if that is what it is.
+fn tiff_inks(bytes: &[u8]) -> Result<Option<(u32, u32, Vec<u8>)>, String> {
     let size = usize::try_from(MAX_ALLOC).unwrap_or(usize::MAX);
     let mut limits = Limits::default();
     limits.decoding_buffer_size = size;
     limits.intermediate_buffer_size = size;
-    let mut decoder = Decoder::new(BufReader::new(file))
+    let mut decoder = Decoder::new(Cursor::new(bytes))
         .map_err(|error| error.to_string())?
         .with_limits(limits);
     let planar = decoder
@@ -137,11 +133,10 @@ fn jpeg_decoder(bytes: &[u8]) -> JpegDecoder<ZCursor<&[u8]>> {
     JpegDecoder::new_with_options(ZCursor::new(bytes), options)
 }
 
-/// Width, height and the inks (1 = full ink, four per pixel) of the CMYK or YCCK JPEG at `path`, if that is what it is.
+/// Width, height and the inks (1 = full ink, four per pixel) of the CMYK or YCCK JPEG `bytes`, if that is what it is.
 /// A JPEG of four components stores its inks inverted (Adobe's convention, which every reader takes for all of them).
-fn jpeg_inks(path: &Path) -> Result<Option<(u32, u32, Vec<u8>)>, String> {
-    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
-    let mut decoder = jpeg_decoder(&bytes);
+fn jpeg_inks(bytes: &[u8]) -> Result<Option<(u32, u32, Vec<u8>)>, String> {
+    let mut decoder = jpeg_decoder(bytes);
     decoder.decode_headers().map_err(|error| format!("{error:?}"))?;
     let Some(stored @ (ColorSpace::CMYK | ColorSpace::YCCK)) = decoder.input_colorspace() else {
         return Ok(None);

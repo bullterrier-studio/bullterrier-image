@@ -69,7 +69,7 @@ pub use data::Characters;
 pub(crate) use data::Data;
 pub use effect::{Category, Effect, FieldParam, Input};
 pub use error::{Constraint, Error, ErrorKind, MapKind};
-pub use files::{WriteOptions, read, read_map, write, write_with};
+pub use files::{WriteOptions, read, read_bytes, read_map, read_map_bytes, write, write_with};
 pub use footprint::Footprint;
 #[cfg(feature = "gpu")]
 pub use gpu::{Gpu, GpuImage, GpuKernel, MOST_BINS, Plane, Reduction, Transfers};
