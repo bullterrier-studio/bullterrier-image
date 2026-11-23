@@ -128,7 +128,7 @@ impl Gpu {
     async fn cut(&self, image: &GpuImage, cut: &Cut) -> Result<GpuImage, Error> {
         let (height, width) = (image.height(), image.width());
         self.guarded("cut the picture out", || {
-            let alpha = self.send(&cut.alpha(height, width), true);
+            let alpha = self.send(&cut.alpha(height, width));
             let dest = self.picture_buffer(height, width);
             let mut encoder = self.encoder();
             self.dispatch(
@@ -261,7 +261,7 @@ async fn steps_on(
                             Some(first) if at == index => first,
                             _ => plain_encoding(step, &header)?,
                         };
-                        current = kernel_step(gpu, &mut encoder, step, encoding, mask, &current, header);
+                        current = kernel_step(gpu, &mut encoder, step, encoding, mask, &current, header)?;
                         regions.release(at);
                     }
                     gpu.queue().submit([encoder.finish()]);
@@ -314,13 +314,13 @@ fn kernel_step(
     gpu: &Gpu,
     encoder: &mut wgpu::CommandEncoder,
     step: &GpuStep<'_>,
-    Encoded { block, table, counted }: Encoded,
+    Encoded { block, table }: Encoded,
     mask: Option<Arc<Layer>>,
     current: &GpuImage,
     header: Header,
-) -> GpuImage {
+) -> Result<GpuImage, Error> {
     let (height, width) = (current.height(), current.width());
-    let table = table.map(|table| gpu.send(&table, counted));
+    let table = table.map(|table| gpu.send_table(&table)).transpose()?;
     let after = gpu.picture_buffer(height, width);
     gpu.dispatch(
         encoder,
@@ -335,9 +335,9 @@ fn kernel_step(
         },
     );
     if step.overlay.is_plain() {
-        return GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), after);
+        return Ok(GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), after));
     }
-    let mask = mask.map(|mask| gpu.send(mask.values(), true));
+    let mask = mask.map(|mask| gpu.send(mask.values()));
     let laid = gpu.picture_buffer(height, width);
     let mode = match step.overlay.blend_mode {
         BlendMode::Normal => 0.0,
@@ -361,5 +361,5 @@ fn kernel_step(
             other: Some(&after),
         },
     );
-    GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), laid)
+    Ok(GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), laid))
 }

@@ -36,13 +36,15 @@ impl PyGpu {
         self.gpu.largest_picture()
     }
 
-    /// What has crossed between the CPU and this context since it was made or last reset: `{"uploads": int, "downloads":
-    /// int, "bytes": int}` (pictures and maps sent, pictures read back, the bytes of both).
+    /// What has crossed between the CPU and this context since it was made or last reset: `{"uploads": int, "tables": int,
+    /// "downloads": int, "bytes": int}` (pictures and maps sent, tables sent for kernels, pictures read back, the bytes
+    /// of all).
     #[getter]
     fn transfers<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let transfers = self.gpu.transfers();
         let counts = PyDict::new(py);
         counts.set_item("uploads", transfers.uploads)?;
+        counts.set_item("tables", transfers.tables)?;
         counts.set_item("downloads", transfers.downloads)?;
         counts.set_item("bytes", transfers.bytes)?;
         Ok(counts)

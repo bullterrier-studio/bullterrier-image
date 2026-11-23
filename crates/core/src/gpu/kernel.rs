@@ -82,24 +82,12 @@ pub(crate) type Block = Vec<[f32; 4]>;
 pub(crate) struct Encoded {
     pub(crate) block: Block,
     pub(crate) table: Option<Vec<f32>>,
-    /// Whether the table is a picture the CPU made (counted as an upload) and not a few numbers.
-    pub(crate) counted: bool,
 }
 
 impl Encoded {
     /// A kernel's `block` and the `table` of numbers it reads, if any.
     pub(crate) const fn new(block: Block, table: Option<Vec<f32>>) -> Self {
-        Self {
-            block,
-            table,
-            counted: false,
-        }
-    }
-
-    /// This, its table a picture the CPU made: sent counted, as any picture sent to the device is.
-    pub(crate) const fn counting_table(mut self) -> Self {
-        self.counted = true;
-        self
+        Self { block, table }
     }
 }
 

@@ -31,3 +31,21 @@ fn a_table_with_its_own_domain_and_entries_outside_the_range_grades_as_on_the_cp
     }
     Ok(())
 }
+
+#[test]
+fn a_table_sent_to_the_device_is_counted_with_its_bytes() -> crate::common::Outcome {
+    let Some(gpu) = fresh() else { return Ok(()) };
+    // 40 entries a side: 64,000 colours of 3 floats
+    let size = 40_usize;
+    let entries = (0..size.pow(3)).map(|at| [(at % 7) as f32 / 7.0; 3]).collect();
+    let lut = Lut::new(size, [0.0; 3], [1.0; 3], entries)?;
+    let values = varied_seeded(23, 19, 4);
+    let photo = Photo::new(Picture::new(23, 19, &values)?).with_lut("grade", Arc::new(lut));
+    let recipe = Recipe::new([Step::new("lut").param("file", "grade")]);
+    rendered(&gpu, &photo, &recipe, Options::default())?;
+    let moved = gpu.transfers();
+    assert_eq!((moved.uploads, moved.tables, moved.downloads), (1, 1, 1));
+    // the picture up (3 floats a pixel), the table up (3 floats an entry) and the picture back (4 floats a pixel)
+    assert_eq!(moved.bytes, (23 * 19 * 12 + size.pow(3) * 12 + 23 * 19 * 16) as u64);
+    Ok(())
+}

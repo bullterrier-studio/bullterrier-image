@@ -169,7 +169,7 @@ impl Gpu {
         let channels = if alpha { 4.0 } else { 3.0 };
         let buffer = self
             .guarded("take a picture", || {
-                let sent = self.send(values, true);
+                let sent = self.send(values);
                 let buffer = self.picture_buffer(height, width);
                 let mut encoder = self.encoder();
                 self.dispatch(
@@ -247,7 +247,7 @@ impl Gpu {
             .collect();
         drop(view);
         staging.unmap();
-        self.count(false, size);
+        self.count_download(size);
         Ok(values)
     }
 }

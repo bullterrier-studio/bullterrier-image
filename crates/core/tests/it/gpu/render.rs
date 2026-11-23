@@ -124,7 +124,9 @@ fn a_recipe_of_kernels_crosses_once_each_way_and_a_cpu_step_adds_one_of_each() -
     let one_cpu_step = gpu.transfers();
     assert_eq!((one_cpu_step.uploads, one_cpu_step.downloads), (2, 2));
     // a picture of 20 x 30 is 600 pixels: sent as 3 floats a pixel and read back as 4
-    assert_eq!(one_cpu_step.bytes, 2 * 600 * 12 + 2 * 600 * 16);
+    // and the curves' table (`tables.rs` and `lut.rs` pin a table's bytes) is counted besides
+    assert_eq!(one_cpu_step.tables, 1);
+    assert!(one_cpu_step.bytes > 2 * 600 * 12 + 2 * 600 * 16, "{one_cpu_step:?}");
     // a mask is a map sent to the device: one float a pixel, counted as an upload of its own
     gpu.reset_transfers();
     let masked = Recipe::new([Step::new("levels").param("black", 0.2).mask("light")]);

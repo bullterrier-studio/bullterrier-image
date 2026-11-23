@@ -703,8 +703,7 @@ fn plan(params: &Params, header: &crate::gpu::Header, given: &crate::gpu::Given<
             .iter()
             .map(|through| [through[0], through[1], through[2], 0.0]),
     );
-    let encoded = crate::gpu::Encoded::new(block, Some(numbers));
-    Some(if mode == 2 { encoded.counting_table() } else { encoded })
+    Some(crate::gpu::Encoded::new(block, Some(numbers)))
 }
 
 /// The dot screen on the GPU (`halftone.wgsl`), within 3e-4 of the CPU (measured at most 9e-5): the CPU's own f32 maths for the

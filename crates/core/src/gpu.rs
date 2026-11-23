@@ -62,17 +62,22 @@ struct Context {
     /// What a kernel's unused storage bindings hold.
     empty: wgpu::Buffer,
     uploads: AtomicU64,
+    tables: AtomicU64,
+    /// The most bytes a table a kernel reads can have: the device's largest storage binding.
+    binding: u64,
     downloads: AtomicU64,
     bytes: AtomicU64,
 }
 
-/// What has crossed between the CPU and a [`Gpu`] since it was made or last reset: pictures and maps sent to the device
-/// and pictures read back. A kernel's parameters are not counted.
+/// What has crossed between the CPU and a [`Gpu`] since it was made or last reset: pictures and maps sent to the device,
+/// the tables a kernel reads, and pictures read back. A kernel's few parameters are not counted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Transfers {
     /// Pictures and maps sent to the device.
     pub uploads: u64,
+    /// Tables sent to the device for kernels to read (a lookup table, a map of faulty cells), apart from `uploads`.
+    pub tables: u64,
     /// Pictures read back from it.
     pub downloads: u64,
     /// The bytes of both.
@@ -271,6 +276,8 @@ impl Gpu {
                 pipelines: Mutex::new(HashMap::new()),
                 empty,
                 uploads: AtomicU64::new(0),
+                tables: AtomicU64::new(0),
+                binding: bytes,
                 downloads: AtomicU64::new(0),
                 bytes: AtomicU64::new(0),
             }),
@@ -308,6 +315,7 @@ impl Gpu {
     pub fn transfers(&self) -> Transfers {
         Transfers {
             uploads: self.context.uploads.load(Ordering::Relaxed),
+            tables: self.context.tables.load(Ordering::Relaxed),
             downloads: self.context.downloads.load(Ordering::Relaxed),
             bytes: self.context.bytes.load(Ordering::Relaxed),
         }
@@ -316,18 +324,19 @@ impl Gpu {
     /// Sets the count of [`transfers`](Self::transfers) back to zero.
     pub fn reset_transfers(&self) {
         self.context.uploads.store(0, Ordering::Relaxed);
+        self.context.tables.store(0, Ordering::Relaxed);
         self.context.downloads.store(0, Ordering::Relaxed);
         self.context.bytes.store(0, Ordering::Relaxed);
     }
 
-    fn count(&self, upload: bool, bytes: u64) {
-        let counter = if upload {
-            &self.context.uploads
-        } else {
-            &self.context.downloads
-        };
+    fn count(&self, counter: &AtomicU64, bytes: u64) {
         counter.fetch_add(1, Ordering::Relaxed);
         self.context.bytes.fetch_add(bytes, Ordering::Relaxed);
+    }
+
+    /// Counts a picture read back, of `bytes`.
+    pub(crate) fn count_download(&self, bytes: u64) {
+        self.count(&self.context.downloads, bytes);
     }
 
     /// `Ok` if a picture of `height` x `width` fits on this device.
@@ -357,9 +366,28 @@ impl Gpu {
         })
     }
 
-    /// `values` sent to the device in a storage buffer a kernel reads as its `data`; a picture or a map is `counted` as an
-    /// upload, a kernel's table is not.
-    pub(crate) fn send(&self, values: &[f32], counted: bool) -> wgpu::Buffer {
+    /// `values`, a picture or a map, sent to the device in a storage buffer; counted as an upload.
+    pub(crate) fn send(&self, values: &[f32]) -> wgpu::Buffer {
+        self.write(values, &self.context.uploads)
+    }
+
+    /// `values`, a table a kernel reads as its `data`, sent to the device; counted as a table. The one way a table goes up,
+    /// so none is uncounted.
+    ///
+    /// # Errors
+    /// [`Error::Gpu`] naming its size if the device cannot bind a buffer so large.
+    pub(crate) fn send_table(&self, values: &[f32]) -> Result<wgpu::Buffer, Error> {
+        let bytes = values.len() as u64 * 4;
+        if bytes > self.context.binding {
+            return Err(Error::Gpu(format!(
+                "a table of {bytes} bytes is larger than the {} bytes a kernel can read on {}; render it on the CPU",
+                self.context.binding, self.context.adapter
+            )));
+        }
+        Ok(self.write(values, &self.context.tables))
+    }
+
+    fn write(&self, values: &[f32], counter: &AtomicU64) -> wgpu::Buffer {
         let bytes: Vec<u8> = values.iter().flat_map(|value| value.to_le_bytes()).collect();
         let buffer = self.device().create_buffer(&wgpu::BufferDescriptor {
             label: Some("bullterrier-image data"),
@@ -368,9 +396,7 @@ impl Gpu {
             mapped_at_creation: false,
         });
         self.queue().write_buffer(&buffer, 0, &bytes);
-        if counted {
-            self.count(true, bytes.len() as u64);
-        }
+        self.count(counter, bytes.len() as u64);
         buffer
     }
 

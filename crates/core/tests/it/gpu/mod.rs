@@ -11,6 +11,7 @@ mod parity;
 mod recipes;
 mod reduce;
 mod render;
+mod tables;
 mod transfer;
 mod wide;
 

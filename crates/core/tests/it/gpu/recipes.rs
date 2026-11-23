@@ -66,6 +66,8 @@ fn each_recipe_runs_whole_on_the_device_with_one_upload_and_one_readback_within_
         let on_gpu = rendered(&gpu, &photo, &recipe, options)?.into_values();
         let moved = gpu.transfers();
         assert_eq!((moved.uploads, moved.downloads), (1, 1), "{what}: left the device");
+        // the tables its kernels read go up beside the picture, each counted
+        assert_eq!(moved.tables, 1, "{what}: its kernel's table is counted");
         let (share, largest) = levels_apart(&cpu, &on_gpu);
         assert!(
             share <= 0.001 && largest <= 2,
