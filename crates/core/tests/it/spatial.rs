@@ -6,7 +6,7 @@ use bullterrier_image::{Error, Inputs, Picture, apply};
 use proptest::prelude::*;
 use serde_json::Value;
 
-use crate::common::compare::{assert_close, first_bit_difference};
+use crate::common::compare::{assert_close, assert_looks_the_same, looks_the_same};
 use crate::common::pictures::varied;
 use crate::common::pixels::{run, run_picture, run_rows};
 
@@ -46,16 +46,16 @@ fn rows_of_the_canvas_told_their_place_are_the_same_rows_of_the_whole_and_rows_n
         let whole = run_picture(&params, height, width, &picture)?;
         for (from, to) in [(0, 9), (13, 30), (30, 37), (36, 37)] {
             let band = run_rows(&params, (height, width), &picture, (from, to), true)?;
-            assert_eq!(
-                first_bit_difference(&band, &whole[from * width * 3..to * width * 3]),
-                None,
-                "rows {from}..{to} told their place, {params:?}"
+            assert_looks_the_same(
+                &band,
+                &whole[from * width * 3..to * width * 3],
+                &format!("rows {from}..{to} told their place, {params:?}"),
             );
         }
         // known bad: the same band not told where it lies sees itself as the canvas and is another vignette
         let alone = run_rows(&params, (height, width), &picture, (13, 30), false)?;
         assert!(
-            first_bit_difference(&alone, &whole[13 * width * 3..30 * width * 3]).is_some(),
+            !looks_the_same(&alone, &whole[13 * width * 3..30 * width * 3]),
             "a band not told its place matched the whole: the test proves nothing"
         );
     }

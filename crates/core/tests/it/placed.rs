@@ -9,7 +9,7 @@ use bullterrier_image::params::Table;
 use bullterrier_image::{Inputs, Picture, Place, apply, effect};
 use serde_json::{Value, json};
 
-use crate::common::compare::{first_bit_difference, first_difference_within};
+use crate::common::compare::{assert_looks_the_same, looks_the_same};
 use crate::common::pictures::{asset, varied};
 
 /// Odd and even sides that differ; the picture is tall enough for a margin of several rows round a band.
@@ -213,31 +213,26 @@ fn check(
     cases: &[(&str, Value)],
     (height, width): (usize, usize),
     bands: [(usize, usize); 4],
-    tolerance: f32,
 ) -> Result<(), Box<dyn Error>> {
     let picture = varied(height, width);
     for (name, params) in cases {
         let reads = margin(name, params)?.ok_or_else(|| format!("{name} {params} says Whole"))?;
         let whole = run(name, params, &picture, (0, height), true, (height, width))?;
+        let (mut got, mut wanted) = (Vec::new(), Vec::new());
         for (from, to) in bands {
             let (low, high) = (from.saturating_sub(reads), (to + reads).min(height));
             let band = run(name, params, &picture, (low, high), true, (height, width))?;
-            let own = &band[(from - low) * width * 3..(to - low) * width * 3];
-            let wanted = &whole[from * width * 3..to * width * 3];
-            let differs = if tolerance == 0.0 {
-                first_bit_difference(own, wanted)
-            } else {
-                first_difference_within(own, wanted, tolerance)
-            };
-            assert_eq!(differs, None, "{name} {params}: rows {from}..{to} told their place");
+            got.extend_from_slice(&band[(from - low) * width * 3..(to - low) * width * 3]);
+            wanted.extend_from_slice(&whole[from * width * 3..to * width * 3]);
         }
+        assert_looks_the_same(&got, &wanted, &format!("{name} {params}: rows told their place"));
         // known bad: the same rows not told where they lie take themselves for the canvas
         let (from, to) = bands[1];
         let (low, high) = (from - reads.min(from), to + reads);
         let alone = run(name, params, &picture, (low, high), false, (height, width))?;
         let own = &alone[(from - low) * width * 3..(to - low) * width * 3];
         assert!(
-            first_bit_difference(own, &whole[from * width * 3..to * width * 3]).is_some(),
+            !looks_the_same(own, &whole[from * width * 3..to * width * 3]),
             "{name} {params}: rows not told their place matched the whole, so the test proves nothing"
         );
     }
@@ -251,14 +246,13 @@ fn rows_told_their_place_are_the_same_rows_of_the_whole_and_rows_not_told_are_no
         &every,
         (HEIGHT, WIDTH),
         [(0, 9), (13, 30), (30, HEIGHT), (HEIGHT - 1, HEIGHT)],
-        0.0,
     )
 }
 
 /// A canvas tall enough that a band is far from both edges, for what a short canvas cannot show: a window of noise that is
 /// less than the canvas, a kernel long enough to be summed by a transform.
 #[test]
-fn noise_made_for_a_window_of_a_tall_canvas_is_the_same_rows_of_the_whole() -> Result<(), Box<dyn Error>> {
+fn noise_made_for_a_window_of_a_tall_canvas_looks_like_the_same_rows_of_the_whole() -> Result<(), Box<dyn Error>> {
     let cases = [
         (
             "noise_field",
@@ -282,33 +276,19 @@ fn noise_made_for_a_window_of_a_tall_canvas_is_the_same_rows_of_the_whole() -> R
             json!({"density": 3.0, "length": 40.0, "step": 1.5, "scale": 30.0, "thickness": 2.0, "seed": 4}),
         ),
         ("fog", json!({"scale": 40.0, "octaves": 3, "amount": 1.0, "seed": 2})),
+        // a kernel of 32 px each side, blurred by a Fourier transform down the window's columns
+        (
+            "grain",
+            json!({"size": 16.0, "amount": 0.3, "edge": "reflect", "seed": 6}),
+        ),
+        // a screen blurred by a kernel of 24 px each side, summed the same way
+        ("halftone", json!({"sigma": 1.0, "cell": 6, "angle": 30.0})),
         (
             "vhs",
             json!({"noise": 0.2, "noise_size": 3.0, "wobble": 2.0, "wobble_size": 6.0, "seed": 3}),
         ),
     ];
-    check(&cases, (400, 10), TALL_BANDS, 0.0)
+    check(&cases, (400, 10), TALL_BANDS)
 }
 
 const TALL_BANDS: [(usize, usize); 4] = [(0, 9), (150, 190), (260, 400), (399, 400)];
-
-/// Grain clumped by a kernel of 32 px each side is blurred by a Fourier transform down the window's columns, whose rounding
-/// depends on the window: the rows agree to the blur's own promise (1e-5 of the whole's), not to the bit.
-#[test]
-fn grain_clumped_beyond_the_reach_of_a_summed_kernel_is_the_same_rows_of_the_whole_to_the_blurs_rounding()
--> Result<(), Box<dyn Error>> {
-    let cases = [(
-        "grain",
-        json!({"size": 16.0, "amount": 0.3, "edge": "reflect", "seed": 6}),
-    )];
-    check(&cases, (400, 10), TALL_BANDS, 1e-5)
-}
-
-/// A screen blurred by a kernel of 24 px each side is blurred by a Fourier transform down the window's columns, whose
-/// rounding depends on the window: the rows agree to the blur's own promise (1e-5), not to the bit.
-#[test]
-fn a_screen_blurred_beyond_the_reach_of_a_summed_kernel_is_the_same_rows_of_the_whole_to_the_blurs_rounding()
--> Result<(), Box<dyn Error>> {
-    let cases = [("halftone", json!({"sigma": 1.0, "cell": 6, "angle": 30.0}))];
-    check(&cases, (400, 10), TALL_BANDS, 1e-5)
-}
