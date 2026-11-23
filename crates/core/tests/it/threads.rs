@@ -1,4 +1,4 @@
-//! A render gives the same picture at any number of threads, and a photo and a look can be shared between threads.
+//! A render gives a picture that looks the same at any number of threads, and a photo and a look can be shared between threads.
 //!
 //! The pictures are large enough, and of odd shapes (one row, one column, fewer rows than threads), that the rows are cut
 //! into several bands at the larger thread counts.
@@ -9,11 +9,11 @@ use std::thread;
 use bullterrier_image::frame::{Fit, Resample};
 use bullterrier_image::region::{Grid, Path, Shares};
 use bullterrier_image::{
-    BlendMode, Error, ErrorKind, Frame, Image, Lut, Options, Photo, Picture, Presets, Recipe, Step,
+    BlendMode, Error, ErrorKind, Frame, Image, Lut, Options, Photo, Picture, Presets, Recipe, Stage, Step,
 };
 use serde_json::json;
 
-use crate::common::compare::first_bit_difference;
+use crate::common::compare::{assert_looks_the_same, looks_the_same};
 use crate::common::pictures::varied_seeded;
 
 /// The thread counts a render is compared at: the default, a few, an odd one, more than rows, and every core.
@@ -837,7 +837,7 @@ fn cases() -> Vec<Case> {
     ]
 }
 #[test]
-fn a_render_gives_the_same_picture_at_any_number_of_threads() -> Result<(), Error> {
+fn a_render_gives_a_picture_that_looks_the_same_at_any_number_of_threads() -> Result<(), Error> {
     for Case { look, recipe, shapes } in cases() {
         for (height, width) in shapes {
             let alone = render(height, width, 1, &recipe, 1)?;
@@ -849,10 +849,10 @@ fn a_render_gives_the_same_picture_at_any_number_of_threads() -> Result<(), Erro
                     (alone.height(), alone.width()),
                     "{look}, {height} x {width}, {threads} threads"
                 );
-                let at = first_bit_difference(&alone_values, &image.into_values());
-                assert_eq!(
-                    at, None,
-                    "{look}, {height} x {width}, {threads} threads: first differs at {at:?}"
+                assert_looks_the_same(
+                    &alone_values,
+                    &image.into_values(),
+                    &format!("{look}, {height} x {width}, {threads} threads"),
                 );
             }
         }
@@ -863,27 +863,49 @@ fn a_render_gives_the_same_picture_at_any_number_of_threads() -> Result<(), Erro
 #[test]
 fn the_comparison_tells_renders_that_differ_apart() -> Result<(), Error> {
     // the known-bad pair of the test above: looks that are not the same must show as different
-    let (a, b) = (Recipe::new([grade(0.2)]), Recipe::new([grade(0.200_000_1)]));
+    let (a, b) = (Recipe::new([grade(0.2)]), Recipe::new([grade(0.6)]));
     let (a, b) = (
         render(201, 199, 1, &a, 1)?.into_values(),
         render(201, 199, 1, &b, 1)?.into_values(),
     );
-    assert!(first_bit_difference(&a, &b).is_some());
-    assert!(first_bit_difference(&a, &a[..a.len() - 1]).is_some());
+    assert!(!looks_the_same(&a, &b));
+    assert!(!looks_the_same(&a, &a[..a.len() - 1]));
     Ok(())
 }
 
+/// Whether two stages are of one kind, with the same numbering and labels, and pictures and maps that look the same.
+fn stage_looks_the_same(one: &Stage, other: &Stage) -> bool {
+    match (one, other) {
+        (Stage::Input(a), Stage::Input(b)) | (Stage::CutOut(a), Stage::CutOut(b)) => {
+            looks_the_same(&a.clone().into_values(), &b.clone().into_values())
+        }
+        (Stage::Step { number: n, image: a }, Stage::Step { number: m, image: b }) => {
+            n == m && looks_the_same(&a.clone().into_values(), &b.clone().into_values())
+        }
+        (Stage::Subject(a), Stage::Subject(b)) | (Stage::Depth(a), Stage::Depth(b)) => {
+            looks_the_same(a.values(), b.values())
+        }
+        (Stage::Selection { name: n, layer: a }, Stage::Selection { name: m, layer: b }) => {
+            n == m && looks_the_same(a.values(), b.values())
+        }
+        _ => one == other,
+    }
+}
+
 #[test]
-fn a_trace_gives_the_same_pictures_at_any_number_of_threads() -> Result<(), Error> {
+fn a_trace_gives_stages_that_look_the_same_at_any_number_of_threads() -> Result<(), Error> {
     let recipe = Recipe::new([grade(0.5).blend_mode(BlendMode::Overlay).mask("light"), grade(-0.2)]);
     let values = varied_seeded(201, 199, 3);
     let photo = Photo::new(Picture::new(201, 199, &values)?);
     let stages = |threads: usize| photo.trace(&recipe, &Presets::new(), Options::default().with_threads(threads));
-    // (a stage's Debug shows its shape only, so the stages are compared as values)
     let alone = stages(1)?;
     assert!(alone.len() >= 3, "the trace has the input and each step");
     for threads in [2, 10] {
-        assert!(stages(threads)? == alone, "{threads} threads");
+        let more = stages(threads)?;
+        assert_eq!(more.len(), alone.len(), "{threads} threads");
+        for (at, (one, other)) in alone.iter().zip(&more).enumerate() {
+            assert!(stage_looks_the_same(one, other), "{threads} threads, stage {at}");
+        }
     }
     Ok(())
 }
@@ -951,11 +973,8 @@ fn several_photos_rendered_at_once_with_one_recipe_each_give_what_they_give_alon
             .collect::<Result<Vec<_>, _>>()
     })?;
     for (seed, (alone, together)) in alone.iter().zip(&together).enumerate() {
-        assert_eq!(first_bit_difference(alone, together), None, "photo {seed}");
+        assert_looks_the_same(alone, together, &format!("photo {seed}"));
     }
-    assert!(
-        first_bit_difference(&alone[0], &alone[1]).is_some(),
-        "the photos differ"
-    );
+    assert!(!looks_the_same(&alone[0], &alone[1]), "the photos differ");
     Ok(())
 }

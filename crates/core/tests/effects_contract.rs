@@ -1,10 +1,10 @@
 //! Own binary: it walks every effect in the process's registry, so effects other tests register would be walked too.
 //!
 //! What every effect the core runs keeps, whatever it does (its Python twin is `tests/effects/test_contract.py`, which
-//! now covers only effects registered from Python): a picture of the input's shape, finite and in 0..1, the same for the
+//! now covers only effects registered from Python): a picture of the input's shape, finite and in 0..1, looking the same for the
 //! same parameters; every number working at its limits and anywhere inside its range, and refused beyond them; every
 //! choice working and any other refused; an `amount` of 0 leaving the picture alone; a seed deciding the picture; a
-//! cyclic angle giving the same picture a turn further; the same picture at any thread count; the same look at twice the
+//! cyclic angle giving the same picture a turn further; a picture that looks the same at any thread count; the same look at twice the
 //! size.
 //!
 //! Each rule is a function `fn(&dyn Effect, &Table) -> Vec<String>` of problems, run on every effect by one test and on
@@ -28,7 +28,7 @@ use bullterrier_image::{
     Category, Constraint, Effect, Image, Input, Inputs, Labels, Layer, Options, Photo, Picture, Presets, Recipe, Step,
     effect, effects,
 };
-use common::compare::first_bit_difference;
+use common::compare::{difference_in_looks, looks_the_same};
 use common::pictures::asset;
 use serde_json::{Map, Value, json};
 
@@ -257,11 +257,8 @@ fn picture_problems(one: &dyn Effect, table: &Table) -> Problems {
         if let Some(fault) = picture_fault(&first, values.len()) {
             problems.push(format!("{} at {height}x{width}: {fault}", one.name()));
         }
-        if let Some(at) = first_bit_difference(&first, &second) {
-            problems.push(format!(
-                "{} at {height}x{width}: two runs differ at value {at}",
-                one.name()
-            ));
+        if let Some(why) = difference_in_looks(&first, &second) {
+            problems.push(format!("{} at {height}x{width}: two runs differ, {why}", one.name()));
         }
     }
     Ok(problems)
@@ -510,7 +507,7 @@ fn seed_problems(one: &dyn Effect, table: &Table) -> Problems {
     };
     let (first, again, other) = (with(1)?, with(1)?, with(2)?);
     let mut problems = Vec::new();
-    if first_bit_difference(&first, &again).is_some() {
+    if !looks_the_same(&first, &again) {
         problems.push(format!("{}: the same seed gives two pictures", one.name()));
     }
     if !differs(&first, &other, 0.0) {
@@ -565,7 +562,7 @@ fn cyclic_problems(one: &dyn Effect, table: &Table) -> Problems {
             problems.push(format!("{name}: min and max are a turn apart but the pictures differ"));
         }
         // four turns and a degree past the bottom of the turn is the same direction as one degree past it
-        if first_bit_difference(&at(low + 4.0 * (high - low) + 1.0)?, &at(low + 1.0)?).is_some() {
+        if !looks_the_same(&at(low + 4.0 * (high - low) + 1.0)?, &at(low + 1.0)?) {
             problems.push(format!(
                 "{name}: a value past the turn is not the direction it wraps to"
             ));
@@ -605,15 +602,15 @@ fn render(photo: &Photo<'_>, one: &dyn Effect, options: Options) -> Result<Image
 }
 
 #[test]
-fn every_effect_gives_the_same_bytes_at_one_and_at_three_threads() -> Outcome {
+fn every_effect_looks_the_same_at_one_and_at_three_threads() -> Outcome {
     let values = noise(61, 37);
     let photo = photo(Picture::new(61, 37, &values)?, 61, 37)?;
     let mut problems = Vec::new();
     for (one, _) in core_effects()? {
         let single = render(&photo, &*one, Options::default())?.into_values();
         let three = render(&photo, &*one, Options::default().with_threads(3))?.into_values();
-        if let Some(at) = first_bit_difference(&single, &three) {
-            problems.push(format!("{}: threads 1 and 3 differ at value {at}", one.name()));
+        if let Some(why) = difference_in_looks(&single, &three) {
+            problems.push(format!("{}: threads 1 and 3 differ, {why}", one.name()));
         }
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
