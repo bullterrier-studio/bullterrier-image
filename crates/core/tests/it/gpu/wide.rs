@@ -63,7 +63,11 @@ fn a_picture_thousands_of_pixels_long_stays_within_each_kernels_bound() -> crate
             let on_gpu = rendered(&gpu, &photo, &recipe, Options::default())?.into_values();
             // the kernel ran: a step it declined would be read back and sent again, and this would compare the CPU with itself
             let moved = gpu.transfers();
-            assert_eq!((moved.uploads, moved.downloads), (1, 1), "{name} at {height} x {width} ran on the CPU");
+            assert_eq!(
+                (moved.uploads, moved.downloads),
+                (1, 1),
+                "{name} at {height} x {width} ran on the CPU"
+            );
             let (gap, at) = largest_gap(&cpu, &on_gpu);
             assert!(
                 gap <= bound,

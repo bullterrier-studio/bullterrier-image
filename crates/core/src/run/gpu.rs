@@ -335,7 +335,13 @@ fn kernel_step(
         },
     );
     if step.overlay.is_plain() {
-        return Ok(GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), after));
+        return Ok(GpuImage::from_buffer(
+            gpu.clone(),
+            height,
+            width,
+            current.has_alpha(),
+            after,
+        ));
     }
     let mask = mask.map(|mask| gpu.send(mask.values()));
     let laid = gpu.picture_buffer(height, width);
@@ -361,5 +367,11 @@ fn kernel_step(
             other: Some(&after),
         },
     );
-    Ok(GpuImage::from_buffer(gpu.clone(), height, width, current.has_alpha(), laid))
+    Ok(GpuImage::from_buffer(
+        gpu.clone(),
+        height,
+        width,
+        current.has_alpha(),
+        laid,
+    ))
 }

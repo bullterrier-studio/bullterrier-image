@@ -26,7 +26,9 @@ fn both(recipe: &Recipe) -> Result<(f32, (u64, u64)), Box<dyn std::error::Error>
 
 /// As [`both`], and the tables the GPU was sent.
 fn both_with_tables(recipe: &Recipe) -> Result<(f32, (u64, u64), u64), Box<dyn std::error::Error>> {
-    let Some(gpu) = fresh() else { return Ok((0.0, (1, 1), 1)) };
+    let Some(gpu) = fresh() else {
+        return Ok((0.0, (1, 1), 1));
+    };
     // a picture with some structure (a ramp across, noise) so cells of every tone appear
     let noise = varied_seeded(SIZE.0, SIZE.1, 5);
     let values: Vec<f32> = noise
@@ -42,7 +44,11 @@ fn both_with_tables(recipe: &Recipe) -> Result<(f32, (u64, u64), u64), Box<dyn s
     let cpu = photo.render(recipe, &Presets::new(), Options::default())?.into_values();
     let on_gpu = rendered(&gpu, &photo, recipe, Options::default())?.into_values();
     let moved = gpu.transfers();
-    Ok((largest_gap(&cpu, &on_gpu).0, (moved.uploads, moved.downloads), moved.tables))
+    Ok((
+        largest_gap(&cpu, &on_gpu).0,
+        (moved.uploads, moved.downloads),
+        moved.tables,
+    ))
 }
 
 /// Says a gap when `BT_GPU_GAPS` is set (the bounds measured, for the docs).
