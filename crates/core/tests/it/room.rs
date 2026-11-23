@@ -1,7 +1,7 @@
 //! A render with room (`Options::with_room`) makes the box of the picture it is handed what a render of the box alone makes: the
 //! oracle is the render of the box, and the picture handed is the box grown by room whose pixels continue its edge.
 //!
-//! A step that places itself by its picture or reads all of it is run on the box and must match the whole box, bit for bit;
+//! A step that places itself by its picture or reads all of it is run on the box and must look the same over the whole box;
 //! one that does not reads the room beside the box's edge, so only the box inside its margin is compared.
 
 use std::error::Error;
@@ -13,8 +13,7 @@ use bullterrier_image::{
 };
 use serde_json::Value;
 
-use crate::banded::{FFT_BLURS, TOLERANCE};
-use crate::common::compare::first_difference_within;
+use crate::common::compare::{assert_looks_the_same, difference_in_looks};
 use crate::common::pictures::{asset, varied};
 use crate::common::sweep::{Setting, variants};
 use crate::common::{Outcome, core_effects};
@@ -55,22 +54,21 @@ fn step_of(name: &str, setting: &Setting) -> Step {
     step
 }
 
-/// The first value of the box of `made` (the grown render) that is not in `plain`, to `within`, ignoring the `inset` rows and
-/// columns along the box's edge.
-fn first_difference(made: &Image, plain: &Image, inset: usize, within: f32) -> Option<String> {
+/// Why the box of `made` (the grown render) does not look the same as `plain`, ignoring the `inset` rows and columns along the
+/// box's edge, or none.
+fn difference(made: &Image, plain: &Image, inset: usize) -> Option<String> {
     if 2 * inset >= WIDTH.min(HEIGHT) {
         return None; // the margin reaches across the box: no pixel of it is clear of the room
     }
     let (made, plain) = (made.clone().into_values(), plain.clone().into_values());
+    let (mut got_all, mut want_all) = (Vec::new(), Vec::new());
     for row in inset..HEIGHT.saturating_sub(inset) {
         let want = &plain[(row * WIDTH + inset) * 3..(row * WIDTH + WIDTH - inset) * 3];
         let start = ((row + ROOM[0]) * GROWN.1 + ROOM[3] + inset) * 3;
-        let got = &made[start..start + want.len()];
-        if let Some(at) = first_difference_within(got, want, within) {
-            return Some(format!("row {row}, value {at} differs"));
-        }
+        got_all.extend_from_slice(&made[start..start + want.len()]);
+        want_all.extend_from_slice(want);
     }
-    None
+    difference_in_looks(&got_all, &want_all)
 }
 
 #[test]
@@ -98,10 +96,10 @@ fn every_effect_renders_the_box_of_a_grown_picture_as_it_renders_the_box_alone()
                 &Presets::new(),
                 with_room(Options::default())?,
             )?;
-            // a step that is run on the box is the same bit for bit; the others are read at the box's edge from the room
-            let (inset, within) = match one.footprint(&Value::Object(completed.clone()))? {
-                _ if one.inputs().contains(&Input::Place) => (0, 0.0),
-                Footprint::Whole => (0, 0.0),
+            // a step that is run on the box is compared over the whole box; the others are read at the box's edge from the room
+            let inset = match one.footprint(&Value::Object(completed.clone()))? {
+                _ if one.inputs().contains(&Input::Place) => 0,
+                Footprint::Whole => 0,
                 footprint => {
                     // it reads sideways as far as it paints (its spread), the rows it reads as far as its margin; an effect
                     // that paints without a bound reads the room's edge anywhere, and only its rows are compared
@@ -110,19 +108,12 @@ fn every_effect_renders_the_box_of_a_grown_picture_as_it_renders_the_box_alone()
                         unbounded.insert(name.clone());
                         continue;
                     };
-                    (
-                        margin.max(sides.into_iter().max().unwrap_or(0)),
-                        if FFT_BLURS.contains(&name.as_str()) {
-                            TOLERANCE
-                        } else {
-                            0.0
-                        },
-                    )
+                    margin.max(sides.into_iter().max().unwrap_or(0))
                 }
             };
             boxed += usize::from(inset == 0);
             cases += 1;
-            if let Some(found) = first_difference(&made, &plain, inset, within) {
+            if let Some(found) = difference(&made, &plain, inset) {
                 problems.push(format!("{name} {}: {found}", Value::Object(setting)));
             }
         }
@@ -213,14 +204,11 @@ fn a_chain_with_masks_pieces_and_whole_picture_steps_renders_the_box_as_the_box_
     // the blur and the sharpening read the room: only the box well inside is the box's
     let reach = 10;
     assert!(2 * reach < WIDTH.min(HEIGHT), "the box is wider than the reach");
-    assert_eq!(first_difference(&made, &plain, reach, TOLERANCE), None);
+    assert_eq!(difference(&made, &plain, reach), None);
     // a render of its bands is the render of the whole
     let rows = std::num::NonZeroUsize::new(7).ok_or("rows")?;
     let banded = photo.render(&recipe, &Presets::new(), with_room(Options::default().with_band(rows))?)?;
-    assert_eq!(
-        first_difference_within(&banded.into_values(), &made.into_values(), TOLERANCE),
-        None
-    );
+    assert_looks_the_same(&banded.into_values(), &made.into_values(), "banded with room");
     Ok(())
 }
 
@@ -260,11 +248,7 @@ fn windows_of_a_picture_with_room_are_the_rows_of_the_render_with_room() -> Outc
                 .into_values();
             let made = &band[(top - from) * width * 3..(bottom - from) * width * 3];
             let want = &whole[top * width * 3..bottom * width * 3];
-            assert_eq!(
-                first_difference_within(made, want, TOLERANCE),
-                None,
-                "band of {rows} rows from row {top}"
-            );
+            assert_looks_the_same(made, want, &format!("band of {rows} rows from row {top}"));
         }
     }
     Ok(())

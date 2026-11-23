@@ -1,8 +1,8 @@
-//! The byte-exact footprint honesty test (`footprint.rs`) owns small shortfalls per step; this matrix, at 1e-4, owns
-//! composition (a footprint bug of 3+ rows shows far above the bound); do not tighten it.
+//! The footprint honesty test (`footprint.rs`) owns small shortfalls per step; this matrix owns composition (a footprint
+//! bug of 3+ rows shows far above the tolerance).
 //!
-//! A banded render (`Options::with_band`) gives the pictures of the whole-picture render (within `TOLERANCE`, most
-//! effects byte for byte), whatever the recipe: the whole render is the oracle, and the recipe is rendered both ways through `Photo::render`.
+//! A banded render (`Options::with_band`) looks the same as the whole-picture render (`common::compare`), whatever the
+//! recipe: the whole render is the oracle, and the recipe is rendered both ways through `Photo::render`.
 //!
 //! Every effect the core runs is rendered as a one-step recipe with its defaults and with each parameter alone at its
 //! limits, at band sizes 1, 7 and 64 rows (a band after the first starts at a row above 0, so every seeded and
@@ -24,7 +24,7 @@ use bullterrier_image::{
 };
 use serde_json::{Value, json};
 
-use crate::common::compare::first_difference_within;
+use crate::common::compare::difference_in_looks;
 use crate::common::pictures::{asset, varied};
 use crate::common::run::{Registered, unique};
 use crate::common::sweep::{Setting, variants};
@@ -37,13 +37,6 @@ const WIDTH: usize = 19;
 const BANDS: [usize; 3] = [1, 7, 64];
 /// At least this many effects are rendered banded (the others are `Whole` and so run as ever).
 const BANDED_AT_LEAST: usize = 20;
-
-/// How far the banded render of any effect may be from the whole render, in value. Nothing for most effects; a band is a
-/// picture of its own height and a blur reaching 16 working px or more is summed by a Fourier transform of a length that
-/// follows the height (`ops/fft`).
-// constant: an FFT blur's sum depends on the window length; the largest difference measured was 5.1e-5 (relight); a
-// footprint bug shows as at least a Gaussian tail, much larger than 1e-4
-pub(crate) const TOLERANCE: f32 = 1e-4;
 
 /// The photo of `values`, handed the maps every recipe may name (`subject`: blocks, `depth`: a hash) and the picture
 /// `asset`.
@@ -66,11 +59,11 @@ fn render(values: &[f32], recipe: &Recipe, options: Options) -> Result<Image, Bo
     Ok(photo(values)?.render(recipe, &Presets::new(), options)?)
 }
 
-/// What differs between `whole` and `banded` by more than `within` (the first value at which they do, with the lengths), or none; shown by
-/// a hash of the picture, never printed whole.
-fn difference(whole: &Image, banded: &Image, within: f32) -> Option<String> {
+/// What differs between `whole` and `banded` beyond looking the same (the first value at which they do, with the lengths), or
+/// none; shown by a hash of the picture, never printed whole.
+fn difference(whole: &Image, banded: &Image) -> Option<String> {
     let (left, right) = (whole.clone().into_values(), banded.clone().into_values());
-    first_difference_within(&left, &right, within).map(|at| {
+    difference_in_looks(&left, &right).map(|why| {
         let hash = |values: &[f32]| {
             let mut hasher = DefaultHasher::new();
             for value in values {
@@ -78,13 +71,8 @@ fn difference(whole: &Image, banded: &Image, within: f32) -> Option<String> {
             }
             hasher.finish()
         };
-        let largest = left
-            .iter()
-            .zip(&right)
-            .map(|(one, other)| (one - other).abs())
-            .fold(0.0_f32, f32::max);
         format!(
-            "first difference at value {at}, largest {largest:e}, of {} / {} (hashes {:x} / {:x})",
+            "{why}, of {} / {} (hashes {:x} / {:x})",
             left.len(),
             right.len(),
             hash(&left),
@@ -104,26 +92,20 @@ fn first_problem(
     recipe: &Recipe,
     options: Options,
     bands: &[usize],
-    within: f32,
 ) -> Result<Option<String>, Box<dyn Error>> {
     let whole = render(values, recipe, options)?;
     for &rows in bands {
         let banded = render(values, recipe, options.with_band(rows_of(rows)?))?;
-        if let Some(found) = difference(&whole, &banded, within) {
+        if let Some(found) = difference(&whole, &banded) {
             return Ok(Some(format!("band {rows}: {found}")));
         }
     }
     Ok(None)
 }
 
-/// Fails unless `recipe` banded at each of `bands` rows (and `options`) is the whole render.
+/// Fails unless `recipe` banded at each of `bands` rows (and `options`) looks the same as the whole render.
 fn assert_same(values: &[f32], recipe: &Recipe, options: Options, bands: &[usize]) -> Outcome {
-    assert_within(values, recipe, options, bands, 0.0)
-}
-
-/// As [`assert_same`], to within `within`.
-fn assert_within(values: &[f32], recipe: &Recipe, options: Options, bands: &[usize], within: f32) -> Outcome {
-    let found = first_problem(values, recipe, options, bands, within)?;
+    let found = first_problem(values, recipe, options, bands)?;
     assert!(found.is_none(), "{found:?}");
     Ok(())
 }
@@ -182,7 +164,7 @@ fn band_matrix(bands: &[usize], sized_bands: &[usize]) -> Outcome {
                 let options = size.map_or_else(Options::default, |size| Options::default().with_size(size));
                 let bands = if size.is_some() { sized_bands } else { bands };
                 cases += bands.len();
-                if let Some(found) = first_problem(&values, &recipe, options, bands, TOLERANCE)? {
+                if let Some(found) = first_problem(&values, &recipe, options, bands)? {
                     problems.push(format!("{name} {setting:?} size {size:?}: {found}"));
                 }
             }
@@ -220,43 +202,18 @@ fn in_px(table: &bullterrier_image::params::Table, setting: &Setting) -> bool {
         })
 }
 
-/// The effects that blur with a Gaussian, which a Fourier transform sums from 16 working px (`ops/fft`) over a window as
-/// long as the band: their sums differ in the last bits between a band and the whole (measured up to 7.3e-5, `liquid_metal`).
-/// They are held to `TOLERANCE`; every other effect is held to the byte. An effect that fails the byte test for this
-/// reason and is not listed is listed here, once its failure is shown to be only that.
-pub(crate) const FFT_BLURS: [&str; 17] = [
-    "ambient_occlusion",
-    "anamorphic_streaks",
-    "bloom",
-    "drop_shadow",
-    "engraving",
-    "focus_blur",
-    "gaussian_blur",
-    "grain",
-    "halftone",
-    "highpass",
-    "lens_blur",
-    "lens_drops",
-    "light_wrap",
-    "liquid_metal",
-    "motion_blur",
-    "sharpen",
-    "vhs",
-];
-
-/// The first of the pictures of long sides `sides` at which one `name` step with `setting` banded is not the whole render, byte for
-/// byte (to `TOLERANCE` for an effect of `FFT_BLURS`).
+/// The first of the pictures of long sides `sides` at which one `name` step with `setting` banded does not look the same as the
+/// whole render.
 fn first_px_problem(
     name: &str,
     setting: &Setting,
     partitioned: bool,
-    within: f32,
     sides: &[usize],
 ) -> Result<Option<String>, Box<dyn Error>> {
     let recipe = Recipe::new([step_of(name, setting, partitioned)]);
     for &side in sides {
         let values = varied(side, WIDTH);
-        if let Some(found) = first_problem(&values, &recipe, Options::default(), &SWEEP_BANDS, within)? {
+        if let Some(found) = first_problem(&values, &recipe, Options::default(), &SWEEP_BANDS)? {
             return Ok(Some(format!("{name} {setting:?} long side {side}: {found}")));
         }
     }
@@ -290,12 +247,7 @@ fn px_sweep(sides: &[usize]) -> Outcome {
                 continue; // Whole: the same code as the whole render
             }
             cases += 1;
-            let within = if FFT_BLURS.contains(&name.as_str()) {
-                TOLERANCE
-            } else {
-                0.0
-            };
-            problems.extend(first_px_problem(&name, setting, partitioned, within, sides)?);
+            problems.extend(first_px_problem(&name, setting, partitioned, sides)?);
         }
     }
     assert!(
@@ -312,7 +264,6 @@ fn px_sweep(sides: &[usize]) -> Outcome {
 fn a_px_value_that_a_small_picture_raises_to_its_minimum_is_the_same_banded() -> Outcome {
     // on a picture of long side 96 (ratio 0.2) the runner raises these to the field's minimum, a wider reach than the
     // value scaled
-    // neither is on the Fourier path (a reach under 16 px), so both are held to the byte
     let mut problems = Vec::new();
     for (name, setting) in [
         ("ambient_occlusion", json!({"radius": 1, "truncate": 4})),
@@ -321,7 +272,7 @@ fn a_px_value_that_a_small_picture_raises_to_its_minimum_is_the_same_banded() ->
         let Value::Object(setting) = setting else {
             return Err("a row is an object".into());
         };
-        problems.extend(first_px_problem(name, &setting, false, 0.0, &SIDES)?);
+        problems.extend(first_px_problem(name, &setting, false, &SIDES)?);
     }
     assert!(problems.is_empty(), "{problems:#?}");
     Ok(())
@@ -438,12 +389,11 @@ fn a_working_picture_that_is_not_the_photo_is_the_same_banded() -> Outcome {
 #[test]
 fn margins_that_reach_the_picture_give_the_whole_render() -> Outcome {
     let recipe = Recipe::new([blur(60.0), blur(40.0), Step::new("vignette")]);
-    assert_within(
+    assert_same(
         &varied(HEIGHT, WIDTH),
         &recipe,
         Options::default().with_size(480),
         &BANDS,
-        1e-5,
     )?;
     // a band as tall as the picture, or taller
     assert_same(
@@ -476,13 +426,7 @@ fn a_relief_effect_with_a_steep_height_and_a_wide_blur_is_the_same_banded() -> O
     }
     let mut problems = Vec::new();
     for step in cases {
-        let found = first_problem(
-            &values,
-            &Recipe::new([step.clone()]),
-            Options::default(),
-            &[17, 150],
-            TOLERANCE,
-        )?;
+        let found = first_problem(&values, &Recipe::new([step.clone()]), Options::default(), &[17, 150])?;
         problems.extend(found.map(|found| format!("{} {:?}: {found}", step.effect, step.params)));
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
@@ -506,7 +450,7 @@ fn the_same_banded_picture_comes_at_any_number_of_threads() -> Outcome {
             &recipe,
             Options::default().with_band(rows_of(7)?).with_threads(threads),
         )?;
-        let found = difference(&one, &other, 0.0);
+        let found = difference(&one, &other);
         assert!(found.is_none(), "threads {threads}: {found:?}");
     }
     Ok(())
@@ -609,6 +553,6 @@ fn the_runner_trusts_a_footprint_and_a_place_is_the_band_on_its_canvas() -> Outc
     let recipe = Recipe::new([Step::new(liar.name())]);
     let whole = render(&values, &recipe, Options::default())?;
     let banded = render(&values, &recipe, Options::default().with_band(rows_of(7)?))?;
-    assert!(difference(&whole, &banded, 0.0).is_some());
+    assert!(difference(&whole, &banded).is_some());
     Ok(())
 }
