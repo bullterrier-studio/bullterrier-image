@@ -76,7 +76,7 @@ take `threads=`; `Step.apply` and `fx` use 1.
 **Canvas:** `Options::with_canvas(width, height)` names the full canvas the returned picture is placed on, in the pixels of that picture
 (after `size`). The design scale (`px` per design px: effect parameters, the `each` feather, a region's edge) is then the canvas's
 longest side over 480, not the picture's, so a `px` value is the same number of output pixels on every picture of one canvas.
-Nothing else follows the canvas yet: `Place` is still the picture. A side of 0 is refused (`Error::Recipe`, naming
+Nothing else follows the canvas: `Place` is the picture. A side of 0 is refused (`Error::Recipe`, naming
 `canvas`); a canvas smaller than the picture is fine (it only fixes the scale). Not in Python.
 **Window:** `Options::with_window(first_row, canvas_width, canvas_height)` says the picture handed to `render` is rows of a larger canvas
 from canvas row `first_row`: the runner builds every effect's `Place` from it (`run/size.rs` `Origin`; the steps of a band the runner cuts add their

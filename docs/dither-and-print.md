@@ -2,17 +2,12 @@
 
 This file records what shipped. Planned work is tracked outside this repository.
 
-Gaps found by comparing the catalogue with the dither and halftone
-tools in common use. Their "dozens of algorithms" are mostly variants (a kernel, a matrix size, a direction), so most rows
-below extend `dither` or `halftone`, by the rule of [effects-roadmap.md](effects-roadmap.md): a new look extends an existing
-effect when every one of its parameters still matters for every look.
-
 ## `dither`: methods
 
 Today: `floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`, `burkes`, `sierra`, `sierra_two_row`, `sierra_lite`,
 `stevenson_arce`, `ostromoukhov`, `dot_diffusion`, `riemersma`, `bayer2`, `bayer4`, `bayer` (8 x 8), `clustered`, `clustered45`,
 `blue_noise`, `white_noise`, `gameboy_camera`, `matrix` (a picture of thresholds), and `serpentine`. One `method` list; how much of
-the pattern shows is `pattern`. Done 2026-11-16, bar the later items below.
+the pattern shows is `pattern`. Done 2026-11-16.
 
 | Addition | What it is |
 |---|---|
@@ -31,8 +26,7 @@ the pattern shows is `pattern`. Done 2026-11-16, bar the later items below.
 | ~~`phase`~~ **Done** (2026-11-16, ordered and noise methods; diffusion ignores it) | A state that shifts the threshold or noise tile by a step. A caller rendering a series sets it per picture: the pattern holds still or moves. With `seed`, the same for diffusion's noise. Keeping a dither steady over a moving sequence needs the previous picture and is not image's. |
 | ~~Named palettes as data~~ **Done** (2026-11-17) | `crates/core/data/palettes.toml`: a table per palette, the build writes `dither`'s `Palette` choices from it (20 named: hardware, greys, colour schemes). The cubes stay in code (a formula). `bullterrier_image.named_palettes()` (Python) and `Palette::NAMED` with `colours()` and `description()` (Rust) list them; `palette` names a palette only in its doc's words, never in a list. |
 
-Tone maps (a curve before the dither) need no parameter: a `curves` or `levels` step before `dither` is one. The gap is
-presets (below).
+Tone maps (a curve before the dither) need no parameter: a `curves` or `levels` step before `dither` is one.
 
 ## `halftone`
 
@@ -82,7 +76,7 @@ Photocopy is a look, not an effect: `grade` contrast, `dither` threshold, `grain
 | ~~Palettes~~ **Done** (2026-11-17) | See `dither`: modes. |
 | ~~Tone curves~~ **Done** (2026-11-17) | `curves` presets: `low_contrast`, `contrast`, `strong_contrast`, `fade`, `matte`, `crush`, `lift_shadows`, `film`, `shoulder`. |
 
-## Data beside the picture (design change)
+## Data beside the picture
 
 Image gives a picture. These give the data a caller needs to print or trace what an effect made.
 
@@ -94,11 +88,3 @@ Image gives a picture. These give the data a caller needs to print or trace what
 | DPI on write | `write_with(path, image, &WriteOptions)` takes an optional resolution (`WriteOptions::with_dpi`): the PNG `pHYs` chunk, the JPEG density. Never in a recipe. Scene's PNG goes through this writer and passes its DPI on. |
 
 **Done (2026-11-17):** functions beside the recipe that ask its last step (`Photo::ink_planes`, `palette_map`, `characters`; Python `ink_planes`, `palette_map`, `characters`), and `write_with(path, image, &WriteOptions)` (`imageio.save(..., dpi=)`). Reasons and limits: design-decisions, "Data beside the picture".
-
-## Order
-
-1. ~~`dither` methods and matrices; `serpentine`.~~ **Done** (2026-11-16).
-2. ~~`halftone` dot shapes, screen geometry, RGB separation, print realism.~~ **Done** (2026-11-16).
-3. ~~`modulation`; attribute cells, pattern tiles, `phase`.~~ **Done** (2026-11-16, batch A); batch B (`stipple`, `crosshatch`, `engraving`) **Done** (2026-11-16).
-4. ~~Presets: gradient maps, palettes as data, tone curves.~~ **Done** (2026-11-17).
-5. ~~Data beside the picture.~~ **Done** (2026-11-17): `Photo::ink_planes`, `palette_map`, `characters` and `write_with`/`WriteOptions` (Python: `ink_planes`, `palette_map`, `characters`, `imageio.save(dpi=)`); see design-decisions.

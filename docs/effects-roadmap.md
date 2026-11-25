@@ -1,4 +1,4 @@
-# Effects roadmap
+# Effects catalogue
 
 This file records what shipped. Planned work is tracked outside this repository.
 
@@ -113,11 +113,6 @@ takes an explicit step count so it stays within the render budget.
 | `lenticular` ✓ | Lenticular-print look: thin interlaced strips that shift with the viewing angle. | `fx.lenticular(strip=6, shift=5)` |
 
 Dropped: `cellular_automata` (noisy specks, little value).
-
-## Text and symbols
-
-| Effect | What it does | Example |
-| --- | --- | --- |
 
 ## Distortion and geometry
 
@@ -263,14 +258,14 @@ Backgrounds made from nothing, for use behind a cut-out or under any effect.
 | Effect | What it does | Example |
 | --- | --- | --- |
 | `avatar` ✓ (a recipe, [avatar.toml](../examples/transparent/avatar.toml)) | Square crop on the subject, optional circle: framing and transparency settings. | `aspect = 1.0`, `anchor = "subject"`, `size = 512`, `transparent = "circle"` |
-| `upscale` ✓ (a setting) | Resampling to a `size` above the photo's own (an optional AI model is not built). | `size = 4096` |
+| `upscale` ✓ (a setting) | Resampling to a `size` above the photo's own. | `size = 4096` |
 | `palette_from_photo` ✓ | Extract dominant colours to feed other steps: a reference picture's colours in, the stops of a `gradient_map` or the colours of a `gradient` out. A function over a numpy array, largest share first. | `bullterrier_image.palette(rgb, colors=5, *, seed=0)` |
 | `sweep` ✓ (CLI) | Render one parameter across a range, side by side. | `bt-image sweep photo.jpg r.toml rgb_split.amount 0..20` |
 
 ## One moment of a process
 
 Effects that show one picture of something that unfolds. `progress` (0 to 1) is the moment shown; whoever animates it
-(the future `bullterrier-video` package) sets it for each frame, from a ramp, a beat or anything else. This library has
+(the `bullterrier-video` package) sets it for each frame, from a ramp, a beat or anything else. This library has
 no time of its own.
 
 | Effect | What it does | Example |

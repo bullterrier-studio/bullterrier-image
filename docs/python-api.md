@@ -141,7 +141,7 @@ Every number and every colour of a step (not a choice, list, palette, picture) h
 - A colour is set as text (`"#rrggbb"`, `"#f80"`) or `[r, g, b]` from 0 to 1: the spellings are the same colour. A colour
   for a number, a number for a colour or a bad colour is refused naming the address. `with_values` only sets: to unset a
   `nullable` colour (`bloom.color`), replace the step without it. A palette (a list of colours), and the colours of
-  regions and the frame, have no address yet.
+  regions and the frame, have no address.
 - All or nothing: every address and value is checked before any is set, and a rule between numbers set together (`low` at most
   `high`) holds for the set. The setter is the core's, `Recipe::with_values(&[(address, Setting)], presets)` in Rust, which
   Python calls.

@@ -1,7 +1,7 @@
 # Design decisions
 
 The decisions that shape bullterrier-image and still hold, each with its reason and what it costs or commits us to. Rules for
-contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the [effects roadmap](effects-roadmap.md).
+contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the [effects catalogue](effects-roadmap.md).
 
 ## Architecture
 
@@ -98,7 +98,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   vector's. A caption in image is an `svg` region (vector's outlines) plus `fill`, `outline` or `drop_shadow`; there is no
   `text` effect. Effects that draw glyphs as texture (`ascii`, `disperse`, later `braille`) stay, on image's
   own font. *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would
-  drift apart. *Consequence:* `text` and `type_on` leave the roadmap.
+  drift apart. *Consequence:* no `text` or `type_on` effect.
 - **One bundled monospaced font, no `font` parameter.** Glyph effects draw with JetBrains Mono Regular (SIL OFL 1.1),
   compiled into the core (`crates/core/data/fonts/`). `sheet` and the piece-number digits use the same file; the banner script
   (`docs/make_banner.py`, a dev-only Pillow script) reads it from there. There is no `font` parameter, `BT_IMAGE_FONTS`, system-font search or
@@ -612,7 +612,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   With a window, `with_canvas` still fixes the scale and the window the place (it first replaced the canvas): a caller banding
   a layer whose `px` follow another length than the canvas's long side (scene's looks in canvas pixels) needs both, and
   the one `ratio` keeps the rule in one place. Without `with_canvas` the window's canvas gives the scale, as before.
-  Python is not exposed yet: a `canvas=(width, height)` on `render` and `render_all` would follow `band` through `bridge` and
+  Python does not expose it (no Python caller has asked): a `canvas=(width, height)` on `render` and `render_all` would follow `band` through `bridge` and
   the extension.
 - **Footprints of the 57 whole-picture effects, by reason (audit for B1/B2).** Of the 57 files that name `Footprint::Whole`,
   56 say it for every parameter set; `edges` says it only for `canny` (sobel and dog already reach). A footprint is about
@@ -874,7 +874,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   recipe document); the subject finder in the browser (`ort` loads its library with `dlopen`: the cut-out is made elsewhere
   and handed in with `options.maps` of `render`); returning float pixels (4x the bytes, and the native export rounds to 8 bits anyway);
   threads (workers and `SharedArrayBuffer` need cross-origin isolation, and the budget below is met on one); a GPU path in
-  this package for now (the WebAssembly package on WebGPU is a later ticket of the GPU backend: see "GPU backend (BTIMG-0009)"). *Limits:* a render blocks the thread that calls it (a page
+  this package for now (the WebAssembly package on WebGPU is BTIMG-0011, see "GPU backend (BTIMG-0009)"). *Limits:* a render blocks the thread that calls it (a page
   uses a worker when it must not); the photo is converted to floats once, by `new Photo`, and every render resamples it to
   `size`, so a page keeps the photo near the preview size; the package is 8 MB uncompressed; a recipe naming a file on disk
   (an svg region, a `.cube` table, a picture by path) fails in the browser, as no file system is there (a picture and a table
@@ -912,7 +912,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   costs in a live frame budget, and NumPy itself borrows arrays the same way. *Check made (2026-10-29):* the library
   starts no threads, and the two arrays it caches and shares (the dither tile, the glyph atlas) are already read-only.
   The photo and maps a project run holds for a photo's recipes are used one recipe at a time; when batch rendering
-  moves to threads (`todo`: parallel batch processing), each worker must own its frame and share maps read-only.
+  moves to threads, each worker must own its frame and share maps read-only.
 - **A ported effect's parameters are declared once, in Rust.** Its `Params` struct is the declaration: each field has a
   type, a `///` doc comment and `#[param(default, unit, min, max, drivable, advanced, cyclic)]`, and a choice is a
   fieldless enum (`crates/derive`: `#[derive(Params)]`, `#[derive(Choice)]`). The derives write `Default` and a table;
@@ -1803,7 +1803,7 @@ measured first would break at a larger one.
   and the non-blocking alternative, polling with `PollType::Poll` and waking itself, spins a core for the length of the GPU
   work. On the web the wait is a no-op and the readback is awaited.
 - **`GpuImage`: the picture on the device is image's**, straight alpha, the levels `Image` holds, stored as one `vec4<f32>` a
-  pixel in a storage buffer (private, so half floats can come later). No texture and no hardware filtering: kernels read
+  pixel in a storage buffer (private). No texture and no hardware filtering: kernels read
   pixels with the CPU's maths. An upload sends 3 floats a pixel and a kernel spreads them into vec4 (a fifth fewer bytes,
   and an upload proves a dispatch); a readback copies the vec4s.
 - **Effects declare kernels, never devices.** An effect file may have `fn kernel() -> Kernel<Params>` and `<effect>.wgsl`
