@@ -224,6 +224,11 @@ On top of the rules in `docs/rules.md`:
 
 ## Gates: image's additions
 
+```bash
+uv run poe check                     # the gate, before you report or merge (then `uv run lint-imports`); skipped in seconds when only docs differ from main
+uv run poe check-all                 # the gate with no docs-only skip (the push hook runs this)
+```
+
 - `poe fast` also runs the Rust tests (it is not an extension point of the template). `poe full` adds, through `project-full`:
   `check-scaffold` (`poe new-effect` end to end, the `rebuild` marker), `audit` (needs the network) and `check-min-deps`.
 - **Full-tier Rust tests:** a matrix over sizes or bands has one row in `check` and every row in a test marked `#[ignore = "full: <why>"]`, run by `poe rust-test-full` (in `project-full` and a CI job). Only that reason may ignore a test (`tests/tools/test_rust_full_tier.py`).
