@@ -299,8 +299,7 @@ A look is added to `examples/recipes/` by the batch that builds its last missing
 
 ## Built for scene and the future directions (2026-11-14)
 
-Asked by `bullterrier-scene` while building real pieces and by the planned directions (animated posters, websites, a
-drag-and-drop editor).
+Asked by `bullterrier-scene` while building real pieces.
 
 - **Done: a sideways reach and a recipe-level query.** Not a sideways `Footprint` but a separate `Effect::spread` (how far an effect paints
   beyond its content's box, per side in working px, or `Unbounded`) and `Recipe::spread(presets, longest_side)`, the steps' sum for scene's room

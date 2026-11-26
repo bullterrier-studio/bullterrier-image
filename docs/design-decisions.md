@@ -93,10 +93,10 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   onto parameters and renders frames, `audio` supplies the beats. Animation done here would exist twice, and a parameter
   measured in seconds would tie an effect to one clip and one clock. *Consequence:* a parameter that moved with time
   becomes a state parameter in `cycles` or `fraction` (disperse's shimmer is `ambient_phase`); the removed code is in git
-  history (before the "remove animation" commits) for when video is built.
+  history (before the "remove animation" commits).
 - **Typesetting belongs to bullterrier-vector; image keeps glyphs as texture.** Shaping, layout and text as outlines are
   vector's. A caption in image is an `svg` region (vector's outlines) plus `fill`, `outline` or `drop_shadow`; there is no
-  `text` effect. Effects that draw glyphs as texture (`ascii`, `disperse`, later `braille`) stay, on image's
+  `text` effect. Effects that draw glyphs as texture (`ascii`, `disperse`) stay, on image's
   own font. *Reason:* a text engine (shaping, bidi, wrapping, font fallback) is a package's worth of work, and two would
   drift apart. *Consequence:* no `text` or `type_on` effect.
 - **One bundled monospaced font, no `font` parameter.** Glyph effects draw with JetBrains Mono Regular (SIL OFL 1.1),
@@ -105,7 +105,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   Pillow fallback. *Reason:* a font found on the system made the output depend on the host, a missing path failed at
   render time, and the file escaped the cache fingerprint; one cited asset gives the same look on every host with the
   same library versions. It covers the Latin ramps and the block elements `█▓▒░▀▄`, which a system monospaced font often
-  lacks; braille is not covered (a later `braille` effect draws its own dots or picks its font then: YAGNI). Pillow's
+  lacks; braille is not covered (YAGNI: an effect that needs it draws its own dots or picks its font then). Pillow's
   basic layout engine is pinned: its optional Raqm engine keeps fractional advances where the basic one rounds, which
   moves a glyph a pixel. *Consequence:* the licence is `MIT AND OFL-1.1` with the OFL text at the repository root
   (`LICENSE-FONT`); a `Font` value type arrives only on request.
@@ -267,7 +267,6 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   should not need a recipe. *Consequence:* the default subject and depth finders live above the core (they know
   `finding`), so `Step.apply` imports `bullterrier_image.recipe` when it is called, a deliberate upward import that
   import-linter cannot see; done at call time it also works in a fresh process (an unpickled step in a pool worker).
-  Later: the structural fix is core-owned default finders, found through entry points, so the core needs no import.
 - **A recipe's name is free text; whoever writes files makes it safe.** `Recipe(steps, name=None, description=None)`; a
   file without `name` takes its file stem as it is. The command line and the pipeline name files `safe_name(name)` (runs
   of characters other than letters, digits, `.`, `_`, `-` become one `-`, no leading dot or dash, at most 64, never a
@@ -465,15 +464,8 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
 - **This is a Rust project with a Python interface, as polars is; Python stays only where Rust has no equivalent.** The
   product is the crate and, later, a backend service for creators, so nothing in the hot or service path is Python. Python is
   the binding, numpy interop, Pydantic builders for the Python interface (Rust validates on its own: enums, and `Table::check`
-  from the `#[param]` declarations) and the hook for Python effects (`register`). *Roadmap, in order:* (1) effects E1 to E6
-  into `crates/core/src/effects/`, each batch with the primitives it shares and the parameter kinds its effects need added to
-  the derive; (2) everything that is not an effect, in Rust: fonts for `ascii` and the contact sheet (a pure-Rust glyph
-  rasteriser; spike against Pillow's atlas first), the subject and depth finders (ONNX through `ort`, Apple Vision through the
-  `objc2` crates; spike the depth model first), `bt-image` as a Rust binary shipped in the wheel (as ruff and uv are), the
-  pipeline, manifest, contact sheet and gallery, recipe files and `.cube` tables, the presets and looks embedded in the crate,
-  and a version for the derive crate; (3) E7: delete the Python `ops`, scipy, Pillow where nothing needs it and the
-  transitional duplicates, re-render the gallery, measure. *Decided:* `ort` for ONNX (speed and model coverage; the cost is
-  bundling the ONNX Runtime library in the wheel and the service). *Not yet:* publishing the crate, until the effects are in.
+  from the `#[param]` declarations) and the hook for Python effects (`register`). *Built in this order:* the effects (E1 to E6), then everything that is not an effect, in Rust, then E7, which deleted the Python `ops`, scipy and the transitional duplicates. *Decided:* `ort` for ONNX (speed and model coverage; the cost is
+  bundling the ONNX Runtime library in the wheel and the service).
 
 ## Finding the subject and depth
 
@@ -1464,8 +1456,7 @@ is a smooth shading, where an error of one 16-bit unit is invisible. Every other
   by one field and one `levels`; the field is a `by` reference like `mask`, so the recipe checks it exists and is a
   selection, and the maps it is made from are found like any other; a recipe file writes `{ by, start, end }`, needs
   `format = 3`, and Python writes `Drive(by=..., start=..., end=...)` with the same keys (no `by()` helper: a second way
-  to write the same thing). Left for later: a parameter an effect receives as a per-pixel map (exact and one render, for
-  the effects where it matters, once the video benchmark says where), and driving a colour.
+  to write the same thing). A parameter an effect receives as a per-pixel map, and driving a colour, are not built.
 - **Region kinds are a closed set in one module, with presets as data.** Not plugins: nobody else writes kinds, and a
   shared plugin registry would be speculative. Python writes regions with the kinds' own Pydantic models. *Revisit
   when* another package wants to add kinds.
@@ -2022,5 +2013,5 @@ considered at 1.4 to 1.6 times the time) for a difference nobody can see, and a 
 *Consequence:* the numbers live beside one compare helper per language (`crates/core/tests/it/common/compare.rs`,
 `tests/conftest.py`, `tests/wasm/looks_the_same.mjs`), each tested on its own. *Kept:* an effect does what its parameters say; the
 same seed gives the same look; goldens against stored files; a step that must not change a pixel changes none; the CPU is the
-reference a GPU path is compared to within its own bound. *Left for later:* the API names `exact_margin` and
+reference a GPU path is compared to within its own bound. *Kept:* the API names `exact_margin` and
 `Recipe::band_margin` against `close_band_margin` still carry the old split; collapsing them is a banding change.

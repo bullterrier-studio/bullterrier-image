@@ -22,7 +22,7 @@ the pattern shows is `pattern`. Done 2026-11-16.
 | Addition | What it is |
 |---|---|
 | ~~Attribute cells~~ **Done** (2026-11-16) | The palette search limited per block: each n x n block (8 by default) gets two colours of the palette, ink and paper, and dithers between them (ZX Spectrum colour clash; MSX rows of 8 x 1, C64 hires as presets). |
-| ~~Pattern tiles~~ **Done** (2026-11-16, `method="tiles"` with a caller's strip; the bundled sets wait for presets that can name a picture) | Tone picks one tile from an ordered set (classic 2 x 2, weave, brick, grid, fishnet, spiral), the set a preset or a caller's picture strip. |
+| ~~Pattern tiles~~ **Done** (2026-11-16, `method="tiles"` with a caller's strip) | Tone picks one tile from an ordered set (classic 2 x 2, weave, brick, grid, fishnet, spiral), the set a caller's picture strip. |
 | ~~`phase`~~ **Done** (2026-11-16, ordered and noise methods; diffusion ignores it) | A state that shifts the threshold or noise tile by a step. A caller rendering a series sets it per picture: the pattern holds still or moves. With `seed`, the same for diffusion's noise. Keeping a dither steady over a moving sequence needs the previous picture and is not image's. |
 | ~~Named palettes as data~~ **Done** (2026-11-17) | `crates/core/data/palettes.toml`: a table per palette, the build writes `dither`'s `Palette` choices from it (20 named: hardware, greys, colour schemes). The cubes stay in code (a formula). `bullterrier_image.named_palettes()` (Python) and `Palette::NAMED` with `colours()` and `description()` (Rust) list them; `palette` names a palette only in its doc's words, never in a list. |
 
