@@ -858,7 +858,7 @@ contributors are in [CLAUDE.md](../CLAUDE.md); the effects that exist are in the
   its f32 sums its own way; with the scalar planner on both targets the five matched too. *Rejected:* the scalar planner
   for every target: it removes a difference nobody sees, at 1.4 to 1.6 times the native time of those five (release build, 1200 px, Apple M4:
   bloom 162 to 265 ms, engraving 20 to 27, focus_blur 170 to 265, lens_blur 61 to 85, starburst 155 to 233), against a 5% limit.
-  `poe wasm-test` (in `check`) renders the shipped look `crt`, five recipes of its own and every `examples/effects` recipe in
+  `poe wasm-test` (in `full` and CI's `wasm` job) renders the shipped look `crt`, five recipes of its own and every `examples/effects` recipe in
   Node (with a `subject` and a `depth` map handed in) and compares the pixels with what the Python package writes for
   them (`tests/wasm/looks_the_same.mjs`); the three examples that read a file
   (`blend`, `color_transfer`, `lut`) must fail as named. Errors are `Error`s named as Python's exceptions (`RecipeError`, `UnknownEffectError`,

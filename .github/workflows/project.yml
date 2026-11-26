@@ -99,7 +99,7 @@ jobs:
         run: uv run --locked python tools/notices.py
 
   # The WebAssembly package (crates/wasm) built and run in Node against what the Python package renders (`poe wasm-test`, which
-  # `poe check` ends with too). Once, on Linux: the wasm-bindgen command is one of the cargo tools Cargo.toml pins.
+  # `poe full` runs too; `poe check` leaves it here). Once, on Linux: the wasm-bindgen command is one of the cargo tools Cargo.toml pins.
   wasm:
     name: The WebAssembly package renders as the native build does
     runs-on: ubuntu-latest

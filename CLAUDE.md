@@ -62,7 +62,7 @@ _native    home of the Rust extension `_native._core`, beside errors          (i
 - Rust effects never refer to each other.
 - The ratio of design px (480 on the longest side) is derived from that working picture, never passed in.
 - Every user number that drives allocation or work has a maximum and a row in `crates/core/tests/it/limits.rs`; its completeness test fails for a bound of `Region::check` with neither a row nor a reason.
-- Python is a facade over the core and runs no recipe itself. The WebAssembly package (`crates/wasm`) is another, as thin: it names no effect, and its renders look the same as the native ones at the same size (`poe wasm-test`, in `check`, runs every example recipe and compares them through `tests/wasm/looks_the_same.mjs`; needs `node`).
+- Python is a facade over the core and runs no recipe itself. The WebAssembly package (`crates/wasm`) is another, as thin: it names no effect, and its renders look the same as the native ones at the same size (`poe wasm-test`, in `full` and CI, runs every example recipe and compares them through `tests/wasm/looks_the_same.mjs`; needs `node`).
 - The render stays on the calling thread, only row bands run on the pool, and rayon's global pool is never used.
 - Outside a pool a kernel runs inline, and `Effect::apply` takes no thread parameter.
 - Rule: the output looks the same at any thread count.
@@ -227,13 +227,15 @@ On top of the rules in `docs/rules.md`:
 ```bash
 uv run poe check                     # the gate, before you report or merge (then `uv run lint-imports`); skipped in seconds when only docs differ from main
 uv run poe check-all                 # the gate with no docs-only skip (the push hook runs this)
+uv run poe gate-tests                # the gate proofs and the tools' own tests: after changing a gate or a tool (CI runs them)
 ```
 
 - `poe fast` also runs the Rust tests (it is not an extension point of the template). `poe full` adds, through `project-full`:
-  `check-scaffold` (`poe new-effect` end to end, the `rebuild` marker), `audit` (needs the network) and `check-min-deps`.
+  `wasm-test` (the WebAssembly package in Node, about 25 s warm), `check-scaffold` (`poe new-effect` end to end, the `rebuild`
+  marker), `audit` (needs the network) and `check-min-deps`.
 - **Full-tier Rust tests:** a matrix over sizes or bands has one row in `check` and every row in a test marked `#[ignore = "full: <why>"]`, run by `poe rust-test-full` (in `project-full` and a CI job). Only that reason may ignore a test (`tests/tools/test_rust_full_tier.py`).
 - A gate needs a known-bad row for every kind of source it must see (an effect file pulled in by `include!` is one); image's rows
-  are in `tests/tools/test_rust_gates.py`, and the files its own proofs copy or match are `[tool.gate-proofs] project-triggers`.
+  are in `tests/tools/test_rust_gates.py`.
 - Test and build profile: `[profile.test] opt-level = 1`, `[profile.dev] debug = "line-tables-only"`, `split-debuginfo = "off"`
   (macOS otherwise keeps every object file).
 - The tests include the import contracts, the effect contract at odd sizes and across every number's range, and the

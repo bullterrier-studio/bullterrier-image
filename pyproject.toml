@@ -114,8 +114,9 @@ dev = [
 # encoding (EncodingWarning), which `filterwarnings` below turns into a failure; an -X flag would not reach the workers
 # Three tiers (docs/rules.md, "Three tiers"): `fast` while working, `check` before a push to main, `full` before a tag and in CI. The tests that
 # prove a gate fails on a known-bad input copy the workspace and build in it (marked `gate`), and the shared tools' own tests are the
-# same in every project (marked `tooling`): `test` is the project's own suite, and `gate-tests` runs both when the tooling changed.
-test = { cmd = "python tools/run_capped.py -- pytest -q -n auto -m 'not rebuild and not gate and not tooling'", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the test suite on every CPU core (pytest-xdist; the order stays random)" }
+# same in every project (marked `tooling`): `test` is the project's own suite, and `gate-tests` runs both (in `full` and CI, not `check`).
+test = { cmd = "python tools/run_capped.py -- pytest -q -n auto -m 'not rebuild and not gate and not tooling'", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the project's test suite on every CPU core (pytest-xdist; the order stays random), without the tests of the tooling" }
+gate-tests = { cmd = "python tools/run_capped.py -- pytest -q -n auto -m 'gate or tooling'", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the tests of the tooling: the proofs that each gate fails on a known-bad input, and the shared tools' own tests" }
 # Not part of `check`: the suite on the oldest Python and the lowest release each direct dependency's floor allows, in a
 # throwaway environment (uv.lock and the project environment stay as they are; the first run downloads the old
 # releases). It is for CI. Tests marked `typecheck` are left out because mypy's verdict on our source depends on the
@@ -168,7 +169,7 @@ api-doc = { cmd = "python tools/check_api_doc.py", help = "Check the API referen
 # The WebAssembly package (crates/wasm): a release build (simd128 for this build step only, never a config file or a native
 # build: the pixel loops are written to vectorise), the glue (`wasm-bindgen`, pinned in Cargo.toml) into the ignored pkg/,
 # then Node runs tests/wasm against what the Python package renders (tests/wasm/oracle.py): the same size, pixels that look the same.
-# About 25 s after a change to the core, so it runs in `check`; it needs `node` (22 or later) on the PATH.
+# About 25 s after a change to the core, so it runs in `full` and CI (project.yml), not `check`; it needs `node` (22 or later) on the PATH.
 wasm-test = { sequence = [
     { cmd = "cargo build -p bullterrier-image-wasm --target wasm32-unknown-unknown --release --locked --quiet", env = { RUSTFLAGS = "-C target-feature=+simd128" } },
     "wasm-bindgen --target nodejs --out-dir pkg ${CARGO_TARGET_DIR:-target}/wasm32-unknown-unknown/release/bullterrier_image_wasm.wasm",
@@ -177,25 +178,18 @@ wasm-test = { sequence = [
 ], default_item_type = "cmd", help = "Build the WebAssembly package (simd128), run it in Node and compare it with the Python package's render" }
 # `cargo publish --dry-run` of the two published crates, packaged and built from their tarballs (needs the network for the index)
 publish-check = { cmd = "cargo publish --dry-run -p bullterrier-image-derive -p bullterrier-image --allow-dirty", help = "Package the two published crates, build them from their tarballs and stop before uploading (needs the network)" }
-project-gates = { sequence = ["uv run python tools/disk.py", "uv run python tools/dev.py check-generated", "uv run python tools/notices.py", { ref = "wasm-test" }], default_item_type = "cmd", help = "The project's own gates, run last by check and full: fx.pyi and docs/effects/ are what regenerate writes, THIRD-PARTY-NOTICES.md is what cargo-about writes; first, the incremental build output goes when the disk has under 15 GB free" }
-project-full = { sequence = [{ ref = "rust-test-full" }, { ref = "rust-test-release" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "publish-check" }, { ref = "check-min-deps" }], default_item_type = "cmd", help = "The project's own steps that only full runs: the whole Rust matrices, the release-only timing guard, the scaffold test, the audit and the publish dry run (both need the network) and the suite on the lowest dependencies" }
+project-gates = { sequence = ["uv run python tools/disk.py", "uv run python tools/dev.py check-generated", "uv run python tools/notices.py"], default_item_type = "cmd", help = "The project's own gates, run last by check and full: fx.pyi and docs/effects/ are what regenerate writes, THIRD-PARTY-NOTICES.md is what cargo-about writes; first, the incremental build output goes when the disk has under 15 GB free" }
+project-full = { sequence = [{ ref = "rust-test-full" }, { ref = "rust-test-release" }, { ref = "wasm-test" }, { ref = "check-scaffold" }, { ref = "audit" }, { ref = "publish-check" }, { ref = "check-min-deps" }], default_item_type = "cmd", help = "The project's own steps that only full runs: the whole Rust matrices, the release-only timing guard, the WebAssembly package in Node, the scaffold test, the audit and the publish dry run (both need the network) and the suite on the lowest dependencies" }
 # The steps `check` and `full` share, cheapest first, stopping at the first failure
-gates = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "api-doc" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "rust-test-gpu" }, { ref = "test" }, { ref = "project-gates" }], default_item_type = "cmd", help = "Every gate except the proofs that each gate can fail (format, lint, workflows, dead code, docs, dependencies, types, tests, the project's own)" }
-fast = { sequence = [{ ref = "rust-fmt" }, "ruff format --check .", { ref = "rust-lint" }, "ruff check .", "mypy", { ref = "rust-test" }], default_item_type = "cmd", help = "The inner loop: format, lint, types and the Rust tests; the Python suite, dead code, dependencies, the build checks and the gate proofs are left to check and full" }
-# A pass on a clean tree is remembered with its tier, so pushing exactly that tree does not repeat it; `check` runs the proofs only when the
-# change since they last passed touches what they test ([tool.gate-proofs] below), `full` always
-proofs = { cmd = "python tools/pre_push.py proofs", help = "Run the gate proofs if the change touches what they test (or they never passed here)" }
+gates = { sequence = ["ruff format --check .", { ref = "rust-fmt" }, "ruff check .", { ref = "rust-lint" }, { ref = "lint-workflows" }, { ref = "dead-code" }, { ref = "api-doc" }, { ref = "rust-doc" }, "deptry .", { ref = "rust-tools" }, { ref = "rust-test-layout" }, { ref = "rust-shear" }, { ref = "rust-deny" }, "mypy", { ref = "stubtest" }, { ref = "rust-test" }, { ref = "rust-test-gpu" }, { ref = "test" }, { ref = "project-gates" }], default_item_type = "cmd", help = "Every gate except the proofs that each gate can fail (format, lint, workflows, dead code, the API reference, docs, dependencies, types, tests, the project's own)" }
+fast = { sequence = [{ ref = "rust-fmt" }, "ruff format --check .", { ref = "rust-lint" }, "ruff check .", "mypy", { ref = "rust-test" }], default_item_type = "cmd", help = "The inner loop: format, lint, types and the Rust tests; the Python suite, dead code, dependencies and the build checks are left to check and full, the tests of the tooling to full and CI" }
+# A pass on a clean tree is remembered with its tier, so pushing exactly that tree does not repeat it. The tests of the tooling
+# (`gate-tests`) are not in `check`: they test the gates, not the change, and were most of its time; `full` and CI run them
 # `check` skips the gate when only documentation (top-level and docs/*.md pages, docs/images pictures) differs from main, running only
 # `api-doc`; else it runs `check-all`. The push hook runs `check-all` itself
 check = { cmd = "python tools/pre_push.py check", help = "The gate before you report or push: `check-all`, or only `api-doc` when nothing but documentation differs from main" }
-check-all = { sequence = ["python tools/pre_push.py start", { ref = "gates" }, { ref = "proofs" }, "python tools/pre_push.py pass check"], default_item_type = "cmd", help = "The gate before a push to main: every gate, and the proofs when the change touches what they test; a pass is remembered for that tree" }
+check-all = { sequence = ["python tools/pre_push.py start", { ref = "gates" }, "python tools/pre_push.py pass check"], default_item_type = "cmd", help = "The gate before a push to main: every gate, without the tests of the tooling (`full` and CI run those); a pass is remembered for that tree" }
 full = { sequence = ["python tools/pre_push.py start", { ref = "gates" }, { ref = "build-check" }, { ref = "gate-tests" }, { ref = "project-full" }, "python tools/pre_push.py pass full"], default_item_type = "cmd", help = "The gate before a tag and in CI: `check`, the build of the sdist and the wheel, the proofs always, and the project's own full-only steps; a pass is remembered for that tree" }
-# Everything a release needs: check, the build of the sdist and the wheel, the proofs always run, then the scaffold test, the audit (needs the network) and
-# the suite on the lowest dependencies. A tag push and `poe release` need it.
-# The proofs that each gate fails on a known-bad change (marker `gate`: tests that copy the project and write one fault
-# into it). Minutes, so `check` runs them only when the change touches [tool.gate-proofs]; `poe full` and CI always do.
-# `--dist=loadfile`: a module's fixture (a copy of the workspace, a build folder) is built once, on one worker.
-gate-tests = { cmd = "python tools/run_capped.py -- pytest -q -n auto --dist=loadfile -m 'gate or tooling'", env = { PYTHONWARNDEFAULTENCODING = "1" }, help = "Run the tests of the tooling: the gate proofs (each gate rejects a known-bad change) and the shared tools' own tests" }
 # Not part of `check` (about 30 s, and a project environment of its own): `poe new-effect` end to end in a copy of the
 # tree, through `uv sync` and the new effect's own and contract tests (the `rebuild` test of tests/test_scaffold.py).
 # CI runs it on Linux.
@@ -236,38 +230,6 @@ tests = 1500
 [tool.run-capped]
 cap-mb = 14000
 
-# Read by tools/pre_push.py (`poe proofs`, the last step of `poe check`): the gate proofs (tests marked `gate`) run in
-# `check` only when the change since they last passed touches one of these globs (`*` also crosses `/`), relative to the repository root, or when
-# the base to compare with cannot be read. List every file a proof copies or whose text it anchors on, never one it only appends to; a proof that edits a file
-# nothing here names would go unrun when that file changes (tests/tools/test_pre_push.py checks the offence rows of
-# test_rust_gates.py). `poe full` runs them always.
-[tool.gate-proofs]
-triggers = [
-    "pyproject.toml",
-    ".pre-commit-config.yaml",
-    "rustfmt.toml",
-    "deny.toml",
-    "rust-toolchain.toml",
-    "Cargo.toml",
-    "Cargo.lock",
-    "crates/*/Cargo.toml",
-    "tools/*",
-    "tests/tools/*",
-    ".github/*",
-]
-# The project's own: files its own proofs copy or match (the template never changes this line)
-project-triggers = [
-    "crates/core/src/effects/grade.rs",
-    "crates/core/tests/parameters_are_read.rs",
-    "tests/conftest.py",
-    "tests/test_scaffold.py",
-    "tests/test_layering.py",
-    "tests/effects/test_no_hidden_tunables.py",
-    "tests/effects/test_contract.py",
-    "src/bullterrier_image/effects/_template/*",
-    "src/bullterrier_image/gallery.py",
-]
-
 # Commands the project's tasks run besides its dev dependencies and cargo's tools: Node runs the WebAssembly tests (`poe wasm-test`)
 [tool.project-wiring]
 system-commands = ["node"]
@@ -289,8 +251,8 @@ testpaths = ["tests"]
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config", "--dist=loadfile"]
 markers = [
     "rebuild: builds a project environment of its own around a rebuilt extension (about 30 s); `poe test` leaves it out, `poe check-scaffold` runs it",
-    "gate: proves a gate fails on a known-bad input in a copy of the workspace; slow, so `poe test` and `poe check` leave it out unless the change touches [tool.gate-proofs]; `poe gate-tests` and `poe full` run it",
-    "control: a gate proof's known-good side (the gate passes on the unchanged copy); `check` leaves it to `full`, which runs every proof",
+    "gate: proves a gate fails on a known-bad input in a copy of the workspace; slow, so `poe test` and `poe check` leave it out; `poe gate-tests`, `poe full` and CI run it",
+    "control: a gate proof's known-good side (the gate passes on the unchanged copy); it runs with the proofs (`poe gate-tests`)",
     "tooling: tests a shared tool of the template (the same file in every project, tested in the template too); `poe test` leaves it out, `poe gate-tests` runs it with the proofs",
     "typecheck: type-checks the package with mypy; `poe check-min-deps` leaves it out",
 ]
