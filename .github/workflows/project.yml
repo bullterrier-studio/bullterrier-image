@@ -69,8 +69,8 @@ jobs:
       - name: Scaffold an effect, rebuild, run its tests (poe check-scaffold)
         run: uv run --locked poe check-scaffold
 
-  # The project's own gates `poe check` ends with: what `regenerate` writes (fx.pyi, docs/effects/) and what cargo-about writes
-  # (THIRD-PARTY-NOTICES.md) are fresh. Once, on Linux.
+  # What `regenerate` writes (fx.pyi, docs/effects/; `poe check` ends with it) and what cargo-about writes (THIRD-PARTY-NOTICES.md;
+  # `poe full` only) are fresh. Once, on Linux.
   generated:
     name: The generated files are fresh
     runs-on: ubuntu-latest

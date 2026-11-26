@@ -231,7 +231,7 @@ uv run poe gate-tests                # the gate proofs and the tools' own tests:
 ```
 
 - `poe fast` also runs the Rust tests (it is not an extension point of the template). `poe full` adds, through `project-full`:
-  `wasm-test` (the WebAssembly package in Node, about 25 s warm), `check-scaffold` (`poe new-effect` end to end, the `rebuild`
+  `wasm-test` (the WebAssembly package in Node, about 25 s after a core change), `tools/notices.py` (cargo-about, about 10 s), `check-scaffold` (`poe new-effect` end to end, the `rebuild`
   marker), `audit` (needs the network) and `check-min-deps`.
 - **Full-tier Rust tests:** a matrix over sizes or bands has one row in `check` and every row in a test marked `#[ignore = "full: <why>"]`, run by `poe rust-test-full` (in `project-full` and a CI job). Only that reason may ignore a test (`tests/tools/test_rust_full_tier.py`).
 - A gate needs a known-bad row for every kind of source it must see (an effect file pulled in by `include!` is one); image's rows
